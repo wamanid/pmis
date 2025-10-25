@@ -45,8 +45,8 @@ import { Skeleton } from "./components/ui/skeleton";
 import ugandaPrisonsLogo from "figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png";
 import {
   fetchMenus,
-  MenuItem as ApiMenuItem,
-} from "./services/mockApi";
+  ApiMenuItem,
+} from "./services/menuService";
 
 type MenuItem = {
   id: string;
@@ -357,7 +357,7 @@ export default function App() {
 
   const handleLogin = () => {
     setIsAuthenticated(true);
-    setActivePage("station-management-lockup"); // Default to Station Dashboard
+    setActivePage("station-management-lockup"); // Default to Lockup page
   };
 
   const handleLogout = () => {

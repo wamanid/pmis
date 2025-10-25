@@ -205,7 +205,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
                   disabled={loading}
                   onClick={handleCredentialsSubmit}
                 >
-                  {loading ? 'Sending OTP...' : 'Continue'}
+                  {loading ? 'Logging in...' : 'Continue'}
                 </Button>
 
                 <div className="text-center text-sm text-muted-foreground">
