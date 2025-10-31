@@ -17,6 +17,8 @@ import {
   DollarSign,
   Upload,
   X,
+  Fingerprint,
+  Loader2,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -30,12 +32,29 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "../ui/card";
 import { Separator } from "../ui/separator";
 import { Badge } from "../ui/badge";
 import { Alert, AlertDescription } from "../ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../ui/table";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "../ui/tabs";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "../ui/table";
 import { toast } from "sonner@2.0.3";
 
 interface PrisonerBioData {
@@ -193,13 +212,28 @@ interface ChildRecord {
   district_of_birth?: string;
 }
 
+interface ArmedPersonnel {
+  id?: string;
+  prisoner?: string;
+  prisoner_name?: string;
+  armed_forces_status?: string;
+  armed_forces_status_name?: string;
+  armed_force?: string;
+  armed_force_name?: string;
+  unit?: string;
+  division?: string;
+  station?: string;
+  government_forces?: boolean;
+  remarks?: string;
+}
+
 // Mock data for dropdowns
 const admissionTypes = [
   { id: "NEW", name: "New Prisoner" },
   { id: "REOFFENDER", name: "Reoffender" },
   { id: "RECAPTURED", name: "Recaptured Prisoner" },
   { id: "TRANSFER", name: "Transfer" },
-  { id: "LODGER", name: "Lodger" },
+  { id: "PMO", name: "Pending MInister's Order" },
 ];
 
 const prisonerCategories = [
@@ -270,6 +304,28 @@ const mockIdTypes = [
   { id: "id-4", name: "Other" },
 ];
 
+const mockArmedForces = [
+  { id: "af-1", name: "Uganda People's Defence Force (UPDF)" },
+  { id: "af-2", name: "Uganda Police Force (UPF)" },
+  { id: "af-3", name: "Uganda Prisons Service" },
+  { id: "af-4", name: "Uganda Wildlife Authority (UWA)" },
+  { id: "af-5", name: "Other Armed Force" },
+];
+
+const mockArmedForceStatuses = [
+  { id: "afs-1", name: "Active Service" },
+  { id: "afs-2", name: "Retired" },
+  { id: "afs-3", name: "Dismissed" },
+  { id: "afs-4", name: "Deserted" },
+  { id: "afs-5", name: "Reserve" },
+];
+
+const mockStatusOfWomen = [
+  { id: "sow-1", name: "Pregnant" },
+  { id: "sow-2", name: "With Child" },
+  { id: "sow-3", name: "Pregnant + With Child" },
+];
+
 // Mock existing prisoners for search
 const mockExistingPrisoners: PrisonerBioData[] = [
   {
@@ -281,6 +337,7 @@ const mockExistingPrisoners: PrisonerBioData[] = [
     surname: "Doe",
     date_of_birth: "1990-05-15",
     id_number: "CM90123456789",
+    finger_print: "FP-001-RIGHT-THUMB-A1B2C3D4E5",
     sex: "sex-1",
     sex_name: "Male",
     nationality: "nationality-1",
@@ -304,6 +361,7 @@ const mockExistingPrisoners: PrisonerBioData[] = [
     surname: "Smith",
     date_of_birth: "1985-08-20",
     id_number: "CM85987654321",
+    finger_print: "FP-002-RIGHT-INDEX-F6G7H8I9J0",
     sex: "sex-2",
     sex_name: "Female",
     nationality: "nationality-1",
@@ -326,18 +384,32 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const [prisonerCategory, setPrisonerCategory] = useState("");
   const [isConscious, setIsConscious] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [searchResults, setSearchResults] = useState<PrisonerBioData[]>([]);
-  const [selectedPrisoner, setSelectedPrisoner] = useState<PrisonerBioData | null>(null);
+  const [searchResults, setSearchResults] = useState<
+    PrisonerBioData[]
+  >([]);
+  const [selectedPrisoner, setSelectedPrisoner] =
+    useState<PrisonerBioData | null>(null);
   const [showRemandAlert, setShowRemandAlert] = useState(false);
-  const [generatedPersonalNumber, setGeneratedPersonalNumber] = useState("");
-  const [generatedPrisonerNumber, setGeneratedPrisonerNumber] = useState("");
-  const [hasChildren, setHasChildren] = useState(false);
+  const [generatedPersonalNumber, setGeneratedPersonalNumber] =
+    useState("");
+  const [generatedPrisonerNumber, setGeneratedPrisonerNumber] =
+    useState("");
   const [children, setChildren] = useState<ChildRecord[]>([]);
-  const [currentChild, setCurrentChild] = useState<ChildRecord | null>(null);
+  const [currentChild, setCurrentChild] =
+    useState<ChildRecord | null>(null);
   const [showChildForm, setShowChildForm] = useState(false);
   const [nextOfKin, setNextOfKin] = useState<NextOfKin[]>([]);
-  const [currentNextOfKin, setCurrentNextOfKin] = useState<NextOfKin | null>(null);
-  const [showNextOfKinForm, setShowNextOfKinForm] = useState(false);
+  const [currentNextOfKin, setCurrentNextOfKin] =
+    useState<NextOfKin | null>(null);
+  const [showNextOfKinForm, setShowNextOfKinForm] =
+    useState(false);
+  const [armedPersonnelData, setArmedPersonnelData] =
+    useState<ArmedPersonnel | null>(null);
+  const [searchMode, setSearchMode] = useState<"regular" | "biometric">(
+    "regular"
+  );
+  const [isScanning, setIsScanning] = useState(false);
+  const [scannedFingerprint, setScannedFingerprint] = useState("");
 
   const {
     register,
@@ -377,6 +449,16 @@ const PrisonerAdmissionScreen: React.FC = () => {
     formState: { errors: nextOfKinErrors },
   } = useForm<NextOfKin>();
 
+  const {
+    register: registerArmedPersonnel,
+    handleSubmit: handleSubmitArmedPersonnel,
+    setValue: setArmedPersonnelValue,
+    watch: watchArmedPersonnel,
+    reset: resetArmedPersonnel,
+    control: controlArmedPersonnel,
+    formState: { errors: armedPersonnelErrors },
+  } = useForm<ArmedPersonnel>();
+
   // Watch form values for selects
   const watchSex = watch("sex");
   const watchNationality = watch("nationality");
@@ -385,6 +467,12 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const watchEmploymentStatus = watch("employment_status");
   const watchReligion = watch("religion");
   const watchIdType = watch("id_type");
+  const watchStatusOfWomen = watch("status_of_women");
+  const isArmedPersonnel = watch("armed_personnel");
+  const watchArmedForce = watchArmedPersonnel("armed_force");
+  const watchArmedForceStatus = watchArmedPersonnel(
+    "armed_forces_status",
+  );
 
   // Search for existing prisoner
   const handleSearch = () => {
@@ -396,10 +484,18 @@ const PrisonerAdmissionScreen: React.FC = () => {
     // Mock search - in real app, this would call the API
     const results = mockExistingPrisoners.filter(
       (p) =>
-        p.prisoner_number_value?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.prisoner_personal_number_value?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.id_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        `${p.first_name} ${p.surname}`.toLowerCase().includes(searchTerm.toLowerCase())
+        p.prisoner_number_value
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        p.prisoner_personal_number_value
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        p.id_number
+          ?.toLowerCase()
+          .includes(searchTerm.toLowerCase()) ||
+        `${p.first_name} ${p.surname}`
+          .toLowerCase()
+          .includes(searchTerm.toLowerCase()),
     );
 
     setSearchResults(results);
@@ -409,13 +505,51 @@ const PrisonerAdmissionScreen: React.FC = () => {
     }
   };
 
+  // Biometric search handler
+  const handleBiometricScan = async () => {
+    setIsScanning(true);
+    setSearchResults([]);
+    toast.info("Initializing fingerprint scanner...");
+
+    // Simulate fingerprint scanning process
+    setTimeout(() => {
+      toast.info("Place finger on scanner...");
+    }, 1000);
+
+    // Simulate scan completion and search
+    setTimeout(() => {
+      // Mock scanned fingerprint data - in real app, this would come from hardware
+      const mockScannedFingerprint = "FP-001-RIGHT-THUMB-A1B2C3D4E5"; // Simulating John Doe's fingerprint
+      setScannedFingerprint(mockScannedFingerprint);
+
+      // Search for matching fingerprint
+      const results = mockExistingPrisoners.filter(
+        (p) => p.finger_print === mockScannedFingerprint,
+      );
+
+      setSearchResults(results);
+      setIsScanning(false);
+
+      if (results.length === 0) {
+        toast.error("No matching fingerprint found in the system");
+      } else {
+        toast.success(
+          `Fingerprint matched! Found ${results.length} record(s)`,
+        );
+      }
+    }, 3000);
+  };
+
   // Select prisoner from search results
   const handleSelectPrisoner = (prisoner: PrisonerBioData) => {
     setSelectedPrisoner(prisoner);
     populateBioDataForm(prisoner);
 
     // Check if prisoner is active remand
-    if (prisoner.prisoner_number_value && prisonerCategory === "REMAND") {
+    if (
+      prisoner.prisoner_number_value &&
+      prisonerCategory === "REMAND"
+    ) {
       setShowRemandAlert(true);
     }
 
@@ -427,7 +561,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
   // Populate biodata form
   const populateBioDataForm = (prisoner: PrisonerBioData) => {
     Object.keys(prisoner).forEach((key) => {
-      setValue(key as keyof PrisonerBioData, prisoner[key as keyof PrisonerBioData]);
+      setValue(
+        key as keyof PrisonerBioData,
+        prisoner[key as keyof PrisonerBioData],
+      );
     });
   };
 
@@ -436,8 +573,12 @@ const PrisonerAdmissionScreen: React.FC = () => {
     // Mock generation - in real app, this would call the API
     const year = new Date().getFullYear();
     const random = Math.floor(Math.random() * 10000);
-    setGeneratedPersonalNumber(`PP-${year}-${String(random).padStart(4, "0")}`);
-    setGeneratedPrisonerNumber(`PN-${year}-${String(random).padStart(4, "0")}`);
+    setGeneratedPersonalNumber(
+      `PP-${year}-${String(random).padStart(4, "0")}`,
+    );
+    setGeneratedPrisonerNumber(
+      `PN-${year}-${String(random).padStart(4, "0")}`,
+    );
     toast.success("Prisoner numbers generated");
   };
 
@@ -483,7 +624,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
       // For non-new prisoners, they must search and select a prisoner
       if (admissionType !== "NEW" && !selectedPrisoner) {
-        toast.error("Please search and select an existing prisoner");
+        toast.error(
+          "Please search and select an existing prisoner",
+        );
         return;
       }
     }
@@ -520,7 +663,13 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const onSubmitChild = (data: ChildRecord) => {
     if (currentChild) {
       // Editing existing child
-      setChildren(children.map(c => c.id === currentChild.id ? { ...data, id: currentChild.id } : c));
+      setChildren(
+        children.map((c) =>
+          c.id === currentChild.id
+            ? { ...data, id: currentChild.id }
+            : c,
+        ),
+      );
       toast.success("Child record updated successfully!");
     } else {
       // Adding new child
@@ -543,13 +692,16 @@ const PrisonerAdmissionScreen: React.FC = () => {
     setCurrentChild(child);
     // Populate form with child data
     Object.keys(child).forEach((key) => {
-      setChildValue(key as keyof ChildRecord, child[key as keyof ChildRecord]);
+      setChildValue(
+        key as keyof ChildRecord,
+        child[key as keyof ChildRecord],
+      );
     });
     setShowChildForm(true);
   };
 
   const handleDeleteChild = (childId: string) => {
-    setChildren(children.filter(c => c.id !== childId));
+    setChildren(children.filter((c) => c.id !== childId));
     toast.success("Child record removed");
   };
 
@@ -563,11 +715,20 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const onSubmitNextOfKin = (data: NextOfKin) => {
     if (currentNextOfKin) {
       // Editing existing next of kin
-      setNextOfKin(nextOfKin.map(nok => nok.id === currentNextOfKin.id ? { ...data, id: currentNextOfKin.id } : nok));
+      setNextOfKin(
+        nextOfKin.map((nok) =>
+          nok.id === currentNextOfKin.id
+            ? { ...data, id: currentNextOfKin.id }
+            : nok,
+        ),
+      );
       toast.success("Next of Kin updated successfully!");
     } else {
       // Adding new next of kin
-      const newNextOfKin = { ...data, id: Date.now().toString() };
+      const newNextOfKin = {
+        ...data,
+        id: Date.now().toString(),
+      };
       setNextOfKin([...nextOfKin, newNextOfKin]);
       toast.success("Next of Kin added successfully!");
     }
@@ -586,13 +747,16 @@ const PrisonerAdmissionScreen: React.FC = () => {
     setCurrentNextOfKin(nok);
     // Populate form with next of kin data
     Object.keys(nok).forEach((key) => {
-      setNextOfKinValue(key as keyof NextOfKin, nok[key as keyof NextOfKin]);
+      setNextOfKinValue(
+        key as keyof NextOfKin,
+        nok[key as keyof NextOfKin],
+      );
     });
     setShowNextOfKinForm(true);
   };
 
   const handleDeleteNextOfKin = (nokId: string) => {
-    setNextOfKin(nextOfKin.filter(nok => nok.id !== nokId));
+    setNextOfKin(nextOfKin.filter((nok) => nok.id !== nokId));
     toast.success("Next of Kin removed");
   };
 
@@ -603,17 +767,30 @@ const PrisonerAdmissionScreen: React.FC = () => {
   };
 
   // Final submission
-  const handleFinalSubmit = (bioData: PrisonerBioData, debtorData: DebtorInformation | null) => {
+  const handleFinalSubmit = (
+    bioData: PrisonerBioData,
+    debtorData: DebtorInformation | null,
+  ) => {
+    // Get armed personnel data if checkbox is checked
+    const armedPersonnelInfo = bioData.armed_personnel
+      ? watchArmedPersonnel()
+      : null;
+
     const admissionData = {
       admission_type: admissionType,
       prisoner_category: prisonerCategory,
       is_conscious: isConscious,
-      prisoner_personal_number: generatedPersonalNumber || selectedPrisoner?.prisoner_personal_number_value,
-      prisoner_number: generatedPrisonerNumber || selectedPrisoner?.prisoner_number_value,
+      prisoner_personal_number:
+        generatedPersonalNumber ||
+        selectedPrisoner?.prisoner_personal_number_value,
+      prisoner_number:
+        generatedPrisonerNumber ||
+        selectedPrisoner?.prisoner_number_value,
       bio_data: bioData,
       debtor_info: debtorData,
       children: children,
       next_of_kin: nextOfKin,
+      armed_personnel: armedPersonnelInfo,
     };
 
     console.log("Final admission data:", admissionData);
@@ -637,16 +814,20 @@ const PrisonerAdmissionScreen: React.FC = () => {
     setShowRemandAlert(false);
     setGeneratedPersonalNumber("");
     setGeneratedPrisonerNumber("");
-    setHasChildren(false);
     setChildren([]);
     setShowChildForm(false);
     setCurrentChild(null);
     setNextOfKin([]);
     setShowNextOfKinForm(false);
     setCurrentNextOfKin(null);
+    setArmedPersonnelData(null);
+    setSearchMode("regular");
+    setIsScanning(false);
+    setScannedFingerprint("");
     reset();
     resetChild();
     resetNextOfKin();
+    resetArmedPersonnel();
   };
 
   return (
@@ -655,7 +836,8 @@ const PrisonerAdmissionScreen: React.FC = () => {
       <div>
         <h1 className="text-[#650000]">Prisoner Admission</h1>
         <p className="text-gray-600">
-          Register new prisoner admission and capture biodata information
+          Register new prisoner admission and capture biodata
+          information
         </p>
       </div>
 
@@ -666,12 +848,20 @@ const PrisonerAdmissionScreen: React.FC = () => {
             <div className="flex items-center gap-2">
               <div
                 className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  currentStep >= 1 ? "bg-[#650000] text-white" : "bg-gray-200"
+                  currentStep >= 1
+                    ? "bg-[#650000] text-white"
+                    : "bg-gray-200"
                 }`}
               >
                 1
               </div>
-              <span className={currentStep >= 1 ? "text-[#650000]" : "text-gray-500"}>
+              <span
+                className={
+                  currentStep >= 1
+                    ? "text-[#650000]"
+                    : "text-gray-500"
+                }
+              >
                 Admission Setup
               </span>
             </div>
@@ -680,18 +870,28 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 className={`h-full transition-all ${
                   currentStep >= 2 ? "bg-[#650000]" : ""
                 }`}
-                style={{ width: currentStep >= 2 ? "100%" : "0%" }}
+                style={{
+                  width: currentStep >= 2 ? "100%" : "0%",
+                }}
               />
             </div>
             <div className="flex items-center gap-2">
               <div
                 className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  currentStep >= 2 ? "bg-[#650000] text-white" : "bg-gray-200"
+                  currentStep >= 2
+                    ? "bg-[#650000] text-white"
+                    : "bg-gray-200"
                 }`}
               >
                 2
               </div>
-              <span className={currentStep >= 2 ? "text-[#650000]" : "text-gray-500"}>
+              <span
+                className={
+                  currentStep >= 2
+                    ? "text-[#650000]"
+                    : "text-gray-500"
+                }
+              >
                 Biodata Form
               </span>
             </div>
@@ -702,18 +902,28 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     className={`h-full transition-all ${
                       currentStep >= 3 ? "bg-[#650000]" : ""
                     }`}
-                    style={{ width: currentStep >= 3 ? "100%" : "0%" }}
+                    style={{
+                      width: currentStep >= 3 ? "100%" : "0%",
+                    }}
                   />
                 </div>
                 <div className="flex items-center gap-2">
                   <div
                     className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                      currentStep >= 3 ? "bg-[#650000] text-white" : "bg-gray-200"
+                      currentStep >= 3
+                        ? "bg-[#650000] text-white"
+                        : "bg-gray-200"
                     }`}
                   >
                     3
                   </div>
-                  <span className={currentStep >= 3 ? "text-[#650000]" : "text-gray-500"}>
+                  <span
+                    className={
+                      currentStep >= 3
+                        ? "text-[#650000]"
+                        : "text-gray-500"
+                    }
+                  >
                     Debtor Information
                   </span>
                 </div>
@@ -736,9 +946,13 @@ const PrisonerAdmissionScreen: React.FC = () => {
             {/* Admission Type */}
             <div>
               <Label>
-                Admission Type <span className="text-red-500">*</span>
+                Admission Type{" "}
+                <span className="text-red-500">*</span>
               </Label>
-              <Select value={admissionType} onValueChange={handleAdmissionTypeChange}>
+              <Select
+                value={admissionType}
+                onValueChange={handleAdmissionTypeChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select admission type" />
                 </SelectTrigger>
@@ -755,9 +969,13 @@ const PrisonerAdmissionScreen: React.FC = () => {
             {/* Prisoner Category */}
             <div>
               <Label>
-                Prisoner Category <span className="text-red-500">*</span>
+                Prisoner Category{" "}
+                <span className="text-red-500">*</span>
               </Label>
-              <Select value={prisonerCategory} onValueChange={handleCategoryChange}>
+              <Select
+                value={prisonerCategory}
+                onValueChange={handleCategoryChange}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select prisoner category" />
                 </SelectTrigger>
@@ -776,9 +994,14 @@ const PrisonerAdmissionScreen: React.FC = () => {
               <Checkbox
                 id="conscious"
                 checked={isConscious}
-                onCheckedChange={(checked) => setIsConscious(checked as boolean)}
+                onCheckedChange={(checked) =>
+                  setIsConscious(checked as boolean)
+                }
               />
-              <Label htmlFor="conscious" className="cursor-pointer">
+              <Label
+                htmlFor="conscious"
+                className="cursor-pointer"
+              >
                 Is prisoner conscious?
               </Label>
             </div>
@@ -788,8 +1011,8 @@ const PrisonerAdmissionScreen: React.FC = () => {
               <Alert className="border-yellow-500 bg-yellow-50">
                 <AlertCircle className="h-4 w-4 text-yellow-600" />
                 <AlertDescription className="text-yellow-800">
-                  Warning: This prisoner has an active remand record. Please verify before
-                  proceeding.
+                  Warning: This prisoner has an active remand
+                  record. Please verify before proceeding.
                 </AlertDescription>
               </Alert>
             )}
@@ -803,25 +1026,122 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     <Search className="h-4 w-4" />
                     Search Existing Prisoner
                   </h3>
-                  <p className="text-sm text-gray-600 mb-3">
-                    Search by prisoner number, personal number, ID number, or name
-                  </p>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Enter search term..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-                    />
-                    <Button
-                      type="button"
-                      onClick={handleSearch}
-                      className="bg-[#650000] hover:bg-[#4a0000]"
+
+                  {/* Search Mode Tabs */}
+                  <Tabs
+                    value={searchMode}
+                    onValueChange={(value) =>
+                      setSearchMode(value as "regular" | "biometric")
+                    }
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-2 mb-4">
+                      <TabsTrigger value="regular">
+                        <Search className="h-4 w-4 mr-2" />
+                        Regular Search
+                      </TabsTrigger>
+                      <TabsTrigger value="biometric">
+                        <Fingerprint className="h-4 w-4 mr-2" />
+                        Biometric Search
+                      </TabsTrigger>
+                    </TabsList>
+
+                    {/* Regular Search Tab */}
+                    <TabsContent value="regular" className="space-y-3">
+                      <p className="text-sm text-gray-600">
+                        Search by prisoner number, personal number,
+                        ID number, or name
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter search term..."
+                          value={searchTerm}
+                          onChange={(e) =>
+                            setSearchTerm(e.target.value)
+                          }
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleSearch()
+                          }
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleSearch}
+                          className="bg-[#650000] hover:bg-[#4a0000]"
+                        >
+                          <Search className="h-4 w-4 mr-2" />
+                          Search
+                        </Button>
+                      </div>
+                    </TabsContent>
+
+                    {/* Biometric Search Tab */}
+                    <TabsContent
+                      value="biometric"
+                      className="space-y-4"
                     >
-                      <Search className="h-4 w-4 mr-2" />
-                      Search
-                    </Button>
-                  </div>
+                      <p className="text-sm text-gray-600">
+                        Use fingerprint scanner to identify prisoner
+                      </p>
+
+                      <div className="flex flex-col items-center gap-4 p-6 border-2 border-dashed rounded-lg">
+                        <div className="flex flex-col items-center gap-2">
+                          <div
+                            className={`p-6 rounded-full ${
+                              isScanning
+                                ? "bg-[#650000] animate-pulse"
+                                : "bg-gray-100"
+                            }`}
+                          >
+                            {isScanning ? (
+                              <Loader2 className="h-12 w-12 text-white animate-spin" />
+                            ) : (
+                              <Fingerprint className="h-12 w-12 text-[#650000]" />
+                            )}
+                          </div>
+                          <div className="text-center">
+                            <p className="text-sm">
+                              {isScanning
+                                ? "Scanning fingerprint..."
+                                : "Ready to scan"}
+                            </p>
+                            {scannedFingerprint && !isScanning && (
+                              <p className="text-xs text-gray-500 mt-1">
+                                Last scan: {scannedFingerprint}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <Button
+                          type="button"
+                          onClick={handleBiometricScan}
+                          disabled={isScanning}
+                          className="bg-[#650000] hover:bg-[#4a0000]"
+                        >
+                          {isScanning ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Scanning...
+                            </>
+                          ) : (
+                            <>
+                              <Fingerprint className="h-4 w-4 mr-2" />
+                              Start Fingerprint Scan
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      <Alert className="border-blue-500 bg-blue-50">
+                        <Info className="h-4 w-4 text-blue-600" />
+                        <AlertDescription className="text-blue-800 text-sm">
+                          Ensure the fingerprint scanner is properly
+                          connected and the prisoner's finger is clean
+                          and dry for optimal results.
+                        </AlertDescription>
+                      </Alert>
+                    </TabsContent>
+                  </Tabs>
 
                   {/* Search Results */}
                   {searchResults.length > 0 && (
@@ -833,15 +1153,27 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         <div
                           key={prisoner.id}
                           className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleSelectPrisoner(prisoner)}
+                          onClick={() =>
+                            handleSelectPrisoner(prisoner)
+                          }
                         >
                           <div>
                             <p>
-                              {prisoner.first_name} {prisoner.middle_name} {prisoner.surname}
+                              {prisoner.first_name}{" "}
+                              {prisoner.middle_name}{" "}
+                              {prisoner.surname}
                             </p>
                             <p className="text-sm text-gray-600">
-                              {prisoner.prisoner_number_value} | {prisoner.id_number}
+                              {prisoner.prisoner_number_value} |{" "}
+                              {prisoner.id_number}
                             </p>
+                            {searchMode === "biometric" &&
+                              prisoner.finger_print && (
+                                <p className="text-xs text-gray-500 mt-1">
+                                  <Fingerprint className="h-3 w-3 inline mr-1" />
+                                  {prisoner.finger_print}
+                                </p>
+                              )}
                           </div>
                           <Button size="sm" variant="outline">
                             Select
@@ -856,8 +1188,11 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     <Alert className="mt-4 border-green-500 bg-green-50">
                       <CheckCircle className="h-4 w-4 text-green-600" />
                       <AlertDescription className="text-green-800">
-                        <strong>Selected:</strong> {selectedPrisoner.first_name}{" "}
-                        {selectedPrisoner.surname} ({selectedPrisoner.prisoner_number_value})
+                        <strong>Selected:</strong>{" "}
+                        {selectedPrisoner.first_name}{" "}
+                        {selectedPrisoner.surname} (
+                        {selectedPrisoner.prisoner_number_value}
+                        )
                       </AlertDescription>
                     </Alert>
                   )}
@@ -866,25 +1201,30 @@ const PrisonerAdmissionScreen: React.FC = () => {
             )}
 
             {/* Generated Numbers - for new prisoners */}
-            {admissionType === "NEW" && generatedPersonalNumber && (
-              <div className="space-y-2">
-                <Separator />
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Personal Number</Label>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-[#650000]">{generatedPersonalNumber}</Badge>
+            {admissionType === "NEW" &&
+              generatedPersonalNumber && (
+                <div className="space-y-2">
+                  <Separator />
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Personal Number</Label>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-[#650000]">
+                          {generatedPersonalNumber}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <Label>Prisoner Number</Label>
-                    <div className="flex items-center gap-2">
-                      <Badge className="bg-[#650000]">{generatedPrisonerNumber}</Badge>
+                    <div>
+                      <Label>Prisoner Number</Label>
+                      <div className="flex items-center gap-2">
+                        <Badge className="bg-[#650000]">
+                          {generatedPrisonerNumber}
+                        </Badge>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
             <div className="flex justify-end">
               <Button
@@ -909,36 +1249,61 @@ const PrisonerAdmissionScreen: React.FC = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Tabs defaultValue="personal" className="space-y-4">
+              <Tabs
+                defaultValue="personal"
+                className="space-y-4"
+              >
                 <TabsList className="grid w-full grid-cols-7">
-                  <TabsTrigger value="personal">Personal</TabsTrigger>
-                  <TabsTrigger value="identification">Identification</TabsTrigger>
-                  <TabsTrigger value="address">Address</TabsTrigger>
-                  <TabsTrigger value="physical">Physical</TabsTrigger>
-                  <TabsTrigger value="record">Record</TabsTrigger>
-                  <TabsTrigger value="next_of_kin">Next of Kin</TabsTrigger>
+                  <TabsTrigger value="personal">
+                    Personal
+                  </TabsTrigger>
+                  <TabsTrigger value="identification">
+                    Identification
+                  </TabsTrigger>
+                  <TabsTrigger value="address">
+                    Address
+                  </TabsTrigger>
+                  <TabsTrigger value="physical">
+                    Physical
+                  </TabsTrigger>
+                  <TabsTrigger value="record">
+                    Record
+                  </TabsTrigger>
+                  <TabsTrigger value="next_of_kin">
+                    Next of Kin
+                  </TabsTrigger>
                   <TabsTrigger value="other">Other</TabsTrigger>
                 </TabsList>
 
                 {/* Personal Information Tab */}
-                <TabsContent value="personal" className="space-y-4">
+                <TabsContent
+                  value="personal"
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label htmlFor="first_name">
-                        First Name <span className="text-red-500">*</span>
+                        First Name{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="first_name"
-                        {...register("first_name", { required: "First name is required" })}
+                        {...register("first_name", {
+                          required: "First name is required",
+                        })}
                         placeholder="Enter first name"
                       />
                       {errors.first_name && (
-                        <p className="text-red-500 text-sm mt-1">{errors.first_name.message}</p>
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.first_name.message}
+                        </p>
                       )}
                     </div>
 
                     <div>
-                      <Label htmlFor="middle_name">Middle Name</Label>
+                      <Label htmlFor="middle_name">
+                        Middle Name
+                      </Label>
                       <Input
                         id="middle_name"
                         {...register("middle_name")}
@@ -948,20 +1313,27 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="surname">
-                        Surname <span className="text-red-500">*</span>
+                        Surname{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="surname"
-                        {...register("surname", { required: "Surname is required" })}
+                        {...register("surname", {
+                          required: "Surname is required",
+                        })}
                         placeholder="Enter surname"
                       />
                       {errors.surname && (
-                        <p className="text-red-500 text-sm mt-1">{errors.surname.message}</p>
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.surname.message}
+                        </p>
                       )}
                     </div>
 
                     <div>
-                      <Label htmlFor="also_known_as">Also Known As</Label>
+                      <Label htmlFor="also_known_as">
+                        Also Known As
+                      </Label>
                       <Input
                         id="also_known_as"
                         {...register("also_known_as")}
@@ -971,29 +1343,43 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="date_of_birth">
-                        Date of Birth <span className="text-red-500">*</span>
+                        Date of Birth{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="date_of_birth"
                         type="date"
-                        {...register("date_of_birth", { required: "Date of birth is required" })}
+                        {...register("date_of_birth", {
+                          required: "Date of birth is required",
+                        })}
                       />
                       {errors.date_of_birth && (
-                        <p className="text-red-500 text-sm mt-1">{errors.date_of_birth.message}</p>
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.date_of_birth.message}
+                        </p>
                       )}
                     </div>
 
                     <div>
                       <Label htmlFor="sex">
-                        Sex <span className="text-red-500">*</span>
+                        Sex{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
-                      <Select value={watchSex} onValueChange={(value) => setValue("sex", value)}>
+                      <Select
+                        value={watchSex}
+                        onValueChange={(value) =>
+                          setValue("sex", value)
+                        }
+                      >
                         <SelectTrigger>
                           <SelectValue placeholder="Select sex" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockSexOptions.map((sex) => (
-                            <SelectItem key={sex.id} value={sex.id}>
+                            <SelectItem
+                              key={sex.id}
+                              value={sex.id}
+                            >
                               {sex.name}
                             </SelectItem>
                           ))}
@@ -1003,18 +1389,24 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="nationality">
-                        Nationality <span className="text-red-500">*</span>
+                        Nationality{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
                       <Select
                         value={watchNationality}
-                        onValueChange={(value) => setValue("nationality", value)}
+                        onValueChange={(value) =>
+                          setValue("nationality", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select nationality" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockNationalities.map((nat) => (
-                            <SelectItem key={nat.id} value={nat.id}>
+                            <SelectItem
+                              key={nat.id}
+                              value={nat.id}
+                            >
                               {nat.name}
                             </SelectItem>
                           ))}
@@ -1023,17 +1415,24 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="marital_status">Marital Status</Label>
+                      <Label htmlFor="marital_status">
+                        Marital Status
+                      </Label>
                       <Select
                         value={watchMaritalStatus}
-                        onValueChange={(value) => setValue("marital_status", value)}
+                        onValueChange={(value) =>
+                          setValue("marital_status", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockMaritalStatuses.map((status) => (
-                            <SelectItem key={status.id} value={status.id}>
+                            <SelectItem
+                              key={status.id}
+                              value={status.id}
+                            >
                               {status.name}
                             </SelectItem>
                           ))}
@@ -1045,14 +1444,19 @@ const PrisonerAdmissionScreen: React.FC = () => {
                       <Label htmlFor="religion">Religion</Label>
                       <Select
                         value={watchReligion}
-                        onValueChange={(value) => setValue("religion", value)}
+                        onValueChange={(value) =>
+                          setValue("religion", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select religion" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockReligions.map((rel) => (
-                            <SelectItem key={rel.id} value={rel.id}>
+                            <SelectItem
+                              key={rel.id}
+                              value={rel.id}
+                            >
                               {rel.name}
                             </SelectItem>
                           ))}
@@ -1061,7 +1465,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="fathers_name">Father's Name</Label>
+                      <Label htmlFor="fathers_name">
+                        Father's Name
+                      </Label>
                       <Input
                         id="fathers_name"
                         {...register("fathers_name")}
@@ -1070,7 +1476,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="mothers_name">Mother's Name</Label>
+                      <Label htmlFor="mothers_name">
+                        Mother's Name
+                      </Label>
                       <Input
                         id="mothers_name"
                         {...register("mothers_name")}
@@ -1080,26 +1488,38 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="tribe">Tribe</Label>
-                      <Input id="tribe" {...register("tribe")} placeholder="Enter tribe" />
+                      <Input
+                        id="tribe"
+                        {...register("tribe")}
+                        placeholder="Enter tribe"
+                      />
                     </div>
                   </div>
                 </TabsContent>
 
                 {/* Identification Tab */}
-                <TabsContent value="identification" className="space-y-4">
+                <TabsContent
+                  value="identification"
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="id_type">ID Type</Label>
                       <Select
                         value={watchIdType}
-                        onValueChange={(value) => setValue("id_type", value)}
+                        onValueChange={(value) =>
+                          setValue("id_type", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select ID type" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockIdTypes.map((type) => (
-                            <SelectItem key={type.id} value={type.id}>
+                            <SelectItem
+                              key={type.id}
+                              value={type.id}
+                            >
                               {type.name}
                             </SelectItem>
                           ))}
@@ -1108,7 +1528,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="id_number">ID Number</Label>
+                      <Label htmlFor="id_number">
+                        ID Number
+                      </Label>
                       <Input
                         id="id_number"
                         {...register("id_number")}
@@ -1117,17 +1539,24 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="education_level">Education Level</Label>
+                      <Label htmlFor="education_level">
+                        Education Level
+                      </Label>
                       <Select
                         value={watchEducationLevel}
-                        onValueChange={(value) => setValue("education_level", value)}
+                        onValueChange={(value) =>
+                          setValue("education_level", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select education level" />
                         </SelectTrigger>
                         <SelectContent>
                           {mockEducationLevels.map((level) => (
-                            <SelectItem key={level.id} value={level.id}>
+                            <SelectItem
+                              key={level.id}
+                              value={level.id}
+                            >
                               {level.name}
                             </SelectItem>
                           ))}
@@ -1136,20 +1565,29 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="employment_status">Employment Status</Label>
+                      <Label htmlFor="employment_status">
+                        Employment Status
+                      </Label>
                       <Select
                         value={watchEmploymentStatus}
-                        onValueChange={(value) => setValue("employment_status", value)}
+                        onValueChange={(value) =>
+                          setValue("employment_status", value)
+                        }
                       >
                         <SelectTrigger>
                           <SelectValue placeholder="Select employment status" />
                         </SelectTrigger>
                         <SelectContent>
-                          {mockEmploymentStatuses.map((status) => (
-                            <SelectItem key={status.id} value={status.id}>
-                              {status.name}
-                            </SelectItem>
-                          ))}
+                          {mockEmploymentStatuses.map(
+                            (status) => (
+                              <SelectItem
+                                key={status.id}
+                                value={status.id}
+                              >
+                                {status.name}
+                              </SelectItem>
+                            ),
+                          )}
                         </SelectContent>
                       </Select>
                     </div>
@@ -1164,7 +1602,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="employment_description">Employment Description</Label>
+                      <Label htmlFor="employment_description">
+                        Employment Description
+                      </Label>
                       <Input
                         id="employment_description"
                         {...register("employment_description")}
@@ -1174,13 +1614,15 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="date_of_admission">
-                        Date of Admission <span className="text-red-500">*</span>
+                        Date of Admission{" "}
+                        <span className="text-red-500">*</span>
                       </Label>
                       <Input
                         id="date_of_admission"
                         type="date"
                         {...register("date_of_admission", {
-                          required: "Date of admission is required",
+                          required:
+                            "Date of admission is required",
                         })}
                       />
                       {errors.date_of_admission && (
@@ -1204,7 +1646,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="habitual_criminal" className="cursor-pointer">
+                        <Label
+                          htmlFor="habitual_criminal"
+                          className="cursor-pointer"
+                        >
                           Habitual Criminal
                         </Label>
                       </div>
@@ -1222,7 +1667,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="deformity" className="cursor-pointer">
+                        <Label
+                          htmlFor="deformity"
+                          className="cursor-pointer"
+                        >
                           Has Deformity
                         </Label>
                       </div>
@@ -1231,50 +1679,84 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </TabsContent>
 
                 {/* Address Tab */}
-                <TabsContent value="address" className="space-y-4">
-                  <h4 className="text-sm text-gray-600">Current Address</h4>
+                <TabsContent
+                  value="address"
+                  className="space-y-4"
+                >
+                  <h4 className="text-sm text-gray-600">
+                    Current Address
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Region</Label>
-                      <Input {...register("address_region")} placeholder="Enter region" />
+                      <Input
+                        {...register("address_region")}
+                        placeholder="Enter region"
+                      />
                     </div>
                     <div>
                       <Label>District</Label>
-                      <Input {...register("address_district")} placeholder="Enter district" />
+                      <Input
+                        {...register("address_district")}
+                        placeholder="Enter district"
+                      />
                     </div>
                     <div>
                       <Label>County</Label>
-                      <Input {...register("address_county")} placeholder="Enter county" />
+                      <Input
+                        {...register("address_county")}
+                        placeholder="Enter county"
+                      />
                     </div>
                     <div>
                       <Label>Sub County</Label>
-                      <Input {...register("address_sub_county")} placeholder="Enter sub county" />
+                      <Input
+                        {...register("address_sub_county")}
+                        placeholder="Enter sub county"
+                      />
                     </div>
                     <div>
                       <Label>Parish</Label>
-                      <Input {...register("address_parish")} placeholder="Enter parish" />
+                      <Input
+                        {...register("address_parish")}
+                        placeholder="Enter parish"
+                      />
                     </div>
                     <div>
                       <Label>Village</Label>
-                      <Input {...register("address_village")} placeholder="Enter village" />
+                      <Input
+                        {...register("address_village")}
+                        placeholder="Enter village"
+                      />
                     </div>
                   </div>
 
                   <Separator />
 
-                  <h4 className="text-sm text-gray-600">Permanent Address</h4>
+                  <h4 className="text-sm text-gray-600">
+                    Permanent Address
+                  </h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
                       <Label>Region</Label>
-                      <Input {...register("permanent_region")} placeholder="Enter region" />
+                      <Input
+                        {...register("permanent_region")}
+                        placeholder="Enter region"
+                      />
                     </div>
                     <div>
                       <Label>District</Label>
-                      <Input {...register("permanent_district")} placeholder="Enter district" />
+                      <Input
+                        {...register("permanent_district")}
+                        placeholder="Enter district"
+                      />
                     </div>
                     <div>
                       <Label>County</Label>
-                      <Input {...register("permanent_county")} placeholder="Enter county" />
+                      <Input
+                        {...register("permanent_county")}
+                        placeholder="Enter county"
+                      />
                     </div>
                     <div>
                       <Label>Sub County</Label>
@@ -1285,20 +1767,31 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
                     <div>
                       <Label>Parish</Label>
-                      <Input {...register("permanent_parish")} placeholder="Enter parish" />
+                      <Input
+                        {...register("permanent_parish")}
+                        placeholder="Enter parish"
+                      />
                     </div>
                     <div>
                       <Label>Village</Label>
-                      <Input {...register("permanent_village")} placeholder="Enter village" />
+                      <Input
+                        {...register("permanent_village")}
+                        placeholder="Enter village"
+                      />
                     </div>
                   </div>
                 </TabsContent>
 
                 {/* Physical Characteristics Tab */}
-                <TabsContent value="physical" className="space-y-4">
+                <TabsContent
+                  value="physical"
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div>
-                      <Label htmlFor="height">Height (cm)</Label>
+                      <Label htmlFor="height">
+                        Height (cm)
+                      </Label>
                       <Input
                         id="height"
                         {...register("height")}
@@ -1308,51 +1801,89 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <div>
                       <Label htmlFor="build">Build</Label>
-                      <Input id="build" {...register("build")} placeholder="e.g., Slim, Medium" />
+                      <Input
+                        id="build"
+                        {...register("build")}
+                        placeholder="e.g., Slim, Medium"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="face">Face</Label>
-                      <Input id="face" {...register("face")} placeholder="Face description" />
+                      <Input
+                        id="face"
+                        {...register("face")}
+                        placeholder="Face description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="eyes">Eyes</Label>
-                      <Input id="eyes" {...register("eyes")} placeholder="Eye description" />
+                      <Input
+                        id="eyes"
+                        {...register("eyes")}
+                        placeholder="Eye description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="mouth">Mouth</Label>
-                      <Input id="mouth" {...register("mouth")} placeholder="Mouth description" />
+                      <Input
+                        id="mouth"
+                        {...register("mouth")}
+                        placeholder="Mouth description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="teeth">Teeth</Label>
-                      <Input id="teeth" {...register("teeth")} placeholder="Teeth description" />
+                      <Input
+                        id="teeth"
+                        {...register("teeth")}
+                        placeholder="Teeth description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="lips">Lips</Label>
-                      <Input id="lips" {...register("lips")} placeholder="Lips description" />
+                      <Input
+                        id="lips"
+                        {...register("lips")}
+                        placeholder="Lips description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="ears">Ears</Label>
-                      <Input id="ears" {...register("ears")} placeholder="Ears description" />
+                      <Input
+                        id="ears"
+                        {...register("ears")}
+                        placeholder="Ears description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="hair">Hair</Label>
-                      <Input id="hair" {...register("hair")} placeholder="Hair description" />
+                      <Input
+                        id="hair"
+                        {...register("hair")}
+                        placeholder="Hair description"
+                      />
                     </div>
 
                     <div>
                       <Label htmlFor="speech">Speech</Label>
-                      <Input id="speech" {...register("speech")} placeholder="Speech pattern" />
+                      <Input
+                        id="speech"
+                        {...register("speech")}
+                        placeholder="Speech pattern"
+                      />
                     </div>
 
                     <div className="md:col-span-2">
-                      <Label htmlFor="marks">Distinguishing Marks</Label>
+                      <Label htmlFor="marks">
+                        Distinguishing Marks
+                      </Label>
                       <Textarea
                         id="marks"
                         {...register("marks")}
@@ -1362,7 +1893,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div className="md:col-span-3">
-                      <Label htmlFor="description">General Description</Label>
+                      <Label htmlFor="description">
+                        General Description
+                      </Label>
                       <Textarea
                         id="description"
                         {...register("description")}
@@ -1374,8 +1907,14 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </TabsContent>
 
                 {/* Prisoner Record Tab */}
-                <TabsContent value="record" className="space-y-4">
+
+                <TabsContent
+                  value="record"
+                  className="space-y-4"
+                >
+                  <Separator />
                   <div className="space-y-4">
+                    <h4 className="mb-4">Prisoner Tagging</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="flex items-center gap-2">
                         <Controller
@@ -1390,7 +1929,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="escapee" className="cursor-pointer">
+                        <Label
+                          htmlFor="escapee"
+                          className="cursor-pointer"
+                        >
                           Escapee
                         </Label>
                       </div>
@@ -1408,7 +1950,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="armed_personnel" className="cursor-pointer">
+                        <Label
+                          htmlFor="armed_personnel"
+                          className="cursor-pointer"
+                        >
                           Armed Personnel
                         </Label>
                       </div>
@@ -1426,7 +1971,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="extremely_violent" className="cursor-pointer">
+                        <Label
+                          htmlFor="extremely_violent"
+                          className="cursor-pointer"
+                        >
                           Extremely Violent
                         </Label>
                       </div>
@@ -1444,26 +1992,11 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="life_or_death_imprisonment" className="cursor-pointer">
+                        <Label
+                          htmlFor="life_or_death_imprisonment"
+                          className="cursor-pointer"
+                        >
                           Life or Death Imprisonment
-                        </Label>
-                      </div>
-
-                      <div className="flex items-center gap-2">
-                        <Controller
-                          name="lodger"
-                          control={control}
-                          defaultValue={false}
-                          render={({ field }) => (
-                            <Checkbox
-                              id="lodger"
-                              checked={field.value}
-                              onCheckedChange={field.onChange}
-                            />
-                          )}
-                        />
-                        <Label htmlFor="lodger" className="cursor-pointer">
-                          Lodger
                         </Label>
                       </div>
 
@@ -1480,17 +2013,24 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             />
                           )}
                         />
-                        <Label htmlFor="commital" className="cursor-pointer">
+                        <Label
+                          htmlFor="commital"
+                          className="cursor-pointer"
+                        >
                           Commital
                         </Label>
                       </div>
 
                       <div>
-                        <Label htmlFor="previous_convictions_count">Previous Convictions Count</Label>
+                        <Label htmlFor="previous_convictions_count">
+                          Previous Convictions Count
+                        </Label>
                         <Input
                           id="previous_convictions_count"
                           type="number"
-                          {...register("previous_convictions_count")}
+                          {...register(
+                            "previous_convictions_count",
+                          )}
                           placeholder="Number of previous convictions"
                         />
                       </div>
@@ -1498,11 +2038,169 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     <Separator />
 
+                    {/* Armed Personnel Details Section */}
+                    {isArmedPersonnel && (
+                      <>
+                        <div className="space-y-4">
+                          <h4 className="mb-4">
+                            Armed Personnel Details
+                          </h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="armed_force">
+                                Armed Force *
+                              </Label>
+                              <Controller
+                                name="armed_force"
+                                control={controlArmedPersonnel}
+                                render={({ field }) => (
+                                  <Select
+                                    onValueChange={
+                                      field.onChange
+                                    }
+                                    value={field.value}
+                                  >
+                                    <SelectTrigger id="armed_force">
+                                      <SelectValue placeholder="Select Armed Force" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {mockArmedForces.map(
+                                        (force) => (
+                                          <SelectItem
+                                            key={force.id}
+                                            value={force.id}
+                                          >
+                                            {force.name}
+                                          </SelectItem>
+                                        ),
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="armed_forces_status">
+                                Armed Force Status *
+                              </Label>
+                              <Controller
+                                name="armed_forces_status"
+                                control={controlArmedPersonnel}
+                                render={({ field }) => (
+                                  <Select
+                                    onValueChange={
+                                      field.onChange
+                                    }
+                                    value={field.value}
+                                  >
+                                    <SelectTrigger id="armed_forces_status">
+                                      <SelectValue placeholder="Select Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {mockArmedForceStatuses.map(
+                                        (status) => (
+                                          <SelectItem
+                                            key={status.id}
+                                            value={status.id}
+                                          >
+                                            {status.name}
+                                          </SelectItem>
+                                        ),
+                                      )}
+                                    </SelectContent>
+                                  </Select>
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="unit">Unit</Label>
+                              <Input
+                                id="unit"
+                                {...registerArmedPersonnel(
+                                  "unit",
+                                )}
+                                placeholder="Enter unit"
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="division">
+                                Division
+                              </Label>
+                              <Input
+                                id="division"
+                                {...registerArmedPersonnel(
+                                  "division",
+                                )}
+                                placeholder="Enter division"
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="station">
+                                Station
+                              </Label>
+                              <Input
+                                id="station"
+                                {...registerArmedPersonnel(
+                                  "station",
+                                )}
+                                placeholder="Enter station"
+                              />
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <Controller
+                                name="government_forces"
+                                control={controlArmedPersonnel}
+                                defaultValue={false}
+                                render={({ field }) => (
+                                  <Checkbox
+                                    id="government_forces"
+                                    checked={field.value}
+                                    onCheckedChange={
+                                      field.onChange
+                                    }
+                                  />
+                                )}
+                              />
+                              <Label
+                                htmlFor="government_forces"
+                                className="cursor-pointer"
+                              >
+                                Government Forces
+                              </Label>
+                            </div>
+                          </div>
+
+                          <div>
+                            <Label htmlFor="armed_remarks">
+                              Remarks
+                            </Label>
+                            <Textarea
+                              id="armed_remarks"
+                              {...registerArmedPersonnel(
+                                "remarks",
+                              )}
+                              placeholder="Enter any additional remarks about armed personnel"
+                              rows={3}
+                            />
+                          </div>
+                        </div>
+
+                        <Separator />
+                      </>
+                    )}
+
                     <div>
                       <h4 className="mb-4">Arrest Location</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="arrest_region">Arrest Region</Label>
+                          <Label htmlFor="arrest_region">
+                            Arrest Region
+                          </Label>
                           <Input
                             id="arrest_region"
                             {...register("arrest_region")}
@@ -1511,7 +2209,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="arrest_district">Arrest District</Label>
+                          <Label htmlFor="arrest_district">
+                            Arrest District
+                          </Label>
                           <Input
                             id="arrest_district"
                             {...register("arrest_district")}
@@ -1520,7 +2220,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="arrest_county">Arrest County</Label>
+                          <Label htmlFor="arrest_county">
+                            Arrest County
+                          </Label>
                           <Input
                             id="arrest_county"
                             {...register("arrest_county")}
@@ -1529,7 +2231,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="arrest_sub_county">Arrest Sub County</Label>
+                          <Label htmlFor="arrest_sub_county">
+                            Arrest Sub County
+                          </Label>
                           <Input
                             id="arrest_sub_county"
                             {...register("arrest_sub_county")}
@@ -1538,7 +2242,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="arrest_parish">Arrest Parish</Label>
+                          <Label htmlFor="arrest_parish">
+                            Arrest Parish
+                          </Label>
                           <Input
                             id="arrest_parish"
                             {...register("arrest_parish")}
@@ -1547,7 +2253,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
 
                         <div>
-                          <Label htmlFor="arrest_village">Arrest Village</Label>
+                          <Label htmlFor="arrest_village">
+                            Arrest Village
+                          </Label>
                           <Input
                             id="arrest_village"
                             {...register("arrest_village")}
@@ -1560,10 +2268,15 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </TabsContent>
 
                 {/* Next of Kin Tab */}
-                <TabsContent value="next_of_kin" className="space-y-4">
+                <TabsContent
+                  value="next_of_kin"
+                  className="space-y-4"
+                >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-sm">Next of Kin Records</h4>
+                      <h4 className="text-sm">
+                        Next of Kin Records
+                      </h4>
                       <Button
                         type="button"
                         size="sm"
@@ -1589,17 +2302,25 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         <TableBody>
                           {nextOfKin.map((nok) => (
                             <TableRow key={nok.id}>
-                              <TableCell>{`${nok.first_name} ${nok.middle_name || ''} ${nok.surname}`}</TableCell>
-                              <TableCell>{nok.relationship}</TableCell>
-                              <TableCell>{nok.phone_number}</TableCell>
-                              <TableCell>{nok.id_number}</TableCell>
+                              <TableCell>{`${nok.first_name} ${nok.middle_name || ""} ${nok.surname}`}</TableCell>
+                              <TableCell>
+                                {nok.relationship}
+                              </TableCell>
+                              <TableCell>
+                                {nok.phone_number}
+                              </TableCell>
+                              <TableCell>
+                                {nok.id_number}
+                              </TableCell>
                               <TableCell>
                                 <div className="flex gap-2">
                                   <Button
                                     type="button"
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleEditNextOfKin(nok)}
+                                    onClick={() =>
+                                      handleEditNextOfKin(nok)
+                                    }
                                   >
                                     Edit
                                   </Button>
@@ -1607,7 +2328,11 @@ const PrisonerAdmissionScreen: React.FC = () => {
                                     type="button"
                                     size="sm"
                                     variant="destructive"
-                                    onClick={() => handleDeleteNextOfKin(nok.id!)}
+                                    onClick={() =>
+                                      handleDeleteNextOfKin(
+                                        nok.id!,
+                                      )
+                                    }
                                   >
                                     <X className="h-4 w-4" />
                                   </Button>
@@ -1624,116 +2349,179 @@ const PrisonerAdmissionScreen: React.FC = () => {
                       <Card className="border-2 border-[#650000]">
                         <CardHeader>
                           <CardTitle className="text-[#650000]">
-                            {currentNextOfKin ? "Edit Next of Kin" : "Add Next of Kin"}
+                            {currentNextOfKin
+                              ? "Edit Next of Kin"
+                              : "Add Next of Kin"}
                           </CardTitle>
                         </CardHeader>
                         <CardContent>
-                          <form onSubmit={handleSubmitNextOfKin(onSubmitNextOfKin)} className="space-y-4">
+                          <div className="space-y-4">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div>
                                 <Label htmlFor="nok_first_name">
-                                  First Name <span className="text-red-500">*</span>
+                                  First Name{" "}
+                                  <span className="text-red-500">
+                                    *
+                                  </span>
                                 </Label>
                                 <Input
                                   id="nok_first_name"
-                                  {...registerNextOfKin("first_name", { required: "First name is required" })}
+                                  {...registerNextOfKin(
+                                    "first_name",
+                                    {
+                                      required:
+                                        "First name is required",
+                                    },
+                                  )}
                                   placeholder="Enter first name"
                                 />
                                 {nextOfKinErrors.first_name && (
                                   <p className="text-red-500 text-sm mt-1">
-                                    {nextOfKinErrors.first_name.message}
+                                    {
+                                      nextOfKinErrors.first_name
+                                        .message
+                                    }
                                   </p>
                                 )}
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_middle_name">Middle Name</Label>
+                                <Label htmlFor="nok_middle_name">
+                                  Middle Name
+                                </Label>
                                 <Input
                                   id="nok_middle_name"
-                                  {...registerNextOfKin("middle_name")}
+                                  {...registerNextOfKin(
+                                    "middle_name",
+                                  )}
                                   placeholder="Enter middle name"
                                 />
                               </div>
 
                               <div>
                                 <Label htmlFor="nok_surname">
-                                  Surname <span className="text-red-500">*</span>
+                                  Surname{" "}
+                                  <span className="text-red-500">
+                                    *
+                                  </span>
                                 </Label>
                                 <Input
                                   id="nok_surname"
-                                  {...registerNextOfKin("surname", { required: "Surname is required" })}
+                                  {...registerNextOfKin(
+                                    "surname",
+                                    {
+                                      required:
+                                        "Surname is required",
+                                    },
+                                  )}
                                   placeholder="Enter surname"
                                 />
                                 {nextOfKinErrors.surname && (
                                   <p className="text-red-500 text-sm mt-1">
-                                    {nextOfKinErrors.surname.message}
+                                    {
+                                      nextOfKinErrors.surname
+                                        .message
+                                    }
                                   </p>
                                 )}
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_relationship">Relationship</Label>
+                                <Label htmlFor="nok_relationship">
+                                  Relationship
+                                </Label>
                                 <Input
                                   id="nok_relationship"
-                                  {...registerNextOfKin("relationship")}
+                                  {...registerNextOfKin(
+                                    "relationship",
+                                  )}
                                   placeholder="e.g., Father, Mother, Spouse"
                                 />
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_sex">Sex</Label>
+                                <Label htmlFor="nok_sex">
+                                  Sex
+                                </Label>
                                 <Select
                                   value={watchNextOfKin("sex")}
-                                  onValueChange={(value) => setNextOfKinValue("sex", value)}
+                                  onValueChange={(value) =>
+                                    setNextOfKinValue(
+                                      "sex",
+                                      value,
+                                    )
+                                  }
                                 >
                                   <SelectTrigger>
                                     <SelectValue placeholder="Select sex" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="male">Male</SelectItem>
-                                    <SelectItem value="female">Female</SelectItem>
+                                    <SelectItem value="male">
+                                      Male
+                                    </SelectItem>
+                                    <SelectItem value="female">
+                                      Female
+                                    </SelectItem>
                                   </SelectContent>
                                 </Select>
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_phone">Phone Number</Label>
+                                <Label htmlFor="nok_phone">
+                                  Phone Number
+                                </Label>
                                 <Input
                                   id="nok_phone"
-                                  {...registerNextOfKin("phone_number")}
+                                  {...registerNextOfKin(
+                                    "phone_number",
+                                  )}
                                   placeholder="+256700000000"
                                 />
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_alt_phone">Alternate Phone Number</Label>
+                                <Label htmlFor="nok_alt_phone">
+                                  Alternate Phone Number
+                                </Label>
                                 <Input
                                   id="nok_alt_phone"
-                                  {...registerNextOfKin("alternate_phone_number")}
+                                  {...registerNextOfKin(
+                                    "alternate_phone_number",
+                                  )}
                                   placeholder="+256700000000"
                                 />
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_id_type">ID Type</Label>
+                                <Label htmlFor="nok_id_type">
+                                  ID Type
+                                </Label>
                                 <Input
                                   id="nok_id_type"
-                                  {...registerNextOfKin("id_type")}
+                                  {...registerNextOfKin(
+                                    "id_type",
+                                  )}
                                   placeholder="e.g., National ID, Passport"
                                 />
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_id_number">ID Number</Label>
+                                <Label htmlFor="nok_id_number">
+                                  ID Number
+                                </Label>
                                 <Input
                                   id="nok_id_number"
-                                  {...registerNextOfKin("id_number")}
+                                  {...registerNextOfKin(
+                                    "id_number",
+                                  )}
                                   placeholder="Enter ID number"
                                 />
                               </div>
 
                               <div>
-                                <Label htmlFor="nok_lc1">LC1 Chairman</Label>
+                                <Label htmlFor="nok_lc1">
+                                  LC1 Chairman
+                                </Label>
                                 <Input
                                   id="nok_lc1"
                                   {...registerNextOfKin("lc1")}
@@ -1750,12 +2538,18 @@ const PrisonerAdmissionScreen: React.FC = () => {
                                     <Checkbox
                                       id="discharge_property"
                                       checked={field.value}
-                                      onCheckedChange={field.onChange}
+                                      onCheckedChange={
+                                        field.onChange
+                                      }
                                     />
                                   )}
                                 />
-                                <Label htmlFor="discharge_property" className="cursor-pointer">
-                                  Discharge Property to this person
+                                <Label
+                                  htmlFor="discharge_property"
+                                  className="cursor-pointer"
+                                >
+                                  Discharge Property to this
+                                  person
                                 </Label>
                               </div>
                             </div>
@@ -1763,58 +2557,84 @@ const PrisonerAdmissionScreen: React.FC = () => {
                             <Separator />
 
                             <div>
-                              <h4 className="mb-4">Next of Kin Address</h4>
+                              <h4 className="mb-4">
+                                Next of Kin Address
+                              </h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
-                                  <Label htmlFor="nok_address_region">Region</Label>
+                                  <Label htmlFor="nok_address_region">
+                                    Region
+                                  </Label>
                                   <Input
                                     id="nok_address_region"
-                                    {...registerNextOfKin("address_region")}
+                                    {...registerNextOfKin(
+                                      "address_region",
+                                    )}
                                     placeholder="Enter region"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="nok_address_district">District</Label>
+                                  <Label htmlFor="nok_address_district">
+                                    District
+                                  </Label>
                                   <Input
                                     id="nok_address_district"
-                                    {...registerNextOfKin("address_district")}
+                                    {...registerNextOfKin(
+                                      "address_district",
+                                    )}
                                     placeholder="Enter district"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="nok_address_county">County</Label>
+                                  <Label htmlFor="nok_address_county">
+                                    County
+                                  </Label>
                                   <Input
                                     id="nok_address_county"
-                                    {...registerNextOfKin("address_county")}
+                                    {...registerNextOfKin(
+                                      "address_county",
+                                    )}
                                     placeholder="Enter county"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="nok_address_sub_county">Sub County</Label>
+                                  <Label htmlFor="nok_address_sub_county">
+                                    Sub County
+                                  </Label>
                                   <Input
                                     id="nok_address_sub_county"
-                                    {...registerNextOfKin("address_sub_county")}
+                                    {...registerNextOfKin(
+                                      "address_sub_county",
+                                    )}
                                     placeholder="Enter sub county"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="nok_address_parish">Parish</Label>
+                                  <Label htmlFor="nok_address_parish">
+                                    Parish
+                                  </Label>
                                   <Input
                                     id="nok_address_parish"
-                                    {...registerNextOfKin("address_parish")}
+                                    {...registerNextOfKin(
+                                      "address_parish",
+                                    )}
                                     placeholder="Enter parish"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="nok_address_village">Village</Label>
+                                  <Label htmlFor="nok_address_village">
+                                    Village
+                                  </Label>
                                   <Input
                                     id="nok_address_village"
-                                    {...registerNextOfKin("address_village")}
+                                    {...registerNextOfKin(
+                                      "address_village",
+                                    )}
                                     placeholder="Enter village"
                                   />
                                 </div>
@@ -1825,16 +2645,26 @@ const PrisonerAdmissionScreen: React.FC = () => {
                               <Button
                                 type="button"
                                 variant="outline"
-                                onClick={handleCancelNextOfKinForm}
+                                onClick={
+                                  handleCancelNextOfKinForm
+                                }
                               >
                                 Cancel
                               </Button>
-                              <Button type="submit" className="bg-[#650000] hover:bg-[#4a0000]">
+                              <Button
+                                type="button"
+                                className="bg-[#650000] hover:bg-[#4a0000]"
+                                onClick={handleSubmitNextOfKin(
+                                  onSubmitNextOfKin,
+                                )}
+                              >
                                 <Save className="h-4 w-4 mr-2" />
-                                {currentNextOfKin ? "Update Next of Kin" : "Add Next of Kin"}
+                                {currentNextOfKin
+                                  ? "Update Next of Kin"
+                                  : "Add Next of Kin"}
                               </Button>
                             </div>
-                          </form>
+                          </div>
                         </CardContent>
                       </Card>
                     )}
@@ -1842,13 +2672,20 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </TabsContent>
 
                 {/* Other Information Tab */}
-                <TabsContent value="other" className="space-y-4">
+                <TabsContent
+                  value="other"
+                  className="space-y-4"
+                >
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor="photo">Photo Upload</Label>
+                      <Label htmlFor="photo">
+                        Photo Upload
+                      </Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center">
                         <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-600">Click to upload photo</p>
+                        <p className="text-sm text-gray-600">
+                          Click to upload photo
+                        </p>
                         <Input
                           id="photo"
                           type="file"
@@ -1860,10 +2697,14 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="finger_print">Fingerprint Upload</Label>
+                      <Label htmlFor="finger_print">
+                        Fingerprint Upload
+                      </Label>
                       <div className="border-2 border-dashed rounded-lg p-4 text-center">
                         <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-600">Click to upload fingerprint</p>
+                        <p className="text-sm text-gray-600">
+                          Click to upload fingerprint
+                        </p>
                         <Input
                           id="finger_print"
                           type="file"
@@ -1874,7 +2715,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                     </div>
 
                     <div>
-                      <Label htmlFor="age_on_admission">Age on Admission</Label>
+                      <Label htmlFor="age_on_admission">
+                        Age on Admission
+                      </Label>
                       <Input
                         id="age_on_admission"
                         type="number"
@@ -1882,40 +2725,65 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         placeholder="Enter age"
                       />
                     </div>
-
-                    <div>
-                      <Label htmlFor="estimated_age_of_pregnancy">
-                        Estimated Age of Pregnancy (weeks)
-                      </Label>
-                      <Input
-                        id="estimated_age_of_pregnancy"
-                        type="number"
-                        {...register("estimated_age_of_pregnancy")}
-                        placeholder="If applicable"
-                      />
-                    </div>
                   </div>
                 </TabsContent>
               </Tabs>
 
-              {/* Children Section - Only visible for Female prisoners */}
+              {/* Status of Women Section - Only visible for Female prisoners */}
               {watchSex === "sex-2" && (
                 <div className="mt-6 space-y-4">
-                  <div className="flex items-center gap-2 pb-4 border-b">
-                    <Checkbox
-                      id="has_children"
-                      checked={hasChildren}
-                      onCheckedChange={(checked) => setHasChildren(checked as boolean)}
-                    />
-                    <Label htmlFor="has_children" className="cursor-pointer">
-                      Prisoner has children
+                  <div className="pb-4 border-b">
+                    <Label htmlFor="status_of_women">
+                      Status of Women
                     </Label>
+                    <Select
+                      value={watchStatusOfWomen}
+                      onValueChange={(value) =>
+                        setValue("status_of_women", value)
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status of women" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {mockStatusOfWomen.map((status) => (
+                          <SelectItem
+                            key={status.id}
+                            value={status.id}
+                          >
+                            {status.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
 
-                  {hasChildren && (
+                  {/* Estimated Duration of Pregnancy - Show if Pregnant or Pregnant + With Child */}
+                  {(watchStatusOfWomen === "sow-1" ||
+                    watchStatusOfWomen === "sow-3") && (
+                    <div>
+                      <Label htmlFor="estimated_age_of_pregnancy">
+                        Estimated Duration of Pregnancy (weeks)
+                      </Label>
+                      <Input
+                        id="estimated_age_of_pregnancy"
+                        type="number"
+                        {...register(
+                          "estimated_age_of_pregnancy",
+                        )}
+                        placeholder="Enter estimated duration in weeks"
+                      />
+                    </div>
+                  )}
+
+                  {/* Children Section - Show if With Child or Pregnant + With Child */}
+                  {(watchStatusOfWomen === "sow-2" ||
+                    watchStatusOfWomen === "sow-3") && (
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-sm">Children Records</h4>
+                        <h4 className="text-sm">
+                          Children Records
+                        </h4>
                         <Button
                           type="button"
                           size="sm"
@@ -1932,26 +2800,40 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           <TableHeader>
                             <TableRow>
                               <TableHead>Name</TableHead>
-                              <TableHead>Date of Birth</TableHead>
+                              <TableHead>
+                                Date of Birth
+                              </TableHead>
                               <TableHead>Sex</TableHead>
-                              <TableHead>Age on Admission</TableHead>
+                              <TableHead>
+                                Age on Admission
+                              </TableHead>
                               <TableHead>Actions</TableHead>
                             </TableRow>
                           </TableHeader>
                           <TableBody>
                             {children.map((child) => (
                               <TableRow key={child.id}>
-                                <TableCell>{child.name}</TableCell>
-                                <TableCell>{child.date_of_birth}</TableCell>
-                                <TableCell>{child.sex}</TableCell>
-                                <TableCell>{child.age_on_admission}</TableCell>
+                                <TableCell>
+                                  {child.name}
+                                </TableCell>
+                                <TableCell>
+                                  {child.date_of_birth}
+                                </TableCell>
+                                <TableCell>
+                                  {child.sex}
+                                </TableCell>
+                                <TableCell>
+                                  {child.age_on_admission}
+                                </TableCell>
                                 <TableCell>
                                   <div className="flex gap-2">
                                     <Button
                                       type="button"
                                       size="sm"
                                       variant="outline"
-                                      onClick={() => handleEditChild(child)}
+                                      onClick={() =>
+                                        handleEditChild(child)
+                                      }
                                     >
                                       Edit
                                     </Button>
@@ -1959,7 +2841,11 @@ const PrisonerAdmissionScreen: React.FC = () => {
                                       type="button"
                                       size="sm"
                                       variant="destructive"
-                                      onClick={() => handleDeleteChild(child.id!)}
+                                      onClick={() =>
+                                        handleDeleteChild(
+                                          child.id!,
+                                        )
+                                      }
                                     >
                                       <X className="h-4 w-4" />
                                     </Button>
@@ -1976,19 +2862,27 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         <Card className="border-2 border-[#650000]">
                           <CardHeader>
                             <CardTitle className="text-[#650000]">
-                              {currentChild ? "Edit Child Record" : "Add Child Record"}
+                              {currentChild
+                                ? "Edit Child Record"
+                                : "Add Child Record"}
                             </CardTitle>
                           </CardHeader>
                           <CardContent>
-                            <form onSubmit={handleSubmitChild(onSubmitChild)} className="space-y-4">
+                            <div className="space-y-4">
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                   <Label htmlFor="child_name">
-                                    Child Name <span className="text-red-500">*</span>
+                                    Child Name{" "}
+                                    <span className="text-red-500">
+                                      *
+                                    </span>
                                   </Label>
                                   <Input
                                     id="child_name"
-                                    {...registerChild("name", { required: "Name is required" })}
+                                    {...registerChild("name", {
+                                      required:
+                                        "Name is required",
+                                    })}
                                     placeholder="Enter child's name"
                                   />
                                   {childErrors.name && (
@@ -2000,133 +2894,196 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                                 <div>
                                   <Label htmlFor="child_dob">
-                                    Date of Birth <span className="text-red-500">*</span>
+                                    Date of Birth{" "}
+                                    <span className="text-red-500">
+                                      *
+                                    </span>
                                   </Label>
                                   <Input
                                     id="child_dob"
                                     type="date"
-                                    {...registerChild("date_of_birth", {
-                                      required: "Date of birth is required",
-                                    })}
+                                    {...registerChild(
+                                      "date_of_birth",
+                                      {
+                                        required:
+                                          "Date of birth is required",
+                                      },
+                                    )}
                                   />
                                   {childErrors.date_of_birth && (
                                     <p className="text-red-500 text-sm mt-1">
-                                      {childErrors.date_of_birth.message}
+                                      {
+                                        childErrors
+                                          .date_of_birth.message
+                                      }
                                     </p>
                                   )}
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="child_sex">Sex</Label>
+                                  <Label htmlFor="child_sex">
+                                    Sex
+                                  </Label>
                                   <Select
                                     value={watchChild("sex")}
-                                    onValueChange={(value) => setChildValue("sex", value)}
+                                    onValueChange={(value) =>
+                                      setChildValue(
+                                        "sex",
+                                        value,
+                                      )
+                                    }
                                   >
                                     <SelectTrigger>
                                       <SelectValue placeholder="Select sex" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                      <SelectItem value="male">Male</SelectItem>
-                                      <SelectItem value="female">Female</SelectItem>
+                                      <SelectItem value="male">
+                                        Male
+                                      </SelectItem>
+                                      <SelectItem value="female">
+                                        Female
+                                      </SelectItem>
                                     </SelectContent>
                                   </Select>
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="child_age">Age on Admission</Label>
+                                  <Label htmlFor="child_age">
+                                    Age on Admission
+                                  </Label>
                                   <Input
                                     id="child_age"
                                     type="number"
-                                    {...registerChild("age_on_admission")}
+                                    {...registerChild(
+                                      "age_on_admission",
+                                    )}
                                     placeholder="Age in years"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="fathers_name">Father's Name</Label>
+                                  <Label htmlFor="fathers_name">
+                                    Father's Name
+                                  </Label>
                                   <Input
                                     id="fathers_name"
-                                    {...registerChild("fathers_name")}
+                                    {...registerChild(
+                                      "fathers_name",
+                                    )}
                                     placeholder="Enter father's name"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="mothers_name">Mother's Name</Label>
+                                  <Label htmlFor="mothers_name">
+                                    Mother's Name
+                                  </Label>
                                   <Input
                                     id="mothers_name"
-                                    {...registerChild("mothers_name")}
+                                    {...registerChild(
+                                      "mothers_name",
+                                    )}
                                     placeholder="Enter mother's name"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="hospital_of_birth">Hospital of Birth</Label>
+                                  <Label htmlFor="hospital_of_birth">
+                                    Hospital of Birth
+                                  </Label>
                                   <Input
                                     id="hospital_of_birth"
-                                    {...registerChild("hospital_of_birth")}
+                                    {...registerChild(
+                                      "hospital_of_birth",
+                                    )}
                                     placeholder="Enter hospital"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="district_of_birth">District of Birth</Label>
+                                  <Label htmlFor="district_of_birth">
+                                    District of Birth
+                                  </Label>
                                   <Input
                                     id="district_of_birth"
-                                    {...registerChild("district_of_birth")}
+                                    {...registerChild(
+                                      "district_of_birth",
+                                    )}
                                     placeholder="Enter district"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="relation">Relation to Prisoner</Label>
+                                  <Label htmlFor="relation">
+                                    Relation to Prisoner
+                                  </Label>
                                   <Input
                                     id="relation"
-                                    {...registerChild("relation")}
+                                    {...registerChild(
+                                      "relation",
+                                    )}
                                     placeholder="e.g., Son, Daughter"
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="physical_condition">Physical Condition</Label>
+                                  <Label htmlFor="physical_condition">
+                                    Physical Condition
+                                  </Label>
                                   <Input
                                     id="physical_condition"
-                                    {...registerChild("physical_condition")}
+                                    {...registerChild(
+                                      "physical_condition",
+                                    )}
                                     placeholder="Describe physical condition"
                                   />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                  <Label htmlFor="medical_condition">Medical Condition</Label>
+                                  <Label htmlFor="medical_condition">
+                                    Medical Condition
+                                  </Label>
                                   <Textarea
                                     id="medical_condition"
-                                    {...registerChild("medical_condition")}
+                                    {...registerChild(
+                                      "medical_condition",
+                                    )}
                                     placeholder="Describe any medical conditions..."
                                     rows={2}
                                   />
                                 </div>
 
                                 <div className="md:col-span-2">
-                                  <Label htmlFor="child_description">Description</Label>
+                                  <Label htmlFor="child_description">
+                                    Description
+                                  </Label>
                                   <Textarea
                                     id="child_description"
-                                    {...registerChild("description")}
+                                    {...registerChild(
+                                      "description",
+                                    )}
                                     placeholder="Additional information about the child..."
                                     rows={2}
                                   />
                                 </div>
 
                                 <div>
-                                  <Label htmlFor="child_photo">Photo Upload</Label>
+                                  <Label htmlFor="child_photo">
+                                    Photo Upload
+                                  </Label>
                                   <div className="border-2 border-dashed rounded-lg p-4 text-center">
                                     <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">Click to upload</p>
+                                    <p className="text-sm text-gray-600">
+                                      Click to upload
+                                    </p>
                                     <Input
                                       id="child_photo"
                                       type="file"
                                       accept="image/*"
                                       className="hidden"
-                                      {...registerChild("photo")}
+                                      {...registerChild(
+                                        "photo",
+                                      )}
                                     />
                                   </div>
                                 </div>
@@ -2136,16 +3093,26 @@ const PrisonerAdmissionScreen: React.FC = () => {
                                 <Button
                                   type="button"
                                   variant="outline"
-                                  onClick={handleCancelChildForm}
+                                  onClick={
+                                    handleCancelChildForm
+                                  }
                                 >
                                   Cancel
                                 </Button>
-                                <Button type="submit" className="bg-[#650000] hover:bg-[#4a0000]">
+                                <Button
+                                  type="button"
+                                  className="bg-[#650000] hover:bg-[#4a0000]"
+                                  onClick={handleSubmitChild(
+                                    onSubmitChild,
+                                  )}
+                                >
                                   <Save className="h-4 w-4 mr-2" />
-                                  {currentChild ? "Update Child" : "Add Child"}
+                                  {currentChild
+                                    ? "Update Child"
+                                    : "Add Child"}
                                 </Button>
                               </div>
-                            </form>
+                            </div>
                           </CardContent>
                         </Card>
                       )}
@@ -2163,10 +3130,14 @@ const PrisonerAdmissionScreen: React.FC = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Previous
                 </Button>
-                <Button type="submit" className="bg-[#650000] hover:bg-[#4a0000]">
+                <Button
+                  type="submit"
+                  className="bg-[#650000] hover:bg-[#4a0000]"
+                >
                   {prisonerCategory === "DEBTOR" ? (
                     <>
-                      Next <ArrowRight className="h-4 w-4 ml-2" />
+                      Next{" "}
+                      <ArrowRight className="h-4 w-4 ml-2" />
                     </>
                   ) : (
                     <>
@@ -2194,7 +3165,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
             <CardContent className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="value_of_debt">Value of Debt</Label>
+                  <Label htmlFor="value_of_debt">
+                    Value of Debt
+                  </Label>
                   <Input
                     id="value_of_debt"
                     {...registerDebtor("value_of_debt")}
@@ -2203,7 +3176,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="creditor_name">Creditor Name</Label>
+                  <Label htmlFor="creditor_name">
+                    Creditor Name
+                  </Label>
                   <Input
                     id="creditor_name"
                     {...registerDebtor("creditor_name")}
@@ -2212,7 +3187,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="date_of_committal">Date of Committal</Label>
+                  <Label htmlFor="date_of_committal">
+                    Date of Committal
+                  </Label>
                   <Input
                     id="date_of_committal"
                     type="date"
@@ -2221,7 +3198,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="subsistence_allowance">Subsistence Allowance</Label>
+                  <Label htmlFor="subsistence_allowance">
+                    Subsistence Allowance
+                  </Label>
                   <Input
                     id="subsistence_allowance"
                     {...registerDebtor("subsistence_allowance")}
@@ -2230,7 +3209,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="rate_per_day">Rate Per Day</Label>
+                  <Label htmlFor="rate_per_day">
+                    Rate Per Day
+                  </Label>
                   <Input
                     id="rate_per_day"
                     {...registerDebtor("rate_per_day")}
@@ -2239,7 +3220,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="amount_received">Amount Received</Label>
+                  <Label htmlFor="amount_received">
+                    Amount Received
+                  </Label>
                   <Input
                     id="amount_received"
                     {...registerDebtor("amount_received")}
@@ -2258,7 +3241,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="amount_for_full_days">Amount for Full Days</Label>
+                  <Label htmlFor="amount_for_full_days">
+                    Amount for Full Days
+                  </Label>
                   <Input
                     id="amount_for_full_days"
                     {...registerDebtor("amount_for_full_days")}
@@ -2267,17 +3252,23 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 </div>
 
                 <div>
-                  <Label htmlFor="previous_convictions_count">Previous Convictions</Label>
+                  <Label htmlFor="previous_convictions_count">
+                    Previous Convictions
+                  </Label>
                   <Input
                     id="previous_convictions_count"
                     type="number"
-                    {...registerDebtor("previous_convictions_count")}
+                    {...registerDebtor(
+                      "previous_convictions_count",
+                    )}
                     placeholder="Number of previous convictions"
                   />
                 </div>
 
                 <div className="md:col-span-2">
-                  <Label htmlFor="next_of_kin_details">Next of Kin Details</Label>
+                  <Label htmlFor="next_of_kin_details">
+                    Next of Kin Details
+                  </Label>
                   <Textarea
                     id="next_of_kin_details"
                     {...registerDebtor("next_of_kin_details")}
@@ -2301,7 +3292,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="escapee" className="cursor-pointer">
+                      <Label
+                        htmlFor="escapee"
+                        className="cursor-pointer"
+                      >
                         Escapee
                       </Label>
                     </div>
@@ -2319,7 +3313,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="armed_personnel" className="cursor-pointer">
+                      <Label
+                        htmlFor="armed_personnel"
+                        className="cursor-pointer"
+                      >
                         Armed Personnel
                       </Label>
                     </div>
@@ -2337,7 +3334,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="extremely_violent" className="cursor-pointer">
+                      <Label
+                        htmlFor="extremely_violent"
+                        className="cursor-pointer"
+                      >
                         Extremely Violent
                       </Label>
                     </div>
@@ -2357,7 +3357,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="life_or_death_imprisonment" className="cursor-pointer">
+                      <Label
+                        htmlFor="life_or_death_imprisonment"
+                        className="cursor-pointer"
+                      >
                         Life/Death Imprisonment
                       </Label>
                     </div>
@@ -2375,7 +3378,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="lodger" className="cursor-pointer">
+                      <Label
+                        htmlFor="lodger"
+                        className="cursor-pointer"
+                      >
                         Lodger
                       </Label>
                     </div>
@@ -2393,7 +3399,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                           />
                         )}
                       />
-                      <Label htmlFor="commital" className="cursor-pointer">
+                      <Label
+                        htmlFor="commital"
+                        className="cursor-pointer"
+                      >
                         Committal
                       </Label>
                     </div>
@@ -2410,7 +3419,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Previous
                 </Button>
-                <Button type="submit" className="bg-[#650000] hover:bg-[#4a0000]">
+                <Button
+                  type="submit"
+                  className="bg-[#650000] hover:bg-[#4a0000]"
+                >
                   <Save className="h-4 w-4 mr-2" />
                   Submit Admission
                 </Button>
