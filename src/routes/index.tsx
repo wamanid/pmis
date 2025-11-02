@@ -3,6 +3,7 @@ import { UnderDevelopment } from '../components/common/UnderDevelopment';
 import { authRoutes } from './auth.routes';
 import { stationRoutes } from './station.routes';
 import { admissionRoutes } from './admission.routes';
+import { demoRoutes } from './demo.routes';
 
 /**
  * Application Routes Configuration
@@ -12,6 +13,7 @@ import { admissionRoutes } from './admission.routes';
  * - Authentication routes (login, logout)
  * - Station management routes (lockup, entry/exit, journals, etc.)
  * - Admissions management routes (prisoner admission, approvals, etc.)
+ * - Demo routes (component demonstrations and examples)
  */
 export const routes: RouteObject[] = [
   // Authentication Routes
@@ -22,6 +24,9 @@ export const routes: RouteObject[] = [
 
   // Admissions Management Routes
   ...admissionRoutes,
+
+  // Demo Routes
+  ...demoRoutes,
 
   // Default/Fallback Route
   {

@@ -21,10 +21,37 @@ axiosInstance.interceptors.request.use(
       config.headers.Authorization = `Bearer ${token}`;
     }
     
+    // Add location filters to query parameters
+    const filterStorage = localStorage.getItem('pmis_user_filters');
+    if (filterStorage) {
+      try {
+        const filters = JSON.parse(filterStorage);
+        
+        // Initialize params if not exists
+        if (!config.params) {
+          config.params = {};
+        }
+        
+        // Add filter params if they exist and aren't already in the request
+        if (filters.region && !config.params.region) {
+          config.params.region = filters.region;
+        }
+        if (filters.district && !config.params.district) {
+          config.params.district = filters.district;
+        }
+        if (filters.station && !config.params.station) {
+          config.params.station = filters.station;
+        }
+      } catch (error) {
+        console.error('Failed to parse filter storage:', error);
+      }
+    }
+    
     // Log request for debugging (remove in production)
     console.log('API Request:', {
       method: config.method?.toUpperCase(),
       url: config.url,
+      params: config.params,
       data: config.data,
     });
     
