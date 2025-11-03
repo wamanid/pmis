@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Search,
   Plus,
@@ -13,6 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import ComplaintForm from "./ComplaintForm";
+import * as ComplaintsService from "../../services/ComplaintsService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -469,7 +470,13 @@ const mockComplaints: Complaint[] = [
 ];
 
 const ComplaintsScreen: React.FC = () => {
-  const [complaints, setComplaints] = useState<Complaint[]>(mockComplaints);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [natures, setNatures] = useState<any[]>([]);
+  const [priorities, setPriorities] = useState<any[]>([]);
+  const [ranks, setRanks] = useState<any[]>([]);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -603,16 +610,61 @@ const ComplaintsScreen: React.FC = () => {
     setIsFormOpen(true);
   };
 
-  // Save complaint (add or edit)
-  const handleSaveComplaint = (complaint: Complaint) => {
-    if (formMode === "add") {
-      setComplaints([complaint, ...complaints]);
-    } else {
-      setComplaints(
-        complaints.map((c) => (c.id === complaint.id ? complaint : c)),
-      );
+  // Save complaint (add or edit) — persists via API
+  const handleSaveComplaint = async (complaint: any) => {
+    try {
+      if (formMode === "add") {
+        const created = await ComplaintsService.createComplaint(complaint);
+        // API may return created object or wrapper; try common shapes
+        const newItem = created?.results ? created.results[0] : created;
+        setComplaints((prev) => [newItem || complaint, ...prev]);
+      } else {
+        const updated = await ComplaintsService.updateComplaint(complaint.id, complaint);
+        const updatedItem = updated?.results ? updated.results[0] : updated;
+        setComplaints((prev) => prev.map((c) => (c.id === (updatedItem?.id ?? complaint.id) ? (updatedItem || complaint) : c)));
+      }
+    } catch (err) {
+      // axiosInstance will show toast; keep UI stable
     }
   };
+
+  const handleDeleteComplaint = async (id: string) => {
+    if (!confirm('Delete this complaint?')) return;
+    try {
+      await ComplaintsService.deleteComplaint(id);
+      setComplaints((prev) => prev.filter((c) => c.id !== id));
+      setIsDetailsOpen(false);
+    } catch (err) { /* axios will show error */ }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const [complaintsRes, stationsRes, prisonersRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
+          ComplaintsService.fetchComplaints({ page_size: 100 }),
+          ComplaintsService.fetchStations(),
+          ComplaintsService.fetchPrisoners(),
+          ComplaintsService.fetchComplaintNatures(),
+          ComplaintsService.fetchPriorities(),
+          ComplaintsService.fetchRanks(),
+        ]);
+
+        // Normalize complaints list
+        const items = complaintsRes?.results ?? complaintsRes ?? [];
+        setComplaints(items);
+        setStations(stationsRes || []);
+        setPrisoners(prisonersRes || []);
+        setNatures(naturesRes || []);
+        setPriorities(prioritiesRes || []);
+        setRanks(ranksRes || []);
+      } catch (e) {
+        // errors handled by axiosInstance interceptors
+      }
+    };
+
+    load();
+  }, []);
 
   // Statistics
   const stats = {
@@ -1009,6 +1061,11 @@ const ComplaintsScreen: React.FC = () => {
         onSave={handleSaveComplaint}
         complaint={editingComplaint}
         mode={formMode}
+        stations={stations}
+        prisoners={prisoners}
+        complaintNatures={natures}
+        priorities={priorities}
+        ranks={ranks}
       />
     </div>
   );

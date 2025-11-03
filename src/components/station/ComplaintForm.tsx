@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useForm } from "react-hook-form@7.55.0";
+import { useForm } from "react-hook-form";
 import {
   Plus,
   Trash2,
@@ -33,7 +33,7 @@ import {
 import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 
 interface ComplaintAction {
   id: string;
@@ -85,6 +85,7 @@ interface Complaint {
 }
 
 interface ComplaintFormData {
+  prisoner?: string;
   prisoner_name: string;
   station: string;
   nature_of_complaint: string;
@@ -112,54 +113,59 @@ interface ComplaintFormProps {
   onSave: (complaint: Complaint) => void;
   complaint?: Complaint | null;
   mode: "add" | "edit";
+  stations?: { id: string; name: string }[];
+  prisoners?: { id: string; name: string }[];
+  complaintNatures?: { id: string; name: string }[];
+  priorities?: { id: string; name: string }[];
+  ranks?: { id: string; name: string }[];
 }
 
 // Mock options
-const mockStations = [
-  { id: "station-1", name: "Central Police Station" },
-  { id: "station-2", name: "North Division Station" },
-  { id: "station-3", name: "South District Station" },
-  { id: "station-4", name: "East Division Station" },
-  { id: "station-5", name: "West Division Station" },
-];
+// const mockStations = [
+//   { id: "station-1", name: "Centralzz Police Station" },
+//   { id: "station-2", name: "North Division Station" },
+//   { id: "station-3", name: "South District Station" },
+//   { id: "station-4", name: "East Division Station" },
+//   { id: "station-5", name: "West Division Station" },
+// ];
 
-const mockPrisoners = [
-  { id: "prisoner-1", name: "John Doe" },
-  { id: "prisoner-2", name: "Jane Smith" },
-  { id: "prisoner-3", name: "Robert Wilson" },
-  { id: "prisoner-4", name: "Maria Garcia" },
-  { id: "prisoner-5", name: "Ahmed Khan" },
-  { id: "prisoner-6", name: "Carlos Mendez" },
-  { id: "prisoner-7", name: "Thomas Anderson" },
-  { id: "prisoner-8", name: "Sarah Johnson" },
-];
+// const mockPrisoners = [
+//   { id: "prisoner-1", name: "John Doe" },
+//   { id: "prisoner-2", name: "Jane Smith" },
+//   { id: "prisoner-3", name: "Robert Wilson" },
+//   { id: "prisoner-4", name: "Maria Garcia" },
+//   { id: "prisoner-5", name: "Ahmed Khan" },
+//   { id: "prisoner-6", name: "Carlos Mendez" },
+//   { id: "prisoner-7", name: "Thomas Anderson" },
+//   { id: "prisoner-8", name: "Sarah Johnson" },
+// ];
 
-const complaintNatures = [
-  { id: "nature-1", name: "Medical Emergency" },
-  { id: "nature-2", name: "Poor Cell Conditions" },
-  { id: "nature-3", name: "Food Quality" },
-  { id: "nature-4", name: "Visitation Rights" },
-  { id: "nature-5", name: "Physical Assault" },
-  { id: "nature-6", name: "Legal Access" },
-  { id: "nature-7", name: "Property Damage" },
-  { id: "nature-8", name: "Hygiene Issues" },
-  { id: "nature-9", name: "Harassment" },
-  { id: "nature-10", name: "Other" },
-];
+// const complaintNatures = [
+//   { id: "nature-1", name: "Medical Emergency" },
+//   { id: "nature-2", name: "Poor Cell Conditions" },
+//   { id: "nature-3", name: "Food Quality" },
+//   { id: "nature-4", name: "Visitation Rights" },
+//   { id: "nature-5", name: "Physical Assault" },
+//   { id: "nature-6", name: "Legal Access" },
+//   { id: "nature-7", name: "Property Damage" },
+//   { id: "nature-8", name: "Hygiene Issues" },
+//   { id: "nature-9", name: "Harassment" },
+//   { id: "nature-10", name: "Other" },
+// ];
 
-const priorities = [
-  { id: "priority-1", name: "Critical" },
-  { id: "priority-2", name: "High" },
-  { id: "priority-3", name: "Medium" },
-  { id: "priority-4", name: "Low" },
-];
+// const priorities = [
+//   { id: "priority-1", name: "Critical" },
+//   { id: "priority-2", name: "High" },
+//   { id: "priority-3", name: "Medium" },
+//   { id: "priority-4", name: "Low" },
+// ];
 
-const ranks = [
-  { id: "rank-1", name: "Chief Inspector" },
-  { id: "rank-2", name: "Inspector" },
-  { id: "rank-3", name: "Sergeant" },
-  { id: "rank-4", name: "Constable" },
-];
+// const ranks = [
+//   { id: "rank-1", name: "Chief Inspector" },
+//   { id: "rank-2", name: "Inspector" },
+//   { id: "rank-3", name: "Sergeant" },
+//   { id: "rank-4", name: "Constable" },
+// ];
 
 const ComplaintForm: React.FC<ComplaintFormProps> = ({
   isOpen,
@@ -167,6 +173,11 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   onSave,
   complaint,
   mode,
+  stations = [],
+  prisoners = [],
+  complaintNatures = [],
+  priorities = [],
+  ranks = [],
 }) => {
   const [actions, setActions] = useState<ComplaintAction[]>([]);
   const [isAddingAction, setIsAddingAction] = useState(false);
@@ -186,6 +197,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     formState: { errors },
   } = useForm<ComplaintFormData>({
     defaultValues: {
+      prisoner: "",
       prisoner_name: "",
       station: "",
       nature_of_complaint: "",
@@ -207,11 +219,12 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   const watchPriority = watch("complaint_priority");
   const watchStatus = watch("complaint_status");
   const watchRank = watch("rank");
+  const watchPrisoner = watch("prisoner");
 
   // Initialize form with complaint data if editing
   useEffect(() => {
     if (complaint && mode === "edit") {
-      setValue("prisoner_name", complaint.prisoner_name);
+      setValue("prisoner", complaint.prisoner);
       setValue("station", complaint.station);
       setValue("nature_of_complaint", complaint.nature_of_complaint);
       setValue("complaint_priority", complaint.complaint_priority);
@@ -250,18 +263,16 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
 
   const onSubmit = (data: ComplaintFormData) => {
     // Get names from IDs
-    const stationName =
-      mockStations.find((s) => s.id === data.station)?.name || "";
-    const natureName =
-      complaintNatures.find((n) => n.id === data.nature_of_complaint)?.name || "";
-    const priorityName =
-      priorities.find((p) => p.id === data.complaint_priority)?.name || "";
+    const stationName = stations.find((s) => s.id === data.station)?.name || "";
+    const natureName = complaintNatures.find((n) => n.id === data.nature_of_complaint)?.name || "";
+    const priorityName = priorities.find((p) => p.id === data.complaint_priority)?.name || "";
     const rankName = ranks.find((r) => r.id === data.rank)?.name || "";
+    const prisonerName = prisoners.find((p) => p.id === (data as any).prisoner)?.name || (data as any).prisoner || "";
 
     const complaintData: Complaint = {
       id: complaint?.id || `complaint-${Date.now()}`,
       station_name: stationName,
-      prisoner_name: data.prisoner_name,
+      prisoner_name: prisonerName,
       nature_of_complaint_name: natureName,
       complaint_priority_name: priorityName,
       officer_requested_username: data.officer_requested_username,
@@ -283,7 +294,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       updated_by: 1,
       deleted_by: null,
       station: data.station,
-      prisoner: data.prisoner_name,
+      prisoner: (data as any).prisoner || data.prisoner_name,
       nature_of_complaint: data.nature_of_complaint,
       complaint_priority: data.complaint_priority,
       officer_requested: 1,
@@ -380,20 +391,26 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="prisoner_name">
-                  Prisoner Name <span className="text-red-500">*</span>
+                <Label htmlFor="prisoner">
+                  Prisoner <span className="text-red-500">*</span>
                 </Label>
-                <Input
-                  id="prisoner_name"
-                  {...register("prisoner_name", {
-                    required: "Prisoner name is required",
-                  })}
-                  placeholder="Enter prisoner name"
-                />
-                {errors.prisoner_name && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.prisoner_name.message}
-                  </p>
+                <Select
+                  value={watchPrisoner}
+                  onValueChange={(value) => setValue("prisoner", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select prisoner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prisoners.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
                 )}
               </div>
 
@@ -409,7 +426,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                     <SelectValue placeholder="Select station" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockStations.map((station) => (
+                    {stations.map((station) => (
                       <SelectItem key={station.id} value={station.id}>
                         {station.name}
                       </SelectItem>
