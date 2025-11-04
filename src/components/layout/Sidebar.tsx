@@ -35,6 +35,7 @@ import { Skeleton } from '../ui/skeleton';
 import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
 import { fetchMenus, ApiMenuItem } from '../../services/menuService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 type MenuItem = {
   id: string;
@@ -131,22 +132,21 @@ export function Sidebar({ isOpen }: SidebarProps) {
   const [menusLoading, setMenusLoading] = useState(true);
 
   // Load menus from API
-  useEffect(() => {
-    const loadMenus = async () => {
-      try {
-        setMenusLoading(true);
-        const response = await fetchMenus();
-        const menus = buildMenuTree(response.results);
-        setMenuItems(menus);
-      } catch (error) {
-        console.error('Failed to load menus:', error);
-      } finally {
-        setMenusLoading(false);
-      }
-    };
+  const loadMenus = async () => {
+    try {
+      setMenusLoading(true);
+      const response = await fetchMenus();
+      const menus = buildMenuTree(response.results);
+      setMenuItems(menus);
+    } catch (error) {
+      console.error('Failed to load menus:', error);
+    } finally {
+      setMenusLoading(false);
+    }
+  };
 
-    loadMenus();
-  }, []);
+  // Load menus on mount and when location filters change
+  useFilterRefresh(loadMenus);
 
   // Helper function to find all parent IDs leading to active page
   const findParentsOfActivePath = (
