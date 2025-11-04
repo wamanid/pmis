@@ -110,7 +110,8 @@ interface ActionFormData {
 interface ComplaintFormProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (complaint: Complaint) => void;
+  // onSave now must return a Promise so the form can wait for the API result
+  onSave: (complaint: Complaint) => Promise<any>;
   complaint?: Complaint | null;
   mode: "add" | "edit";
   stations?: { id: string; name: string }[];
@@ -181,6 +182,9 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
 }) => {
   const [actions, setActions] = useState<ComplaintAction[]>([]);
   const [isAddingAction, setIsAddingAction] = useState(false);
+  // add search state for prisoners and stations
+  const [prisonerSearch, setPrisonerSearch] = useState("");
+  const [stationSearch, setStationSearch] = useState("");
   const [currentActionForm, setCurrentActionForm] = useState<ActionFormData>({
     action: "",
     action_date: new Date().toISOString().split("T")[0],
@@ -261,7 +265,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     }
   }, [isOpen, reset]);
 
-  const onSubmit = (data: ComplaintFormData) => {
+  const onSubmit = async (data: ComplaintFormData) => {
     // Get names from IDs
     const stationName = stations.find((s) => s.id === data.station)?.name || "";
     const natureName = complaintNatures.find((n) => n.id === data.nature_of_complaint)?.name || "";
@@ -301,13 +305,16 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       rank: data.rank,
     };
 
-    onSave(complaintData);
-    toast.success(
-      mode === "add"
-        ? "Complaint created successfully"
-        : "Complaint updated successfully",
-    );
-    onClose();
+    try {
+      await onSave(complaintData);
+      toast.success(
+        mode === "add" ? "Complaint created successfully" : "Complaint updated successfully",
+      );
+      onClose();
+    } catch (err) {
+      // axiosInstance interceptors already show detailed toast for many errors.
+      toast.error("Failed to save complaint. Please check your input.");
+    }
   };
 
   const handleAddAction = () => {
@@ -390,7 +397,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
               Basic Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
+              {/* <div>
                 <Label htmlFor="prisoner">
                   Prisoner <span className="text-red-500">*</span>
                 </Label>
@@ -412,9 +419,45 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 {errors.prisoner && (
                   <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
                 )}
-              </div>
+              </div> */}
+                <div>
+                <Label htmlFor="prisoner">
+                  Prisoner <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={watchPrisoner}
+                  onValueChange={(value: string) => setValue("prisoner", value)}
+                  >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select prisoner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <div className="px-3 py-2">
+                    <Input
+                      placeholder="Search prisoner..."
+                      value={prisonerSearch}
+                      onChange={(e) => setPrisonerSearch(e.target.value)}
+                      className="mb-2"
+                    />
+                    </div>
+                    {prisoners
+                    .filter((p) => {
+                      if (!prisonerSearch) return true;
+                      return p.name?.toLowerCase().includes(prisonerSearch.toLowerCase());
+                    })
+                    .map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
+                )}
+                </div>
 
-              <div>
+                <div>
                 <Label htmlFor="station">
                   Station <span className="text-red-500">*</span>
                 </Label>
@@ -423,22 +466,35 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                   onValueChange={(value) => setValue("station", value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select station" />
+                  <SelectValue placeholder="Select station" />
                   </SelectTrigger>
                   <SelectContent>
-                    {stations.map((station) => (
-                      <SelectItem key={station.id} value={station.id}>
-                        {station.name}
-                      </SelectItem>
+                  <div className="px-3 py-2">
+                    <Input
+                    placeholder="Search station..."
+                    value={stationSearch}
+                    onChange={(e) => setStationSearch(e.target.value)}
+                    className="mb-2"
+                    />
+                  </div>
+                  {stations
+                    .filter((s) => {
+                    if (!stationSearch) return true;
+                    return s.name?.toLowerCase().includes(stationSearch.toLowerCase());
+                    })
+                    .map((station) => (
+                    <SelectItem key={station.id} value={station.id}>
+                      {station.name}
+                    </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {errors.station && (
                   <p className="text-red-500 text-sm mt-1">
-                    {errors.station.message}
+                  {errors.station.message}
                   </p>
                 )}
-              </div>
+                </div>
 
               <div>
                 <Label htmlFor="complaint_date">
