@@ -12,31 +12,6 @@ export interface AddLockUp {
   sex: string;
 }
 
-export interface LockupRecordResponse {
-  id?: string;
-  error?: string;
-  station_name?: string;
-  type_name?: string;
-  prisoner_category_name?: string;
-  sex_name?: string;
-  created_by_name?: string;
-  created_datetime?: string;
-  is_active?: boolean;
-  updated_datetime?: string;
-  deleted_datetime?: string;
-  date?: string;
-  lockup_time?: string;
-  location?: string;
-  count?: number;
-  created_by?: number;
-  updated_by?: number;
-  deleted_by?: number;
-  station?: string;
-  type?: string;
-  prisoner_category?: string;
-  sex?: string;
-}
-
 export interface Item {
   id: string;
   created_datetime: string;
@@ -127,6 +102,37 @@ export interface LockType {
   results: LockTypeItem[];
 }
 
+export interface ManualLockUpItem {
+  id: string;
+  station_name: string;
+  type_name: string;
+  prisoner_category_name: string;
+  sex_name: string;
+  created_by_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  date: string;
+  lockup_time: string;
+  location: string;
+  count: number;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  station: string;
+  type: string;
+  prisoner_category: string;
+  sex: string;
+}
+
+export interface ManualLockup {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: ManualLockUpItem[];
+}
+
 export interface ErrorResponse {
   error: string;
 }
@@ -134,11 +140,23 @@ export interface ErrorResponse {
 export type StationInformationResponse = StationInformation | ErrorResponse;
 export type StationResponse = Station | ErrorResponse;
 export type LockTypeResponse = LockType | ErrorResponse;
+export type ManualLockupResponse = ManualLockup | ErrorResponse;
+export type ManualLockupResp = ManualLockUpItem | ErrorResponse;
 
-export const addLockUpRecord = async (lockup: AddLockUp): Promise<LockupRecordResponse> => {
-  const response = await axiosInstance.post<LockupRecordResponse>('/station-management/api/manual-lockups/', lockup);
+export const addLockUpRecord = async (lockup: AddLockUp): Promise<ManualLockupResp> => {
+  const response = await axiosInstance.post<ManualLockupResp>('/station-management/api/manual-lockups/', lockup);
   return response.data;
 };
+
+export const getManualLockup = async () : Promise<ManualLockupResponse> => {
+  const response = await axiosInstance.get<ManualLockupResponse>('/station-management/api/manual-lockups/');
+  return response.data;
+}
+
+export const getLockType = async () : Promise<LockTypeResponse> => {
+  const response = await axiosInstance.get<LockTypeResponse>('/station-management/api/lockup-types/');
+  return response.data;
+}
 
 export const getSexes = async () : Promise<StationInformationResponse> => {
   const response = await axiosInstance.get<StationInformationResponse>('/system-administration/sexes/');
@@ -154,10 +172,3 @@ export const getStation = async () : Promise<StationResponse> => {
   const response = await axiosInstance.get<StationResponse>('/system-administration/stations/');
   return response.data;
 }
-
-export const getLockType = async () : Promise<LockTypeResponse> => {
-  const response = await axiosInstance.get<LockTypeResponse>('/station-management/api/lockup-types/');
-  return response.data;
-}
-
-

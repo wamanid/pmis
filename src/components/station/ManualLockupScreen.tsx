@@ -1,4 +1,4 @@
-import {useEffect, useState} from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
@@ -16,8 +16,8 @@ import { ManualLockupTableView } from './ManualLockupTableView';
 
 import {
   addLockUpRecord,
-  getLockType, getPrisonerCategories, getSexes,
-  getStation,
+  getLockType, getManualLockup, getPrisonerCategories, getSexes,
+  getStation, ManualLockUpItem,
 } from '../../services/otherServices/manualLockupIntegration';
 import axiosInstance from "../../services/axiosInstance";
 
@@ -100,11 +100,12 @@ const mockLockupData: ManualLockup[] = [
 ];
 
 export function ManualLockupScreen() {
-  const [lockups, setLockups] = useState<ManualLockup[]>(mockLockupData);
+  const [lockups, setLockups] = useState<ManualLockUpItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stationDataLoading, setStationDataLoading] = useState(true);
+  const [recordsListLoading, setRecordsListLoading] = useState(true)
   const [stations, setStations] = useState([])
   const [lockTypes, setLockTypes] = useState([])
   const [sexes, setSexes] = useState([])
@@ -159,12 +160,12 @@ export function ManualLockupScreen() {
 
     try {
       const response = await addLockUpRecord(newLockup)
-      if (response.error) {
-        toast.error(response.error);
-        return;
+      if ('error' in response){
+           toast.error(response.error);
+           return
       }
 
-      setLockups([newLockup, ...lockups]);
+      setLockups([response, ...lockups]);
       setDialogOpen(false);
       toast.success('Manual lockup record added successfully');
 
@@ -217,7 +218,6 @@ export function ManualLockupScreen() {
   };
 
   useEffect(() => {
-
     async function fetchData(){
       if (dialogOpen){
        try {
@@ -289,6 +289,44 @@ export function ManualLockupScreen() {
     }
      fetchData()
   }, [dialogOpen]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (recordsListLoading){
+        try {
+          const response = await getManualLockup()
+           if ('error' in response){
+             toast.error(response.error);
+             return
+           }
+           const data = response.results
+           setLockups(data)
+
+        } catch (error) {
+          if (!error?.response) {
+              toast.error('Failed to connect to server. Please try again.');
+          }
+        }finally {
+          setRecordsListLoading(false)
+        }
+      }
+    }
+    fetchData()
+  }, []);
+
+
+  if (recordsListLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm">
+            Fetching lockups
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -373,7 +411,6 @@ export function ManualLockupScreen() {
               </CardHeader>
             </Card>
           </div>
-
           {/* Add Lockup Dialog Button */}
           <div className="flex justify-end">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -391,7 +428,7 @@ export function ManualLockupScreen() {
                     <div className="size-full flex items-center justify-center">
                       <div className="text-center">
                         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                        <p className="text-muted-foreground">
+                        <p className="text-muted-foreground text-sm">
                           Fetching station data, Please wait...
                         </p>
                       </div>
@@ -531,7 +568,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select station" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockStations.map((station) => (
+                      {stations.map((station) => (
                         <SelectItem key={station.id} value={station.id}>
                           {station.name}
                         </SelectItem>
@@ -554,7 +591,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select lockup type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockLockupTypes.map((type) => (
+                      {lockTypes.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
                           {type.name}
                         </SelectItem>
@@ -577,7 +614,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select prisoner category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockPrisonerCategories.map((category) => (
+                      {prisonerCategories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>
@@ -600,7 +637,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select sex" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockSexOptions.map((sex) => (
+                      {sexes.map((sex) => (
                         <SelectItem key={sex.id} value={sex.id}>
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />
@@ -634,77 +671,76 @@ export function ManualLockupScreen() {
           </DialogContent>
         </Dialog>
           </div>
-
           {/* Table Card */}
           <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Manual Lockup Records</CardTitle>
-              <CardDescription>View and manage all manual lockup entries</CardDescription>
-            </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search lockups..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Station</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Sex</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLockups.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground h-24">
-                      No lockup records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLockups.map((lockup) => (
-                    <TableRow key={lockup.id}>
-                      <TableCell>
-                        <Badge variant={lockup.is_active ? 'default' : 'secondary'}>
-                          {lockup.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{lockup.date}</TableCell>
-                      <TableCell>{lockup.lockup_time}</TableCell>
-                      <TableCell>
-                        <Badge className={getLocationBadgeColor(lockup.location)}>
-                          {lockup.location.charAt(0).toUpperCase() + lockup.location.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStationName(lockup.station)}</TableCell>
-                      <TableCell>{getTypeName(lockup.type)}</TableCell>
-                      <TableCell>{getCategoryName(lockup.prisoner_category)}</TableCell>
-                      <TableCell>{getSexName(lockup.sex)}</TableCell>
-                      <TableCell className="text-right">{lockup.count}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      <CardHeader>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <CardTitle>Manual Lockup Records</CardTitle>
+                        <CardDescription>View and manage all manual lockup entries</CardDescription>
+                      </div>
+                      <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search lockups..."
+                          className="pl-9"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      </div>
+                      </CardHeader>
+                      <CardContent>
+                    <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Station</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Sex</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLockups.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center text-muted-foreground h-24">
+                              No lockup records found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredLockups.map((lockup) => (
+                            <TableRow key={lockup.id}>
+                              <TableCell>
+                                <Badge variant={lockup.is_active ? 'default' : 'secondary'}>
+                                  {lockup.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{lockup.date}</TableCell>
+                              <TableCell>{lockup.lockup_time}</TableCell>
+                              <TableCell>
+                                <Badge className={getLocationBadgeColor(lockup.location)}>
+                                  {lockup.location.charAt(0).toUpperCase() + lockup.location.slice(1)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{lockup.station_name}</TableCell>
+                              <TableCell>{lockup.type_name}</TableCell>
+                              <TableCell>{lockup.prisoner_category_name}</TableCell>
+                              <TableCell>{lockup.sex_name}</TableCell>
+                              <TableCell className="text-right">{lockup.count}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    </div>
+                    </CardContent>
+                    </Card>
         </TabsContent>
       </Tabs>
     </div>
