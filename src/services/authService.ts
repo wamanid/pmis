@@ -107,6 +107,7 @@ export const logout = async (): Promise<void> => {
   } finally {
     // Clear local storage regardless of API response
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
   }
 };

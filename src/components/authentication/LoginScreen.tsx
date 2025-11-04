@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
@@ -9,12 +10,12 @@ import { toast } from 'sonner@2.0.3';
 import { WavesBackground } from './WavesBackground';
 import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
 import { login, verifyOtp, resendOtp } from '../../services/authService';
+import { useAuth } from '../../contexts/AuthContext';
 
-interface LoginScreenProps {
-  onLogin: () => void;
-}
-
-export function LoginScreen({ onLogin }: LoginScreenProps) {
+export function LoginScreen() {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { login: authLogin } = useAuth();
   const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,8 +54,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       } else {
         // MFA not required - tokens already stored, redirect to dashboard
         toast.success(response.message || 'Login successful!');
-        // Call onLogin to update app state and redirect
-        onLogin();
+        // Update auth context and redirect
+        if (response.user && response.access_token) {
+          authLogin(response.user, response.access_token);
+          const from = (location.state as any)?.from || '/station-management/overview';
+          navigate(from, { replace: true });
+        }
       }
     } catch (error: any) {
       // Error handling is done by axios interceptor
@@ -92,10 +97,12 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       if (response.error) {
         toast.error(response.error);
         setLoading(false);
-      } else if (response.access_token) {
+      } else if (response.access_token && response.user) {
         toast.success(response.message || 'Login successful!');
-        // Call onLogin to update app state
-        onLogin();
+        // Update auth context and redirect
+        authLogin(response.user, response.access_token);
+        const from = (location.state as any)?.from || '/station-management/overview';
+        navigate(from, { replace: true });
       } else {
         toast.error('Invalid OTP. Please try again.');
         setLoading(false);
