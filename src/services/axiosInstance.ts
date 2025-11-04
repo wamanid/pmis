@@ -63,6 +63,7 @@ axiosInstance.interceptors.response.use(
       
       switch (status) {
         case 400:
+          console.log(data)
           toast.error(data?.message || 'Bad request. Please check your input.');
           break;
         case 401:

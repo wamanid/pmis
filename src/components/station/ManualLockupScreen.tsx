@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import {useEffect, useState} from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
@@ -13,6 +13,13 @@ import { toast } from 'sonner@2.0.3';
 import { Switch } from '../ui/switch';
 import { ManualLockupTableForm } from './ManualLockupTableForm';
 import { ManualLockupTableView } from './ManualLockupTableView';
+
+import {
+  addLockUpRecord,
+  getLockType, getPrisonerCategories, getSexes,
+  getStation,
+} from '../../services/otherServices/manualLockupIntegration';
+import axiosInstance from "../../services/axiosInstance";
 
 // Mock data for foreign key references
 const mockStations = [
@@ -97,6 +104,11 @@ export function ManualLockupScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stationDataLoading, setStationDataLoading] = useState(true);
+  const [stations, setStations] = useState([])
+  const [lockTypes, setLockTypes] = useState([])
+  const [sexes, setSexes] = useState([])
+  const [prisonerCategories, setPrisonerCategories] = useState([])
 
   // Callback to handle records created from the table form
   const handleRecordsCreated = (records: ManualLockup[]) => {
@@ -130,7 +142,7 @@ export function ManualLockupScreen() {
     setLoading(true);
     
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // await new Promise(resolve => setTimeout(resolve, 1000));
     
     const newLockup: ManualLockup = {
       id: Date.now().toString(),
@@ -145,23 +157,38 @@ export function ManualLockupScreen() {
       sex: formData.sex,
     };
 
-    setLockups([newLockup, ...lockups]);
-    setDialogOpen(false);
-    setLoading(false);
-    toast.success('Manual lockup record added successfully');
-    
-    // Reset form
-    setFormData({
-      is_active: true,
-      date: new Date().toISOString().split('T')[0],
-      lockup_time: '',
-      location: '',
-      count: '',
-      station: '',
-      type: '',
-      prisoner_category: '',
-      sex: '',
-    });
+    try {
+      const response = await addLockUpRecord(newLockup)
+      if (response.error) {
+        toast.error(response.error);
+        return;
+      }
+
+      setLockups([newLockup, ...lockups]);
+      setDialogOpen(false);
+      toast.success('Manual lockup record added successfully');
+
+      // Reset form
+      setFormData({
+        is_active: true,
+        date: new Date().toISOString().split('T')[0],
+        lockup_time: '',
+        location: '',
+        count: '',
+        station: '',
+        type: '',
+        prisoner_category: '',
+        sex: '',
+      });
+
+    } catch (error: any) {
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
+    } finally {
+      setLoading(false)
+    }
+
   };
 
   const getStationName = (id: string) => mockStations.find(s => s.id === id)?.name || 'Unknown';
@@ -188,6 +215,80 @@ export function ManualLockupScreen() {
       default: return '';
     }
   };
+
+  useEffect(() => {
+
+    async function fetchData(){
+      if (dialogOpen){
+       try {
+
+         const response1 = await getStation()
+         if ('error' in response1){
+           toast.error(response1.error);
+           setDialogOpen(false);
+           return
+         }
+         const data1 = response1.results
+         if (data1.length === 0){
+           toast.error("There are no stations")
+           setDialogOpen(false);
+           return
+         }
+         setStations(data1)
+
+         const response2 = await getLockType()
+         if ('error' in response2){
+           toast.error(response2.error);
+           setDialogOpen(false);
+           return
+         }
+         const data2 = response2.results
+         if (data2.length === 0){
+           toast.error("There are no lock types")
+           setDialogOpen(false);
+           return
+         }
+         setLockTypes(data2)
+
+         const response3 = await getPrisonerCategories()
+         if ('error' in response3){
+           toast.error(response3.error);
+           setDialogOpen(false);
+           return
+         }
+         const data3 = response3.results
+         if (data3.length === 0){
+           toast.error("There are no prisoner categories")
+           setDialogOpen(false);
+           return
+         }
+         setPrisonerCategories(data3)
+
+         const response4 = await getSexes()
+         if ('error' in response4){
+           toast.error(response4.error);
+           setDialogOpen(false);
+           return
+         }
+         const data4 = response4.results
+         if (data1.length === 0){
+           toast.error("There are no sex categories")
+           setDialogOpen(false);
+           return
+         }
+         setSexes(data4)
+
+         setStationDataLoading(false)
+
+       } catch (error) {
+          if (!error?.response) {
+            toast.error('Failed to connect to server. Please try again.');
+          }
+       }
+     }
+    }
+     fetchData()
+  }, [dialogOpen]);
 
   return (
     <div className="space-y-6">
@@ -282,14 +383,28 @@ export function ManualLockupScreen() {
                   Add Lockup (Legacy Form)
                 </Button>
               </DialogTrigger>
+
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+            <>
+              {
+                stationDataLoading ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-muted-foreground">
+                          Fetching station data, Please wait...
+                        </p>
+                      </div>
+                    </div>
+                ) : (
+                    <>
+                      <DialogHeader>
               <DialogTitle>Add Manual Lockup Record</DialogTitle>
               <DialogDescription>
                 Enter the details for the manual lockup count
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
+                      <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 {/* Is Active Switch */}
                 <div className="flex items-center justify-between">
@@ -512,6 +627,10 @@ export function ManualLockupScreen() {
                 </Button>
               </DialogFooter>
             </form>
+                    </>
+                )
+              }
+            </>
           </DialogContent>
         </Dialog>
           </div>
