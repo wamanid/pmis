@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import {useCallback, useEffect, useState} from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
@@ -13,6 +13,13 @@ import { toast } from 'sonner@2.0.3';
 import { Switch } from '../ui/switch';
 import { ManualLockupTableForm } from './ManualLockupTableForm';
 import { ManualLockupTableView } from './ManualLockupTableView';
+
+import {
+  addLockUpRecord,
+  getLockType, getManualLockup, getPrisonerCategories, getSexes,
+  getStation, ManualLockUpItem,
+} from '../../services/stationServices/manualLockupIntegration';
+import axiosInstance from "../../services/axiosInstance";
 
 // Mock data for foreign key references
 const mockStations = [
@@ -93,10 +100,16 @@ const mockLockupData: ManualLockup[] = [
 ];
 
 export function ManualLockupScreen() {
-  const [lockups, setLockups] = useState<ManualLockup[]>(mockLockupData);
+  const [lockups, setLockups] = useState<ManualLockUpItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [stationDataLoading, setStationDataLoading] = useState(true);
+  const [recordsListLoading, setRecordsListLoading] = useState(true)
+  const [stations, setStations] = useState([])
+  const [lockTypes, setLockTypes] = useState([])
+  const [sexes, setSexes] = useState([])
+  const [prisonerCategories, setPrisonerCategories] = useState([])
 
   // Callback to handle records created from the table form
   const handleRecordsCreated = (records: ManualLockup[]) => {
@@ -130,7 +143,7 @@ export function ManualLockupScreen() {
     setLoading(true);
     
     // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // await new Promise(resolve => setTimeout(resolve, 1000));
     
     const newLockup: ManualLockup = {
       id: Date.now().toString(),
@@ -145,23 +158,38 @@ export function ManualLockupScreen() {
       sex: formData.sex,
     };
 
-    setLockups([newLockup, ...lockups]);
-    setDialogOpen(false);
-    setLoading(false);
-    toast.success('Manual lockup record added successfully');
-    
-    // Reset form
-    setFormData({
-      is_active: true,
-      date: new Date().toISOString().split('T')[0],
-      lockup_time: '',
-      location: '',
-      count: '',
-      station: '',
-      type: '',
-      prisoner_category: '',
-      sex: '',
-    });
+    try {
+      const response = await addLockUpRecord(newLockup)
+      if ('error' in response){
+           toast.error(response.error);
+           return
+      }
+
+      setLockups([response, ...lockups]);
+      setDialogOpen(false);
+      toast.success('Manual lockup record added successfully');
+
+      // Reset form
+      setFormData({
+        is_active: true,
+        date: new Date().toISOString().split('T')[0],
+        lockup_time: '',
+        location: '',
+        count: '',
+        station: '',
+        type: '',
+        prisoner_category: '',
+        sex: '',
+      });
+
+    } catch (error: any) {
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
+    } finally {
+      setLoading(false)
+    }
+
   };
 
   const getStationName = (id: string) => mockStations.find(s => s.id === id)?.name || 'Unknown';
@@ -188,6 +216,117 @@ export function ManualLockupScreen() {
       default: return '';
     }
   };
+
+  useEffect(() => {
+    async function fetchData(){
+      if (dialogOpen){
+       try {
+
+         const response1 = await getStation()
+         if ('error' in response1){
+           toast.error(response1.error);
+           setDialogOpen(false);
+           return
+         }
+         const data1 = response1.results
+         if (data1.length === 0){
+           toast.error("There are no stations")
+           setDialogOpen(false);
+           return
+         }
+         setStations(data1)
+
+         const response2 = await getLockType()
+         if ('error' in response2){
+           toast.error(response2.error);
+           setDialogOpen(false);
+           return
+         }
+         const data2 = response2.results
+         if (data2.length === 0){
+           toast.error("There are no lock types")
+           setDialogOpen(false);
+           return
+         }
+         setLockTypes(data2)
+
+         const response3 = await getPrisonerCategories()
+         if ('error' in response3){
+           toast.error(response3.error);
+           setDialogOpen(false);
+           return
+         }
+         const data3 = response3.results
+         if (data3.length === 0){
+           toast.error("There are no prisoner categories")
+           setDialogOpen(false);
+           return
+         }
+         setPrisonerCategories(data3)
+
+         const response4 = await getSexes()
+         if ('error' in response4){
+           toast.error(response4.error);
+           setDialogOpen(false);
+           return
+         }
+         const data4 = response4.results
+         if (data1.length === 0){
+           toast.error("There are no sex categories")
+           setDialogOpen(false);
+           return
+         }
+         setSexes(data4)
+
+         setStationDataLoading(false)
+
+       } catch (error) {
+          if (!error?.response) {
+            toast.error('Failed to connect to server. Please try again.');
+          }
+       }
+     }
+    }
+     fetchData()
+  }, [dialogOpen]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      if (recordsListLoading){
+        try {
+          const response = await getManualLockup()
+           if ('error' in response){
+             toast.error(response.error);
+             return
+           }
+           const data = response.results
+           setLockups(data)
+
+        } catch (error) {
+          if (!error?.response) {
+              toast.error('Failed to connect to server. Please try again.');
+          }
+        }finally {
+          setRecordsListLoading(false)
+        }
+      }
+    }
+    fetchData()
+  }, []);
+
+
+  if (recordsListLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground text-sm">
+            Fetching lockups
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -272,7 +411,6 @@ export function ManualLockupScreen() {
               </CardHeader>
             </Card>
           </div>
-
           {/* Add Lockup Dialog Button */}
           <div className="flex justify-end">
             <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -282,14 +420,28 @@ export function ManualLockupScreen() {
                   Add Lockup (Legacy Form)
                 </Button>
               </DialogTrigger>
+
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
+            <>
+              {
+                stationDataLoading ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                        <p className="text-muted-foreground text-sm">
+                          Fetching station data, Please wait...
+                        </p>
+                      </div>
+                    </div>
+                ) : (
+                    <>
+                      <DialogHeader>
               <DialogTitle>Add Manual Lockup Record</DialogTitle>
               <DialogDescription>
                 Enter the details for the manual lockup count
               </DialogDescription>
             </DialogHeader>
-            <form onSubmit={handleSubmit}>
+                      <form onSubmit={handleSubmit}>
               <div className="grid gap-4 py-4">
                 {/* Is Active Switch */}
                 <div className="flex items-center justify-between">
@@ -416,7 +568,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select station" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockStations.map((station) => (
+                      {stations.map((station) => (
                         <SelectItem key={station.id} value={station.id}>
                           {station.name}
                         </SelectItem>
@@ -439,7 +591,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select lockup type" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockLockupTypes.map((type) => (
+                      {lockTypes.map((type) => (
                         <SelectItem key={type.id} value={type.id}>
                           {type.name}
                         </SelectItem>
@@ -462,7 +614,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select prisoner category" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockPrisonerCategories.map((category) => (
+                      {prisonerCategories.map((category) => (
                         <SelectItem key={category.id} value={category.id}>
                           {category.name}
                         </SelectItem>
@@ -485,7 +637,7 @@ export function ManualLockupScreen() {
                       <SelectValue placeholder="Select sex" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockSexOptions.map((sex) => (
+                      {sexes.map((sex) => (
                         <SelectItem key={sex.id} value={sex.id}>
                           <div className="flex items-center gap-2">
                             <User className="h-4 w-4" />
@@ -512,80 +664,83 @@ export function ManualLockupScreen() {
                 </Button>
               </DialogFooter>
             </form>
+                    </>
+                )
+              }
+            </>
           </DialogContent>
         </Dialog>
           </div>
-
           {/* Table Card */}
           <Card>
-        <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <CardTitle>Manual Lockup Records</CardTitle>
-              <CardDescription>View and manage all manual lockup entries</CardDescription>
-            </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search lockups..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Location</TableHead>
-                  <TableHead>Station</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Sex</TableHead>
-                  <TableHead className="text-right">Count</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredLockups.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={9} className="text-center text-muted-foreground h-24">
-                      No lockup records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredLockups.map((lockup) => (
-                    <TableRow key={lockup.id}>
-                      <TableCell>
-                        <Badge variant={lockup.is_active ? 'default' : 'secondary'}>
-                          {lockup.is_active ? 'Active' : 'Inactive'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{lockup.date}</TableCell>
-                      <TableCell>{lockup.lockup_time}</TableCell>
-                      <TableCell>
-                        <Badge className={getLocationBadgeColor(lockup.location)}>
-                          {lockup.location.charAt(0).toUpperCase() + lockup.location.slice(1)}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>{getStationName(lockup.station)}</TableCell>
-                      <TableCell>{getTypeName(lockup.type)}</TableCell>
-                      <TableCell>{getCategoryName(lockup.prisoner_category)}</TableCell>
-                      <TableCell>{getSexName(lockup.sex)}</TableCell>
-                      <TableCell className="text-right">{lockup.count}</TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      <CardHeader>
+                      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                      <div>
+                        <CardTitle>Manual Lockup Records</CardTitle>
+                        <CardDescription>View and manage all manual lockup entries</CardDescription>
+                      </div>
+                      <div className="relative w-full md:w-72">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Search lockups..."
+                          className="pl-9"
+                          value={searchTerm}
+                          onChange={(e) => setSearchTerm(e.target.value)}
+                        />
+                      </div>
+                      </div>
+                      </CardHeader>
+                      <CardContent>
+                    <div className="rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Time</TableHead>
+                          <TableHead>Location</TableHead>
+                          <TableHead>Station</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Category</TableHead>
+                          <TableHead>Sex</TableHead>
+                          <TableHead className="text-right">Count</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {filteredLockups.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={9} className="text-center text-muted-foreground h-24">
+                              No lockup records found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          filteredLockups.map((lockup) => (
+                            <TableRow key={lockup.id}>
+                              <TableCell>
+                                <Badge variant={lockup.is_active ? 'default' : 'secondary'}>
+                                  {lockup.is_active ? 'Active' : 'Inactive'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{lockup.date}</TableCell>
+                              <TableCell>{lockup.lockup_time}</TableCell>
+                              <TableCell>
+                                <Badge className={getLocationBadgeColor(lockup.location)}>
+                                  {lockup.location.charAt(0).toUpperCase() + lockup.location.slice(1)}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>{lockup.station_name}</TableCell>
+                              <TableCell>{lockup.type_name}</TableCell>
+                              <TableCell>{lockup.prisoner_category_name}</TableCell>
+                              <TableCell>{lockup.sex_name}</TableCell>
+                              <TableCell className="text-right">{lockup.count}</TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                    </div>
+                    </CardContent>
+                    </Card>
         </TabsContent>
       </Tabs>
     </div>
