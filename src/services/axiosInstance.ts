@@ -31,6 +31,33 @@ axiosInstance.interceptors.request.use(
     } catch (e) {
       // storage unavailable or access denied — continue without token
     }
+
+
+    // --- 2. Inject location filters if present
+    try {
+      const filterStorage = localStorage.getItem('pmis_user_filters');
+      if (filterStorage) {
+        const filters = JSON.parse(filterStorage);
+
+        // Ensure params object exists
+        config.params = config.params || {};
+
+        // Only add filters that exist and aren't already set
+        if (filters.region && !config.params.region) {
+          config.params.region = filters.region;
+        }
+        if (filters.district && !config.params.district) {
+          config.params.district = filters.district;
+        }
+        if (filters.station && !config.params.station) {
+          config.params.station = filters.station;
+        }
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Failed to parse user filters:', err);
+      }
+    }
     
     // Do not log request bodies or headers in production or with tokens.
     if (process.env.NODE_ENV !== 'production') {
