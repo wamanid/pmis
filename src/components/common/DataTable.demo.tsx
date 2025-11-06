@@ -124,7 +124,7 @@ export function DataTableDemo() {
 
   // Demo 1: Users table with custom rendering
   const userColumns: DataTableColumn[] = [
-    { key: 'id', label: 'ID', sortable: true },
+    { key: 'id', label: 'ID', sortable: true},
     { key: 'name', label: 'Name', sortable: true },
     { key: 'email', label: 'Email', sortable: true },
     { 
