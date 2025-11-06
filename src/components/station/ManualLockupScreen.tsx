@@ -278,12 +278,13 @@ export function ManualLockupScreen() {
          }
          setSexes(data4)
 
-         setStationDataLoading(false)
-
        } catch (error) {
           if (!error?.response) {
+            setDialogOpen(false);
             toast.error('Failed to connect to server. Please try again.');
           }
+       }finally {
+         setStationDataLoading(false)
        }
      }
     }
