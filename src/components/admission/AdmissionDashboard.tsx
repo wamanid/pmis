@@ -30,6 +30,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+
 import {
   fetchAdmissionStats,
   searchPrisoners,
@@ -48,20 +49,24 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
   const [searchResults, setSearchResults] = useState<PrisonerSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
 
+
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
+
         const stats = await fetchAdmissionStats();
         setAdmissionStats(stats);
       } catch (error) {
         console.error('Error loading admission data:', error);
+
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
+
   }, []);
 
   const handleSearch = async () => {
@@ -79,6 +84,7 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
     } finally {
       setSearching(false);
     }
+
   };
 
   const COLORS = ['#650000', '#8b0000', '#a52a2a', '#dc143c', '#ff6347'];
@@ -107,6 +113,7 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
         </div>
       </div>
 
+
       {/* Search and Admit Button */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 flex gap-2">
@@ -128,11 +135,13 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
         <Button 
           className="bg-primary hover:bg-primary/90"
           onClick={() => onNavigate?.('admissions-management-prisoner-admission')}
+
         >
           <UserPlus className="mr-2 h-4 w-4" />
           Admit Prisoner
         </Button>
       </div>
+
 
       {/* Search Results */}
       {searchResults.length > 0 && (
@@ -175,7 +184,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Admissions"
+
           value={admissionStats?.total_admissions || 0}
+
           subtitle="All time admissions"
           icon={Users}
           iconColor="text-primary"
@@ -183,7 +194,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
         
         <StatCard
           title="Pending Approval"
+
           value={admissionStats?.pending_approval || 0}
+
           subtitle="Awaiting processing"
           icon={Clock}
           iconColor="text-orange-500"
@@ -191,7 +204,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
         
         <StatCard
           title="Armed Personnel"
+
           value={admissionStats?.armed_personnel || 0}
+
           subtitle="Currently admitted"
           icon={Shield}
           iconColor="text-red-500"
@@ -199,7 +214,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
         
         <StatCard
           title="Children Admitted"
+
           value={admissionStats?.children_admitted || 0}
+
           subtitle="Under 18 years"
           icon={Baby}
           iconColor="text-blue-500"
@@ -215,7 +232,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
+
               {admissionStats?.by_category.map((cat) => (
+
                 <div key={cat.category}>
                   <div className="flex justify-between items-center mb-2">
                     <span>{cat.category}</span>
@@ -249,19 +268,23 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
                     <Calendar className="h-4 w-4 text-primary" />
                     <span>Weekly Summary</span>
                   </div>
+
                   <Badge variant={admissionStats && admissionStats.weekly_summary.change_percentage > 0 ? 'default' : 'secondary'}>
                     <TrendingUp className="h-3 w-3 mr-1" />
                     {admissionStats?.weekly_summary.change_percentage.toFixed(1)}%
+
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
                     <div className="text-sm text-muted-foreground">Current Week</div>
+
                     <div className="text-2xl">{admissionStats?.weekly_summary.current_week}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Previous Week</div>
                     <div className="text-2xl">{admissionStats?.weekly_summary.previous_week}</div>
+
                   </div>
                 </div>
               </div>
@@ -272,19 +295,23 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
                     <Calendar className="h-4 w-4 text-primary" />
                     <span>Monthly Summary</span>
                   </div>
+
                   <Badge variant={admissionStats && admissionStats.monthly_summary.change_percentage > 0 ? 'default' : 'secondary'}>
                     <TrendingUp className="h-3 w-3 mr-1" />
                     {admissionStats?.monthly_summary.change_percentage.toFixed(1)}%
+
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
                     <div className="text-sm text-muted-foreground">Current Month</div>
+
                     <div className="text-2xl">{admissionStats?.monthly_summary.current_month}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Previous Month</div>
                     <div className="text-2xl">{admissionStats?.monthly_summary.previous_month}</div>
+
                   </div>
                 </div>
               </div>
@@ -292,6 +319,7 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
           </CardContent>
         </Card>
       </div>
+
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -364,6 +392,7 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
               <Legend />
               <Bar dataKey="count" fill="#650000" name="Count" />
             </BarChart>
+
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -384,7 +413,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
               </TableRow>
             </TableHeader>
             <TableBody>
+
               {admissionStats?.by_category.map((cat) => (
+
                 <TableRow key={cat.category}>
                   <TableCell>{cat.category}</TableCell>
                   <TableCell className="text-right">{cat.count}</TableCell>
@@ -402,7 +433,9 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
               <TableRow className="bg-muted/50">
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right">
+
                   {admissionStats?.by_category.reduce((sum, cat) => sum + cat.count, 0)}
+
                 </TableCell>
                 <TableCell className="text-right">100%</TableCell>
                 <TableCell></TableCell>

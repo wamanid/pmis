@@ -5,6 +5,7 @@ import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { KeyRound, Shield } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
+
 import { toast } from 'sonner';
 import { WavesBackground } from './WavesBackground';
 import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
@@ -15,6 +16,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
+
   const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -90,6 +92,7 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
       if (response.error) {
         toast.error(response.error);
         setLoading(false);
+
       } else if (response.access_token) {
         toast.success(response.message || 'Login successful!');
         setLoading(false);
@@ -100,9 +103,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         setLoading(false);
       }
     } catch (error: any) {
+
       if (!error?.response) {
         toast.error('Failed to connect to server. Please try again.');
       }
+
       setLoading(false);
     }
   };
@@ -125,9 +130,11 @@ export function LoginScreen({ onLogin }: LoginScreenProps) {
         setOtp('');
       }
     } catch (error: any) {
+
       if (!error?.response) {
         toast.error('Failed to connect to server. Please try again.');
       }
+
     } finally {
       setLoading(false);
     }

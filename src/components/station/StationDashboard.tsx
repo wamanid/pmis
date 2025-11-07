@@ -1,4 +1,6 @@
+
 import { useEffect, useState } from "react";
+
 import {
   Card,
   CardContent,
@@ -80,6 +82,7 @@ interface StationDashboardProps {
 export function StationDashboard({
   onNavigate,
 }: StationDashboardProps) {
+
   const [lockupData, setLockupData] =
     useState<LockupData | null>(null);
   const [congestionData, setCongestionData] =
@@ -318,9 +321,11 @@ export function StationDashboard({
   }
 
   const handleAddManualLockup = () => {
+
     if (onNavigate) {
       onNavigate("station-management-lockup-manual");
     }
+
   };
 
   return (

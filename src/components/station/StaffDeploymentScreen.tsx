@@ -258,48 +258,20 @@ export function StaffDeploymentScreen() {
 
   useEffect(() => {
       const fetchData = async () => {
+        setStaffProfileLoading(true)
         if(deployOpen){
-          try {
-             const response1 = await getStaffProfile()
-             if ('error' in response1){
-               toast.error(response1.error);
-               setDeployOpen(false);
-               return
-             }
-
-             const data1 = response1.results
-             // console.log(data1)
-             if (data1.length === 0){
-               toast.error("There are no staff members")
-               setDeployOpen(false);
-               return
-             }
-             setStaffProfile(data1)
-             setHrmisResults(data1)
-
-             const response2 = await getStation()
-             if ('error' in response2){
-               toast.error(response2.error);
-               setDeployOpen(false);
-               return
-             }
-             const data2 = response2.results
-             // console.log(data2)
-             if (data2.length === 0){
-               toast.error("There are no stations")
-               setDeployOpen(false);
-               return
-             }
-             setStationsX(data2)
-
-             setStaffProfileLoading(false)
-
-          }catch (error) {
-            if (!error?.response) {
-              toast.error('Failed to connect to server. Please try again.');
-            }
-            setDeployOpen(false)
+          if (staffProfile.length == 0){
+             toast.error("There are no staff members")
+             setDeployOpen(false);
+             return
           }
+
+          if (stationsX.length == 0){
+             toast.error("There are no stations")
+             setDeployOpen(false);
+             return
+          }
+           setStaffProfileLoading(false)
         }
       }
       fetchData()
