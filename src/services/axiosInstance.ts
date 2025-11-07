@@ -1,6 +1,13 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
+// allow a custom config flag so callers can suppress interceptor toasts
+declare module 'axios' {
+  export interface AxiosRequestConfig {
+    skipErrorToast?: boolean;
+  }
+}
+
 const API_BASE_URL = 'https://pmis.angstrom-technologies.ug/api';
 
 // Create axios instance
@@ -23,6 +30,33 @@ axiosInstance.interceptors.request.use(
       }
     } catch (e) {
       // storage unavailable or access denied — continue without token
+    }
+
+
+    // --- 2. Inject location filters if present
+    try {
+      const filterStorage = localStorage.getItem('pmis_user_filters');
+      if (filterStorage) {
+        const filters = JSON.parse(filterStorage);
+
+        // Ensure params object exists
+        config.params = config.params || {};
+
+        // Only add filters that exist and aren't already set
+        if (filters.region && !config.params.region) {
+          config.params.region = filters.region;
+        }
+        if (filters.district && !config.params.district) {
+          config.params.district = filters.district;
+        }
+        if (filters.station && !config.params.station) {
+          config.params.station = filters.station;
+        }
+      }
+    } catch (err) {
+      if (process.env.NODE_ENV !== 'production') {
+        console.warn('Failed to parse user filters:', err);
+      }
     }
     
     // Do not log request bodies or headers in production or with tokens.
@@ -57,45 +91,51 @@ axiosInstance.interceptors.response.use(
     return response;
   },
   (error) => {
-    // Handle different error scenarios
+    // If caller asked to skip axios toast (e.g. form will handle showing a message),
+    // we look for a custom header or config flag.
+    const skipToast =
+      Boolean(error?.config?.headers?.['x-skip-toast']) ||
+      Boolean(error?.config?.skipErrorToast);
+
     if (error.response) {
-      const { status, data } = error.response;
-      
-      switch (status) {
-        case 400:
-          console.log(data)
-          toast.error(data?.message || 'Bad request. Please check your input.');
-          break;
-        case 401:
-          toast.error('Unauthorized. Please login again.');
-          try {
-            localStorage.removeItem('auth_token');
-            localStorage.removeItem('user_data');
-          } catch (e) { /* ignore storage errors */ }
-          break;
-        case 403:
-          toast.error('Access forbidden. You do not have permission.');
-          break;
-        case 404:
-          toast.error('Resource not found.');
-          break;
-        case 500:
-          toast.error('Server error. Please try again later.');
-          break;
-        default:
-          toast.error(data?.message || 'An error occurred. Please try again.');
+      if (!skipToast) {
+        const { status, data } = error.response;
+        
+        switch (status) {
+          case 400:
+            toast.error(data?.message || 'Bad request. Please check your input.');
+            break;
+          case 401:
+            toast.error('Unauthorized. Please login again.');
+            try {
+              localStorage.removeItem('auth_token');
+              localStorage.removeItem('user_data');
+            } catch (e) { /* ignore storage errors */ }
+            break;
+          case 403:
+            toast.error('Access forbidden. You do not have permission.');
+            break;
+          case 404:
+            toast.error('Resource not found.');
+            break;
+          case 500:
+            toast.error('Server error. Please try again later.');
+            break;
+          default:
+            toast.error(data?.message || 'An error occurred. Please try again.');
+        }
       }
-      
+
       if (process.env.NODE_ENV !== 'production') {
-        // console.error('API Error Response:', { status, url: error.config?.url });
+        // console.error('API Error Response:', { status: error.response.status, url: error.config?.url, data: error.response.data });
       }
     } else if (error.request) {
-      toast.error('Network error. Please check your connection.');
+      if (!skipToast) toast.error('Network error. Please check your connection.');
       if (process.env.NODE_ENV !== 'production') {
         // console.error('Network Error:', error.request);
       }
     } else {
-      toast.error('An unexpected error occurred.');
+      if (!skipToast) toast.error('An unexpected error occurred.');
       if (process.env.NODE_ENV !== 'production') {
         // console.error('Error:', error.message);
       }
