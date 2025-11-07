@@ -219,6 +219,7 @@ export function ManualLockupScreen() {
 
   useEffect(() => {
     async function fetchData(){
+      setStationDataLoading(true)
       if (dialogOpen){
        try {
 
@@ -302,6 +303,7 @@ export function ManualLockupScreen() {
            }
            const data = response.results
            setLockups(data)
+          console.log(data)
 
         } catch (error) {
           if (!error?.response) {
@@ -314,7 +316,6 @@ export function ManualLockupScreen() {
     }
     fetchData()
   }, []);
-
 
   if (recordsListLoading) {
     return (
