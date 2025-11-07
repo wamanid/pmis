@@ -23,11 +23,16 @@ import {
   HRMISStaff
 } from '../../services/mockApi';
 import { cn } from '../ui/utils';
-import {getStaffProfile, StaffItem} from "../../services/otherServices/staffDeploymentIntegration";
+import {
+  addStaffDeployment, getStaffDeployment,
+  getStaffProfile,
+  StaffDeployment, StaffDeploymentResponse,
+  StaffItem
+} from "../../services/otherServices/staffDeploymentIntegration";
 import {getStation} from "../../services/otherServices/manualLockupIntegration";
 
 export function StaffDeploymentScreen() {
-  const [deployments, setDeployments] = useState<StaffDeploymentRecord[]>([]);
+  const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);
   const [summary, setSummary] = useState<StaffDeploymentSummary | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +49,7 @@ export function StaffDeploymentScreen() {
   // Station Search for deployment
   const [stationSearchOpen, setStationSearchOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [summaryX, setSummaryX] = useState({staff: 0, deployed: 0, stations: 0})
   
   // Form data
   const [deployFormData, setDeployFormData] = useState({
@@ -56,29 +62,92 @@ export function StaffDeploymentScreen() {
   const [stationsX, setStationsX] = useState([])
 
   useEffect(() => {
-    loadData();
+    // loadData();
+    fetchData()
   }, []);
 
-  useEffect(() => {
-    const searchHRMIS = async () => {
-      if (hrmisSearchQuery.length >= 2) {
-        setLoadingHRMIS(true);
-        try {
-          const results = await searchHRMISStaff(hrmisSearchQuery);
-          setHrmisResults(results);
-        } catch (error) {
-          console.error('Failed to search HRMIS:', error);
-        } finally {
-          setLoadingHRMIS(false);
-        }
-      } else {
-        setHrmisResults([]);
-      }
-    };
+  // useEffect(() => {
+  //   const searchHRMIS = async () => {
+  //     if (hrmisSearchQuery.length >= 2) {
+  //       setLoadingHRMIS(true);
+  //       try {
+  //         const results = await searchHRMISStaff(hrmisSearchQuery);
+  //         setHrmisResults(results);
+  //       } catch (error) {
+  //         console.error('Failed to search HRMIS:', error);
+  //       } finally {
+  //         setLoadingHRMIS(false);
+  //       }
+  //     } else {
+  //       setHrmisResults([]);
+  //     }
+  //   };
+  //
+  //   const debounce = setTimeout(searchHRMIS, 300);
+  //   return () => clearTimeout(debounce);
+  // }, [hrmisSearchQuery]);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
 
-    const debounce = setTimeout(searchHRMIS, 300);
-    return () => clearTimeout(debounce);
-  }, [hrmisSearchQuery]);
+      let data1 = []
+      let data = []
+      let data2 = []
+
+      const response = await getStaffDeployment()
+      if ('error' in response){
+         toast.error(response.error);
+      }
+
+      if ("results" in response) {
+        data = response.results
+         setDeployments(data)
+        // console.log(data)
+      }
+
+      const response1 = await getStaffProfile()
+       if ('error' in response1){
+         toast.error(response1.error)
+       }
+      if ("results" in response1) {
+        data1 = response1.results
+        if (data1.length === 0){
+          toast.error("There are no staff members")
+        }
+        setStaffProfile(data1)
+        setHrmisResults(data1)
+      }
+
+      const response2 = await getStation()
+
+       if ('error' in response2){
+         toast.error(response2.error)
+       }
+      if ("results" in response2) {
+        data2 = response2.results
+        if (data2.length === 0){
+         toast.error("There are no staff members")
+       }
+        setStationsX(data2)
+      }
+
+      handleSummary(data, data1, data2)
+
+    }catch (error) {
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
+    }finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSummary = (data: [], data1: [], data2: []) => {
+      const is_active = (data ?? []).filter(da => da.is_active).length
+      const uniqueStations = new Set(data.map(item => item.station_name));
+      const uniqueStationCount = uniqueStations.size;
+      setSummaryX({staff: data1.length, deployed: is_active, stations: uniqueStationCount})
+  }
 
   const loadData = async () => {
     try {
@@ -116,31 +185,53 @@ export function StaffDeploymentScreen() {
     }
 
     try {
-      // Split name into parts
-      const nameParts = selectedStaff.name.trim().split(' ');
-      const first_name = nameParts[0] || '';
-      const last_name = nameParts[nameParts.length - 1] || '';
-      const middle_name = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
 
-      await createStaffDeployment({
-        first_name,
-        middle_name,
-        last_name,
-        force_number: selectedStaff.force_number,
-        date_of_birth: selectedStaff.dob,
-        rank: selectedStaff.rank,
-        station: selectedStation.id.toString(),
+      const deployment : StaffDeployment = {
+        is_active: true,
         start_date: deployFormData.start_date,
-        end_date: deployFormData.end_date || undefined
-      });
-      
+        end_date: deployFormData.end_date,
+        station: selectedStation.id,
+        profile: selectedStaff.id
+      }
+
+      const response = await addStaffDeployment(deployment)
+      if ('error' in response){
+         toast.error(response.error);
+         return
+      }
+
       toast.success('Staff member deployed successfully');
       setDeployOpen(false);
       resetForm();
-      loadData();
+      setDeployments((prev) => [...prev, response as StaffDeploymentResponse]);
+      // loadData()
+
+      // Split name into parts
+      // const nameParts = selectedStaff.name.trim().split(' ');
+      // const first_name = nameParts[0] || '';
+      // const last_name = nameParts[nameParts.length - 1] || '';
+      // const middle_name = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+      //
+      // await createStaffDeployment({
+      //   first_name,
+      //   middle_name,
+      //   last_name,
+      //   force_number: selectedStaff.force_number,
+      //   date_of_birth: selectedStaff.dob,
+      //   rank: selectedStaff.rank,
+      //   station: selectedStation.id.toString(),
+      //   start_date: deployFormData.start_date,
+      //   end_date: deployFormData.end_date || undefined
+      // });
+      //
+      // toast.success('Staff member deployed successfully');
+      // setDeployOpen(false);
+      // resetForm();
+      // loadData();
     } catch (error) {
-      console.error('Failed to deploy staff:', error);
-      toast.error('Failed to deploy staff member');
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
     }
   };
 
@@ -177,7 +268,7 @@ export function StaffDeploymentScreen() {
              }
 
              const data1 = response1.results
-             console.log(data1)
+             // console.log(data1)
              if (data1.length === 0){
                toast.error("There are no staff members")
                setDeployOpen(false);
@@ -284,7 +375,7 @@ export function StaffDeploymentScreen() {
                             className="w-full justify-between"
                           >
                             {selectedStaff ? (
-                              <span>{selectedStaff.force_number} - {selectedStaff.name}</span>
+                              <span>{selectedStaff.force_number} - {selectedStaff.first_name} {selectedStaff.first_name}</span>
                             ) : (
                               <span className="text-muted-foreground">Search by force number or name...</span>
                             )}
@@ -322,7 +413,7 @@ export function StaffDeploymentScreen() {
                                     <div className="flex flex-col">
                                       <span>{staff.force_number} - {staff.first_name} {staff.last_name}</span>
                                       <span className="text-xs text-muted-foreground">
-                                        {staff.rank} • DOB: {staff.dob}
+                                        {staff.rank_name} • DOB: {staff.date_of_birth}
                                       </span>
                                     </div>
                                   </CommandItem>
@@ -338,9 +429,9 @@ export function StaffDeploymentScreen() {
                     {selectedStaff && (
                       <div className="p-3 bg-muted rounded-lg space-y-1 text-sm">
                         <div><span className="font-medium">Force Number:</span> {selectedStaff.force_number}</div>
-                        <div><span className="font-medium">Name:</span> {selectedStaff.name}</div>
-                        <div><span className="font-medium">Rank:</span> {selectedStaff.rank}</div>
-                        <div><span className="font-medium">Date of Birth:</span> {selectedStaff.dob}</div>
+                        <div><span className="font-medium">Name:</span> {selectedStaff.first_name} {selectedStaff.last_name}</div>
+                        <div><span className="font-medium">Rank:</span> {selectedStaff.rank_name}</div>
+                        <div><span className="font-medium">Date of Birth:</span> {selectedStaff.date_of_birth}</div>
                       </div>
                     )}
 
@@ -435,7 +526,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <Users className="h-8 w-8 text-muted-foreground" />
               <div>
-                <div className="text-2xl">{summary?.total_staff || 0}</div>
+                <div className="text-2xl">{summaryX.staff}</div>
                 <p className="text-xs text-muted-foreground">All deployed staff</p>
               </div>
             </div>
@@ -450,7 +541,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8" style={{ color: '#650000' }} />
               <div>
-                <div className="text-2xl">{summary?.deployed_staff || 0}</div>
+                <div className="text-2xl">{summaryX.deployed}</div>
                 <p className="text-xs text-muted-foreground">Currently deployed</p>
               </div>
             </div>
@@ -465,7 +556,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <MapPin className="h-8 w-8 text-blue-500" />
               <div>
-                <div className="text-2xl">{summary?.by_station.length || 0}</div>
+                <div className="text-2xl">{summaryX.stations}</div>
                 <p className="text-xs text-muted-foreground">Stations with staff</p>
               </div>
             </div>
@@ -555,7 +646,7 @@ export function StaffDeploymentScreen() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm">{deployment.age_at_deployment} years</span>
+                            <span className="text-sm">{deployment.age_at_deployment}</span>
                           </TableCell>
                           <TableCell>
                             <Badge 
