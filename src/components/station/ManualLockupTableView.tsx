@@ -8,9 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { cn } from '../ui/utils';
-import {ManualLockUpItem} from "../../services/otherServices/manualLockupIntegration";
+import {ManualLockUpItem} from "../../services/stationServices/manualLockupIntegration";
 
-import { getStationsAndTypes } from "../../services/otherServices/utils"
+import { getStationsAndTypes } from "../../services/stationServices/utils"
 
 interface ManualLockup {
   id: string;

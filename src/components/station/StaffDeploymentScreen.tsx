@@ -28,8 +28,8 @@ import {
   getStaffProfile,
   StaffDeployment, StaffDeploymentResponse,
   StaffItem
-} from "../../services/otherServices/staffDeploymentIntegration";
-import {getStation} from "../../services/otherServices/manualLockupIntegration";
+} from "../../services/stationServices/staffDeploymentIntegration";
+import {getStation} from "../../services/stationServices/manualLockupIntegration";
 
 export function StaffDeploymentScreen() {
   const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);

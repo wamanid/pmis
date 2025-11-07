@@ -18,7 +18,7 @@ import {
   addLockUpRecord,
   getLockType, getManualLockup, getPrisonerCategories, getSexes,
   getStation, ManualLockUpItem,
-} from '../../services/otherServices/manualLockupIntegration';
+} from '../../services/stationServices/manualLockupIntegration';
 import axiosInstance from "../../services/axiosInstance";
 
 // Mock data for foreign key references
