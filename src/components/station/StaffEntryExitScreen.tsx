@@ -11,7 +11,6 @@ import { toast } from 'sonner@2.0.3';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { StaffProfileService } from '../../services/stationServices/StaffProfileService';
 
 // Mock data for foreign key references
 const mockStations = [
@@ -139,17 +138,6 @@ export function StaffEntryExitScreen() {
     remark: '',
     attendance_type: 'PRESENT' as 'PRESENT' | 'ABSENT',
   });
-
-  const handleFetchStaffDetails = async (forceNumber: string) => {
-    try {
-      const staff = await StaffProfileService.fetchStaffProfiles(forceNumber);
-      if (staff) {
-        setStaffDetails(staff);
-      }
-    } catch (error) {
-      console.error('Error fetching staff details:', error);
-    }
-  };
 
   // Mock function to fetch staff details from backend
   const fetchStaffDetails = async (forceNumber: string) => {
@@ -333,7 +321,7 @@ export function StaffEntryExitScreen() {
                             autoFocus
                           />
                         </div>
-                        <Button type="submit" disabled={scanning || !barcode.trim()} onClick={() => handleFetchStaffDetails}>
+                        <Button type="submit" disabled={scanning || !barcode.trim()}>
                           {scanning ? (
                             <>
                               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -346,7 +334,6 @@ export function StaffEntryExitScreen() {
                             </>
                           )}
                         </Button>
-                    
                       </div>
                     </div>
                   </form>
@@ -383,9 +370,7 @@ export function StaffEntryExitScreen() {
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border border-border">
-                    {staffDetails && (<pre>{JSON.stringify(staffDetails, null, 2)}</pre>)}
                       <div>
-
                         <Label className="text-muted-foreground text-xs">Full Name</Label>
                         <p className="mt-1">{staffDetails.full_name}</p>
                       </div>

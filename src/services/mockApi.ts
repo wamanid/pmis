@@ -227,7 +227,11 @@ export interface StationAttendanceSummary {
 }
 
 // Mock API functions - Replace these with actual API calls
+<<<<<<< HEAD
 const API_BASE_URL = 'https://pmis.angstrom-technologies.ug/api'; // Replace with your actual API base URL
+=======
+const API_BASE_URL = 'http://localhost:8000/api/'; // Replace with your actual API base URL
+>>>>>>> upstream/main
 const STATION_ID = 1; // Replace with actual station ID from authentication/context
 
 /**

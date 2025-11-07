@@ -1,4 +1,9 @@
+<<<<<<< HEAD
 import { useEffect, useState } from "react";
+=======
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+>>>>>>> upstream/main
 import {
   Card,
   CardContent,
@@ -73,6 +78,7 @@ import {
 } from "../../services/mockApi";
 import { LockupTable } from "./LockupTable";
 
+<<<<<<< HEAD
 interface StationDashboardProps {
   onNavigate?: (page: string) => void;
 }
@@ -80,6 +86,10 @@ interface StationDashboardProps {
 export function StationDashboard({
   onNavigate,
 }: StationDashboardProps) {
+=======
+export function StationDashboard() {
+  const navigate = useNavigate();
+>>>>>>> upstream/main
   const [lockupData, setLockupData] =
     useState<LockupData | null>(null);
   const [congestionData, setCongestionData] =
@@ -318,9 +328,13 @@ export function StationDashboard({
   }
 
   const handleAddManualLockup = () => {
+<<<<<<< HEAD
     if (onNavigate) {
       onNavigate("station-management-lockup-manual");
     }
+=======
+    navigate('/station-management/lockup/manual');
+>>>>>>> upstream/main
   };
 
   return (

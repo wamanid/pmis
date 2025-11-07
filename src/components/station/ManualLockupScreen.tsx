@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import {useEffect, useState} from 'react';
+=======
+import { useState } from 'react';
+>>>>>>> upstream/main
 import { Button } from '../ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
@@ -14,6 +18,7 @@ import { Switch } from '../ui/switch';
 import { ManualLockupTableForm } from './ManualLockupTableForm';
 import { ManualLockupTableView } from './ManualLockupTableView';
 
+<<<<<<< HEAD
 import {
   addLockUpRecord,
   getLockType, getPrisonerCategories, getSexes,
@@ -21,6 +26,8 @@ import {
 } from '../../services/otherServices/manualLockupIntegration';
 import axiosInstance from "../../services/axiosInstance";
 
+=======
+>>>>>>> upstream/main
 // Mock data for foreign key references
 const mockStations = [
   { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
@@ -104,11 +111,14 @@ export function ManualLockupScreen() {
   const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+<<<<<<< HEAD
   const [stationDataLoading, setStationDataLoading] = useState(true);
   const [stations, setStations] = useState([])
   const [lockTypes, setLockTypes] = useState([])
   const [sexes, setSexes] = useState([])
   const [prisonerCategories, setPrisonerCategories] = useState([])
+=======
+>>>>>>> upstream/main
 
   // Callback to handle records created from the table form
   const handleRecordsCreated = (records: ManualLockup[]) => {
@@ -142,7 +152,11 @@ export function ManualLockupScreen() {
     setLoading(true);
     
     // Simulate API call
+<<<<<<< HEAD
     // await new Promise(resolve => setTimeout(resolve, 1000));
+=======
+    await new Promise(resolve => setTimeout(resolve, 1000));
+>>>>>>> upstream/main
     
     const newLockup: ManualLockup = {
       id: Date.now().toString(),
@@ -157,6 +171,7 @@ export function ManualLockupScreen() {
       sex: formData.sex,
     };
 
+<<<<<<< HEAD
     try {
       const response = await addLockUpRecord(newLockup)
       if (response.error) {
@@ -189,6 +204,25 @@ export function ManualLockupScreen() {
       setLoading(false)
     }
 
+=======
+    setLockups([newLockup, ...lockups]);
+    setDialogOpen(false);
+    setLoading(false);
+    toast.success('Manual lockup record added successfully');
+    
+    // Reset form
+    setFormData({
+      is_active: true,
+      date: new Date().toISOString().split('T')[0],
+      lockup_time: '',
+      location: '',
+      count: '',
+      station: '',
+      type: '',
+      prisoner_category: '',
+      sex: '',
+    });
+>>>>>>> upstream/main
   };
 
   const getStationName = (id: string) => mockStations.find(s => s.id === id)?.name || 'Unknown';
@@ -216,6 +250,7 @@ export function ManualLockupScreen() {
     }
   };
 
+<<<<<<< HEAD
   useEffect(() => {
 
     async function fetchData(){
@@ -290,6 +325,8 @@ export function ManualLockupScreen() {
      fetchData()
   }, [dialogOpen]);
 
+=======
+>>>>>>> upstream/main
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -383,6 +420,7 @@ export function ManualLockupScreen() {
                   Add Lockup (Legacy Form)
                 </Button>
               </DialogTrigger>
+<<<<<<< HEAD
 
           <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <>
@@ -399,12 +437,20 @@ export function ManualLockupScreen() {
                 ) : (
                     <>
                       <DialogHeader>
+=======
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+>>>>>>> upstream/main
               <DialogTitle>Add Manual Lockup Record</DialogTitle>
               <DialogDescription>
                 Enter the details for the manual lockup count
               </DialogDescription>
             </DialogHeader>
+<<<<<<< HEAD
                       <form onSubmit={handleSubmit}>
+=======
+            <form onSubmit={handleSubmit}>
+>>>>>>> upstream/main
               <div className="grid gap-4 py-4">
                 {/* Is Active Switch */}
                 <div className="flex items-center justify-between">
@@ -627,10 +673,13 @@ export function ManualLockupScreen() {
                 </Button>
               </DialogFooter>
             </form>
+<<<<<<< HEAD
                     </>
                 )
               }
             </>
+=======
+>>>>>>> upstream/main
           </DialogContent>
         </Dialog>
           </div>

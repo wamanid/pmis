@@ -6,7 +6,11 @@ Implemented backend API integration for the login system with axios interceptors
 ## Files Created/Modified
 
 ### 1. **src/services/axiosInstance.ts** (NEW)
+<<<<<<< HEAD
 - Configured axios instance with base URL: `https://pmis.angstrom-technologies.ug/api`
+=======
+- Configured axios instance with base URL: `http://localhost:8000/api/`
+>>>>>>> upstream/main
 - **Request Interceptor:**
   - Automatically adds Bearer token from localStorage to all requests
   - Logs requests for debugging
@@ -111,7 +115,11 @@ The backend should implement these endpoints:
 
 ## Testing
 
+<<<<<<< HEAD
 Make sure your backend API is running at `https://pmis.angstrom-technologies.ug/api` before testing the login flow.
+=======
+Make sure your backend API is running at `http://localhost:8000/api/` before testing the login flow.
+>>>>>>> upstream/main
 
 To test:
 1. Start the backend server
