@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import ComplaintForm from "./ComplaintForm";
-import * as ComplaintsService from "../../services/stationServices/ComplaintsService";
+import * as ComplaintsService from "../../services/stationServices/complaintsService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {

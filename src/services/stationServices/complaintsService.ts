@@ -1,4 +1,4 @@
-import axiosInstance from './axiosInstance';
+import axiosInstance from '../axiosInstance';
 import { toast } from 'sonner';
 
 const BASE = '/station-management/api/complaints/';
