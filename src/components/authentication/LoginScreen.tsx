@@ -1,15 +1,11 @@
 import { useState } from 'react';
-<<<<<<< HEAD
-=======
-import { useNavigate, useLocation } from 'react-router-dom';
->>>>>>> upstream/main
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { KeyRound, Shield } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../ui/input-otp';
-<<<<<<< HEAD
+
 import { toast } from 'sonner';
 import { WavesBackground } from './WavesBackground';
 import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
@@ -20,18 +16,7 @@ interface LoginScreenProps {
 }
 
 export function LoginScreen({ onLogin }: LoginScreenProps) {
-=======
-import { toast } from 'sonner@2.0.3';
-import { WavesBackground } from './WavesBackground';
-import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
-import { login, verifyOtp, resendOtp } from '../../services/authService';
-import { useAuth } from '../../contexts/AuthContext';
 
-export function LoginScreen() {
-  const navigate = useNavigate();
-  const location = useLocation();
-  const { login: authLogin } = useAuth();
->>>>>>> upstream/main
   const [step, setStep] = useState<'credentials' | 'otp'>('credentials');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -70,27 +55,12 @@ export function LoginScreen() {
       } else {
         // MFA not required - tokens already stored, redirect to dashboard
         toast.success(response.message || 'Login successful!');
-<<<<<<< HEAD
         // Call onLogin to update app state and redirect
         onLogin();
       }
     } catch (error: any) {
       // axios interceptor shows user-friendly messages; show fallback if no response
       if (!error?.response) {
-=======
-        // Update auth context and redirect
-        if (response.user && response.access_token) {
-          authLogin(response.user, response.access_token);
-          const from = (location.state as any)?.from || '/station-management/overview';
-          navigate(from, { replace: true });
-        }
-      }
-    } catch (error: any) {
-      // Error handling is done by axios interceptor
-      console.error('Login error:', error);
-      // Only show additional error if interceptor didn't handle it
-      if (!error.response) {
->>>>>>> upstream/main
         toast.error('Failed to connect to server. Please try again.');
       }
       setLoading(false);
@@ -122,33 +92,22 @@ export function LoginScreen() {
       if (response.error) {
         toast.error(response.error);
         setLoading(false);
-<<<<<<< HEAD
+
       } else if (response.access_token) {
         toast.success(response.message || 'Login successful!');
         setLoading(false);
         // Call onLogin to update app state
         onLogin();
-=======
-      } else if (response.access_token && response.user) {
-        toast.success(response.message || 'Login successful!');
-        // Update auth context and redirect
-        authLogin(response.user, response.access_token);
-        const from = (location.state as any)?.from || '/station-management/overview';
-        navigate(from, { replace: true });
->>>>>>> upstream/main
       } else {
         toast.error('Invalid OTP. Please try again.');
         setLoading(false);
       }
     } catch (error: any) {
-<<<<<<< HEAD
+
       if (!error?.response) {
         toast.error('Failed to connect to server. Please try again.');
       }
-=======
-      // Error handling is done by axios interceptor
-      console.error('OTP verification error:', error);
->>>>>>> upstream/main
+
       setLoading(false);
     }
   };
@@ -171,14 +130,11 @@ export function LoginScreen() {
         setOtp('');
       }
     } catch (error: any) {
-<<<<<<< HEAD
+
       if (!error?.response) {
         toast.error('Failed to connect to server. Please try again.');
       }
-=======
-      // Error handling is done by axios interceptor
-      console.error('Resend OTP error:', error);
->>>>>>> upstream/main
+
     } finally {
       setLoading(false);
     }
@@ -255,10 +211,6 @@ export function LoginScreen() {
                   type="submit" 
                   className="w-full bg-primary hover:bg-primary/90"
                   disabled={loading}
-<<<<<<< HEAD
-=======
-                  onClick={handleCredentialsSubmit}
->>>>>>> upstream/main
                 >
                   {loading ? 'Logging in...' : 'Continue'}
                 </Button>

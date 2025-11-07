@@ -1,8 +1,4 @@
 import { useEffect, useState } from 'react';
-<<<<<<< HEAD
-=======
-import { useNavigate } from 'react-router-dom';
->>>>>>> upstream/main
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { StatCard } from '../common/StatCard';
 import { Input } from '../ui/input';
@@ -34,7 +30,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-<<<<<<< HEAD
+
 import {
   fetchAdmissionStats,
   searchPrisoners,
@@ -52,50 +48,25 @@ export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PrisonerSearchResult[]>([]);
   const [searching, setSearching] = useState(false);
-=======
-import { admissionService } from '../../services/admissionService';
-import { DashboardResponse, DashboardFilters } from '../../models/admission';
-import { toast } from 'sonner';
 
-// Transform API response to chart data format
-interface CategoryData {
-  category: string;
-  count: number;
-  percentage: number;
-}
-
-export function AdmissionDashboard() {
-  const navigate = useNavigate();
-  const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState<DashboardFilters>({
-    period: 'daily'
-  });
->>>>>>> upstream/main
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-<<<<<<< HEAD
+
         const stats = await fetchAdmissionStats();
         setAdmissionStats(stats);
       } catch (error) {
         console.error('Error loading admission data:', error);
-=======
-        const data = await admissionService.getAdmissionDashboard(filters);
-        setDashboardData(data);
-      } catch (error) {
-        console.error('Error loading admission dashboard:', error);
-        toast.error('Failed to load admission dashboard data');
->>>>>>> upstream/main
+
       } finally {
         setLoading(false);
       }
     };
 
     loadData();
-<<<<<<< HEAD
+
   }, []);
 
   const handleSearch = async () => {
@@ -113,22 +84,7 @@ export function AdmissionDashboard() {
     } finally {
       setSearching(false);
     }
-=======
-  }, [filters]);
 
-  // Transform category data from API response
-  const getCategoryData = (): CategoryData[] => {
-    if (!dashboardData) return [];
-    
-    const categories = dashboardData.admissions.category;
-    const total = Object.values(categories).reduce((sum, count) => sum + count, 0);
-    
-    return Object.entries(categories).map(([key, count]) => ({
-      category: key.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()),
-      count,
-      percentage: total > 0 ? Math.round((count / total) * 100) : 0
-    }));
->>>>>>> upstream/main
   };
 
   const COLORS = ['#650000', '#8b0000', '#a52a2a', '#dc143c', '#ff6347'];
@@ -157,7 +113,7 @@ export function AdmissionDashboard() {
         </div>
       </div>
 
-<<<<<<< HEAD
+
       {/* Search and Admit Button */}
       <div className="flex gap-4 items-center">
         <div className="flex-1 flex gap-2">
@@ -179,20 +135,14 @@ export function AdmissionDashboard() {
         <Button 
           className="bg-primary hover:bg-primary/90"
           onClick={() => onNavigate?.('admissions-management-prisoner-admission')}
-=======
-      {/* Admit Button */}
-      <div className="flex justify-end">
-        <Button 
-          className="bg-primary hover:bg-primary/90"
-          onClick={() => navigate('/admissions-management/prisoner-admission')}
->>>>>>> upstream/main
+
         >
           <UserPlus className="mr-2 h-4 w-4" />
           Admit Prisoner
         </Button>
       </div>
 
-<<<<<<< HEAD
+
       {/* Search Results */}
       {searchResults.length > 0 && (
         <Card>
@@ -230,17 +180,13 @@ export function AdmissionDashboard() {
         </Card>
       )}
 
-=======
->>>>>>> upstream/main
       {/* Top Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Total Admissions"
-<<<<<<< HEAD
+
           value={admissionStats?.total_admissions || 0}
-=======
-          value={dashboardData?.total_admissions || 0}
->>>>>>> upstream/main
+
           subtitle="All time admissions"
           icon={Users}
           iconColor="text-primary"
@@ -248,11 +194,9 @@ export function AdmissionDashboard() {
         
         <StatCard
           title="Pending Approval"
-<<<<<<< HEAD
+
           value={admissionStats?.pending_approval || 0}
-=======
-          value={dashboardData?.pending_approvals || 0}
->>>>>>> upstream/main
+
           subtitle="Awaiting processing"
           icon={Clock}
           iconColor="text-orange-500"
@@ -260,11 +204,9 @@ export function AdmissionDashboard() {
         
         <StatCard
           title="Armed Personnel"
-<<<<<<< HEAD
+
           value={admissionStats?.armed_personnel || 0}
-=======
-          value={dashboardData?.armed_personnel || 0}
->>>>>>> upstream/main
+
           subtitle="Currently admitted"
           icon={Shield}
           iconColor="text-red-500"
@@ -272,11 +214,9 @@ export function AdmissionDashboard() {
         
         <StatCard
           title="Children Admitted"
-<<<<<<< HEAD
+
           value={admissionStats?.children_admitted || 0}
-=======
-          value={dashboardData?.children || 0}
->>>>>>> upstream/main
+
           subtitle="Under 18 years"
           icon={Baby}
           iconColor="text-blue-500"
@@ -292,11 +232,9 @@ export function AdmissionDashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-<<<<<<< HEAD
+
               {admissionStats?.by_category.map((cat) => (
-=======
-              {getCategoryData().map((cat) => (
->>>>>>> upstream/main
+
                 <div key={cat.category}>
                   <div className="flex justify-between items-center mb-2">
                     <span>{cat.category}</span>
@@ -330,33 +268,23 @@ export function AdmissionDashboard() {
                     <Calendar className="h-4 w-4 text-primary" />
                     <span>Weekly Summary</span>
                   </div>
-<<<<<<< HEAD
+
                   <Badge variant={admissionStats && admissionStats.weekly_summary.change_percentage > 0 ? 'default' : 'secondary'}>
                     <TrendingUp className="h-3 w-3 mr-1" />
                     {admissionStats?.weekly_summary.change_percentage.toFixed(1)}%
-=======
-                  <Badge variant={dashboardData && dashboardData.weekly_summary.percentage_change > 0 ? 'default' : 'secondary'}>
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {dashboardData?.weekly_summary.percentage_change.toFixed(1)}%
->>>>>>> upstream/main
+
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
                     <div className="text-sm text-muted-foreground">Current Week</div>
-<<<<<<< HEAD
+
                     <div className="text-2xl">{admissionStats?.weekly_summary.current_week}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Previous Week</div>
                     <div className="text-2xl">{admissionStats?.weekly_summary.previous_week}</div>
-=======
-                    <div className="text-2xl">{dashboardData?.weekly_summary.current}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Previous Week</div>
-                    <div className="text-2xl">{dashboardData?.weekly_summary.previous}</div>
->>>>>>> upstream/main
+
                   </div>
                 </div>
               </div>
@@ -367,56 +295,23 @@ export function AdmissionDashboard() {
                     <Calendar className="h-4 w-4 text-primary" />
                     <span>Monthly Summary</span>
                   </div>
-<<<<<<< HEAD
+
                   <Badge variant={admissionStats && admissionStats.monthly_summary.change_percentage > 0 ? 'default' : 'secondary'}>
                     <TrendingUp className="h-3 w-3 mr-1" />
                     {admissionStats?.monthly_summary.change_percentage.toFixed(1)}%
-=======
-                  <Badge variant={dashboardData && dashboardData.monthly_summary.percentage_change > 0 ? 'default' : 'secondary'}>
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {dashboardData?.monthly_summary.percentage_change.toFixed(1)}%
->>>>>>> upstream/main
+
                   </Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-4 mt-3">
                   <div>
                     <div className="text-sm text-muted-foreground">Current Month</div>
-<<<<<<< HEAD
+
                     <div className="text-2xl">{admissionStats?.monthly_summary.current_month}</div>
                   </div>
                   <div>
                     <div className="text-sm text-muted-foreground">Previous Month</div>
                     <div className="text-2xl">{admissionStats?.monthly_summary.previous_month}</div>
-=======
-                    <div className="text-2xl">{dashboardData?.monthly_summary.current}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Previous Month</div>
-                    <div className="text-2xl">{dashboardData?.monthly_summary.previous}</div>
-                  </div>
-                </div>
-              </div>
 
-              <div className="p-4 bg-muted rounded-lg">
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4 text-primary" />
-                    <span>Annual Summary</span>
-                  </div>
-                  <Badge variant={dashboardData && dashboardData.annual_summary.percentage_change > 0 ? 'default' : 'secondary'}>
-                    <TrendingUp className="h-3 w-3 mr-1" />
-                    {dashboardData?.annual_summary.percentage_change.toFixed(1)}%
-                  </Badge>
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-3">
-                  <div>
-                    <div className="text-sm text-muted-foreground">Current Year</div>
-                    <div className="text-2xl">{dashboardData?.annual_summary.current}</div>
-                  </div>
-                  <div>
-                    <div className="text-sm text-muted-foreground">Previous Year</div>
-                    <div className="text-2xl">{dashboardData?.annual_summary.previous}</div>
->>>>>>> upstream/main
                   </div>
                 </div>
               </div>
@@ -425,7 +320,7 @@ export function AdmissionDashboard() {
         </Card>
       </div>
 
-<<<<<<< HEAD
+
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Admission Trend Graph */}
@@ -497,32 +392,7 @@ export function AdmissionDashboard() {
               <Legend />
               <Bar dataKey="count" fill="#650000" name="Count" />
             </BarChart>
-=======
-      {/* Category Distribution Pie Chart */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Category Distribution</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <PieChart>
-              <Pie
-                data={getCategoryData()}
-                cx="50%"
-                cy="50%"
-                labelLine={false}
-                label={({ category, percentage }) => `${category}: ${percentage}%`}
-                outerRadius={80}
-                fill="#8884d8"
-                dataKey="count"
-              >
-                {getCategoryData().map((entry, index) => (
-                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                ))}
-              </Pie>
-              <Tooltip />
-            </PieChart>
->>>>>>> upstream/main
+
           </ResponsiveContainer>
         </CardContent>
       </Card>
@@ -543,11 +413,9 @@ export function AdmissionDashboard() {
               </TableRow>
             </TableHeader>
             <TableBody>
-<<<<<<< HEAD
+
               {admissionStats?.by_category.map((cat) => (
-=======
-              {getCategoryData().map((cat) => (
->>>>>>> upstream/main
+
                 <TableRow key={cat.category}>
                   <TableCell>{cat.category}</TableCell>
                   <TableCell className="text-right">{cat.count}</TableCell>
@@ -565,11 +433,9 @@ export function AdmissionDashboard() {
               <TableRow className="bg-muted/50">
                 <TableCell>Total</TableCell>
                 <TableCell className="text-right">
-<<<<<<< HEAD
+
                   {admissionStats?.by_category.reduce((sum, cat) => sum + cat.count, 0)}
-=======
-                  {getCategoryData().reduce((sum, cat) => sum + cat.count, 0)}
->>>>>>> upstream/main
+
                 </TableCell>
                 <TableCell className="text-right">100%</TableCell>
                 <TableCell></TableCell>
