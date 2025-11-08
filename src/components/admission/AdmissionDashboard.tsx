@@ -31,7 +31,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { admissionService } from '../../services/admissionService';
+import { getAdmissionDashboard } from '../../services/admission';
 import { DashboardResponse, DashboardFilters } from '../../models/admission';
 import { toast } from 'sonner';
 import { useFilterRefresh } from '../../hooks/useFilterRefresh';
@@ -54,7 +54,7 @@ export function AdmissionDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await admissionService.getAdmissionDashboard(filters);
+      const data = await getAdmissionDashboard(filters);
       setDashboardData(data);
     } catch (error) {
       console.error('Error loading admission dashboard:', error);

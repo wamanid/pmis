@@ -56,6 +56,7 @@ import {
   TableRow,
 } from "../ui/table";
 import { toast } from "sonner@2.0.3";
+import { PrisonerCategorySelect } from "../common/PrisonerCategorySelect";
 
 interface PrisonerBioData {
   id?: string;
@@ -234,12 +235,6 @@ const admissionTypes = [
   { id: "RECAPTURED", name: "Recaptured Prisoner" },
   { id: "TRANSFER", name: "Transfer" },
   { id: "PMO", name: "Pending MInister's Order" },
-];
-
-const prisonerCategories = [
-  { id: "DEBTOR", name: "Debtor" },
-  { id: "REMAND", name: "Remand" },
-  { id: "CONVICT", name: "Convict" },
 ];
 
 const mockRegions = [
@@ -972,21 +967,11 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 Prisoner Category{" "}
                 <span className="text-red-500">*</span>
               </Label>
-              <Select
+              <PrisonerCategorySelect
                 value={prisonerCategory}
                 onValueChange={handleCategoryChange}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select prisoner category" />
-                </SelectTrigger>
-                <SelectContent>
-                  {prisonerCategories.map((cat) => (
-                    <SelectItem key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Select prisoner category"
+              />
             </div>
 
             {/* Consciousness Check */}

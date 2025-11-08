@@ -28,6 +28,7 @@ import {
   Settings,
   LucideIcon,
   Table,
+  Search,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -270,21 +271,6 @@ export function Sidebar({ isOpen }: SidebarProps) {
             ) : (
               <>
                 {menuItems.map((item) => renderMenuItem(item))}
-                
-                {/* Static Demo Menu Item */}
-                <div className="pt-2 mt-2 border-t border-border">
-                  <button
-                    onClick={() => navigate('/demo/datatable')}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                      location.pathname === '/demo/datatable'
-                        ? 'bg-primary text-white'
-                        : 'hover:bg-muted text-foreground'
-                    }`}
-                  >
-                    <Table className="h-4 w-4 shrink-0" />
-                    <span className="flex-1 text-left text-sm">DataTable Demo</span>
-                  </button>
-                </div>
               </>
             )}
           </div>
