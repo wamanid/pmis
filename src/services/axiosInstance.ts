@@ -1,14 +1,8 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
-// allow a custom config flag so callers can suppress interceptor toasts
-declare module 'axios' {
-  export interface AxiosRequestConfig {
-    skipErrorToast?: boolean;
-  }
-}
-
-const API_BASE_URL = 'https://pmis.angstrom-technologies.ug/api';
+// Get API base URL from environment variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://pmis.angstrom-technologies.ug/api';
 
 // Create axios instance
 const axiosInstance = axios.create({
