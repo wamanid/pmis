@@ -96,7 +96,9 @@ axiosInstance.interceptors.response.use(
           // Clear token and redirect to login
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
-          // You might want to redirect to login page here
+          localStorage.removeItem('pmis_user_filters');
+          // Redirect to login page
+          window.location.href = '/login';
           break;
         case 403:
           toast.error('Access forbidden. You do not have permission.');

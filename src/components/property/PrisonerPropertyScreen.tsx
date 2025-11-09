@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import BiometricCapture from '../common/BiometricCapture';
+import NextOfKinScreen from '../admission/NextOfKinScreen';
+import PropertyStatusChangeForm from './PropertyStatusChangeForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -13,6 +16,7 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Checkbox } from '../ui/checkbox';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
 import { toast } from 'sonner@2.0.3';
 import { 
@@ -30,7 +34,10 @@ import {
   FileText,
   AlertCircle,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 
@@ -38,6 +45,7 @@ interface Property {
   id: string;
   prisoner_name: string;
   property_type_name: string;
+  property_category_name: string;
   property_item_name: string;
   measurement_unit_name: string;
   property_bag_number: string;
@@ -47,10 +55,12 @@ interface Property {
   quantity: string;
   amount: string;
   biometric_consent: boolean;
+  biometric_data?: string;
   note: string;
   destination: string;
   prisoner: string;
   property_type: string;
+  property_category: string;
   property_item: string;
   measurement_unit: string;
   property_bag: string;
@@ -65,6 +75,11 @@ interface PropertyType {
 }
 
 interface PropertyItem {
+  id: string;
+  name: string;
+}
+
+interface PropertyCategory {
   id: string;
   name: string;
 }
@@ -97,12 +112,23 @@ interface NextOfKin {
   relationship: string;
 }
 
+interface Visitor {
+  id: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  id_number: string;
+  phone_number: string;
+  visitor_type_name?: string;
+}
+
 // Mock Data
 const mockProperties: Property[] = [
   {
     id: '1',
     prisoner_name: 'John Doe',
     property_type_name: 'Personal Items',
+    property_category_name: 'Valuables',
     property_item_name: 'Mobile Phone',
     measurement_unit_name: 'Piece',
     property_bag_number: 'BAG-001',
@@ -116,6 +142,7 @@ const mockProperties: Property[] = [
     destination: 'Property Store',
     prisoner: 'pr1',
     property_type: 'pt1',
+    property_category: 'pc1',
     property_item: 'pi1',
     measurement_unit: 'mu1',
     property_bag: 'pb1',
@@ -127,6 +154,7 @@ const mockProperties: Property[] = [
     id: '2',
     prisoner_name: 'Michael Smith',
     property_type_name: 'Clothing',
+    property_category_name: 'Personal Effects',
     property_item_name: 'Leather Jacket',
     measurement_unit_name: 'Piece',
     property_bag_number: 'BAG-002',
@@ -140,6 +168,7 @@ const mockProperties: Property[] = [
     destination: 'Released to visitor',
     prisoner: 'pr2',
     property_type: 'pt2',
+    property_category: 'pc3',
     property_item: 'pi2',
     measurement_unit: 'mu1',
     property_bag: 'pb2',
@@ -151,6 +180,7 @@ const mockProperties: Property[] = [
     id: '3',
     prisoner_name: 'David Wilson',
     property_type_name: 'Electronics',
+    property_category_name: 'Valuables',
     property_item_name: 'Laptop',
     measurement_unit_name: 'Piece',
     property_bag_number: 'BAG-003',
@@ -164,6 +194,7 @@ const mockProperties: Property[] = [
     destination: 'Property Store',
     prisoner: 'pr3',
     property_type: 'pt3',
+    property_category: 'pc1',
     property_item: 'pi3',
     measurement_unit: 'mu1',
     property_bag: 'pb3',
@@ -175,6 +206,7 @@ const mockProperties: Property[] = [
     id: '4',
     prisoner_name: 'James Taylor',
     property_type_name: 'Money',
+    property_category_name: 'Confiscated',
     property_item_name: 'Cash',
     measurement_unit_name: 'UGX',
     property_bag_number: 'BAG-004',
@@ -188,6 +220,7 @@ const mockProperties: Property[] = [
     destination: 'Prison Safe',
     prisoner: 'pr4',
     property_type: 'pt4',
+    property_category: 'pc6',
     property_item: 'pi4',
     measurement_unit: 'mu2',
     property_bag: 'pb4',
@@ -199,6 +232,7 @@ const mockProperties: Property[] = [
     id: '5',
     prisoner_name: 'Robert Martinez',
     property_type_name: 'Documents',
+    property_category_name: 'Legal Documents',
     property_item_name: 'National ID',
     measurement_unit_name: 'Piece',
     property_bag_number: 'BAG-005',
@@ -212,6 +246,7 @@ const mockProperties: Property[] = [
     destination: 'Property Store',
     prisoner: 'pr5',
     property_type: 'pt5',
+    property_category: 'pc4',
     property_item: 'pi5',
     measurement_unit: 'mu1',
     property_bag: 'pb5',
@@ -227,6 +262,15 @@ const mockPropertyTypes: PropertyType[] = [
   { id: 'pt3', name: 'Electronics' },
   { id: 'pt4', name: 'Money' },
   { id: 'pt5', name: 'Documents' }
+];
+
+const mockPropertyCategories: PropertyCategory[] = [
+  { id: 'pc1', name: 'Valuables' },
+  { id: 'pc2', name: 'Contraband' },
+  { id: 'pc3', name: 'Personal Effects' },
+  { id: 'pc4', name: 'Legal Documents' },
+  { id: 'pc5', name: 'Prohibited Items' },
+  { id: 'pc6', name: 'Confiscated' }
 ];
 
 const mockPropertyItems: PropertyItem[] = [
@@ -277,8 +321,92 @@ const mockNextOfKin: NextOfKin[] = [
   { id: 'nok3', full_name: 'Anna Martinez', relationship: 'Sister' }
 ];
 
+const mockVisitors: Visitor[] = [
+  { id: 'v1', first_name: 'Sarah', middle_name: 'Jane', last_name: 'Smith', id_number: 'CM123456789', phone_number: '0771234567', visitor_type_name: 'Family' },
+  { id: 'v2', first_name: 'John', middle_name: '', last_name: 'Brown', id_number: 'CM987654321', phone_number: '0752345678', visitor_type_name: 'Friend' },
+  { id: 'v3', first_name: 'Mary', middle_name: 'Ann', last_name: 'Johnson', id_number: 'CM456789123', phone_number: '0783456789', visitor_type_name: 'Family' },
+  { id: 'v4', first_name: 'David', middle_name: '', last_name: 'Williams', id_number: 'CM789123456', phone_number: '0704567890', visitor_type_name: 'Legal Representative' }
+];
+
+interface VisitorItemData {
+  id: string;
+  visitor_id: string;
+  visitor_name: string;
+  visitor_id_number: string;
+  visitor_phone: string;
+  item_name: string;
+  category_name: string;
+  bag_no: string;
+  quantity: number;
+  amount: string;
+}
+
+const mockVisitorItems: VisitorItemData[] = [
+  {
+    id: 'vi1',
+    visitor_id: 'v1',
+    visitor_name: 'Sarah Jane Smith',
+    visitor_id_number: 'CM123456789',
+    visitor_phone: '0771234567',
+    item_name: 'Rice',
+    category_name: 'Food Items',
+    bag_no: 'BAG-V001',
+    quantity: 5,
+    amount: '25000'
+  },
+  {
+    id: 'vi2',
+    visitor_id: 'v2',
+    visitor_name: 'John Brown',
+    visitor_id_number: 'CM987654321',
+    visitor_phone: '0752345678',
+    item_name: 'T-Shirt',
+    category_name: 'Clothing',
+    bag_no: 'BAG-V002',
+    quantity: 2,
+    amount: '40000'
+  },
+  {
+    id: 'vi3',
+    visitor_id: 'v3',
+    visitor_name: 'Mary Ann Johnson',
+    visitor_id_number: 'CM456789123',
+    visitor_phone: '0783456789',
+    item_name: 'Soap',
+    category_name: 'Personal Care',
+    bag_no: 'BAG-V003',
+    quantity: 3,
+    amount: '15000'
+  },
+  {
+    id: 'vi4',
+    visitor_id: 'v4',
+    visitor_name: 'David Williams',
+    visitor_id_number: 'CM789123456',
+    visitor_phone: '0704567890',
+    item_name: 'Bible',
+    category_name: 'Books & Magazines',
+    bag_no: 'BAG-V004',
+    quantity: 1,
+    amount: '20000'
+  },
+  {
+    id: 'vi5',
+    visitor_id: 'v1',
+    visitor_name: 'Sarah Jane Smith',
+    visitor_id_number: 'CM123456789',
+    visitor_phone: '0771234567',
+    item_name: 'Beans',
+    category_name: 'Food Items',
+    bag_no: 'BAG-V005',
+    quantity: 3,
+    amount: '18000'
+  }
+];
+
 export default function PrisonerPropertyScreen() {
   const [properties, setProperties] = useState<Property[]>(mockProperties);
+  const [visitors, setVisitors] = useState<Visitor[]>(mockVisitors);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -287,11 +415,49 @@ export default function PrisonerPropertyScreen() {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isNextOfKinDialogOpen, setIsNextOfKinDialogOpen] = useState(false);
+  const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
+  const [previousPropertyStatus, setPreviousPropertyStatus] = useState('');
+  const [statusChangeData, setStatusChangeData] = useState<any>(null);
 
+  // Separate state for prisoner and visitor info (for create mode)
+  const [prisonerInfo, setPrisonerInfo] = useState({
+    prisoner: ''
+  });
+
+  const [visitorInfo, setVisitorInfo] = useState({
+    visitor: ''
+  });
+
+  // State for multiple property items (for create mode)
+  const [propertyItems, setPropertyItems] = useState([{
+    id: '1',
+    property_type: '',
+    property_category: '',
+    property_item: '',
+    measurement_unit: '',
+    property_bag: '',
+    next_of_kin: '',
+    property_status: '',
+    quantity: '',
+    amount: '',
+    note: '',
+    destination: ''
+  }]);
+
+  // State for biometric data (for create mode)
+  const [biometricData, setBiometricData] = useState('');
+
+  // State for collapsible property items section
+  const [isPropertyItemsOpen, setIsPropertyItemsOpen] = useState(true);
+
+  // State for editing single item (for edit mode)
   const [formData, setFormData] = useState({
     prisoner: '',
     property_type: '',
+    property_category: '',
     property_item: '',
     measurement_unit: '',
     property_bag: '',
@@ -306,6 +472,26 @@ export default function PrisonerPropertyScreen() {
   });
 
   const itemsPerPage = 10;
+
+  // Fetch visitors from API
+  useEffect(() => {
+    const fetchVisitors = async () => {
+      setIsLoadingVisitors(true);
+      try {
+        const response = await fetch('/api/gate-management/visitors/');
+        if (response.ok) {
+          const data = await response.json();
+          setVisitors(data.results || data);
+        }
+      } catch (error) {
+        console.error('Error fetching visitors:', error);
+        toast.error('Failed to load visitors');
+      } finally {
+        setIsLoadingVisitors(false);
+      }
+    };
+    fetchVisitors();
+  }, []);
 
   // Filter properties
   const filteredProperties = properties.filter(property => {
@@ -328,29 +514,63 @@ export default function PrisonerPropertyScreen() {
   );
 
   const handleCreate = () => {
-    setFormData({
-      prisoner: '',
+    setPrisonerInfo({ prisoner: '' });
+    setVisitorInfo({ visitor: '' });
+    setPropertyItems([{
+      id: '1',
       property_type: '',
+      property_category: '',
       property_item: '',
       measurement_unit: '',
       property_bag: '',
       next_of_kin: 'none',
-      visitor: '',
       property_status: '',
       quantity: '',
       amount: '',
-      biometric_consent: false,
       note: '',
       destination: ''
-    });
+    }]);
+    setBiometricData('');
     setIsCreateDialogOpen(true);
+  };
+
+  const handleAddPropertyItem = () => {
+    const newItem = {
+      id: Date.now().toString(),
+      property_type: '',
+      property_category: '',
+      property_item: '',
+      measurement_unit: '',
+      property_bag: '',
+      next_of_kin: 'none',
+      property_status: '',
+      quantity: '',
+      amount: '',
+      note: '',
+      destination: ''
+    };
+    setPropertyItems([...propertyItems, newItem]);
+  };
+
+  const handleRemovePropertyItem = (itemId: string) => {
+    if (propertyItems.length > 1) {
+      setPropertyItems(propertyItems.filter(item => item.id !== itemId));
+    }
+  };
+
+  const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
+    setPropertyItems(propertyItems.map(item => 
+      item.id === itemId ? { ...item, [field]: value } : item
+    ));
   };
 
   const handleEdit = (property: Property) => {
     setSelectedProperty(property);
+    setPreviousPropertyStatus(property.property_status); // Store the original status
     setFormData({
       prisoner: property.prisoner,
       property_type: property.property_type,
+      property_category: property.property_category,
       property_item: property.property_item,
       measurement_unit: property.measurement_unit,
       property_bag: property.property_bag,
@@ -385,33 +605,60 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
+  const handleStatusChangeSubmit = (data: any) => {
+    // Handle the status change submission
+    console.log('Status change submitted:', data);
+    toast.success('Property status change recorded successfully');
+    // You can add API call here to save the status change
+  };
+
   const handleSubmitCreate = (e: React.FormEvent) => {
     e.preventDefault();
     
-    const prisoner = mockPrisoners.find(p => p.id === formData.prisoner);
-    const propertyType = mockPropertyTypes.find(pt => pt.id === formData.property_type);
-    const propertyItem = mockPropertyItems.find(pi => pi.id === formData.property_item);
-    const measurementUnit = mockMeasurementUnits.find(mu => mu.id === formData.measurement_unit);
-    const propertyBag = mockPropertyBags.find(pb => pb.id === formData.property_bag);
-    const propertyStatus = mockPropertyStatuses.find(ps => ps.id === formData.property_status);
-    const nextOfKin = formData.next_of_kin !== 'none' ? mockNextOfKin.find(nok => nok.id === formData.next_of_kin) : undefined;
+    const prisoner = mockPrisoners.find(p => p.id === prisonerInfo.prisoner);
+    const visitor = visitors.find(v => v.id === visitorInfo.visitor);
 
-    const newProperty: Property = {
-      id: Date.now().toString(),
-      prisoner_name: prisoner?.full_name || '',
-      property_type_name: propertyType?.name || '',
-      property_item_name: propertyItem?.name || '',
-      measurement_unit_name: measurementUnit?.name || '',
-      property_bag_number: propertyBag?.bag_number || '',
-      property_status_name: propertyStatus?.name || '',
-      next_of_kin_name: nextOfKin?.full_name || '',
-      visitor_name: formData.visitor,
-      ...formData,
-      next_of_kin: formData.next_of_kin === 'none' ? '' : formData.next_of_kin
-    };
+    // Create multiple properties from propertyItems
+    const newProperties: Property[] = propertyItems.map((item, index) => {
+      const propertyType = mockPropertyTypes.find(pt => pt.id === item.property_type);
+      const propertyCategory = mockPropertyCategories.find(pc => pc.id === item.property_category);
+      const propertyItem = mockPropertyItems.find(pi => pi.id === item.property_item);
+      const measurementUnit = mockMeasurementUnits.find(mu => mu.id === item.measurement_unit);
+      const propertyBag = mockPropertyBags.find(pb => pb.id === item.property_bag);
+      const propertyStatus = mockPropertyStatuses.find(ps => ps.id === item.property_status);
+      const nextOfKin = item.next_of_kin !== 'none' ? mockNextOfKin.find(nok => nok.id === item.next_of_kin) : undefined;
 
-    setProperties([...properties, newProperty]);
-    toast.success('Property created successfully');
+      return {
+        id: (Date.now() + index).toString(),
+        prisoner: prisonerInfo.prisoner,
+        prisoner_name: prisoner?.full_name || '',
+        property_type: item.property_type,
+        property_type_name: propertyType?.name || '',
+        property_category: item.property_category,
+        property_category_name: propertyCategory?.name || '',
+        property_item: item.property_item,
+        property_item_name: propertyItem?.name || '',
+        measurement_unit: item.measurement_unit,
+        measurement_unit_name: measurementUnit?.name || '',
+        property_bag: item.property_bag,
+        property_bag_number: propertyBag?.bag_number || '',
+        property_status: item.property_status,
+        property_status_name: propertyStatus?.name || '',
+        next_of_kin: item.next_of_kin === 'none' ? '' : item.next_of_kin,
+        next_of_kin_name: nextOfKin?.full_name || '',
+        visitor: visitorInfo.visitor,
+        visitor_name: visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '',
+        quantity: item.quantity,
+        amount: item.amount,
+        biometric_consent: !!biometricData,
+        biometric_data: biometricData,
+        note: item.note,
+        destination: item.destination
+      };
+    });
+
+    setProperties([...properties, ...newProperties]);
+    toast.success(`${newProperties.length} ${newProperties.length === 1 ? 'property' : 'properties'} created successfully`);
     setIsCreateDialogOpen(false);
   };
 
@@ -421,22 +668,25 @@ export default function PrisonerPropertyScreen() {
     if (selectedProperty) {
       const prisoner = mockPrisoners.find(p => p.id === formData.prisoner);
       const propertyType = mockPropertyTypes.find(pt => pt.id === formData.property_type);
+      const propertyCategory = mockPropertyCategories.find(pc => pc.id === formData.property_category);
       const propertyItem = mockPropertyItems.find(pi => pi.id === formData.property_item);
       const measurementUnit = mockMeasurementUnits.find(mu => mu.id === formData.measurement_unit);
       const propertyBag = mockPropertyBags.find(pb => pb.id === formData.property_bag);
       const propertyStatus = mockPropertyStatuses.find(ps => ps.id === formData.property_status);
       const nextOfKin = formData.next_of_kin !== 'none' ? mockNextOfKin.find(nok => nok.id === formData.next_of_kin) : undefined;
+      const visitor = visitors.find(v => v.id === formData.visitor);
 
       const updatedProperty: Property = {
         ...selectedProperty,
         prisoner_name: prisoner?.full_name || '',
         property_type_name: propertyType?.name || '',
+        property_category_name: propertyCategory?.name || '',
         property_item_name: propertyItem?.name || '',
         measurement_unit_name: measurementUnit?.name || '',
         property_bag_number: propertyBag?.bag_number || '',
         property_status_name: propertyStatus?.name || '',
         next_of_kin_name: nextOfKin?.full_name || '',
-        visitor_name: formData.visitor,
+        visitor_name: visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '',
         ...formData,
         next_of_kin: formData.next_of_kin === 'none' ? '' : formData.next_of_kin
       };
@@ -475,14 +725,764 @@ export default function PrisonerPropertyScreen() {
   const releasedProperties = properties.filter(p => p.property_status_name === 'Released').length;
   const totalValue = properties.reduce((sum, p) => sum + parseInt(p.amount || '0'), 0);
 
-  const PropertyForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+  // Component for creating multiple property items
+  const CreatePropertyForm = ({ onSubmit }: { onSubmit: (e: React.FormEvent) => void }) => {
     const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [openVisitor, setOpenVisitor] = useState(false);
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-6">
+        {/* Prisoner Information Section */}
+        <Card className="border-2" style={{ borderColor: '#650000' }}>
+          <div className="p-4">
+            <h3 className="mb-4" style={{ color: '#650000' }}>Prisoner Information</h3>
+            <div className="space-y-2">
+              <Label htmlFor="prisoner">Prisoner *</Label>
+              <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openPrisoner}
+                    className="w-full justify-between"
+                    type="button"
+                  >
+                    {prisonerInfo.prisoner ? (
+                      (() => {
+                        const prisoner = mockPrisoners.find((p) => p.id === prisonerInfo.prisoner);
+                        return prisoner ? (
+                          <div className="flex items-center gap-2">
+                            <span>{prisoner.full_name}</span>
+                            <span className="text-gray-500">({prisoner.prisoner_number})</span>
+                          </div>
+                        ) : "Select prisoner...";
+                      })()
+                    ) : "Select prisoner..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search prisoner..." />
+                    <CommandList>
+                      <CommandEmpty>No prisoner found.</CommandEmpty>
+                      <CommandGroup>
+                        {mockPrisoners.map((prisoner) => (
+                          <CommandItem
+                            key={prisoner.id}
+                            value={prisoner.full_name + ' ' + prisoner.prisoner_number}
+                            onSelect={() => {
+                              setPrisonerInfo({...prisonerInfo, prisoner: prisoner.id});
+                              setOpenPrisoner(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                prisonerInfo.prisoner === prisoner.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{prisoner.full_name}</span>
+                              <span className="text-xs text-gray-500">Prisoner Number: {prisoner.prisoner_number}</span>
+                            </div>
+                          </CommandItem>
+                        ))}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {prisonerInfo.prisoner && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-md">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Prisoner Number:</span>
+                      <span className="ml-2">{mockPrisoners.find((p) => p.id === prisonerInfo.prisoner)?.prisoner_number}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Full Name:</span>
+                      <span className="ml-2">{mockPrisoners.find((p) => p.id === prisonerInfo.prisoner)?.full_name}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Visitor Information Section */}
+        <Card className="border-2" style={{ borderColor: '#650000' }}>
+          <div className="p-4">
+            <h3 className="mb-4" style={{ color: '#650000' }}>Visitor Information</h3>
+            <div className="space-y-2">
+              <Label htmlFor="visitor">Visitor</Label>
+              <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    role="combobox"
+                    aria-expanded={openVisitor}
+                    className="w-full justify-between"
+                    type="button"
+                    disabled={isLoadingVisitors}
+                  >
+                    {visitorInfo.visitor ? (
+                      (() => {
+                        const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
+                        return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : "Select visitor...";
+                      })()
+                    ) : "Select visitor..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-full p-0">
+                  <Command>
+                    <CommandInput placeholder="Search by name, ID, or phone..." />
+                    <CommandList>
+                      <CommandEmpty>
+                        {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
+                      </CommandEmpty>
+                      <CommandGroup>
+                        <CommandItem
+                          value="none"
+                          onSelect={() => {
+                            setVisitorInfo({...visitorInfo, visitor: ''});
+                            setOpenVisitor(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              visitorInfo.visitor === '' ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          None
+                        </CommandItem>
+                        {visitors.map((visitor) => {
+                          const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
+                          const searchValue = `${fullName} ${visitor.id_number} ${visitor.phone_number}`;
+                          return (
+                            <CommandItem
+                              key={visitor.id}
+                              value={searchValue}
+                              onSelect={() => {
+                                setVisitorInfo({...visitorInfo, visitor: visitor.id});
+                                setOpenVisitor(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  visitorInfo.visitor === visitor.id ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              <div className="flex flex-col">
+                                <span>{fullName}</span>
+                                <span className="text-xs text-gray-500">
+                                  ID: {visitor.id_number} | Phone: {visitor.phone_number}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          );
+                        })}
+                      </CommandGroup>
+                    </CommandList>
+                  </Command>
+                </PopoverContent>
+              </Popover>
+              {visitorInfo.visitor && (
+                <div className="mt-2 p-3 bg-gray-50 rounded-md">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>
+                      <span className="text-gray-600">Visitor Name:</span>
+                      <span className="ml-2">
+                        {(() => {
+                          const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
+                          return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '';
+                        })()}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Phone Number:</span>
+                      <span className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.phone_number}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-600">ID Number:</span>
+                      <span className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.id_number}</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </Card>
+
+        {/* Property Items Section */}
+        <Collapsible open={isPropertyItemsOpen} onOpenChange={setIsPropertyItemsOpen}>
+          <Card className="border-2" style={{ borderColor: isPropertyItemsOpen ? '#650000' : '#e5e7eb' }}>
+            <CollapsibleTrigger asChild>
+              <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
+                <h3 className="flex items-center gap-2" style={{ color: '#650000' }}>
+                  <Package className="h-5 w-5" />
+                  Property Items
+                  <Badge variant="secondary">{propertyItems.length}</Badge>
+                </h3>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleAddPropertyItem();
+                    }}
+                    size="sm"
+                    style={{ backgroundColor: '#650000' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Item
+                  </Button>
+                  {isPropertyItemsOpen ? (
+                    <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />
+                  ) : (
+                    <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />
+                  )}
+                </div>
+              </div>
+            </CollapsibleTrigger>
+
+            <CollapsibleContent>
+              <div className="p-4 pt-0 space-y-4">
+                {propertyItems.map((item, index) => (
+                  <PropertyItemCard
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    onUpdate={handleUpdatePropertyItem}
+                    onRemove={handleRemovePropertyItem}
+                    canRemove={propertyItems.length > 1}
+                  />
+                ))}
+              </div>
+            </CollapsibleContent>
+          </Card>
+        </Collapsible>
+
+        {/* Biometric Capture/Verification Section */}
+        <Card className="border-2" style={{ borderColor: '#650000' }}>
+          <div className="p-4">
+            <h3 className="mb-4" style={{ color: '#650000' }}>Biometric Capture/Verification</h3>
+            <BiometricCapture
+              value={biometricData}
+              onChange={setBiometricData}
+              label="Prisoner Fingerprint Verification"
+            />
+          </div>
+        </Card>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  // Component for individual property item card
+  const PropertyItemCard = ({ item, index, onUpdate, onRemove, canRemove }: {
+    item: any;
+    index: number;
+    onUpdate: (id: string, field: string, value: any) => void;
+    onRemove: (id: string) => void;
+    canRemove: boolean;
+  }) => {
+    const [isItemOpen, setIsItemOpen] = useState(true);
     const [openPropertyType, setOpenPropertyType] = useState(false);
+    const [openPropertyCategory, setOpenPropertyCategory] = useState(false);
     const [openPropertyItem, setOpenPropertyItem] = useState(false);
     const [openMeasurementUnit, setOpenMeasurementUnit] = useState(false);
     const [openPropertyBag, setOpenPropertyBag] = useState(false);
     const [openPropertyStatus, setOpenPropertyStatus] = useState(false);
     const [openNextOfKin, setOpenNextOfKin] = useState(false);
+    const [openVisitorItem, setOpenVisitorItem] = useState(false);
+    const [visitorItemSearch, setVisitorItemSearch] = useState('');
+
+    // Filter visitor items based on search
+    const filteredVisitorItems = mockVisitorItems.filter((visitorItem) => {
+      const searchLower = visitorItemSearch.toLowerCase();
+      return (
+        visitorItem.visitor_name.toLowerCase().includes(searchLower) ||
+        visitorItem.visitor_id_number.toLowerCase().includes(searchLower) ||
+        visitorItem.visitor_phone.toLowerCase().includes(searchLower) ||
+        visitorItem.item_name.toLowerCase().includes(searchLower)
+      );
+    });
+
+    const handleVisitorItemSelect = (visitorItem: VisitorItemData) => {
+      // Populate fields from selected visitor item
+      onUpdate(item.id, 'quantity', visitorItem.quantity.toString());
+      onUpdate(item.id, 'amount', visitorItem.amount);
+      toast.success(`Loaded item from visitor: ${visitorItem.visitor_name}`);
+      setOpenVisitorItem(false);
+    };
+
+    // Get summary info for collapsed state
+    const propertyTypeName = item.property_type 
+      ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name 
+      : null;
+    const propertyItemName = item.property_item 
+      ? mockPropertyItems.find((i) => i.id === item.property_item)?.name 
+      : null;
+
+    return (
+      <Collapsible open={isItemOpen} onOpenChange={setIsItemOpen}>
+        <Card className="relative border-2" style={{ borderColor: isItemOpen ? '#650000' : '#e5e7eb' }}>
+          <CollapsibleTrigger asChild>
+            <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-4 w-4" style={{ color: '#650000' }} />
+                  <h4 className="font-medium">Item #{index + 1}</h4>
+                </div>
+                {!isItemOpen && (propertyTypeName || propertyItemName) && (
+                  <div className="flex gap-2">
+                    {propertyTypeName && (
+                      <Badge variant="secondary">{propertyTypeName}</Badge>
+                    )}
+                    {propertyItemName && (
+                      <Badge variant="outline">{propertyItemName}</Badge>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {canRemove && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="hover:bg-red-50"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onRemove(item.id);
+                    }}
+                  >
+                    <Trash2 className="h-4 w-4 text-red-600" />
+                  </Button>
+                )}
+                {isItemOpen ? (
+                  <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />
+                ) : (
+                  <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />
+                )}
+              </div>
+            </div>
+          </CollapsibleTrigger>
+
+          <CollapsibleContent>
+            <div className="px-4 pb-4">{/* Content wrapper */}
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Search Visitor Items */}
+          <div className="space-y-2 md:col-span-2">
+            <Label>Search from Visitor Items (Optional)</Label>
+            <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  <span className="text-gray-500">Search by visitor name, ID, or phone...</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0" style={{ width: '600px' }}>
+                <Command>
+                  <CommandInput 
+                    placeholder="Search by visitor name, ID number, or phone..." 
+                    value={visitorItemSearch}
+                    onValueChange={setVisitorItemSearch}
+                  />
+                  <CommandList>
+                    <CommandEmpty>No visitor items found.</CommandEmpty>
+                    <CommandGroup>
+                      {filteredVisitorItems.map((visitorItem) => (
+                        <CommandItem
+                          key={visitorItem.id}
+                          value={`${visitorItem.visitor_name} ${visitorItem.visitor_id_number} ${visitorItem.visitor_phone} ${visitorItem.item_name}`}
+                          onSelect={() => handleVisitorItemSelect(visitorItem)}
+                        >
+                          <div className="flex flex-col w-full">
+                            <div className="flex items-center justify-between">
+                              <span className="font-medium">{visitorItem.visitor_name}</span>
+                              <Badge variant="secondary">{visitorItem.item_name}</Badge>
+                            </div>
+                            <div className="flex gap-4 text-sm text-gray-600 mt-1">
+                              <span>ID: {visitorItem.visitor_id_number}</span>
+                              <span>Phone: {visitorItem.visitor_phone}</span>
+                              <span>Bag: {visitorItem.bag_no}</span>
+                            </div>
+                          </div>
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Property Type */}
+          <div className="space-y-2">
+            <Label>Property Type *</Label>
+            <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.property_type
+                    ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name
+                    : "Select property type..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search property type..." />
+                  <CommandList>
+                    <CommandEmpty>No type found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyTypes.map((type) => (
+                        <CommandItem
+                          key={type.id}
+                          value={type.name}
+                          onSelect={() => {
+                            onUpdate(item.id, 'property_type', type.id);
+                            setOpenPropertyType(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.property_type === type.id ? "opacity-100" : "opacity-0")} />
+                          {type.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Property Category */}
+          <div className="space-y-2">
+            <Label>Property Category *</Label>
+            <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.property_category
+                    ? mockPropertyCategories.find((c) => c.id === item.property_category)?.name
+                    : "Select category..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search category..." />
+                  <CommandList>
+                    <CommandEmpty>No category found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyCategories.map((category) => (
+                        <CommandItem
+                          key={category.id}
+                          value={category.name}
+                          onSelect={() => {
+                            onUpdate(item.id, 'property_category', category.id);
+                            setOpenPropertyCategory(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
+                          {category.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Property Item */}
+          <div className="space-y-2">
+            <Label>Property Item *</Label>
+            <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.property_item
+                    ? mockPropertyItems.find((i) => i.id === item.property_item)?.name
+                    : "Select item..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search item..." />
+                  <CommandList>
+                    <CommandEmpty>No item found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyItems.map((propertyItem) => (
+                        <CommandItem
+                          key={propertyItem.id}
+                          value={propertyItem.name}
+                          onSelect={() => {
+                            onUpdate(item.id, 'property_item', propertyItem.id);
+                            setOpenPropertyItem(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.property_item === propertyItem.id ? "opacity-100" : "opacity-0")} />
+                          {propertyItem.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Measurement Unit */}
+          <div className="space-y-2">
+            <Label>Measurement Unit</Label>
+            <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.measurement_unit
+                    ? mockMeasurementUnits.find((u) => u.id === item.measurement_unit)?.name
+                    : "Select unit..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search unit..." />
+                  <CommandList>
+                    <CommandEmpty>No unit found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockMeasurementUnits.map((unit) => (
+                        <CommandItem
+                          key={unit.id}
+                          value={unit.name}
+                          onSelect={() => {
+                            onUpdate(item.id, 'measurement_unit', unit.id);
+                            setOpenMeasurementUnit(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.measurement_unit === unit.id ? "opacity-100" : "opacity-0")} />
+                          {unit.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Quantity */}
+          <div className="space-y-2">
+            <Label>Quantity *</Label>
+            <Input
+              type="text"
+              value={item.quantity}
+              onChange={(e) => onUpdate(item.id, 'quantity', e.target.value)}
+              placeholder="Enter quantity"
+              required
+            />
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label>Amount (UGX)</Label>
+            <Input
+              type="number"
+              value={item.amount}
+              onChange={(e) => onUpdate(item.id, 'amount', e.target.value)}
+              placeholder="Enter amount"
+            />
+          </div>
+
+          {/* Property Bag */}
+          <div className="space-y-2">
+            <Label>Property Bag *</Label>
+            <Popover open={openPropertyBag} onOpenChange={setOpenPropertyBag}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.property_bag
+                    ? mockPropertyBags.find((b) => b.id === item.property_bag)?.bag_number
+                    : "Select bag..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search bag..." />
+                  <CommandList>
+                    <CommandEmpty>No bag found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyBags.map((bag) => (
+                        <CommandItem
+                          key={bag.id}
+                          value={bag.bag_number}
+                          onSelect={() => {
+                            onUpdate(item.id, 'property_bag', bag.id);
+                            setOpenPropertyBag(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.property_bag === bag.id ? "opacity-100" : "opacity-0")} />
+                          {bag.bag_number}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Property Status */}
+          <div className="space-y-2">
+            <Label>Property Status *</Label>
+            <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                  {item.property_status
+                    ? mockPropertyStatuses.find((s) => s.id === item.property_status)?.name
+                    : "Select status..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search status..." />
+                  <CommandList>
+                    <CommandEmpty>No status found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyStatuses.map((status) => (
+                        <CommandItem
+                          key={status.id}
+                          value={status.name}
+                          onSelect={() => {
+                            onUpdate(item.id, 'property_status', status.id);
+                            setOpenPropertyStatus(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.property_status === status.id ? "opacity-100" : "opacity-0")} />
+                          {status.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Next of Kin */}
+          <div className="space-y-2">
+            <Label>Next of Kin</Label>
+            <div className="flex gap-2">
+              <Popover open={openNextOfKin} onOpenChange={setOpenNextOfKin}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" role="combobox" className="flex-1 justify-between" type="button">
+                    {item.next_of_kin && item.next_of_kin !== 'none'
+                      ? mockNextOfKin.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + mockNextOfKin.find((nok) => nok.id === item.next_of_kin)?.relationship + ')'
+                      : "Select next of kin..."}
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search next of kin..." />
+                  <CommandList>
+                    <CommandEmpty>No next of kin found.</CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          onUpdate(item.id, 'next_of_kin', 'none');
+                          setOpenNextOfKin(false);
+                        }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === 'none' ? "opacity-100" : "opacity-0")} />
+                        None
+                      </CommandItem>
+                      {mockNextOfKin.map((nok) => (
+                        <CommandItem
+                          key={nok.id}
+                          value={nok.full_name + ' ' + nok.relationship}
+                          onSelect={() => {
+                            onUpdate(item.id, 'next_of_kin', nok.id);
+                            setOpenNextOfKin(false);
+                          }}
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === nok.id ? "opacity-100" : "opacity-0")} />
+                          {nok.full_name} ({nok.relationship})
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0"
+              onClick={() => setIsNextOfKinDialogOpen(true)}
+              title="Add New Next of Kin"
+              style={{ borderColor: '#650000' }}
+            >
+              <Plus className="h-5 w-5" style={{ color: '#650000' }} />
+            </Button>
+          </div>
+        </div>
+
+          {/* Destination */}
+          <div className="space-y-2">
+            <Label>Destination</Label>
+            <Input
+              type="text"
+              value={item.destination}
+              onChange={(e) => onUpdate(item.id, 'destination', e.target.value)}
+              placeholder="Enter destination"
+            />
+          </div>
+
+          {/* Note */}
+          <div className="space-y-2 md:col-span-2">
+            <Label>Notes</Label>
+            <Textarea
+              value={item.note}
+              onChange={(e) => onUpdate(item.id, 'note', e.target.value)}
+              placeholder="Enter any additional notes"
+              rows={2}
+            />
+          </div>
+        </div>
+            </div>{/* End content wrapper */}
+          </CollapsibleContent>
+        </Card>
+      </Collapsible>
+    );
+  };
+
+  const PropertyForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [openPropertyType, setOpenPropertyType] = useState(false);
+    const [openPropertyCategory, setOpenPropertyCategory] = useState(false);
+    const [openPropertyItem, setOpenPropertyItem] = useState(false);
+    const [openMeasurementUnit, setOpenMeasurementUnit] = useState(false);
+    const [openPropertyBag, setOpenPropertyBag] = useState(false);
+    const [openPropertyStatus, setOpenPropertyStatus] = useState(false);
+    const [openNextOfKin, setOpenNextOfKin] = useState(false);
+    const [openVisitor, setOpenVisitor] = useState(false);
 
     return (
       <form onSubmit={onSubmit} className="space-y-4">
@@ -577,6 +1577,55 @@ export default function PrisonerPropertyScreen() {
                             )}
                           />
                           {type.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Property Category Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="property_category">Property Category *</Label>
+            <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openPropertyCategory}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {formData.property_category
+                    ? mockPropertyCategories.find((c) => c.id === formData.property_category)?.name
+                    : "Select property category..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search property category..." />
+                  <CommandList>
+                    <CommandEmpty>No property category found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPropertyCategories.map((category) => (
+                        <CommandItem
+                          key={category.id}
+                          value={category.name}
+                          onSelect={() => {
+                            setFormData({...formData, property_category: category.id});
+                            setOpenPropertyCategory(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              formData.property_category === category.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {category.name}
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -762,8 +1811,24 @@ export default function PrisonerPropertyScreen() {
                           key={status.id}
                           value={status.name}
                           onSelect={() => {
-                            setFormData({...formData, property_status: status.id});
-                            setOpenPropertyStatus(false);
+                            // Check if this is an edit mode and status is changing
+                            if (isEdit && previousPropertyStatus && previousPropertyStatus !== status.id) {
+                              // Prepare status change data
+                              const changeData = {
+                                property: selectedProperty?.id,
+                                property_status: status.id,
+                                date_of_status_change: new Date(),
+                                reason_for_status_change: '',
+                                destination: ''
+                              };
+                              setStatusChangeData(changeData);
+                              setFormData({...formData, property_status: status.id});
+                              setOpenPropertyStatus(false);
+                              setIsStatusChangeDialogOpen(true);
+                            } else {
+                              setFormData({...formData, property_status: status.id});
+                              setOpenPropertyStatus(false);
+                            }
                           }}
                         >
                           <Check
@@ -870,15 +1935,85 @@ export default function PrisonerPropertyScreen() {
             </Popover>
           </div>
 
+          {/* Visitor Dropdown */}
           <div className="space-y-2">
-            <Label htmlFor="visitor">Visitor Name</Label>
-            <Input
-              id="visitor"
-              type="text"
-              value={formData.visitor}
-              onChange={(e) => setFormData({...formData, visitor: e.target.value})}
-              placeholder="Enter visitor name"
-            />
+            <Label htmlFor="visitor">Visitor</Label>
+            <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openVisitor}
+                  className="w-full justify-between"
+                  type="button"
+                  disabled={isLoadingVisitors}
+                >
+                  {formData.visitor
+                    ? (() => {
+                        const visitor = visitors.find((v) => v.id === formData.visitor);
+                        return visitor 
+                          ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim()
+                          : "Select visitor...";
+                      })()
+                    : "Select visitor..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search by name, ID, or phone..." />
+                  <CommandList>
+                    <CommandEmpty>
+                      {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
+                    </CommandEmpty>
+                    <CommandGroup>
+                      <CommandItem
+                        value="none"
+                        onSelect={() => {
+                          setFormData({...formData, visitor: ''});
+                          setOpenVisitor(false);
+                        }}
+                      >
+                        <Check
+                          className={cn(
+                            "mr-2 h-4 w-4",
+                            formData.visitor === '' ? "opacity-100" : "opacity-0"
+                          )}
+                        />
+                        None
+                      </CommandItem>
+                      {visitors.map((visitor) => {
+                        const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
+                        const searchValue = `${fullName} ${visitor.id_number} ${visitor.phone_number}`;
+                        return (
+                          <CommandItem
+                            key={visitor.id}
+                            value={searchValue}
+                            onSelect={() => {
+                              setFormData({...formData, visitor: visitor.id});
+                              setOpenVisitor(false);
+                            }}
+                          >
+                            <Check
+                              className={cn(
+                                "mr-2 h-4 w-4",
+                                formData.visitor === visitor.id ? "opacity-100" : "opacity-0"
+                              )}
+                            />
+                            <div className="flex flex-col">
+                              <span>{fullName}</span>
+                              <span className="text-xs text-gray-500">
+                                ID: {visitor.id_number} | Phone: {visitor.phone_number}
+                              </span>
+                            </div>
+                          </CommandItem>
+                        );
+                      })}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
           </div>
 
           <div className="space-y-2">
@@ -1061,15 +2196,15 @@ export default function PrisonerPropertyScreen() {
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
-                    <TableRow>
-                      <TableHead>Prisoner</TableHead>
-                      <TableHead>Property Type</TableHead>
-                      <TableHead>Item</TableHead>
-                      <TableHead>Bag Number</TableHead>
-                      <TableHead>Quantity</TableHead>
-                      <TableHead>Amount</TableHead>
-                      <TableHead>Status</TableHead>
-                      <TableHead className="text-right">Actions</TableHead>
+                    <TableRow style={{ backgroundColor: '#650000' }}>
+                      <TableHead className="text-white">Prisoner</TableHead>
+                      <TableHead className="text-white">Property Type</TableHead>
+                      <TableHead className="text-white">Item</TableHead>
+                      <TableHead className="text-white">Bag Number</TableHead>
+                      <TableHead className="text-white">Quantity</TableHead>
+                      <TableHead className="text-white">Amount</TableHead>
+                      <TableHead className="text-white">Status</TableHead>
+                      <TableHead className="text-right text-white">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1167,20 +2302,23 @@ export default function PrisonerPropertyScreen() {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Create New Property</DialogTitle>
             <DialogDescription>
-              Add a new property item to the system
+              Add property items for a prisoner and visitor
             </DialogDescription>
           </DialogHeader>
-          <PropertyForm onSubmit={handleSubmitCreate} isEdit={false} />
+          <CreatePropertyForm onSubmit={handleSubmitCreate} />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Edit Property</DialogTitle>
             <DialogDescription>
@@ -1188,12 +2326,14 @@ export default function PrisonerPropertyScreen() {
             </DialogDescription>
           </DialogHeader>
           <PropertyForm onSubmit={handleSubmitEdit} isEdit={true} />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Property Details</DialogTitle>
             <DialogDescription>
@@ -1310,8 +2450,34 @@ export default function PrisonerPropertyScreen() {
                   </div>
                 </>
               )}
+
+              {/* Biometric Data */}
+              {selectedProperty.biometric_data && (
+                <>
+                  <Separator />
+                  <div>
+                    <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Biometric Verification</h3>
+                    <Card>
+                      <CardContent className="p-4">
+                        <div className="space-y-3">
+                          <div className="flex items-center gap-2">
+                            <Badge className="bg-green-600">Verified</Badge>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Fingerprint Data</p>
+                            <div className="mt-2 p-3 bg-gray-50 rounded border text-xs text-gray-600 font-mono break-all">
+                              {selectedProperty.biometric_data}
+                            </div>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                </>
+              )}
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -1342,6 +2508,23 @@ export default function PrisonerPropertyScreen() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Next of Kin Management Dialog */}
+      <Dialog open={isNextOfKinDialogOpen} onOpenChange={setIsNextOfKinDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize" style={{ resize: 'both' }}>
+          <div className="flex-1 overflow-y-auto">
+            <NextOfKinScreen />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Property Status Change Dialog */}
+      <PropertyStatusChangeForm
+        open={isStatusChangeDialogOpen}
+        onOpenChange={setIsStatusChangeDialogOpen}
+        onSubmit={handleStatusChangeSubmit}
+        editData={statusChangeData}
+      />
     </div>
   );
 }

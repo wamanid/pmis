@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchDistricts } from '../../services/systemAdministrationService';
+import { fetchDistricts } from '../../services/system_administration';
 import type { District } from '../../models/system_administration';
 
 export interface DistrictSelectProps {
