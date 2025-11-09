@@ -19,13 +19,15 @@ export interface UserDetails {
  */
 export interface Prisoner {
   id: string;
-  prison_number: string;
+  prisoner_number: string;
+  prisoner_number_value: string;
+  prisoner_personal_number: string;
+  prisoner_personal_number_value: string;
   first_name: string;
   last_name: string;
   full_name: string;
-  habitual: boolean;
-  is_dangerous: boolean;
-  avg_security_rating: number;
+  current_station: string;
+  current_station_name: string;
   is_active: boolean;
   created_datetime: string;
   created_by: number;
@@ -48,10 +50,10 @@ export interface PrisonerListResponse {
  * Prisoner list filters
  */
 export interface PrisonerFilters {
-  habitual?: boolean;
   is_active?: boolean;
-  is_dangerous?: boolean;
   ordering?: string;
   page?: number;
+  prisoner_number?: string;
+  prisoner_personal_number?: string;
   search?: string;
 }
