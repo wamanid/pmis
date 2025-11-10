@@ -30,6 +30,13 @@ import {
   StaffItem
 } from "../../services/stationServices/staffDeploymentIntegration";
 import {getStation} from "../../services/stationServices/manualLockupIntegration";
+import {
+  DistrictFilter,
+  getDistrictSummary, getRegionSummary,
+  getStationSummary,
+  RegionFilter,
+  StationFilter
+} from "../../services/stationServices/utils"
 
 export function StaffDeploymentScreen() {
   const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);
@@ -60,6 +67,9 @@ export function StaffDeploymentScreen() {
   const [staffProfile, setStaffProfile] = useState<StaffItem[]>([])
   const [staffProfileLoading, setStaffProfileLoading] = useState(true)
   const [stationsX, setStationsX] = useState([])
+  const [stationSummary, setStationSummary] = useState<StationFilter[]>([])
+  const [regionSummary, setRegionSummary] = useState<RegionFilter[]>([])
+  const [districtSummary, setDistrictSummary] = useState<DistrictFilter[]>([])
 
   useEffect(() => {
     // loadData();
@@ -102,7 +112,9 @@ export function StaffDeploymentScreen() {
       if ("results" in response) {
         data = response.results
          setDeployments(data)
-        // console.log(data)
+        setStationSummary(getStationSummary(data))
+        setDistrictSummary(getDistrictSummary(data))
+        setRegionSummary(getRegionSummary(data))
       }
 
       const response1 = await getStaffProfile()
@@ -657,8 +669,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_station.map(item => (
-                      <TableRow key={item.station_id}>
+                    {stationSummary?.map(item => (
+                      <TableRow key={item.station_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4" style={{ color: '#650000' }} />
@@ -668,7 +680,7 @@ export function StaffDeploymentScreen() {
                         <TableCell>{item.district_name}</TableCell>
                         <TableCell>{item.region_name}</TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -697,8 +709,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_district.map(item => (
-                      <TableRow key={item.district_id}>
+                    {districtSummary?.map(item => (
+                      <TableRow key={item.district_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-blue-500" />
@@ -707,7 +719,7 @@ export function StaffDeploymentScreen() {
                         </TableCell>
                         <TableCell>{item.region_name}</TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -735,8 +747,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_region.map(item => (
-                      <TableRow key={item.region_id}>
+                    {regionSummary?.map(item => (
+                      <TableRow key={item.region_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-green-500" />
@@ -744,7 +756,7 @@ export function StaffDeploymentScreen() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
