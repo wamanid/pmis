@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import { ChevronDown, ChevronRight, Check, ChevronsUpDown, Filter, X } from 'lucide-react';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Button } from '../ui/button';
@@ -8,6 +8,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { cn } from '../ui/utils';
+import {ManualLockUpItem} from "../../services/stationServices/manualLockupIntegration";
+
+import { getStationsAndTypes } from "../../services/stationServices/utils"
 
 interface ManualLockup {
   id: string;
@@ -44,20 +47,20 @@ interface DetailGrid {
 }
 
 interface ManualLockupTableViewProps {
-  lockups: ManualLockup[];
+  lockups: ManualLockUpItem;
 }
 
-const mockStations = [
-  { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440002', name: 'East Wing Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440003', name: 'West Wing Station' },
-];
-
-const mockLockupTypes = [
-  { id: '660e8400-e29b-41d4-a716-446655440001', name: 'Morning Lockup' },
-  { id: '660e8400-e29b-41d4-a716-446655440002', name: 'Midday' },
-  { id: '660e8400-e29b-41d4-a716-446655440003', name: 'Evening Lockup' },
-];
+// const mockStations = [
+//   { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
+//   { id: '550e8400-e29b-41d4-a716-446655440002', name: 'East Wing Station' },
+//   { id: '550e8400-e29b-41d4-a716-446655440003', name: 'West Wing Station' },
+// ];
+//
+// const mockLockupTypes = [
+//   { id: '660e8400-e29b-41d4-a716-446655440001', name: 'Morning Lockup' },
+//   { id: '660e8400-e29b-41d4-a716-446655440002', name: 'Midday' },
+//   { id: '660e8400-e29b-41d4-a716-446655440003', name: 'Evening Lockup' },
+// ];
 
 const categoryIds = {
   convict: '770e8400-e29b-41d4-a716-446655440001',
@@ -77,12 +80,22 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
   const [lockupTypeFilter, setLockupTypeFilter] = useState<string>('');
   const [dateFilter, setDateFilter] = useState<string>('');
   const [stationSearchOpen, setStationSearchOpen] = useState(false);
+  const [mockStations, setMockStations] = useState([])
+  const [mockLockupTypes, setMockLockupTypes] = useState([])
+
+  useEffect(() => {
+    if (lockups.length !== 0){
+       const data = getStationsAndTypes(lockups)
+       setMockStations(data.stations)
+       setMockLockupTypes(data.types)
+    }
+  }, [lockups]);
 
   const getStationName = (id: string) => mockStations.find(s => s.id === id)?.name || id;
   const getTypeName = (id: string) => mockLockupTypes.find(t => t.id === id)?.name || id;
 
   // Filter lockups based on selected filters
-  const getFilteredLockups = (): ManualLockup[] => {
+  const getFilteredLockups = (): ManualLockUpItem[] => {
     return lockups.filter(lockup => {
       const matchesStation = !stationFilter || lockup.station === stationFilter;
       const matchesType = !lockupTypeFilter || lockupTypeFilter === 'all' || lockup.type === lockupTypeFilter;
@@ -98,21 +111,21 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
     const grouped: { [key: string]: GroupedLockup } = {};
 
     filtered.forEach(lockup => {
-      const key = `${lockup.station}-${lockup.type}-${lockup.date}-${lockup.lockup_time}`;
+      const key = `${lockup.station_name}-${lockup.type_name}-${lockup.date}-${lockup.lockup_time}`;
       
       if (!grouped[key]) {
         grouped[key] = {
           station: lockup.station,
-          stationName: getStationName(lockup.station),
+          stationName: lockup.station_name,
           type: lockup.type,
-          typeName: getTypeName(lockup.type),
+          typeName: lockup.type_name,
           date: lockup.date,
           time: lockup.lockup_time,
           records: [],
-          convictTotal: 0,
-          remandTotal: 0,
-          debtorTotal: 0,
-          lodgerTotal: 0,
+          convictTotal: lockup.prisoner_category_name == "Convict" ? lockup.count : 0,
+          remandTotal: lockup.prisoner_category_name == "Remand" ? lockup.count : 0,
+          debtorTotal: lockup.prisoner_category_name == "Civil Debtor" ? lockup.count : 0,
+          lodgerTotal: lockup.prisoner_category_name == "Lodger" ? lockup.count : 0,
           grandTotal: 0,
         };
       }

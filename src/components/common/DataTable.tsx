@@ -343,7 +343,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                       {column.label}
                       {column.sortable && sortConfig?.key === column.key && (
                         <span className="text-xs">
-                          {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                          {sortConfig?.direction === 'asc' ? '↑' : '↓'}
                         </span>
                       )}
                     </div>
