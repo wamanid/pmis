@@ -215,7 +215,8 @@ export function StaffDeploymentScreen() {
       toast.success('Staff member deployed successfully');
       setDeployOpen(false);
       resetForm();
-      setDeployments((prev) => [...prev, response as StaffDeploymentResponse]);
+      addDeployment(response as StaffDeploymentResponse)
+      // setDeployments((prev) => [...prev, response as StaffDeploymentResponse]);
       // loadData()
 
       // Split name into parts
@@ -246,6 +247,16 @@ export function StaffDeploymentScreen() {
       }
     }
   };
+
+  const addDeployment = (response: StaffDeploymentResponse) => {
+    setDeployments((prev) => {
+      const updatedDeployments = [...prev, response]
+      setStationSummary(getStationSummary(updatedDeployments));
+      setDistrictSummary(getDistrictSummary(updatedDeployments));
+      setRegionSummary(getRegionSummary(updatedDeployments));
+      return updatedDeployments
+    })
+  }
 
   const resetForm = () => {
     setSelectedStaff(null);
