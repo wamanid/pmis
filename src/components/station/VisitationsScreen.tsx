@@ -60,6 +60,7 @@ import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import VisitorPassForm from "../gatePass/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
+import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 
 // Types based on API
 interface Visitor {
@@ -701,33 +702,32 @@ export default function VisitationsScreen() {
               />
             </div>
 
-            <Dialog
-              open={isDialogOpen}
-              onOpenChange={(open) => {
-                setIsDialogOpen(open);
-                if (!open) {
-                  resetForm();
-                }
-              }}
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setIsDialogOpen(true)}
             >
-              <DialogTrigger asChild>
-                <Button className="bg-primary hover:bg-primary/90">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Register Visitor
-                </Button>
-              </DialogTrigger>
-          <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-            <div className="flex-1 overflow-y-auto p-6">
-            <DialogHeader>
-              <DialogTitle>
-                {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingVisitor
-                  ? "Update visitor information"
-                  : "Register a new visitor and manage check-in/check-out"}
-              </DialogDescription>
-            </DialogHeader>
+              <Plus className="h-4 w-4 mr-2" />
+              Register Visitor
+            </Button>
+          </div>
+
+          <VisitorRegistrationDialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                resetForm();
+              }
+            }}
+            onVisitorCreated={(visitor) => {
+              // Refresh the visitors list - for now just close the dialog
+              // TODO: Implement actual data refresh when API is integrated
+            }}
+            editingVisitor={editingVisitor}
+          />
+
+          {/* Placeholder for form - will be removed */}
+          <div style={{display: 'none'}}>
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               <Tabs defaultValue="personal" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
@@ -1488,10 +1488,7 @@ export default function VisitationsScreen() {
                 </Button>
               </div>
             </form>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
 
       {/* Visitors Table */}
       <Card>

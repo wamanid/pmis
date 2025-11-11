@@ -19,7 +19,7 @@ import {
 } from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Calendar } from "../ui/calendar";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   ChevronsUpDown,
   Check,
@@ -300,7 +300,7 @@ export default function VisitorRegistrationDialog({
         resetForm();
       }
     }}>
-      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+      <DialogContent className="max-w-[80vw] w-[80vw] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
         <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>
@@ -314,7 +314,7 @@ export default function VisitorRegistrationDialog({
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6 mt-4">
             <Tabs defaultValue="personal" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="flex w-full">
                 <TabsTrigger value="personal">Personal Info</TabsTrigger>
                 <TabsTrigger value="visit">Visit Details</TabsTrigger>
                 <TabsTrigger value="security">Security</TabsTrigger>
@@ -823,7 +823,7 @@ export default function VisitorRegistrationDialog({
                         <Calendar
                           mode="single"
                           selected={form.visitation_datetime}
-                          onSelect={(date) => {
+                          onSelect={(date: Date | undefined) => {
                             if (date) {
                               setForm({ ...form, visitation_datetime: date });
                               setCalendarOpen(false);
