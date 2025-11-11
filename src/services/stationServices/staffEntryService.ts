@@ -51,7 +51,9 @@ export const deleteEntry = async (id: string) => {
 export const fetchStaffProfiles = async (params?: Record<string, any>) => {
   const res = await axiosInstance.get(STAFF_PROFILES, { params });
   const items = res.data.results ?? res.data ?? [];
-  return (items || []).map((p: any) => ({
+
+  // Normalize to consistent shape
+  const profiles = (items || []).map((p: any) => ({
     id: p.id,
     first_name: p.first_name,
     last_name: p.last_name,
@@ -60,8 +62,19 @@ export const fetchStaffProfiles = async (params?: Record<string, any>) => {
     rank_name: p.rank_name,
     station: p.station,
     station_name: p.station_name,
+    senior: p.senior, // boolean
     raw: p,
   })) as StaffProfile[];
+
+  // If caller provided a specific force_number, prefer exact-match on client side.
+  // Some backends return broad results; this ensures we only accept exact hits.
+  if (params && params.force_number) {
+    const needle = String(params.force_number).trim();
+    const exact = profiles.find((p) => String(p.force_number).trim() === needle);
+    return exact ? [exact] : [];
+  }
+
+  return profiles;
 };
 
 export const fetchStations = async () => {

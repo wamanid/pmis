@@ -458,42 +458,42 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 </div>
 
                 <div>
-                <Label htmlFor="station">
-                  Station <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={watchStation}
-                  onValueChange={(value) => setValue("station", value)}
-                >
-                  <SelectTrigger>
-                  <SelectValue placeholder="Select station" />
-                  </SelectTrigger>
-                  <SelectContent>
-                  <div className="px-3 py-2">
-                    <Input
-                    placeholder="Search station..."
-                    value={stationSearch}
-                    onChange={(e) => setStationSearch(e.target.value)}
-                    className="mb-2"
-                    />
-                  </div>
-                  {stations
-                    .filter((s) => {
-                    if (!stationSearch) return true;
-                    return s.name?.toLowerCase().includes(stationSearch.toLowerCase());
-                    })
-                    .map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.station && (
-                  <p className="text-red-500 text-sm mt-1">
-                  {errors.station.message}
-                  </p>
-                )}
+                  <Label htmlFor="station">
+                    Station <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={watchStation}
+                    onValueChange={(value) => setValue("station", value)}
+                  >
+                    <SelectTrigger>
+                    <SelectValue placeholder="Select station" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    <div className="px-3 py-2">
+                      <Input
+                      placeholder="Search station..."
+                      value={stationSearch}
+                      onChange={(e) => setStationSearch(e.target.value)}
+                      className="mb-2"
+                      />
+                    </div>
+                    {stations
+                      .filter((s) => {
+                      if (!stationSearch) return true;
+                      return s.name?.toLowerCase().includes(stationSearch.toLowerCase());
+                      })
+                      .map((station) => (
+                      <SelectItem key={station.id} value={station.id}>
+                        {station.name}
+                      </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {errors.station && (
+                    <p className="text-red-500 text-sm mt-1">
+                    {errors.station.message}
+                    </p>
+                  )}
                 </div>
 
               <div>
