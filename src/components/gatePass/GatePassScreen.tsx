@@ -10,6 +10,13 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable';
+import BiometricCapture from '../common/BiometricCapture';
+import VisitorPassList from './VisitorPassList';
+import VisitorPassForm from './VisitorPassForm';
+import VisitorRegistrationDialog from '../station/VisitorRegistrationDialog';
 import { 
   Plus, 
   Search, 
@@ -23,7 +30,11 @@ import {
   Shield,
   Clock,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  Printer,
+  Download,
+  Check,
+  ChevronsUpDown
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 
@@ -38,6 +49,7 @@ interface Prisoner {
   prisoner: string;
   gate_pass: string;
   working_party: string | null;
+  fingerprint_verification?: string;
 }
 
 interface Escort {
@@ -93,6 +105,87 @@ interface User {
   rank: string;
   force_number: string;
 }
+
+interface VisitorPass {
+  id?: string;
+  prisoner_name?: string;
+  visitor_name?: string;
+  suspended_by_username?: string;
+  visitor_tag_number: string;
+  valid_from: string;
+  valid_until: string;
+  purpose: string;
+  issue_date: string;
+  is_suspended: boolean;
+  suspended_date: string;
+  suspended_reason: string;
+  is_valid?: boolean;
+  prisoner: string;
+  visitor: string;
+  suspended_by: number;
+}
+
+interface Visitor {
+  id: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  id_number: string;
+  contact_no: string;
+  address: string;
+  relation: string;
+}
+
+interface Relationship {
+  id: string;
+  name: string;
+}
+
+interface IDType {
+  id: string;
+  name: string;
+}
+
+// Mock Data
+const mockRelationships: Relationship[] = [
+  { id: 'rel1', name: 'Spouse' },
+  { id: 'rel2', name: 'Parent' },
+  { id: 'rel3', name: 'Child' },
+  { id: 'rel4', name: 'Sibling' },
+  { id: 'rel5', name: 'Lawyer' },
+  { id: 'rel6', name: 'Friend' },
+  { id: 'rel7', name: 'Other' }
+];
+
+const mockIDTypes: IDType[] = [
+  { id: 'id1', name: 'National ID' },
+  { id: 'id2', name: 'Passport' },
+  { id: 'id3', name: 'Driver License' },
+  { id: 'id4', name: 'Voter ID' }
+];
+
+const mockVisitors: Visitor[] = [
+  {
+    id: 'v1',
+    first_name: 'Jane',
+    middle_name: 'Marie',
+    last_name: 'Doe',
+    id_number: 'ID-123456',
+    contact_no: '+256-700-123456',
+    address: '123 Main Street, Kampala',
+    relation: 'rel1'
+  },
+  {
+    id: 'v2',
+    first_name: 'Robert',
+    middle_name: 'James',
+    last_name: 'Smith',
+    id_number: 'ID-789012',
+    contact_no: '+256-700-789012',
+    address: '456 Oak Avenue, Kampala',
+    relation: 'rel5'
+  }
+];
 
 // Mock Data
 const mockGatePasses: GatePass[] = [
@@ -284,10 +377,21 @@ export default function GatePassScreen() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [selectedGatePass, setSelectedGatePass] = useState<GatePass | null>(null);
+  
+  // Visitor Pass state
+  const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
+  const [isVisitorPassViewDialogOpen, setIsVisitorPassViewDialogOpen] = useState(false);
+  const [visitorPassDialogMode, setVisitorPassDialogMode] = useState<'create' | 'edit'>('create');
+  const [selectedVisitorPass, setSelectedVisitorPass] = useState<any>(null);
+  
+  // Visitor management state
+  const [visitors, setVisitors] = useState<Visitor[]>(mockVisitors);
+  const [isVisitorDialogOpen, setIsVisitorDialogOpen] = useState(false);
 
   // Form state
   const [formData, setFormData] = useState({
     gate_pass_type: '',
+    gate_keeper: '',
     destination: '',
     main_gate_required: true,
     exception_reason: '',
@@ -301,9 +405,15 @@ export default function GatePassScreen() {
     reason: string;
     time_out: string;
     time_in: string;
+    fingerprint_verification: string;
   }>>([]);
 
   const [selectedEscorts, setSelectedEscorts] = useState<string[]>([]);
+
+  // Users and gate keeper state
+  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [isUsersLoading, setIsUsersLoading] = useState(false);
+  const [openGateKeeperCombobox, setOpenGateKeeperCombobox] = useState(false);
 
   const itemsPerPage = 10;
 
@@ -331,6 +441,7 @@ export default function GatePassScreen() {
     setDialogMode('create');
     setFormData({
       gate_pass_type: '',
+      gate_keeper: '',
       destination: '',
       main_gate_required: true,
       exception_reason: '',
@@ -346,6 +457,7 @@ export default function GatePassScreen() {
     setSelectedGatePass(gatePass);
     setFormData({
       gate_pass_type: gatePass.gate_pass_type,
+      gate_keeper: gatePass.gate_keeper.toString(),
       destination: gatePass.destination,
       main_gate_required: gatePass.main_gate_required,
       exception_reason: gatePass.exception_reason,
@@ -357,7 +469,8 @@ export default function GatePassScreen() {
       destination: p.destination,
       reason: p.reason,
       time_out: p.time_out,
-      time_in: p.time_in || ''
+      time_in: p.time_in || '',
+      fingerprint_verification: p.fingerprint_verification || ''
     })));
     setSelectedEscorts(gatePass.escorts.map(e => e.force_number));
     setIsDialogOpen(true);
@@ -376,17 +489,17 @@ export default function GatePassScreen() {
   };
 
   const handleSubmit = () => {
-    if (!formData.gate_pass_type || !formData.destination || selectedPrisoners.length === 0 || selectedEscorts.length === 0) {
-      toast.error('Please fill all required fields including at least one prisoner and one escort');
+    if (!formData.gate_pass_type || !formData.gate_keeper || !formData.destination || selectedPrisoners.length === 0 || selectedEscorts.length === 0) {
+      toast.error('Please fill all required fields including gate keeper, at least one prisoner and one escort');
       return;
     }
 
     const gatePassType = mockGatePassTypes.find(t => t.id === formData.gate_pass_type);
-    const currentUser = mockUsers[0];
+    const selectedGateKeeper = users.find(u => u.id.toString() === formData.gate_keeper);
 
     const newGatePass: GatePass = {
       id: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
-      gate_keeper_username: currentUser.username,
+      gate_keeper_username: selectedGateKeeper?.username || '',
       gate_pass_type_name: gatePassType?.name || '',
       prisoners: selectedPrisoners.map((sp, idx) => {
         const prisoner = mockPrisonerRecords.find(p => p.id === sp.prisoner_id);
@@ -401,7 +514,8 @@ export default function GatePassScreen() {
           reason: sp.reason,
           prisoner: sp.prisoner_id,
           gate_pass: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
-          working_party: sp.working_party_id
+          working_party: sp.working_party_id,
+          fingerprint_verification: sp.fingerprint_verification
         };
       }),
       escorts: selectedEscorts.map((forceNumber, idx) => {
@@ -421,7 +535,7 @@ export default function GatePassScreen() {
       main_gate_required: formData.main_gate_required,
       exception_reason: formData.exception_reason,
       remarks: formData.remarks,
-      gate_keeper: currentUser.id,
+      gate_keeper: parseInt(formData.gate_keeper),
       gate_pass_type: formData.gate_pass_type,
       created_at: dialogMode === 'create' ? new Date().toISOString() : selectedGatePass!.created_at,
       status: 'active'
@@ -445,7 +559,8 @@ export default function GatePassScreen() {
       destination: formData.destination,
       reason: '',
       time_out: new Date().toISOString().slice(0, 16),
-      time_in: ''
+      time_in: '',
+      fingerprint_verification: ''
     }]);
   };
 
@@ -486,6 +601,56 @@ export default function GatePassScreen() {
     }
   };
 
+  // Visitor Pass handlers
+  const handleCreateVisitorPass = () => {
+    setVisitorPassDialogMode('create');
+    setSelectedVisitorPass(null);
+    setIsVisitorPassDialogOpen(true);
+  };
+
+  const handleEditVisitorPass = (pass: VisitorPass) => {
+    setVisitorPassDialogMode('edit');
+    setSelectedVisitorPass(pass);
+    setIsVisitorPassDialogOpen(true);
+  };
+
+  const handleViewVisitorPass = (pass: VisitorPass) => {
+    setSelectedVisitorPass(pass);
+    setIsVisitorPassViewDialogOpen(true);
+  };
+
+  const handleVisitorPassSubmit = (data: VisitorPass) => {
+    if (visitorPassDialogMode === 'create') {
+      toast.success('Visitor pass created successfully');
+    } else {
+      toast.success('Visitor pass updated successfully');
+    }
+    setIsVisitorPassDialogOpen(false);
+  };
+
+  // Visitor management handlers
+  const handleAddNewVisitor = () => {
+    setIsVisitorDialogOpen(true);
+  };
+
+  const handleVisitorCreated = (visitor: any) => {
+    // Convert the full visitor object from VisitorRegistrationDialog to our simpler Visitor format
+    const newVisitor: Visitor = {
+      id: visitor.id || `v-${Date.now()}`,
+      first_name: visitor.first_name,
+      middle_name: visitor.middle_name,
+      last_name: visitor.last_name,
+      id_number: visitor.id_number,
+      contact_no: visitor.contact_no,
+      address: visitor.address,
+      relation: visitor.relation
+    };
+
+    setVisitors([...visitors, newVisitor]);
+    toast.success('Visitor registered successfully');
+    setIsVisitorDialogOpen(false);
+  };
+
   const formatDateTime = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleString('en-US', {
@@ -497,23 +662,476 @@ export default function GatePassScreen() {
     });
   };
 
+  const handlePrintGatePass = () => {
+    if (!selectedGatePass) return;
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Gate Pass - ${selectedGatePass.id}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 40px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #650000;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              color: #650000;
+              margin: 0 0 10px 0;
+            }
+            .header h2 {
+              color: #666;
+              font-weight: normal;
+              margin: 0;
+              font-size: 18px;
+            }
+            .section {
+              margin-bottom: 30px;
+            }
+            .section h3 {
+              color: #650000;
+              border-bottom: 2px solid #650000;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 15px;
+            }
+            .info-item {
+              padding: 10px;
+              background: #f9f9f9;
+              border-left: 3px solid #650000;
+            }
+            .info-label {
+              font-size: 12px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .info-value {
+              font-weight: bold;
+            }
+            .prisoner-card, .escort-card {
+              border: 1px solid #ddd;
+              padding: 15px;
+              margin-bottom: 10px;
+              border-radius: 5px;
+            }
+            .badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+            .badge-green {
+              background: #10b981;
+              color: white;
+            }
+            .badge-blue {
+              background: #3b82f6;
+              color: white;
+            }
+            .badge-yellow {
+              background: #f59e0b;
+              color: white;
+            }
+            @media print {
+              body { padding: 20px; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>GATE PASS</h1>
+            <h2>Prison Management Information System</h2>
+          </div>
+
+          <div class="section">
+            <h3>Gate Pass Information</h3>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Gate Pass Type</div>
+                <div class="info-value">${selectedGatePass.gate_pass_type_name}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Status</div>
+                <div class="info-value">
+                  <span class="badge ${selectedGatePass.status === 'active' ? 'badge-blue' : selectedGatePass.status === 'completed' ? 'badge-green' : 'badge-yellow'}">
+                    ${selectedGatePass.status?.toUpperCase() || 'UNKNOWN'}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Gatekeeper</div>
+                <div class="info-value">${selectedGatePass.gate_keeper_username}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Created</div>
+                <div class="info-value">${selectedGatePass.created_at ? formatDateTime(selectedGatePass.created_at) : '-'}</div>
+              </div>
+              <div class="info-item" style="grid-column: span 2;">
+                <div class="info-label">Destination</div>
+                <div class="info-value">${selectedGatePass.destination}</div>
+              </div>
+              <div class="info-item" style="grid-column: span 2;">
+                <div class="info-label">Main Gate Required</div>
+                <div class="info-value">${selectedGatePass.main_gate_required ? 'Yes' : 'No'}</div>
+              </div>
+              ${selectedGatePass.exception_reason ? `
+                <div class="info-item" style="grid-column: span 2;">
+                  <div class="info-label">Exception Reason</div>
+                  <div class="info-value">${selectedGatePass.exception_reason}</div>
+                </div>
+              ` : ''}
+              ${selectedGatePass.remarks ? `
+                <div class="info-item" style="grid-column: span 2;">
+                  <div class="info-label">Remarks</div>
+                  <div class="info-value">${selectedGatePass.remarks}</div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Prisoners (${selectedGatePass.prisoners.length})</h3>
+            ${selectedGatePass.prisoners.map(prisoner => `
+              <div class="prisoner-card">
+                <div style="font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                  <span>${prisoner.prisoner_name}</span>
+                  <span class="badge ${prisoner.time_in ? 'badge-green' : 'badge-blue'}">
+                    ${prisoner.time_in ? 'RETURNED' : 'OUT'}
+                  </span>
+                </div>
+                <div class="info-grid">
+                  ${prisoner.working_party_name ? `
+                    <div>
+                      <div class="info-label">Working Party</div>
+                      <div>${prisoner.working_party_name}</div>
+                    </div>
+                  ` : ''}
+                  <div>
+                    <div class="info-label">Destination</div>
+                    <div>${prisoner.destination}</div>
+                  </div>
+                  <div>
+                    <div class="info-label">Reason</div>
+                    <div>${prisoner.reason}</div>
+                  </div>
+                  <div>
+                    <div class="info-label">Time Out</div>
+                    <div>${formatDateTime(prisoner.time_out)}</div>
+                  </div>
+                  ${prisoner.time_in ? `
+                    <div>
+                      <div class="info-label">Time In</div>
+                      <div>${formatDateTime(prisoner.time_in)}</div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h3>Escort Team (${selectedGatePass.escorts.length})</h3>
+            ${selectedGatePass.escorts.map(escort => `
+              <div class="escort-card">
+                <div style="font-weight: bold; margin-bottom: 5px;">${escort.full_name}</div>
+                <div style="color: #666; font-size: 14px;">
+                  Rank: ${escort.rank} | Force #: ${escort.force_number}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
+            <p>Generated on ${new Date().toLocaleString()}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.focus();
+    
+    // Slight delay to ensure content is loaded before printing
+    setTimeout(() => {
+      printWindow.print();
+    }, 250);
+  };
+
+  const handleExportToPDF = async () => {
+    if (!selectedGatePass) return;
+
+    // Create a hidden iframe for PDF generation
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'absolute';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = 'none';
+    document.body.appendChild(iframe);
+
+    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
+    if (!iframeDoc) return;
+
+    const pdfContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Gate Pass - ${selectedGatePass.id}</title>
+          <style>
+            body {
+              font-family: Arial, sans-serif;
+              padding: 40px;
+              color: #333;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 3px solid #650000;
+              padding-bottom: 20px;
+              margin-bottom: 30px;
+            }
+            .header h1 {
+              color: #650000;
+              margin: 0 0 10px 0;
+            }
+            .header h2 {
+              color: #666;
+              font-weight: normal;
+              margin: 0;
+              font-size: 18px;
+            }
+            .section {
+              margin-bottom: 30px;
+            }
+            .section h3 {
+              color: #650000;
+              border-bottom: 2px solid #650000;
+              padding-bottom: 10px;
+              margin-bottom: 15px;
+            }
+            .info-grid {
+              display: grid;
+              grid-template-columns: repeat(2, 1fr);
+              gap: 15px;
+              margin-bottom: 15px;
+            }
+            .info-item {
+              padding: 10px;
+              background: #f9f9f9;
+              border-left: 3px solid #650000;
+            }
+            .info-label {
+              font-size: 12px;
+              color: #666;
+              margin-bottom: 5px;
+            }
+            .info-value {
+              font-weight: bold;
+            }
+            .prisoner-card, .escort-card {
+              border: 1px solid #ddd;
+              padding: 15px;
+              margin-bottom: 10px;
+              border-radius: 5px;
+            }
+            .badge {
+              display: inline-block;
+              padding: 4px 8px;
+              border-radius: 4px;
+              font-size: 12px;
+              font-weight: bold;
+            }
+            .badge-green {
+              background: #10b981;
+              color: white;
+            }
+            .badge-blue {
+              background: #3b82f6;
+              color: white;
+            }
+            .badge-yellow {
+              background: #f59e0b;
+              color: white;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>GATE PASS</h1>
+            <h2>Prison Management Information System</h2>
+          </div>
+
+          <div class="section">
+            <h3>Gate Pass Information</h3>
+            <div class="info-grid">
+              <div class="info-item">
+                <div class="info-label">Gate Pass Type</div>
+                <div class="info-value">${selectedGatePass.gate_pass_type_name}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Status</div>
+                <div class="info-value">
+                  <span class="badge ${selectedGatePass.status === 'active' ? 'badge-blue' : selectedGatePass.status === 'completed' ? 'badge-green' : 'badge-yellow'}">
+                    ${selectedGatePass.status?.toUpperCase() || 'UNKNOWN'}
+                  </span>
+                </div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Gatekeeper</div>
+                <div class="info-value">${selectedGatePass.gate_keeper_username}</div>
+              </div>
+              <div class="info-item">
+                <div class="info-label">Created</div>
+                <div class="info-value">${selectedGatePass.created_at ? formatDateTime(selectedGatePass.created_at) : '-'}</div>
+              </div>
+              <div class="info-item" style="grid-column: span 2;">
+                <div class="info-label">Destination</div>
+                <div class="info-value">${selectedGatePass.destination}</div>
+              </div>
+              <div class="info-item" style="grid-column: span 2;">
+                <div class="info-label">Main Gate Required</div>
+                <div class="info-value">${selectedGatePass.main_gate_required ? 'Yes' : 'No'}</div>
+              </div>
+              ${selectedGatePass.exception_reason ? `
+                <div class="info-item" style="grid-column: span 2;">
+                  <div class="info-label">Exception Reason</div>
+                  <div class="info-value">${selectedGatePass.exception_reason}</div>
+                </div>
+              ` : ''}
+              ${selectedGatePass.remarks ? `
+                <div class="info-item" style="grid-column: span 2;">
+                  <div class="info-label">Remarks</div>
+                  <div class="info-value">${selectedGatePass.remarks}</div>
+                </div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="section">
+            <h3>Prisoners (${selectedGatePass.prisoners.length})</h3>
+            ${selectedGatePass.prisoners.map(prisoner => `
+              <div class="prisoner-card">
+                <div style="font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
+                  <span>${prisoner.prisoner_name}</span>
+                  <span class="badge ${prisoner.time_in ? 'badge-green' : 'badge-blue'}">
+                    ${prisoner.time_in ? 'RETURNED' : 'OUT'}
+                  </span>
+                </div>
+                <div class="info-grid">
+                  ${prisoner.working_party_name ? `
+                    <div>
+                      <div class="info-label">Working Party</div>
+                      <div>${prisoner.working_party_name}</div>
+                    </div>
+                  ` : ''}
+                  <div>
+                    <div class="info-label">Destination</div>
+                    <div>${prisoner.destination}</div>
+                  </div>
+                  <div>
+                    <div class="info-label">Reason</div>
+                    <div>${prisoner.reason}</div>
+                  </div>
+                  <div>
+                    <div class="info-label">Time Out</div>
+                    <div>${formatDateTime(prisoner.time_out)}</div>
+                  </div>
+                  ${prisoner.time_in ? `
+                    <div>
+                      <div class="info-label">Time In</div>
+                      <div>${formatDateTime(prisoner.time_in)}</div>
+                    </div>
+                  ` : ''}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div class="section">
+            <h3>Escort Team (${selectedGatePass.escorts.length})</h3>
+            ${selectedGatePass.escorts.map(escort => `
+              <div class="escort-card">
+                <div style="font-weight: bold; margin-bottom: 5px;">${escort.full_name}</div>
+                <div style="color: #666; font-size: 14px;">
+                  Rank: ${escort.rank} | Force #: ${escort.force_number}
+                </div>
+              </div>
+            `).join('')}
+          </div>
+
+          <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
+            <p>Generated on ${new Date().toLocaleString()}</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    iframeDoc.open();
+    iframeDoc.write(pdfContent);
+    iframeDoc.close();
+
+    // Wait for content to load, then trigger print dialog with PDF option
+    setTimeout(() => {
+      iframe.contentWindow?.focus();
+      iframe.contentWindow?.print();
+      
+      // Clean up after a delay
+      setTimeout(() => {
+        document.body.removeChild(iframe);
+      }, 1000);
+    }, 250);
+
+    toast.success('PDF export initiated. Please use "Save as PDF" in the print dialog.');
+  };
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 style={{ color: '#650000' }}>Automated Gate Management</h1>
-          <p className="text-gray-600">Manage gate passes, prisoner movements, and escort teams</p>
+          <p className="text-gray-600">Manage gate passes, prisoner movements, escort teams, and visitor passes</p>
         </div>
-        <Button 
-          onClick={handleCreateGatePass}
-          style={{ backgroundColor: '#650000' }}
-          className="hover:opacity-90"
-        >
-          <Plus className="mr-2 h-4 w-4" />
-          Create Gate Pass
-        </Button>
       </div>
+
+      <Tabs defaultValue="gate-passes" className="w-full">
+        <div className="bg-white rounded-lg p-2 mb-6 shadow-sm border">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="gate-passes" className="data-[state=active]:bg-[#650000] data-[state=active]:text-white">
+              Gate Passes
+            </TabsTrigger>
+            <TabsTrigger value="visitor-passes" className="data-[state=active]:bg-[#650000] data-[state=active]:text-white">
+              Visitor Passes
+            </TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent value="gate-passes" className="space-y-6">
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleCreateGatePass}
+              style={{ backgroundColor: '#650000' }}
+              className="hover:opacity-90"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Gate Pass
+            </Button>
+          </div>
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -626,16 +1244,16 @@ export default function GatePassScreen() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Gate Pass Type</TableHead>
-                  <TableHead>Gatekeeper</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Prisoners</TableHead>
-                  <TableHead>Escorts</TableHead>
-                  <TableHead>Main Gate</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Created</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow style={{ backgroundColor: '#650000' }}>
+                  <TableHead className="text-white">Gate Pass Type</TableHead>
+                  <TableHead className="text-white">Gatekeeper</TableHead>
+                  <TableHead className="text-white">Destination</TableHead>
+                  <TableHead className="text-white">Prisoners</TableHead>
+                  <TableHead className="text-white">Escorts</TableHead>
+                  <TableHead className="text-white">Main Gate</TableHead>
+                  <TableHead className="text-white">Status</TableHead>
+                  <TableHead className="text-white">Created</TableHead>
+                  <TableHead className="text-right text-white">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -732,10 +1350,31 @@ export default function GatePassScreen() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="visitor-passes" className="space-y-6">
+          <div className="flex justify-end">
+            <Button 
+              onClick={handleCreateVisitorPass}
+              style={{ backgroundColor: '#650000' }}
+              className="hover:opacity-90"
+            >
+              <Plus className="mr-2 h-4 w-4" />
+              Create Visitor Pass
+            </Button>
+          </div>
+
+          <VisitorPassList
+            onEdit={handleEditVisitorPass}
+            onView={handleViewVisitorPass}
+          />
+        </TabsContent>
+      </Tabs>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>
               {dialogMode === 'create' ? 'Create Gate Pass' : 'Edit Gate Pass'}
@@ -749,7 +1388,7 @@ export default function GatePassScreen() {
 
           <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="general">General Information</TabsTrigger>
+              <TabsTrigger value="general">Gate Pass Information</TabsTrigger>
               <TabsTrigger value="prisoners">Prisoners</TabsTrigger>
               <TabsTrigger value="escorts">Escort Team</TabsTrigger>
             </TabsList>
@@ -773,6 +1412,57 @@ export default function GatePassScreen() {
                       ))}
                     </SelectContent>
                   </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Gate Keeper *</Label>
+                  <Popover open={openGateKeeperCombobox} onOpenChange={setOpenGateKeeperCombobox}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openGateKeeperCombobox}
+                        className="w-full justify-between"
+                      >
+                        {formData.gate_keeper
+                          ? users.find((user) => user.id.toString() === formData.gate_keeper)?.full_name
+                          : "Select gate keeper..."}
+                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-full p-0">
+                      <Command>
+                        <CommandInput placeholder="Search gate keeper..." />
+                        <CommandList>
+                          <CommandEmpty>No gate keeper found.</CommandEmpty>
+                          <CommandGroup>
+                            {users.map((user) => (
+                              <CommandItem
+                                key={user.id}
+                                value={`${user.full_name} ${user.username} ${user.force_number}`}
+                                onSelect={() => {
+                                  setFormData({ ...formData, gate_keeper: user.id.toString() });
+                                  setOpenGateKeeperCombobox(false);
+                                }}
+                              >
+                                <Check
+                                  className={`mr-2 h-4 w-4 ${
+                                    formData.gate_keeper === user.id.toString() ? "opacity-100" : "opacity-0"
+                                  }`}
+                                />
+                                <div className="flex flex-col">
+                                  <span>{user.full_name}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {user.rank} - {user.force_number}
+                                  </span>
+                                </div>
+                              </CommandItem>
+                            ))}
+                          </CommandGroup>
+                        </CommandList>
+                      </Command>
+                    </PopoverContent>
+                  </Popover>
                 </div>
 
                 <div className="space-y-2">
@@ -936,6 +1626,14 @@ export default function GatePassScreen() {
                               onChange={(e) => updatePrisonerRow(index, 'time_in', e.target.value ? new Date(e.target.value).toISOString() : '')}
                             />
                           </div>
+
+                          <div className="col-span-2">
+                            <BiometricCapture
+                              value={prisoner.fingerprint_verification}
+                              onChange={(value) => updatePrisonerRow(index, 'fingerprint_verification', value)}
+                              label={prisoner.time_in ? 'Check-In Verification' : 'Check-Out Verification'}
+                            />
+                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -1034,12 +1732,14 @@ export default function GatePassScreen() {
               {dialogMode === 'create' ? 'Create Gate Pass' : 'Update Gate Pass'}
             </Button>
           </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[90vw] w-[1200px] max-h-[90vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Gate Pass Details</DialogTitle>
             <DialogDescription>
@@ -1049,9 +1749,9 @@ export default function GatePassScreen() {
 
           {selectedGatePass && (
             <div className="space-y-6">
-              {/* General Information */}
+              {/* Gate Pass Information */}
               <div>
-                <h3 className="mb-3" style={{ color: '#650000' }}>General Information</h3>
+                <h3 className="mb-3" style={{ color: '#650000' }}>Gate Pass Information</h3>
                 <Card>
                   <CardContent className="p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-4">
@@ -1177,13 +1877,147 @@ export default function GatePassScreen() {
             </div>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="flex justify-between items-center">
+            <div className="flex gap-2">
+              <Button 
+                variant="outline"
+                onClick={handlePrintGatePass}
+                className="flex items-center gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                Print gate pass
+              </Button>
+              <Button 
+                variant="outline"
+                onClick={handleExportToPDF}
+                className="flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Export to PDF
+              </Button>
+            </div>
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
           </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
+
+      {/* Visitor Pass Create/Edit Dialog */}
+      <Dialog 
+        open={isVisitorPassDialogOpen} 
+        onOpenChange={setIsVisitorPassDialogOpen}
+      >
+        <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>
+              {visitorPassDialogMode === 'create' ? 'Create Visitor Pass' : 'Edit Visitor Pass'}
+            </DialogTitle>
+            <DialogDescription>
+              {visitorPassDialogMode === 'create' 
+                ? 'Create a new visitor pass for authorized visits'
+                : 'Update the visitor pass information'}
+            </DialogDescription>
+          </DialogHeader>
+
+          <VisitorPassForm
+            pass={selectedVisitorPass}
+            onSubmit={handleVisitorPassSubmit}
+            onCancel={() => setIsVisitorPassDialogOpen(false)}
+            onAddNewVisitor={handleAddNewVisitor}
+            visitors={visitors.map(v => ({
+              id: v.id,
+              name: `${v.first_name} ${v.middle_name} ${v.last_name}`.replace(/\s+/g, ' ').trim(),
+              id_number: v.id_number
+            }))}
+          />
+        </DialogContent>
+      </Dialog>
+
+      {/* Visitor Pass View Dialog */}
+      <Dialog 
+        open={isVisitorPassViewDialogOpen} 
+        onOpenChange={setIsVisitorPassViewDialogOpen}
+      >
+        <DialogContent className="max-w-[1000px] max-h-[90vh] overflow-y-auto">
+          <div className="space-y-4">
+            <DialogHeader>
+              <DialogTitle style={{ color: '#650000' }}>
+                Visitor Pass Details
+              </DialogTitle>
+            </DialogHeader>
+
+            {selectedVisitorPass && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Tag Number</Label>
+                    <p>{selectedVisitorPass.visitor_tag_number}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Issue Date</Label>
+                    <p>{new Date(selectedVisitorPass.issue_date).toLocaleDateString()}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Prisoner</Label>
+                    <p>{selectedVisitorPass.prisoner_name}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Visitor</Label>
+                    <p>{selectedVisitorPass.visitor_name}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Valid From</Label>
+                    <p>{new Date(selectedVisitorPass.valid_from).toLocaleString()}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-gray-600">Valid Until</Label>
+                    <p>{new Date(selectedVisitorPass.valid_until).toLocaleString()}</p>
+                  </div>
+                  <div className="space-y-2 col-span-2">
+                    <Label className="text-gray-600">Purpose</Label>
+                    <p>{selectedVisitorPass.purpose}</p>
+                  </div>
+                  {selectedVisitorPass.is_suspended && (
+                    <>
+                      <div className="space-y-2 col-span-2">
+                        <Label className="text-red-600">Suspension Status</Label>
+                        <Badge variant="destructive">Suspended</Badge>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-gray-600">Suspended Date</Label>
+                        <p>{new Date(selectedVisitorPass.suspended_date).toLocaleString()}</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-gray-600">Suspended By</Label>
+                        <p>{selectedVisitorPass.suspended_by_username}</p>
+                      </div>
+                      <div className="space-y-2 col-span-2">
+                        <Label className="text-gray-600">Suspension Reason</Label>
+                        <p>{selectedVisitorPass.suspended_reason}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsVisitorPassViewDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Visitor Registration Dialog */}
+      <VisitorRegistrationDialog
+        open={isVisitorDialogOpen}
+        onOpenChange={setIsVisitorDialogOpen}
+        onVisitorCreated={handleVisitorCreated}
+      />
     </div>
   );
 }
