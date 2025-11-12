@@ -11,9 +11,7 @@ import {
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useFilters } from '../../contexts/FilterContext';
-import { fetchRegionById } from '../../services/systemAdministrationService';
-import { fetchDistrictById } from '../../services/systemAdministrationService';
-import { fetchStationById } from '../../services/systemAdministrationService';
+import { fetchRegionById, fetchDistrictById, fetchStationById } from '../../services/system_administration';
 
 export interface LocationFilterProps {
   className?: string;

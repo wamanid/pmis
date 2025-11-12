@@ -155,6 +155,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
+  // Transaction tab filters
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
+  const [transactionStatusFilter, setTransactionStatusFilter] = useState('all');
+  const [transactionCurrentPage, setTransactionCurrentPage] = useState(1);
+
   // Account dialogs
   const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
   const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
@@ -312,7 +318,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     }
   };
 
-  // Pagination
+  // Pagination for accounts
   const filteredAccounts = accounts.filter(acc =>
     acc.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     acc.account_type_name.toLowerCase().includes(searchTerm.toLowerCase())
@@ -322,6 +328,26 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const paginatedAccounts = filteredAccounts.slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
+  );
+
+  // Filter and pagination for transactions tab
+  const filteredTransactions = mockTransactions.filter(transaction => {
+    const matchesSearch = 
+      transaction.prisoner_name.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.account_type_name.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.transaction_remark.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.checked_by_name.toLowerCase().includes(transactionSearchTerm.toLowerCase());
+    
+    const matchesType = transactionTypeFilter === 'all' || transaction.transaction_type === transactionTypeFilter;
+    const matchesStatus = transactionStatusFilter === 'all' || transaction.transaction_status === transactionStatusFilter;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  const totalTransactionPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (transactionCurrentPage - 1) * itemsPerPage,
+    transactionCurrentPage * itemsPerPage
   );
 
   // Calculate statistics
@@ -721,8 +747,19 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       </div>
 
       <Tabs defaultValue="accounts" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="accounts">Accounts</TabsTrigger>
+        <TabsList className="w-full">
+          <TabsTrigger 
+            value="accounts" 
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger 
+            value="transactions" 
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="accounts" className="space-y-6">
@@ -798,13 +835,13 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
             <CardContent className="pt-6">
               <Table>
                 <TableHeader>
-                  <TableRow>
-                    <TableHead></TableHead>
-                    <TableHead>Prisoner Name</TableHead>
-                    <TableHead>Account Type</TableHead>
-                    <TableHead>Currency</TableHead>
-                    <TableHead className="text-right">Balance</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
+                  <TableRow style={{ backgroundColor: '#650000' }}>
+                    <TableHead className="text-white"></TableHead>
+                    <TableHead className="text-white">Prisoner Name</TableHead>
+                    <TableHead className="text-white">Account Type</TableHead>
+                    <TableHead className="text-white">Currency</TableHead>
+                    <TableHead className="text-right text-white">Balance</TableHead>
+                    <TableHead className="text-right text-white">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1009,33 +1046,279 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">
+                  {mockTransactions.filter(t => t.transaction_status_name === 'Approved').length}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">
+                  UGX {mockTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0).toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => {
+                        setTransactionSearchTerm(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => setIsCreateTransactionDialogOpen(true)}
+                    style={{ backgroundColor: '#650000' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="transactionTypeFilter">Transaction Type</Label>
+                    <select
+                      id="transactionTypeFilter"
+                      value={transactionTypeFilter}
+                      onChange={(e) => {
+                        setTransactionTypeFilter(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="all">All Types</option>
+                      {mockTransactionTypes.map(type => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="transactionStatusFilter">Status</Label>
+                    <select
+                      id="transactionStatusFilter"
+                      value={transactionStatusFilter}
+                      onChange={(e) => {
+                        setTransactionStatusFilter(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="all">All Statuses</option>
+                      {mockTransactionStatuses.map(status => (
+                        <option key={status.id} value={status.id}>{status.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table */}
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Prisoner</TableHead>
+                    <TableHead>Account Type</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Balance After</TableHead>
+                    <TableHead>Checked By</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-gray-500 py-8">
+                        No transactions found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm">
+                              {new Date(transaction.transaction_datetime).toLocaleString()}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{transaction.prisoner_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{transaction.account_type_name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{transaction.transaction_type_name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className={parseFloat(transaction.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {parseFloat(transaction.amount) >= 0 ? '+' : ''}{parseFloat(transaction.amount).toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              transaction.transaction_status_name === 'Approved' 
+                                ? 'default' 
+                                : transaction.transaction_status_name === 'Pending'
+                                ? 'secondary'
+                                : 'destructive'
+                            }
+                          >
+                            {transaction.transaction_status_name}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{parseFloat(transaction.balance_after).toLocaleString()}</TableCell>
+                        <TableCell>{transaction.checked_by_name}</TableCell>
+                        <TableCell className="max-w-xs truncate">{transaction.transaction_remark || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTransaction(transaction);
+                                setIsViewTransactionDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteTransactionId(transaction.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalTransactionPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-gray-600">
+                    Showing {((transactionCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(transactionCurrentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTransactionCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={transactionCurrentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">
+                        Page {transactionCurrentPage} of {totalTransactionPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTransactionCurrentPage(prev => Math.min(totalTransactionPages, prev + 1))}
+                      disabled={transactionCurrentPage === totalTransactionPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
       </Tabs>
 
       {/* Create Account Dialog */}
       <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Create New Account</DialogTitle>
             <DialogDescription>Add a new prisoner account</DialogDescription>
           </DialogHeader>
           <AccountForm onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Edit Account Dialog */}
       <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Edit Account</DialogTitle>
             <DialogDescription>Update account information</DialogDescription>
           </DialogHeader>
           <AccountForm onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Account Dialog */}
       <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Account Details</DialogTitle>
             <DialogDescription>View prisoner account information</DialogDescription>
@@ -1067,23 +1350,27 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               Close
             </Button>
           </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Create Transaction Dialog */}
       <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Create New Transaction</DialogTitle>
             <DialogDescription>Add a new transaction</DialogDescription>
           </DialogHeader>
           <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Transaction Dialog */}
       <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle>Transaction Details</DialogTitle>
             <DialogDescription>View transaction information</DialogDescription>
@@ -1155,6 +1442,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               Close
             </Button>
           </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 

@@ -442,15 +442,15 @@ export default function PrisonerEntryExitScreen() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Prisoner Name</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Working Party</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>IN/OUT Station</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow style={{ backgroundColor: '#650000' }}>
+                  <TableHead className="text-white">Prisoner Name</TableHead>
+                  <TableHead className="text-white">Destination</TableHead>
+                  <TableHead className="text-white">Working Party</TableHead>
+                  <TableHead className="text-white">Reason</TableHead>
+                  <TableHead className="text-white">Time Out</TableHead>
+                  <TableHead className="text-white">Time In</TableHead>
+                  <TableHead className="text-white">IN/OUT Station</TableHead>
+                  <TableHead className="text-right text-white">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -532,7 +532,8 @@ export default function PrisonerEntryExitScreen() {
 
       {/* View Details Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>
               Prisoner Movement Details
@@ -696,6 +697,7 @@ export default function PrisonerEntryExitScreen() {
               )}
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
