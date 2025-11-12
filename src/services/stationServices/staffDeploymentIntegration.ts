@@ -1,5 +1,63 @@
 import axiosInstance from "../axiosInstance";
 
+export interface Region {
+  id: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  name: string;
+  description: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+}
+
+export interface District {
+  id: string;
+  region_name: string;
+  region: Region;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  name: string;
+  description: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+}
+
+export interface Station {
+  id: string;
+  district: District;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  name: string;
+  station_code: string;
+  manual_capacity: number;
+  date_opened: string;
+  physical_address: string;
+  postal_address: string;
+  gps_location: string;
+  phone_number: string;
+  fax_number: string;
+  email: string;
+  alternate_email: string;
+  pmis_available: boolean;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  region: string;
+  security_level: string;
+  category: string;
+  station_type: string;
+  jurisdiction_area: string;
+  gender: string;
+}
+
 export interface StaffItem {
   id: string;
   rank_name: string;
@@ -46,8 +104,9 @@ export interface StaffDeployment {
 }
 
 export interface StaffDeploymentResponse {
-  id: string;
+   id: string;
   station_name: string;
+  station: Station;
   created_by_name: string;
   full_name: string;
   force_number: string;
@@ -64,7 +123,6 @@ export interface StaffDeploymentResponse {
   created_by: number;
   updated_by: number;
   deleted_by: number;
-  station: string;
   profile: string;
 }
 
