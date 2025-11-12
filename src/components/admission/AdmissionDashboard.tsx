@@ -1,8 +1,5 @@
 import { useEffect, useState } from 'react';
-<<<<<<< HEAD
-=======
 import { useNavigate } from 'react-router-dom';
->>>>>>> upstream/main
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { StatCard } from '../common/StatCard';
 import { Input } from '../ui/input';
@@ -34,28 +31,10 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-<<<<<<< HEAD
-import {
-  fetchAdmissionStats,
-  searchPrisoners,
-  AdmissionStats,
-  PrisonerSearchResult
-} from '../../services/mockApi';
-
-interface AdmissionDashboardProps {
-  onNavigate?: (page: string) => void;
-}
-
-export function AdmissionDashboard({ onNavigate }: AdmissionDashboardProps) {
-  const [admissionStats, setAdmissionStats] = useState<AdmissionStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<PrisonerSearchResult[]>([]);
-  const [searching, setSearching] = useState(false);
-=======
-import { admissionService } from '../../services/admissionService';
+import { getAdmissionDashboard } from '../../services/admission';
 import { DashboardResponse, DashboardFilters } from '../../models/admission';
 import { toast } from 'sonner';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 // Transform API response to chart data format
 interface CategoryData {
@@ -73,48 +52,21 @@ export function AdmissionDashboard() {
   });
 >>>>>>> upstream/main
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-<<<<<<< HEAD
-        const stats = await fetchAdmissionStats();
-        setAdmissionStats(stats);
-      } catch (error) {
-        console.error('Error loading admission data:', error);
-=======
-        const data = await admissionService.getAdmissionDashboard(filters);
-        setDashboardData(data);
-      } catch (error) {
-        console.error('Error loading admission dashboard:', error);
-        toast.error('Failed to load admission dashboard data');
->>>>>>> upstream/main
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
-<<<<<<< HEAD
-  }, []);
-
-  const handleSearch = async () => {
-    if (!searchQuery.trim()) {
-      setSearchResults([]);
-      return;
-    }
-
-    setSearching(true);
+  const loadData = async () => {
+    setLoading(true);
     try {
-      const results = await searchPrisoners(searchQuery);
-      setSearchResults(results);
+      const data = await getAdmissionDashboard(filters);
+      setDashboardData(data);
     } catch (error) {
-      console.error('Error searching prisoners:', error);
+      console.error('Error loading admission dashboard:', error);
+      toast.error('Failed to load admission dashboard data');
     } finally {
-      setSearching(false);
+      setLoading(false);
     }
-=======
-  }, [filters]);
+  };
+
+  // Load data on mount, when filters change, and when location filters change
+  useFilterRefresh(loadData, [filters]);
 
   // Transform category data from API response
   const getCategoryData = (): CategoryData[] => {

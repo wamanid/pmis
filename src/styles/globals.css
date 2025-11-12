@@ -187,3 +187,30 @@
 html {
   font-size: var(--font-size);
 }
+
+/* Resizable Dialog Styles */
+.resize[role="dialog"] {
+  resize: both !important;
+  overflow: auto !important;
+  min-width: 800px !important;
+  min-height: 600px !important;
+}
+
+/* Resize handle indicator */
+.resize[role="dialog"]::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(
+    135deg,
+    transparent 0%,
+    transparent 50%,
+    rgba(101, 0, 0, 0.3) 50%,
+    rgba(101, 0, 0, 0.3) 100%
+  );
+  cursor: nwse-resize;
+  pointer-events: none;
+}

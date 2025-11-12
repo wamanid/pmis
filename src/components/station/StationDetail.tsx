@@ -3,7 +3,7 @@ import { MapPin, Phone, Mail, Calendar, Users, Building2, Shield, Loader2, Alert
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Skeleton } from '../ui/skeleton';
-import { fetchStationById } from '../../services/systemAdministrationService';
+import { fetchStationById } from '../../services/system_administration';
 import type { Station } from '../../models/system_administration';
 
 export interface StationDetailProps {

@@ -73,16 +73,28 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     // Clear dependent filters
     setDistrictState('');
     setStationState('');
+    // Emit event to notify components to refetch data
+    window.dispatchEvent(new CustomEvent('filterChanged', { 
+      detail: { region: value, district: '', station: '' } 
+    }));
   };
 
   const setDistrict = (value: string) => {
     setDistrictState(value);
     // Clear dependent filter
     setStationState('');
+    // Emit event to notify components to refetch data
+    window.dispatchEvent(new CustomEvent('filterChanged', { 
+      detail: { region, district: value, station: '' } 
+    }));
   };
 
   const setStation = (value: string) => {
     setStationState(value);
+    // Emit event to notify components to refetch data
+    window.dispatchEvent(new CustomEvent('filterChanged', { 
+      detail: { region, district, station: value } 
+    }));
   };
 
   // Get filter params for API requests
@@ -100,6 +112,10 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setDistrictState('');
     setStationState('');
     localStorage.removeItem(STORAGE_KEY);
+    // Emit event to notify components to refetch data
+    window.dispatchEvent(new CustomEvent('filterChanged', { 
+      detail: { region: '', district: '', station: '' } 
+    }));
   };
 
   return (

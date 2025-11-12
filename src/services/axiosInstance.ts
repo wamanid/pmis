@@ -92,36 +92,33 @@ axiosInstance.interceptors.response.use(
       Boolean(error?.config?.skipErrorToast);
 
     if (error.response) {
-      if (!skipToast) {
-        const { status, data } = error.response;
-        
-        switch (status) {
-          case 400:
-            toast.error(data?.message || 'Bad request. Please check your input.');
-            break;
-          case 401:
-            toast.error('Unauthorized. Please login again.');
-            try {
-              localStorage.removeItem('auth_token');
-              localStorage.removeItem('user_data');
-            } catch (e) { /* ignore storage errors */ }
-            break;
-          case 403:
-            toast.error('Access forbidden. You do not have permission.');
-            break;
-          case 404:
-            toast.error('Resource not found.');
-            break;
-          case 500:
-            toast.error('Server error. Please try again later.');
-            break;
-          default:
-            toast.error(data?.message || 'An error occurred. Please try again.');
-        }
-      }
-
-      if (process.env.NODE_ENV !== 'production') {
-        // console.error('API Error Response:', { status: error.response.status, url: error.config?.url, data: error.response.data });
+      // Server responded with error status
+      const { status, data } = error.response;
+      
+      switch (status) {
+        case 400:
+          toast.error(data?.message || 'Bad request. Please check your input.');
+          break;
+        case 401:
+          toast.error('Unauthorized. Please login again.');
+          // Clear token and redirect to login
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('user_data');
+          localStorage.removeItem('pmis_user_filters');
+          // Redirect to login page
+          window.location.href = '/login';
+          break;
+        case 403:
+          toast.error('Access forbidden. You do not have permission.');
+          break;
+        case 404:
+          toast.error('Resource not found.');
+          break;
+        case 500:
+          toast.error('Server error. Please try again later.');
+          break;
+        default:
+          toast.error(data?.message || 'An error occurred. Please try again.');
       }
     } else if (error.request) {
       if (!skipToast) toast.error('Network error. Please check your connection.');

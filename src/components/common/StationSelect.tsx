@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchStations } from '../../services/systemAdministrationService';
+import { fetchStations } from '../../services/system_administration';
 import type { Station } from '../../models/system_administration';
 
 export interface StationSelectProps {
