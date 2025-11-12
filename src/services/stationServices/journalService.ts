@@ -1,8 +1,8 @@
 import axiosInstance from '../axiosInstance';
 
-const JOURNALS_BASE = '/api/station-management/api/journals/';
-const JOURNAL_TYPES = '/api/station-management/api/journal-types/';
-const JOURNAL_PRISONERS = '/api/station-management/api/journal-prisoners/';
+const JOURNALS_BASE = '/station-management/api/journals/';
+const JOURNAL_TYPES = '/station-management/api/journal-types/';
+const JOURNAL_PRISONERS = '/station-management/api/journal-prisoners/';
 const STAFF_PROFILES = '/auth/staff-profiles/';
 const STATIONS_ENDPOINT = '/system-administration/stations/';
 
@@ -55,6 +55,12 @@ export interface JournalItem {
 export const fetchJournals = async (params?: Record<string, any>, signal?: AbortSignal) => {
   const res = await axiosInstance.get(JOURNALS_BASE, { params, signal });
   return res.data; // {count, next, previous, results}
+};
+
+// fetch single journal by id
+export const fetchJournalById = async (id: string, signal?: AbortSignal) => {
+  const res = await axiosInstance.get(`${JOURNALS_BASE}${id}/`, { signal });
+  return res.data;
 };
 
 export const createJournal = async (payload: Record<string, any>) => {

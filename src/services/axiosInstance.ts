@@ -1,8 +1,9 @@
 import axios from 'axios';
 import { toast } from 'sonner';
 
-// Get API base URL from environment variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://pmis.angstrom-technologies.ug/api';
+// Get API base URL from environment variable and ensure trailing slash
+let API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://pmis.angstrom-technologies.ug/api';
+if (!API_BASE_URL.endsWith('/')) API_BASE_URL = API_BASE_URL + '/';
 
 // Create axios instance
 const axiosInstance = axios.create({
