@@ -14,6 +14,7 @@ export interface StaffProfile {
   rank_name?: string;
   station?: string;
   station_name?: string;
+  senior?: boolean;
   raw?: any;
 }
 
@@ -32,10 +33,10 @@ export interface StaffEntryPayload {
   staff_category?: string;
 }
 
-export const fetchEntries = async (params?: Record<string, any>) => {
-  const res = await axiosInstance.get(ENTRIES_BASE, { params });
-  // return standardized shape: { results, count, next, previous }
-  return res.data;
+export const fetchEntries = async (params?: Record<string, any>, signal?: AbortSignal) => {
+  // pass through the signal so callers can cancel requests
+  const res = await axiosInstance.get(ENTRIES_BASE, { params, signal });
+  return res.data; // standardized DRF paginated payload: {count, next, previous, results}
 };
 
 export const createEntry = async (payload: StaffEntryPayload) => {
@@ -82,6 +83,7 @@ export const fetchStations = async () => {
     const res = await axiosInstance.get(STATIONS_ENDPOINT);
     return res.data.results ?? res.data ?? [];
   } catch (err) {
+    console.error('fetchStations error:', err);
     return [];
   }
 };

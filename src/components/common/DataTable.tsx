@@ -78,8 +78,8 @@ export function DataTable({
    // if API provides paginated { results, count } we can surface count too
    const [total, setTotal] = useState<number | null>(null);
  
+   // Fetch data (with cancellation); operate in "controlled mode" if externalData provided
    useEffect(() => {
-     // If parent provided data, do not perform fetch — operate in controlled mode
      if (externalData !== undefined) {
        setData(externalData);
        setLoading(false);
@@ -87,33 +87,34 @@ export function DataTable({
        if (externalTotal !== undefined) setTotal(externalTotal);
        return;
      }
- 
-     let mounted = true;
+
+     if (!url) return;
+     const controller = new AbortController();
      const fetchData = async () => {
        setLoading(true);
        setError(null);
        try {
-        // request with server-side paging/search params
-        const params: Record<string, any> = {};
-        if (currentPage) params.page = currentPage;
-        if (pageSize !== -1) params.page_size = pageSize;
-        if (searchTerm) { params.search = searchTerm; setCurrentPage(1); }
-        if (sortField) params.ordering = (sortDir === 'desc' ? `-${sortField}` : sortField);
-        const response = await axios.get(url, { params });
+         const params: Record<string, any> = {};
+         if (currentPage) params.page = currentPage;
+         if (pageSize !== -1) params.page_size = pageSize;
+         if (searchTerm) params.search = searchTerm; // do NOT mutate page here
+         if (sortField) params.ordering = sortDir === 'desc' ? `-${sortField}` : sortField;
+
+         const response = await axios.get(url, { params, signal: controller.signal });
          const payload = response.data;
          const rows = Array.isArray(payload) ? payload : payload?.results ?? payload?.data ?? [];
-         if (!mounted) return;
          setData(rows);
          setTotal(payload?.count ?? null);
        } catch (err: any) {
-         setError(err.message || 'Failed to fetch data');
+         if (err?.name === 'AbortError') return;
+         setError(err?.message || 'Failed to fetch data');
        } finally {
-         if (mounted) setLoading(false);
+         setLoading(false);
        }
      };
-     if (url) fetchData();
-    return () => { mounted = false; };
-   }, [url, searchTerm, currentPage, mergedConfig.lengthMenu, externalData, externalTotal, pageSize, sortField, sortDir]);
+     fetchData();
+     return () => controller.abort();
+   }, [url, searchTerm, currentPage, externalData, externalTotal, pageSize, sortField, sortDir, mergedConfig.lengthMenu]);
  
    // derive final render values preferring external props
    const rowsToRender = externalData ?? data;
@@ -184,7 +185,7 @@ export function DataTable({
     setSearchTerm(v);
     setCurrentPage(1);
     if (externalData !== undefined && onSearch) {
-      // controlled mode -> notify parent to fetch
+      // controlled mode -> notify parent to fetch (parent is authoritative)
       onSearch(v);
       return;
     }
@@ -209,28 +210,21 @@ export function DataTable({
   };
 
   const handleSort = (key: string) => {
-    // compute new sort state synchronously so we can notify parent correctly
-    let newField: string | null = sortField;
-    let newDir: 'asc' | 'desc' | null = sortDir;
+    // compute next direction deterministically before updating state
+    let nextDir: 'asc' | 'desc' | null = 'asc';
+    if (sortField !== key) nextDir = 'asc';
+    else if (sortDir === 'asc') nextDir = 'desc';
+    else if (sortDir === 'desc') nextDir = null;
 
-    if (sortField !== key) {
-      newField = key;
-      newDir = 'asc';
-    } else {
-      if (sortDir === 'asc') newDir = 'desc';
-      else if (sortDir === 'desc') { newField = null; newDir = null; }
-      else newDir = 'asc';
-    }
-
-    setSortField(newField);
-    setSortDir(newDir);
+    setSortField(nextDir ? key : null);
+    setSortDir(nextDir);
     setCurrentPage(1);
 
     if (externalData !== undefined && onSort) {
-      onSort(newField, newDir);
+      onSort(nextDir ? key : null, nextDir);
     }
   };
-
+ 
    return (
      <div className="datatable">
       {/* Search + Export area */}
@@ -244,7 +238,10 @@ export function DataTable({
                 type="text"
                 placeholder="Search..."
                 value={searchTerm}
-                onChange={(e) => handleSearchChange(e.target.value)}
+                onChange={(e) => {
+                  setSearchTerm(e.target.value);
+                  setCurrentPage(1);
+                }}
                 className="pl-8 w-[220px]"
               />
             </div>

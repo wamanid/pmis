@@ -152,73 +152,86 @@ export function StaffEntryExitScreen() {
   };
 
   // load table data from backend
+// load table data: abort previous requests, debounce handled by effect, safe page handling
+  const abortRef = useRef<AbortController | null>(null);
   const loadTable = useCallback(async (p = page, ps = pageSize, sf?: string, sd?: string, q?: string) => {
+    // cancel previous
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch {}
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setTableLoading(true);
     setLoadError(null);
     try {
-      const params: Record<string, any> = {
-        page: p,
-        page_size: ps,
-      };
+      const params: Record<string, any> = {};
+      if (ps !== -1) {
+        params.page = Math.max(1, Number(p) || 1);
+        params.page_size = Number(ps) || 10;
+      }
       if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
       if (q) params.search = q;
-      const res = await StaffEntryService.fetchEntries(params);
+
+      const res = await StaffEntryService.fetchEntries(params, controller.signal);
       const items = res.results ?? res ?? [];
-      // setTableData((items || []).map((it: any) => ({
-      //   id: it.id,
-      //   date: it.date,
-      //   staff_name: it.staff_name ?? `${it.first_name ?? ''} ${it.last_name ?? ''}`.trim(),
-      //   staff_force_number: it.staff_force_number ?? it.force_number ?? '',
-      //   // staff_category: it.staff_category ?? it.staff_category_name ?? '',
-      //   staff_category: (typeof it.senior === 'boolean')
-      //     ? (it.senior ? 'Senior' : 'Junior')
-      //     : (it.staff_category ?? it.staff_category_name ?? ''),
-      //   time_in: it.time_in,
-      //   time_out: it.time_out,
-      //   attendance_type: it.attendance_type,
-      //   station: it.station_name ?? it.station,
-      //   staff_rank: it.staff_rank ?? it.rank_name,
-      // })));
-      setTableData((items || []).map((it: any) => ({
+      const totalCount = Number(res.count ?? (items.length || 0));
+
+      const mapped = (items || []).map((it: any): StaffEntryRow => ({
         id: it.id,
-        // keep full created_datetime (columns expect 'created_datetime'); format in column render if desired
         created_datetime: it.created_datetime ?? null,
         staff_name: it.staff_name ?? '',
         staff_force_number: it.staff_force_number ?? '',
-        // keep senior as boolean (columns render it)
         senior: typeof it.senior === 'boolean' ? it.senior : null,
-        // use API-provided name fields
         staff_rank_name: it.staff_rank_name ?? it.staff_rank ?? '',
         station_name: it.station_name ?? it.station ?? '',
         time_in: it.time_in ?? null,
         time_out: it.time_out ?? null,
         attendance_type: it.attendance_type ?? null,
         remark: it.remark ?? '',
-      })));
+      }));
 
-      setTotal(res.count ?? (items.length || 0));
+      // compute total pages and guard against invalid page requests
+      const effectivePageSize = ps === -1 ? totalCount || mapped.length : ps;
+      const totalPages = effectivePageSize > 0 ? Math.max(1, Math.ceil(totalCount / effectivePageSize)) : 1;
+      if (ps !== -1 && params.page && params.page > totalPages) {
+        setPage(totalPages);
+        return; // effect will re-run and fetch safe page
+      }
+
+      setTableData(mapped);
+      setTotal(totalCount);
+      setPage(params.page ?? 1);
     } catch (err: any) {
-      // log full details to console for debugging (avoid toast noise)
+      if (err?.name === 'AbortError' || err?.message === 'canceled') return;
       console.error('loadTable error:', err?.response ?? err);
-      // set a small message for the UI so users know to check console / network
-      const msg = err?.response?.status
-        ? `Failed to load records (status ${err.response.status}). See console/network tab for details.`
-        : 'Failed to load records (network error). See console/network tab for details.';
-      setLoadError(msg);
+      const status = err?.response?.status;
+      const detail = String(err?.response?.data?.detail ?? '').toLowerCase();
+      if (status === 404 && detail.includes('invalid page')) {
+        setPage(1); // safe fallback
+        return;
+      }
+      setLoadError(status ? `Failed to load records (status ${status}).` : 'Failed to load records (network error).');
     } finally {
       setTableLoading(false);
     }
-  }, [page, pageSize]);
-
-  useEffect(() => {
-    loadStations();
-    loadTable(1, pageSize, sortField, sortDir, search);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // reload when table state changes
+  // load stations once
+  useEffect(() => { loadStations(); }, [loadStations]);
+
+  // debounced / single effect to fetch table whenever page/pageSize/sort/search change
+  const searchDebounceRef = useRef<number | null>(null);
   useEffect(() => {
-    loadTable(page, pageSize, sortField, sortDir, search);
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    // 300ms debounce for search + avoid double calls during quick UI interactions
+    searchDebounceRef.current = window.setTimeout(() => {
+      const usePage = Math.max(1, page || 1);
+      loadTable(usePage, pageSize, sortField, sortDir, search || undefined);
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    };
   }, [page, pageSize, sortField, sortDir, search, loadTable]);
 
   // barcode scanner hook: when enabled, global key capture sends scanned value to onScan
@@ -354,6 +367,20 @@ export function StaffEntryExitScreen() {
     }
   };
 
+  const formatTime = (t?: string | null) => {
+  if (!t) return '-';
+  try {
+    const date = new Date(`1970-01-01T${t}`);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return t;
+  }
+};
+
 // keys must match the API fields (created_datetime, staff_force_number, staff_name, senior, staff_rank_name, station_name, remark)
   const userColumns: DataTableColumn[] = [
     // { key: 'created_datetime', label: 'Date', sortable: true },
@@ -372,7 +399,7 @@ export function StaffEntryExitScreen() {
       render: (value) => (typeof value === 'boolean' ? (value ? 'Senior' : 'Junior') : (value ?? '-')),
     },
     { key: 'staff_rank_name', label: 'Rank', sortable: true },
-    { key: 'station_name', label: 'Station', sortable: true },
+    { key: 'station_name', label: 'Station', sortable: true }, 
     {
       key: 'time_in',
       label: 'Time In',
@@ -380,7 +407,7 @@ export function StaffEntryExitScreen() {
       render: (value) => (
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3 text-muted-foreground" />
-          {value ?? '-'}
+          {formatTime(value)}
         </div>
       ),
     },
@@ -392,7 +419,7 @@ export function StaffEntryExitScreen() {
         value ? (
           <div className="flex items-center gap-1">
             <Clock className="h-3 w-3 text-muted-foreground" />
-            {value}
+            {formatTime(value)}
           </div>
         ) : (
           <span className="text-muted-foreground text-sm">-</span>
@@ -714,26 +741,29 @@ export function StaffEntryExitScreen() {
             title="Staff Entry & Exit Records"
             columns={userColumns}
             externalSearch={search}
-            onSearch={(q) => {
-              setSearch(q);
-              setPage(1);
-              loadTable(1, pageSize, sortField, sortDir, q);
-            }}
-            onPageChange={(p) => {
-              setPage(p);
-              loadTable(p, pageSize, sortField, sortDir, search);
-            }}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setPage(1);
-              loadTable(1, size, sortField, sortDir, search);
-            }}
-            onSort={(field, dir) => {
-              setSortField(field ?? undefined);
-              setSortDir(dir ?? undefined);
-              loadTable(1, pageSize, field ?? undefined, dir ?? undefined, search);
-            }}
+            // onSearch={(q) => {
+            //   setSearch(q);
+            //   setPage(1);
+            //   loadTable(1, pageSize, sortField, sortDir, q);
+            // }}
+            // onPageChange={(p) => {
+            //   setPage(p);
+            //   loadTable(p, pageSize, sortField, sortDir, search);
+            // }}
+            // onPageSizeChange={(size) => {
+            //   setPageSize(size);
+            //   setPage(1);
+            //   loadTable(1, size, sortField, sortDir, search);
+            // }}
+            // onSort={(field, dir) => {
+            //   setSortField(field ?? undefined);
+            //   setSortDir(dir ?? undefined);
+            //   loadTable(1, pageSize, field ?? undefined, dir ?? undefined, search);
+            // }}
+
+            
           />
+          
         </CardContent>
       </Card>
 

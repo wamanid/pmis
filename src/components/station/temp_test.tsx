@@ -1,4 +1,659 @@
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Button } from '../ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../ui/dialog';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Badge } from '../ui/badge';
+import { Plus, Search, Edit, Trash2, Filter, Building2, Calendar as CalendarIcon, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
+import { Textarea } from '../ui/textarea';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription, AlertDialogFooter } from '../ui/alert-dialog';
+import { Popover, PopoverTrigger, PopoverContent } from '../ui/popover';
+import { Checkbox } from '../ui/checkbox';
+import { Switch } from '../ui/switch';
+import { DataTable } from '../common/DataTable';
+import * as JournalService from '../../services/stationServices/journalService';
 
+interface JournalRow {
+  id: string;
+  station_name?: string;
+  type_of_journal_name?: string;
+  duty_officer_username?: string;
+  rank_name?: string;
+  created_datetime?: string;
+  activity?: string;
+  force_number?: string;
+  journal_date?: string;
+  is_active?: boolean;
+  [k: string]: any;
+}
+
+export function JournalScreen() {
+  // Data table states (controlled)
+  const [tableData, setTableData] = useState<JournalRow[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [reloadKey, setReloadKey] = useState<number>(Date.now());
+
+  // lookups
+  const [journalTypes, setJournalTypes] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
+  const [dutyOfficers, setDutyOfficers] = useState<any[]>([]);
+  const [lookupLoading, setLookupLoading] = useState(false);
+
+  // local sample for stats
+  const [journalsSample, setJournalsSample] = useState<JournalRow[]>([]);
+
+  // filters & UI state
+  const [selectedJournalTypes, setSelectedJournalTypes] = useState<string[]>([]);
+  const [selectedStations, setSelectedStations] = useState<string[]>([]);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [journalToDelete, setJournalToDelete] = useState<string | null>(null);
+
+  // create/edit form
+  const [editingJournal, setEditingJournal] = useState<JournalRow | null>(null);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [formData, setFormData] = useState({
+    is_active: true,
+    activity: '',
+    state_of_prisoners: '',
+    state_of_prison: '',
+    remark: '',
+    force_number: '',
+    journal_date: new Date().toISOString().split('T')[0],
+    station: '',
+    type_of_journal: '',
+    duty_officer: '',
+    rank: '',
+  });
+
+  // abort + debounce refs
+  const abortRef = useRef<AbortController | null>(null);
+  const searchDebounceRef = useRef<number | null>(null);
+
+  // searchable selects local query
+  const [dutyQuery, setDutyQuery] = useState('');
+  const [stationQuery, setStationQuery] = useState('');
+
+  // computed stats
+  const totalCount = journalsSample.length;
+  const activeCount = journalsSample.filter((j) => j.is_active).length;
+  const thisWeekCount = journalsSample.filter((j) => {
+    if (!j.journal_date) return false;
+    const weekAgo = new Date(); weekAgo.setDate(weekAgo.getDate() - 7);
+    return new Date(j.journal_date) >= weekAgo;
+  }).length;
+  const thisMonthCount = journalsSample.filter((j) => {
+    if (!j.journal_date) return false;
+    const monthAgo = new Date(); monthAgo.setMonth(monthAgo.getMonth() - 1);
+    return new Date(j.journal_date) >= monthAgo;
+  }).length;
+
+  // load lookup lists once
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+    setLookupLoading(true);
+    (async () => {
+      try {
+        const [types, stns, officers] = await Promise.all([
+          JournalService.fetchJournalTypes(undefined, controller.signal),
+          JournalService.fetchStations(undefined, controller.signal),
+          JournalService.fetchDutyOfficers(undefined, controller.signal),
+        ]);
+        if (!mounted) return;
+        setJournalTypes(types ?? []);
+        setStations(stns ?? []);
+        setDutyOfficers(officers ?? []);
+      } catch (err) {
+        console.error('lookup load error', err);
+        toast.error('Failed to load lookup data');
+      } finally {
+        setLookupLoading(false);
+      }
+    })();
+    return () => { mounted = false; controller.abort(); };
+  }, []);
+
+  // load a small sample (for stats / quick preview)
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const res = await JournalService.fetchJournals({ page: 1, page_size: 100 }, controller.signal);
+        if (!mounted) return;
+        const items = res?.results ?? res ?? [];
+        setJournalsSample(items.map((it: any) => mapItem(it)));
+      } catch (err) {
+        console.error('journals sample load error', err);
+      }
+    })();
+    return () => { mounted = false; controller.abort(); };
+  }, [reloadKey]);
+
+  const mapItem = useCallback((it: any): JournalRow => ({
+    id: it.id,
+    station_name: it.station_name ?? it.station ?? '',
+    type_of_journal_name: it.type_of_journal_name ?? it.type_of_journal ?? '',
+    duty_officer_username: it.duty_officer_username ?? it.duty_officer ?? '',
+    rank_name: it.rank_name ?? it.rank ?? '',
+    created_datetime: it.created_datetime ?? it.journal_date ?? '',
+    activity: it.activity ?? '',
+    force_number: it.force_number ?? '',
+    journal_date: it.journal_date ?? '',
+    is_active: !!it.is_active,
+    ...it,
+  }), []);
+
+  // loadTable: cancel previous, fetch page, set tableData/total, guard invalid page
+  const loadTable = useCallback(async (p = page, ps = pageSize, sf = sortField, sd = sortDir, q = searchTerm) => {
+    try { abortRef.current?.abort(); } catch {}
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setTableLoading(true);
+    try {
+      const params: Record<string, any> = {};
+      params.page = Math.max(1, Number(p) || 1);
+      params.page_size = ps === -1 ? -1 : Number(ps) || 10;
+      if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
+      if (q) params.search = q;
+      params._t = reloadKey;
+
+      const res = await JournalService.fetchJournals(params, controller.signal);
+      const items = res?.results ?? [];
+      const count = Number(res?.count ?? items.length ?? 0);
+
+      const effectivePageSize = params.page_size === -1 ? count || items.length : params.page_size;
+      const totalPages = Math.max(1, Math.ceil(count / (effectivePageSize || 1)));
+
+      if (params.page > totalPages) {
+        setPage(totalPages);
+        return;
+      }
+
+      setTableData((items || []).map(mapItem));
+      setTotal(count);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTable error', err?.response ?? err);
+      const status = err?.response?.status;
+      const detail = String(err?.response?.data?.detail ?? '').toLowerCase();
+      if (status === 404 && detail.includes('invalid page')) {
+        setPage(1);
+        return;
+      }
+      toast.error('Failed to load journals');
+    } finally {
+      setTableLoading(false);
+    }
+  }, [page, pageSize, sortField, sortDir, searchTerm, reloadKey, mapItem]);
+
+  // debounced search effect
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    searchDebounceRef.current = window.setTimeout(() => {
+      setPage(1);
+      loadTable(1, pageSize, sortField, sortDir, searchTerm);
+    }, 350);
+    return () => { if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current); };
+  }, [searchTerm, pageSize, sortField, sortDir, reloadKey, loadTable]);
+
+  // fetch on page/size/sort/reload
+  useEffect(() => { loadTable(page, pageSize, sortField, sortDir, searchTerm); }, [page, pageSize, sortField, sortDir, reloadKey]);
+
+  // DataTable callbacks (only update state)
+  const handleSearch = (q: string) => { setSearchTerm(q); setPage(1); };
+  const handlePageChange = (p: number) => { setPage(p); };
+  const handlePageSizeChange = (size: number) => { setPageSize(size); setPage(1); };
+  const handleSort = (field: string | null, dir: 'asc' | 'desc' | null) => {
+    setSortField(field ?? undefined);
+    setSortDir(dir ?? undefined);
+    setPage(1);
+  };
+
+  // duty officer selection auto-fill
+  const handleDutyOfficerSelect = (officerId: string) => {
+    const o = dutyOfficers.find((d) => String(d.id) === String(officerId));
+    if (o) {
+      setFormData((prev) => ({
+        ...prev,
+        duty_officer: String(o.id),
+        force_number: o.force_number ?? prev.force_number,
+        rank: o.rank ?? o.rank_name ?? prev.rank,
+      }));
+    } else {
+      setFormData((prev) => ({ ...prev, duty_officer: officerId }));
+    }
+  };
+
+  // form submit
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!formData.activity || !formData.force_number || !formData.journal_date || !formData.station || !formData.type_of_journal || !formData.duty_officer) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+    setSubmitLoading(true);
+    try {
+      const payload = {
+        activity: formData.activity,
+        state_of_prisoners: formData.state_of_prisoners,
+        state_of_prison: formData.state_of_prison,
+        remark: formData.remark,
+        force_number: formData.force_number,
+        journal_date: formData.journal_date,
+        station: formData.station,
+        type_of_journal: formData.type_of_journal,
+        duty_officer: formData.duty_officer,
+        rank: formData.rank,
+        is_active: formData.is_active,
+      };
+      if (editingJournal?.id) {
+        await JournalService.updateJournal(editingJournal.id, payload);
+        toast.success('Journal updated');
+      } else {
+        await JournalService.createJournal(payload);
+        toast.success('Journal created');
+      }
+      setReloadKey(Date.now());
+      setDialogOpen(false);
+      setEditingJournal(null);
+      // reset form
+      setFormData({
+        is_active: true,
+        activity: '',
+        state_of_prisoners: '',
+        state_of_prison: '',
+        remark: '',
+        force_number: '',
+        journal_date: new Date().toISOString().split('T')[0],
+        station: '',
+        type_of_journal: '',
+        duty_officer: '',
+        rank: '',
+      });
+    } catch (err) {
+      console.error('journal save error', err?.response ?? err);
+      toast.error('Failed to save journal');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!journalToDelete) return;
+    try {
+      await JournalService.deleteJournal(journalToDelete);
+      toast.success('Journal deleted');
+      setJournalToDelete(null);
+      setDeleteDialogOpen(false);
+      setReloadKey(Date.now());
+    } catch (err) {
+      console.error('journal delete error', err?.response ?? err);
+      toast.error('Failed to delete journal');
+    }
+  };
+
+  // filters helpers
+  const toggleJournalType = (id: string) => setSelectedJournalTypes((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const toggleStation = (id: string) => setSelectedStations((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  const clearFilters = () => { setSelectedJournalTypes([]); setSelectedStations([]); setSearchTerm(''); };
+  const activeFiltersCount = (selectedJournalTypes.length || 0) + (selectedStations.length || 0);
+
+  const getJournalTypeName = (id: string) => {
+    const t = journalTypes.find((x) => String(x.id) === String(id));
+    return t?.name ?? String(id);
+  };
+  const getStationName = (id: string) => {
+    const s = stations.find((x) => String(x.id) === String(id));
+    return s?.name ?? s?.station_name ?? String(id);
+  };
+
+  // DataTable columns
+  const journalColumns = [
+    { key: 'created_datetime', label: 'Created', sortable: true, render: (v: string) => (v ? v.split('T')[0] : '-') },
+    { key: 'journal_date', label: 'Journal Date', sortable: true },
+    { key: 'type_of_journal_name', label: 'Type', sortable: true },
+    { key: 'station_name', label: 'Station', sortable: true },
+    { key: 'duty_officer_username', label: 'Duty Officer', sortable: true },
+    { key: 'force_number', label: 'Force No.' },
+    { key: 'rank_name', label: 'Rank' },
+    { key: 'activity', label: 'Activity' },
+    {
+      key: 'id',
+      label: 'Actions',
+      sortable: false,
+      render: (_v: any, row: any) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => {
+            setEditingJournal(row);
+            setFormData({
+              is_active: !!row.is_active,
+              activity: row.activity ?? '',
+              state_of_prisoners: row.state_of_prisoners ?? '',
+              state_of_prison: row.state_of_prison ?? '',
+              remark: row.remark ?? '',
+              force_number: row.force_number ?? '',
+              journal_date: row.journal_date ?? new Date().toISOString().split('T')[0],
+              station: row.station ?? '',
+              type_of_journal: row.type_of_journal ?? '',
+              duty_officer: row.duty_officer ?? '',
+              rank: row.rank ?? '',
+            });
+            setDialogOpen(true);
+          }}>
+            <Edit className="h-4 w-4 text-blue-600" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => { setJournalToDelete(row.id); setDeleteDialogOpen(true); }}>
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
+  const journalsUrl = `/api/station-management/api/journals/?_t=${reloadKey}`;
+
+  return (
+    <div className="space-y-6">
+      {/* Header + add dialog */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold text-[#650000]">Journal Management</h2>
+          <p className="text-sm text-muted-foreground">Record and manage station journals and reports</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingJournal(null); } }}>
+            <DialogTrigger asChild>
+              <Button className="bg-primary hover:bg-primary/90">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Journal Entry
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>{editingJournal ? 'Edit Journal Entry' : 'Add New Journal Entry'}</DialogTitle>
+                <DialogDescription>{editingJournal ? 'Update the journal entry details' : 'Fill in details for the new journal entry'}</DialogDescription>
+              </DialogHeader>
+
+              <form onSubmit={handleSubmit}>
+                <div className="grid gap-4 py-4">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="is_active">Active Status</Label>
+                      <p className="text-sm text-muted-foreground">Mark this journal entry as active</p>
+                    </div>
+                    <Switch id="is_active" checked={formData.is_active} onCheckedChange={(checked) => setFormData({ ...formData, is_active: !!checked })} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Journal Date <span className="text-red-500">*</span></Label>
+                      <div className="relative">
+                        <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input className="pl-9" type="date" value={formData.journal_date} onChange={(e) => setFormData({ ...formData, journal_date: e.target.value })} required />
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label>Station <span className="text-red-500">*</span></Label>
+                      <Select value={formData.station} onValueChange={(v) => setFormData({ ...formData, station: v })} required>
+                        <SelectTrigger><SelectValue placeholder="Select station" /></SelectTrigger>
+                        <SelectContent>
+                          {/* searchable input */}
+                          <div className="px-2 py-2">
+                            <Input placeholder="Filter stations..." value={stationQuery} onChange={(e) => setStationQuery(e.target.value)} />
+                          </div>
+                          {stations
+                            .filter((s) => !stationQuery || String(s.name ?? s.station_name ?? '').toLowerCase().includes(stationQuery.toLowerCase()))
+                            .map((s) => <SelectItem key={s.id} value={s.id}>{s.name ?? s.station_name ?? s.id}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Journal Type <span className="text-red-500">*</span></Label>
+                      <Select value={formData.type_of_journal} onValueChange={(v) => setFormData({ ...formData, type_of_journal: v })} required>
+                        <SelectTrigger><SelectValue placeholder="Select journal type" /></SelectTrigger>
+                        <SelectContent>
+                          {journalTypes.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label>Duty Officer <span className="text-red-500">*</span></Label>
+                      <Select value={String(formData.duty_officer ?? '')} onValueChange={(v) => handleDutyOfficerSelect(v)} required>
+                        <SelectTrigger><SelectValue placeholder="Select duty officer" /></SelectTrigger>
+                        <SelectContent>
+                          <div className="px-2 py-2">
+                            <Input placeholder="Filter officers..." value={dutyQuery} onChange={(e) => setDutyQuery(e.target.value)} />
+                          </div>
+                          {dutyOfficers
+                            .filter((o) => {
+                              if (!dutyQuery) return true;
+                              const full = `${o.first_name ?? ''} ${o.last_name ?? ''} ${o.force_number ?? ''}`.toLowerCase();
+                              return full.includes(dutyQuery.toLowerCase());
+                            })
+                            .map((o) => (
+                              <SelectItem key={o.id} value={String(o.id)}>
+                                {(o.first_name ?? '') + ' ' + (o.last_name ?? '')} {o.force_number ? `(${o.force_number})` : ''}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Force Number <span className="text-red-500">*</span></Label>
+                      <Input value={formData.force_number} readOnly placeholder="Auto-populated" className="bg-muted" required />
+                    </div>
+                    <div>
+                      <Label>Rank <span className="text-red-500">*</span></Label>
+                      <Input value={formData.rank} readOnly placeholder="Auto-populated" className="bg-muted" required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Activity <span className="text-red-500">*</span></Label>
+                    <Textarea value={formData.activity} onChange={(e) => setFormData({ ...formData, activity: e.target.value })} required />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>State of Prisoners <span className="text-red-500">*</span></Label>
+                      <Textarea value={formData.state_of_prisoners} onChange={(e) => setFormData({ ...formData, state_of_prisoners: e.target.value })} required />
+                    </div>
+                    <div>
+                      <Label>State of Prison <span className="text-red-500">*</span></Label>
+                      <Textarea value={formData.state_of_prison} onChange={(e) => setFormData({ ...formData, state_of_prison: e.target.value })} required />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>Remarks</Label>
+                    <Textarea value={formData.remark} onChange={(e) => setFormData({ ...formData, remark: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2">
+                  <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setEditingJournal(null); }}>
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={submitLoading}>{submitLoading ? 'Saving...' : (editingJournal ? 'Update' : 'Create')}</Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid gap-4 md:grid-cols-4">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Total Journals</CardDescription>
+            <CardTitle className="text-3xl text-[#650000]">{totalCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>Active Journals</CardDescription>
+            <CardTitle className="text-3xl text-[#650000]">{activeCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>This Week</CardDescription>
+            <CardTitle className="text-3xl text-[#650000]">{thisWeekCount}</CardTitle>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardDescription>This Month</CardDescription>
+            <CardTitle className="text-3xl text-[#650000]">{thisMonthCount}</CardTitle>
+          </CardHeader>
+        </Card>
+      </div>
+
+      {/* Filters / Table */}
+      <Card>
+        <CardHeader>
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <CardTitle>Journal Entries</CardTitle>
+              <CardDescription>View and manage all journal entries</CardDescription>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 items-center">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search journals..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              </div>
+
+              <div className="flex gap-2">
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="relative">
+                      <Filter className="mr-2 h-4 w-4" />
+                      Journal Type
+                      {selectedJournalTypes.length > 0 && <Badge className="ml-2">{selectedJournalTypes.length}</Badge>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="end">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Journal Type</h4>
+                        {selectedJournalTypes.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedJournalTypes([])}>Clear</Button>}
+                      </div>
+                      <div className="space-y-2">
+                        {journalTypes.map((type) => (
+                          <div key={type.id} className="flex items-center space-x-2">
+                            <Checkbox id={`type-${type.id}`} checked={selectedJournalTypes.includes(type.id)} onCheckedChange={() => toggleJournalType(type.id)} />
+                            <label htmlFor={`type-${type.id}`} className="text-sm cursor-pointer flex-1">{type.name}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="relative">
+                      <Building2 className="mr-2 h-4 w-4" />
+                      Station
+                      {selectedStations.length > 0 && <Badge className="ml-2">{selectedStations.length}</Badge>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-64" align="end">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Station</h4>
+                        {selectedStations.length > 0 && <Button variant="ghost" size="sm" onClick={() => setSelectedStations([])}>Clear</Button>}
+                      </div>
+                      <div className="space-y-2">
+                        {stations.map((s) => (
+                          <div key={s.id} className="flex items-center space-x-2">
+                            <Checkbox id={`station-${s.id}`} checked={selectedStations.includes(s.id)} onCheckedChange={() => toggleStation(s.id)} />
+                            <label htmlFor={`station-${s.id}`} className="text-sm cursor-pointer flex-1">{s.name ?? s.station_name ?? s.id}</label>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {activeFiltersCount > 0 && (
+                  <Button variant="ghost" size="sm" onClick={clearFilters}>
+                    <X className="mr-1 h-4 w-4" /> Clear All
+                  </Button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {activeFiltersCount > 0 && (
+            <div className="flex items-center gap-2 mt-4">
+              <span className="text-sm text-muted-foreground">Active filters:</span>
+              {selectedJournalTypes.map((t) => <Badge key={t} variant="secondary">{getJournalTypeName(t)} <button onClick={() => toggleJournalType(t)}><X className="h-3 w-3 inline-block ml-1" /></button></Badge>)}
+              {selectedStations.map((s) => <Badge key={s} variant="secondary">{getStationName(s)} <button onClick={() => toggleStation(s)}><X className="h-3 w-3 inline-block ml-1" /></button></Badge>)}
+            </div>
+          )}
+        </CardHeader>
+
+        <CardContent>
+          <div className="">
+            <DataTable
+              data={tableData}
+              loading={tableLoading}
+              total={total}
+              title="Staff Journal Entries"
+              columns={journalColumns}
+              externalSearch={searchTerm}
+              onSearch={handleSearch}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+              onSort={handleSort}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Delete confirmation */}
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Journal Entry</AlertDialogTitle>
+            <AlertDialogDescription>Are you sure you want to delete this journal entry? This action cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setJournalToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+
+}
+
+export default JournalScreen;
 
 
 -------------
