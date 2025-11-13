@@ -53,10 +53,14 @@ import {
   LogOut,
   Edit,
   Eye,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import VisitorPassForm from "../gatePass/VisitorPassForm";
+import VisitorItemList from "./VisitorItemList";
+import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 
 // Types based on API
 interface Visitor {
@@ -175,6 +179,10 @@ export default function VisitationsScreen() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  
+  // Visitor Pass Dialog states
+  const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
+  const [selectedVisitorForPass, setSelectedVisitorForPass] = useState<Visitor | null>(null);
 
   // Form states
   const [form, setForm] = useState({
@@ -571,6 +579,17 @@ export default function VisitationsScreen() {
     );
   };
 
+  const handleGenerateVisitorPass = (visitor: Visitor) => {
+    setSelectedVisitorForPass(visitor);
+    setIsVisitorPassDialogOpen(true);
+  };
+
+  const handleVisitorPassSubmit = (data: any) => {
+    toast.success('Visitor pass generated successfully');
+    setIsVisitorPassDialogOpen(false);
+    setSelectedVisitorForPass(null);
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -650,44 +669,65 @@ export default function VisitationsScreen() {
         </CardContent>
       </Card>
 
-      {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID number, or contact..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
+      {/* Main Tabs */}
+      <Tabs defaultValue="records" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+          <TabsTrigger 
+            value="records" 
+            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Visitor Records
+          </TabsTrigger>
+          <TabsTrigger 
+            value="items" 
+            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Visitor Items
+          </TabsTrigger>
+        </TabsList>
 
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              resetForm();
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
+        {/* Visitor Records Tab */}
+        <TabsContent value="records" className="space-y-6 mt-6">
+          {/* Search and Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, ID number, or contact..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setIsDialogOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Register Visitor
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingVisitor
-                  ? "Update visitor information"
-                  : "Register a new visitor and manage check-in/check-out"}
-              </DialogDescription>
-            </DialogHeader>
+          </div>
+
+          <VisitorRegistrationDialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                resetForm();
+              }
+            }}
+            onVisitorCreated={(visitor) => {
+              // Refresh the visitors list - for now just close the dialog
+              // TODO: Implement actual data refresh when API is integrated
+            }}
+            editingVisitor={editingVisitor}
+          />
+
+          {/* Placeholder for form - will be removed */}
+          <div style={{display: 'none'}}>
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               <Tabs defaultValue="personal" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
@@ -1448,9 +1488,7 @@ export default function VisitationsScreen() {
                 </Button>
               </div>
             </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
 
       {/* Visitors Table */}
       <Card>
@@ -1537,8 +1575,18 @@ export default function VisitationsScreen() {
                             variant="ghost"
                             size="sm"
                             onClick={() => handleEdit(visitor)}
+                            title="Edit visitor"
                           >
                             <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleGenerateVisitorPass(visitor)}
+                            style={{ color: '#650000' }}
+                            title="Generate visitor pass"
+                          >
+                            <FileText className="h-4 w-4" />
                           </Button>
                         </div>
                       </TableCell>
@@ -1550,6 +1598,68 @@ export default function VisitationsScreen() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Visitor Items Tab */}
+        <TabsContent value="items" className="mt-6">
+          <VisitorItemList />
+        </TabsContent>
+      </Tabs>
+
+      {/* Visitor Pass Generation Dialog */}
+      <Dialog 
+        open={isVisitorPassDialogOpen} 
+        onOpenChange={(open) => {
+          setIsVisitorPassDialogOpen(open);
+          if (!open) {
+            setSelectedVisitorForPass(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>
+              Generate Visitor Pass
+            </DialogTitle>
+            <DialogDescription>
+              Create a visitor pass for {selectedVisitorForPass ? `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.last_name}` : 'selected visitor'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedVisitorForPass && (
+            <VisitorPassForm
+              pass={{
+                visitor_tag_number: '',
+                valid_from: '',
+                valid_until: '',
+                purpose: selectedVisitorForPass.reason_of_visitation || '',
+                issue_date: new Date().toISOString().slice(0, 16),
+                is_suspended: false,
+                suspended_date: '',
+                suspended_reason: '',
+                prisoner: selectedVisitorForPass.prisoner,
+                visitor: selectedVisitorForPass.id,
+                suspended_by: 0,
+                prisoner_name: selectedVisitorForPass.prisoner_name,
+                visitor_name: `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.middle_name} ${selectedVisitorForPass.last_name}`.trim()
+              }}
+              onSubmit={handleVisitorPassSubmit}
+              onCancel={() => {
+                setIsVisitorPassDialogOpen(false);
+                setSelectedVisitorForPass(null);
+              }}
+              disabledFields={{
+                prisoner: true,
+                visitor: false
+              }}
+              onAddNewVisitor={() => {
+                setIsDialogOpen(true);
+                setEditingVisitor(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

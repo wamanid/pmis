@@ -219,6 +219,7 @@ export function ManualLockupScreen() {
 
   useEffect(() => {
     async function fetchData(){
+      setStationDataLoading(true)
       if (dialogOpen){
        try {
 
@@ -278,12 +279,13 @@ export function ManualLockupScreen() {
          }
          setSexes(data4)
 
-         setStationDataLoading(false)
-
        } catch (error) {
           if (!error?.response) {
+            setDialogOpen(false);
             toast.error('Failed to connect to server. Please try again.');
           }
+       }finally {
+         setStationDataLoading(false)
        }
      }
     }
@@ -301,6 +303,7 @@ export function ManualLockupScreen() {
            }
            const data = response.results
            setLockups(data)
+          console.log(data)
 
         } catch (error) {
           if (!error?.response) {
@@ -313,7 +316,6 @@ export function ManualLockupScreen() {
     }
     fetchData()
   }, []);
-
 
   if (recordsListLoading) {
     return (
