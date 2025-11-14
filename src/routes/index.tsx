@@ -4,6 +4,7 @@ import { authRoutes } from './auth.routes';
 import { stationRoutes } from './station.routes';
 import { admissionRoutes } from './admission.routes';
 import { demoRoutes } from './demo.routes';
+import { propertyRoutes } from './property.routes'
 
 /**
  * Application Routes Configuration
@@ -27,6 +28,9 @@ export const routes: RouteObject[] = [
 
   // Demo Routes
   ...demoRoutes,
+
+  // Property Management Routes
+  ...propertyRoutes,
 
   // Default/Fallback Route
   {

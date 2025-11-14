@@ -8,6 +8,7 @@ import ComplaintsScreen from '../components/station/ComplaintsScreen';
 import { PrisonerEntryExit } from '../components/station/PrisonerEntryExit';
 import VisitationsScreen from '../components/station/VisitationsScreen';
 import ShiftDeploymentsScreen from '../components/station/ShiftDeploymentsScreen';
+import PhonesLettersScreen from "../components/station/PhonesLettersScreen";
 
 /**
  * Station Management Routes
@@ -60,7 +61,7 @@ export const stationRoutes: RouteObject[] = [
   },
   {
     path: '/station-management/letters-phone',
-    element: <StationDashboard />,
+    element: <PhonesLettersScreen />,
   },
   {
     path: '/station-management/visitations',

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import BiometricCapture from '../common/BiometricCapture';
-import NextOfKinScreen from '../admission/NextOfKinScreen';
+// import NextOfKinScreen from '../admission/NextOfKinScreen';
 import PropertyStatusChangeForm from './PropertyStatusChangeForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -2513,7 +2513,8 @@ export default function PrisonerPropertyScreen() {
       <Dialog open={isNextOfKinDialogOpen} onOpenChange={setIsNextOfKinDialogOpen}>
         <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize" style={{ resize: 'both' }}>
           <div className="flex-1 overflow-y-auto">
-            <NextOfKinScreen />
+            {/*<NextOfKinScreen />*/}
+            Next of Kin chodrine
           </div>
         </DialogContent>
       </Dialog>
