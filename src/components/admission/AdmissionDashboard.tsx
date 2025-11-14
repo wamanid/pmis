@@ -31,10 +31,9 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { getAdmissionDashboard } from '../../services/admission';
+import { admissionService } from '../../services/admissionService';
 import { DashboardResponse, DashboardFilters } from '../../models/admission';
 import { toast } from 'sonner';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 // Transform API response to chart data format
 interface CategoryData {
@@ -51,21 +50,22 @@ export function AdmissionDashboard() {
     period: 'daily'
   });
 
-  const loadData = async () => {
-    setLoading(true);
-    try {
-      const data = await getAdmissionDashboard(filters);
-      setDashboardData(data);
-    } catch (error) {
-      console.error('Error loading admission dashboard:', error);
-      toast.error('Failed to load admission dashboard data');
-    } finally {
-      setLoading(false);
-    }
-  };
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        const data = await admissionService.getAdmissionDashboard(filters);
+        setDashboardData(data);
+      } catch (error) {
+        console.error('Error loading admission dashboard:', error);
+        toast.error('Failed to load admission dashboard data');
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Load data on mount, when filters change, and when location filters change
-  useFilterRefresh(loadData, [filters]);
+    loadData();
+  }, [filters]);
 
   // Transform category data from API response
   const getCategoryData = (): CategoryData[] => {

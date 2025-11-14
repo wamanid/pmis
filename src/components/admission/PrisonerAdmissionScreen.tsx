@@ -56,9 +56,6 @@ import {
   TableRow,
 } from "../ui/table";
 import { toast } from "sonner@2.0.3";
-import { PrisonerCategorySelect } from "../common/PrisonerCategorySelect";
-import PrisonerSearchScreen from "../common/PrisonerSearchScreen";
-import { Prisoner } from "../../models/admission";
 
 interface PrisonerBioData {
   id?: string;
@@ -67,11 +64,11 @@ interface PrisonerBioData {
   sex_name?: string;
   nationality_name?: string;
   current_age_value?: number;
-  first_name?: string;
-  middle_name?: string;
-  surname?: string;
+  first_name: string;
+  middle_name: string;
+  surname: string;
   photo?: string;
-  date_of_birth?: string;
+  date_of_birth: string;
   employment_description?: string;
   employer?: string;
   also_known_as?: string;
@@ -84,10 +81,10 @@ interface PrisonerBioData {
   height?: string;
   description?: string;
   marks?: string;
-  date_of_admission?: string;
+  date_of_admission: string;
   deformity?: boolean;
   age_on_admission?: number;
-  sex?: string;
+  sex: string;
   birth_region?: string;
   birth_district?: string;
   birth_county?: string;
@@ -97,7 +94,7 @@ interface PrisonerBioData {
   education_level?: string;
   employment_status?: string;
   tribe?: string;
-  nationality?: string;
+  nationality: string;
   marital_status?: string;
   address_region?: string;
   address_district?: string;
@@ -232,10 +229,17 @@ interface ArmedPersonnel {
 
 // Mock data for dropdowns
 const admissionTypes = [
-  { id: "COURT", name: "From Court" },
+  { id: "NEW", name: "New Prisoner" },
+  { id: "REOFFENDER", name: "Reoffender" },
   { id: "RECAPTURED", name: "Recaptured Prisoner" },
   { id: "TRANSFER", name: "Transfer" },
   { id: "PMO", name: "Pending MInister's Order" },
+];
+
+const prisonerCategories = [
+  { id: "DEBTOR", name: "Debtor" },
+  { id: "REMAND", name: "Remand" },
+  { id: "CONVICT", name: "Convict" },
 ];
 
 const mockRegions = [
@@ -968,11 +972,21 @@ const PrisonerAdmissionScreen: React.FC = () => {
                 Prisoner Category{" "}
                 <span className="text-red-500">*</span>
               </Label>
-              <PrisonerCategorySelect
+              <Select
                 value={prisonerCategory}
                 onValueChange={handleCategoryChange}
-                placeholder="Select prisoner category"
-              />
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select prisoner category" />
+                </SelectTrigger>
+                <SelectContent>
+                  {prisonerCategories.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Consciousness Check */}
@@ -1034,22 +1048,30 @@ const PrisonerAdmissionScreen: React.FC = () => {
 
                     {/* Regular Search Tab */}
                     <TabsContent value="regular" className="space-y-3">
-                      <PrisonerSearchScreen
-                        showTitle={false}
-                        label="Search Prisoner"
-                        onPrisonerSelect={(prisoner: Prisoner) => {
-                          // Convert Prisoner to PrisonerBioData format
-                          const bioData: PrisonerBioData = {
-                            id: prisoner.id,
-                            prisoner_number_value: prisoner.prisoner_number_value,
-                            prisoner_personal_number_value: prisoner.prisoner_personal_number_value,
-                            first_name: prisoner.first_name,
-                            surname: prisoner.last_name,
-                            middle_name: '',
-                          };
-                          handleSelectPrisoner(bioData);
-                        }}
-                      />
+                      <p className="text-sm text-gray-600">
+                        Search by prisoner number, personal number,
+                        ID number, or name
+                      </p>
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Enter search term..."
+                          value={searchTerm}
+                          onChange={(e) =>
+                            setSearchTerm(e.target.value)
+                          }
+                          onKeyDown={(e) =>
+                            e.key === "Enter" && handleSearch()
+                          }
+                        />
+                        <Button
+                          type="button"
+                          onClick={handleSearch}
+                          className="bg-[#650000] hover:bg-[#4a0000]"
+                        >
+                          <Search className="h-4 w-4 mr-2" />
+                          Search
+                        </Button>
+                      </div>
                     </TabsContent>
 
                     {/* Biometric Search Tab */}
@@ -1159,6 +1181,20 @@ const PrisonerAdmissionScreen: React.FC = () => {
                         </div>
                       ))}
                     </div>
+                  )}
+
+                  {/* Selected Prisoner */}
+                  {selectedPrisoner && (
+                    <Alert className="mt-4 border-green-500 bg-green-50">
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                      <AlertDescription className="text-green-800">
+                        <strong>Selected:</strong>{" "}
+                        {selectedPrisoner.first_name}{" "}
+                        {selectedPrisoner.surname} (
+                        {selectedPrisoner.prisoner_number_value}
+                        )
+                      </AlertDescription>
+                    </Alert>
                   )}
                 </div>
               </div>

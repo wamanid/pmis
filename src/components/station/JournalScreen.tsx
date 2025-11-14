@@ -316,8 +316,7 @@ export function JournalScreen() {
               Add Journal Entry
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-            <div className="flex-1 overflow-y-auto p-6">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingJournal ? 'Edit Journal Entry' : 'Add New Journal Entry'}
@@ -544,7 +543,6 @@ export function JournalScreen() {
                 </Button>
               </DialogFooter>
             </form>
-            </div>
           </DialogContent>
         </Dialog>
       </div>
