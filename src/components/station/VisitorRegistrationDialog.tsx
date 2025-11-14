@@ -300,8 +300,8 @@ export default function VisitorRegistrationDialog({
         resetForm();
       }
     }}>
-      <DialogContent className="max-w-[80vw] w-[80vw] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-        <div className="flex-1 overflow-y-auto p-6">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex-1 max-h-[90vh] p-6">
           <DialogHeader>
             <DialogTitle>
               {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
