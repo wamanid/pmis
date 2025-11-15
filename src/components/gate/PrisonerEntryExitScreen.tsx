@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,6 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { getprisonerMovements,getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass } from '../../services/gateService';
+import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
+
 import { 
   Search, 
   Eye, 
@@ -61,8 +64,8 @@ interface PrisonerDetail {
 }
 
 // Mock Data
-const mockPrisonerGatePasses: PrisonerGatePass[] = [
-  {
+let mockPrisonerGatePasses: PrisonerGatePass[] = [
+  /*{
     id: '1',
     prisoner_name: 'John Doe',
     working_party_name: '',
@@ -133,7 +136,7 @@ const mockPrisonerGatePasses: PrisonerGatePass[] = [
     prisoner: 'pr6',
     gate_pass: 'gp5',
     working_party: null
-  }
+  }*/
 ];
 
 const mockGatePassDetails: Record<string, GatePassDetail> = {
@@ -269,8 +272,28 @@ export  function PrisonerEntryExitScreen() {
   const [currentPage, setCurrentPage] = useState(1);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerGatePass | null>(null);
-
   const itemsPerPage = 10;
+  const [isLoading, setIsLoading]=useState(true);
+
+  
+  const loadData = async () => { 
+   // getvisitors
+  setIsLoading(true);
+    getprisonerMovements().then((data) => {
+    mockPrisonerGatePasses = data.results;
+    setPrisonerGatePasses(mockPrisonerGatePasses);
+    //alert(JSON.stringify(data.results));
+        setIsLoading(false);
+  }).catch((error) => {
+    alert(error);
+      setIsLoading(false);
+  });
+
+  }
+
+useEffect(() => {
+loadData();
+    }, []);
 
   // Get status based on time_out
   const getInOutStatus = (timeOut: string | null) => {
@@ -280,7 +303,7 @@ export  function PrisonerEntryExitScreen() {
   // Filter prisoner gate passes
   const filteredRecords = prisonerGatePasses.filter(record => {
     const matchesSearch = 
-      record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.working_party_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -335,6 +358,18 @@ export  function PrisonerEntryExitScreen() {
   const prisonersOut = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'OUT').length;
   const prisonersIn = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'IN').length;
   const onWorkingParty = prisonerGatePasses.filter(p => p.working_party).length;
+
+
+    if (isLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading  data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -472,7 +507,7 @@ export  function PrisonerEntryExitScreen() {
                           <span className="text-gray-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">{record.reason}</TableCell>
+                      <TableCell className="max-w-xs truncate">{record.remarks}</TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {formatDateTime(record.time_out)}
                       </TableCell>
@@ -703,3 +738,5 @@ export  function PrisonerEntryExitScreen() {
     </div>
   );
 }
+
+

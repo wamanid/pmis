@@ -150,13 +150,7 @@ let mockVisitors: Visitor[] = [
 export  function GatePassScreen() {
   //load api data from here
 const loadData = async () => { 
-
-
  // getvisitors
-
- 
-
-
 setIsLoading(true);
 
 getvisitorspass().then((data) => {
@@ -180,7 +174,7 @@ getvisitors().then((data) => {
   getgatepasses().then((data) => {
   mockGatePasses = data.results;
   setGatePasses(mockGatePasses);
-  //alert(JSON.stringify(data.results));
+ // alert(JSON.stringify(data.results));
 }).catch((error) => {
   alert(error);
     setIsLoading(false);

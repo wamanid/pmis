@@ -47,6 +47,14 @@ export const getgatepasses = async (): Promise<GatePass[]> => {
   return response.data;
 };
 
+
+
+//get movements
+export const getprisonerMovements = async (): Promise<GatePass[]> => {
+  const response = await axiosInstance.get<GatePass[]>('gate-management/gate-pass-prisoners/');
+  return response.data;
+};
+
 //delete gatepass
 export const deletegatepasses = async (id:String): Promise<GatePass[]> => {
   const response = await axiosInstance.delete<GatePass[]>(`/gate-management/gate-passes/${id}/`);
