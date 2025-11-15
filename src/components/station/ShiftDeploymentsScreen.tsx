@@ -491,7 +491,8 @@ export default function ShiftDeploymentsScreen() {
                 Create Shift
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+              <div className="flex-1 overflow-y-auto p-6">
               <DialogHeader>
                 <DialogTitle>Create New Shift</DialogTitle>
                 <DialogDescription>
@@ -693,6 +694,7 @@ export default function ShiftDeploymentsScreen() {
                   </Button>
                 </div>
               </form>
+              </div>
             </DialogContent>
           </Dialog>
 
@@ -703,7 +705,8 @@ export default function ShiftDeploymentsScreen() {
                 Add Staff to Shift
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+              <div className="flex-1 overflow-y-auto p-6">
               <DialogHeader>
                 <DialogTitle>Add Staff Member to Shift</DialogTitle>
                 <DialogDescription>
@@ -1003,6 +1006,7 @@ export default function ShiftDeploymentsScreen() {
                   </Button>
                 </div>
               </form>
+              </div>
             </DialogContent>
           </Dialog>
         </div>

@@ -34,7 +34,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -817,20 +816,42 @@ export default function HousingAllocationScreen() {
       </div>
 
       {/* Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full max-w-md grid-cols-2">
-          <TabsTrigger value="assignments" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Housing Assignments ({filteredAssignments.length})
-          </TabsTrigger>
-          <TabsTrigger value="wards" className="flex items-center gap-2">
-            <Home className="h-4 w-4" />
-            Wards ({filteredWardsSearch.length})
-          </TabsTrigger>
-        </TabsList>
+      <Card>
+        <CardContent className="p-0">
+          {/* Custom Tabs Navigation */}
+          <div className="flex gap-2 p-4 bg-gray-100 border-b">
+            <button
+              onClick={() => setActiveTab("assignments")}
+              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                activeTab === "assignments"
+                  ? 'text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={{
+                backgroundColor: activeTab === "assignments" ? '#650000' : undefined,
+              }}
+            >
+              <Users className="h-4 w-4" />
+              Housing Assignments ({filteredAssignments.length})
+            </button>
+            <button
+              onClick={() => setActiveTab("wards")}
+              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                activeTab === "wards"
+                  ? 'text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={{
+                backgroundColor: activeTab === "wards" ? '#650000' : undefined,
+              }}
+            >
+              <Home className="h-4 w-4" />
+              Wards ({filteredWardsSearch.length})
+            </button>
+          </div>
 
         {/* Housing Assignments Table */}
-        <TabsContent value="assignments">
+        {activeTab === "assignments" && (
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -887,10 +908,10 @@ export default function HousingAllocationScreen() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
+        )}
 
         {/* Wards Table */}
-        <TabsContent value="wards">
+        {activeTab === "wards" && (
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -972,15 +993,17 @@ export default function HousingAllocationScreen() {
               </Table>
             </CardContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        )}
+        </CardContent>
+      </Card>
 
       {/* Housing Assignment Dialog */}
       <Dialog
         open={isAssignmentDialogOpen}
         onOpenChange={setIsAssignmentDialogOpen}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
               <Users className="h-5 w-5" />
@@ -1201,12 +1224,14 @@ export default function HousingAllocationScreen() {
               </Button>
             </div>
           </form>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Ward Dialog */}
       <Dialog open={isWardDialogOpen} onOpenChange={setIsWardDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
               <Home className="h-5 w-5" />
@@ -1412,6 +1437,7 @@ export default function HousingAllocationScreen() {
               </Button>
             </div>
           </form>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
