@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -38,7 +38,7 @@ import {
   getIdTypes,
   getPrisoners, getRelationships, getVisitorStatus,
   getVisitorTypes, IdType, Prisoner, PrisonerItem, RelationShipItem,
-  StationVisitor, VisitorStatusItem, VisitorTypeItem
+  StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
 } from "../../services/stationServices/VisitorsService";
 import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
 import {handleResponseError} from "../../services/stationServices/utils";
@@ -75,6 +75,7 @@ interface VisitorRegistrationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onVisitorCreated?: (visitor: Visitor) => void;
+  setVisitors?: React.Dispatch<React.SetStateAction<Visitor[]>>;
   editingVisitor?: Visitor | null;
 }
 
@@ -190,9 +191,25 @@ export default function VisitorRegistrationDialog({
 
   useEffect(() => {
     if (editingVisitor) {
-      setForm(editingVisitor);
+      setForm({
+        ...editingVisitor,
+        time_in: extractTimeHHMM(editingVisitor?.time_in),
+        time_out: extractTimeHHMM(editingVisitor?.time_out ?? ""),
+      });
+      setPhotoPreview(editingVisitor.photo)
     }
   }, [editingVisitor]);
+
+  function extractTimeHHMM(isoString: string): string {
+    const d = new Date(isoString);
+
+    if (isNaN(d.getTime())) return ""; // invalid date
+
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+
+    return `${hh}:${mm}`;
+  }
 
   const resetForm = () => {
     setForm({
@@ -284,7 +301,6 @@ export default function VisitorRegistrationDialog({
     return rawBase64;
   }
 
-
   function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -325,10 +341,20 @@ export default function VisitorRegistrationDialog({
         id: editingVisitor?.id || `visitor-${Date.now()}`,
       };
 
-      const response = await addStationVisitor(newVisitor)
-      if (handleResponseError(response)) return
+      console.log(newVisitor)
 
-      setVisitors(prev => ([response, ...prev]))
+      if (!editingVisitor) {
+         const response = await addStationVisitor(newVisitor)
+         if (handleResponseError(response)) return
+         setVisitors(prev => ([response, ...prev]))
+      }
+      else {
+         const response = await updateStationVisitor(newVisitor, editingVisitor.id)
+         if (handleResponseError(response)) return
+         if ("id" in response) {
+           setVisitors(prev => prev.map(v => (v.id === response.id ? response : v)))
+         }
+      }
 
       toast.success(
         editingVisitor

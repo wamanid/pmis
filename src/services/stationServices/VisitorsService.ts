@@ -242,6 +242,11 @@ export const getStationVisitors = async () : Promise<VisitorGetResponse> => {
   return response.data;
 }
 
+export const updateStationVisitor = async (visitor: StationVisitor, id: string) : Promise<VisitorResponse> => {
+  const response = await axiosInstance.put<VisitorResponse>(`/gate-management/station-visitors/${id}/`, visitor);
+  return response.data;
+}
+
 export const getIdTypes = async () : Promise<IdTypeResponse> => {
   const response = await axiosInstance.get<IdTypeResponse>('/system-administration/id-types/');
   return response.data;

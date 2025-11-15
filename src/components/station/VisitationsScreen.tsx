@@ -473,33 +473,34 @@ export default function VisitationsScreen() {
   };
 
   const handleEdit = (visitor: Visitor) => {
+    // console.log(visitor)
     setEditingVisitor(visitor);
-    setForm({
-      first_name: visitor.first_name,
-      middle_name: visitor.middle_name,
-      last_name: visitor.last_name,
-      organisation: visitor.organisation,
-      vehicle_no: visitor.vehicle_no,
-      reason_of_visitation: visitor.reason_of_visitation,
-      id_number: visitor.id_number,
-      address: visitor.address,
-      contact_no: visitor.contact_no,
-      place_visited: visitor.place_visited,
-      remarks: visitor.remarks,
-      blacklist_reason: visitor.blacklist_reason,
-      photo: null,
-      gate: visitor.gate,
-      prisoner: visitor.prisoner,
-      visitor_type: visitor.visitor_type,
-      gate_keeper: visitor.gate_keeper,
-      relation: visitor.relation,
-      id_type: visitor.id_type,
-      visitor_status: visitor.visitor_status,
-      visitation_datetime: new Date(visitor.visitation_datetime),
-      time_in: visitor.time_in,
-      time_out: visitor.time_out,
-    });
-    setPhotoPreview(visitor.photo);
+    // setForm({
+    //   first_name: visitor.first_name,
+    //   middle_name: visitor.middle_name,
+    //   last_name: visitor.last_name,
+    //   organisation: visitor.organisation,
+    //   vehicle_no: visitor.vehicle_no,
+    //   reason_of_visitation: visitor.reason_of_visitation,
+    //   id_number: visitor.id_number,
+    //   address: visitor.address,
+    //   contact_no: visitor.contact_no,
+    //   place_visited: visitor.place_visited,
+    //   remarks: visitor.remarks,
+    //   blacklist_reason: visitor.blacklist_reason,
+    //   photo: null,
+    //   gate: visitor.gate,
+    //   prisoner: visitor.prisoner,
+    //   visitor_type: visitor.visitor_type,
+    //   gate_keeper: visitor.gate_keeper,
+    //   relation: visitor.relation,
+    //   id_type: visitor.id_type,
+    //   visitor_status: visitor.visitor_status,
+    //   visitation_datetime: new Date(visitor.visitation_datetime),
+    //   time_in: visitor.time_in,
+    //   time_out: visitor.time_out,
+    // });
+    // setPhotoPreview(visitor.photo);
     setIsDialogOpen(true);
   };
 
@@ -547,7 +548,7 @@ export default function VisitationsScreen() {
                     return true
                 }
                 setVisitors(data)
-                console.log(data)
+                // console.log(data)
               }
 
             }catch (error) {
@@ -563,6 +564,12 @@ export default function VisitationsScreen() {
         fetchData()
       }
   }, [setVisitorRecordsLoading]);
+
+  useEffect(() => {
+    if (!isDialogOpen){
+      setEditingVisitor(null)
+    }
+  }, [isDialogOpen]);
 
   function extractTimeHHMM(isoString: string): string {
     const d = new Date(isoString);
