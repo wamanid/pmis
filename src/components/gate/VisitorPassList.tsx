@@ -40,11 +40,12 @@ interface VisitorPassListProps {
   onEdit: (pass: VisitorPass) => void;
   onView: (pass: VisitorPass) => void;
   passes?: VisitorPass[];
+  onDelete: (pass: VisitorPass) => void;
   
 }
 let visitorList: VisitorPass[] = [];
 
-export default function VisitorPassList({ onEdit, onView ,passes}: VisitorPassListProps) {
+export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: VisitorPassListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -68,7 +69,12 @@ export default function VisitorPassList({ onEdit, onView ,passes}: VisitorPassLi
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this visitor pass?')) {
-      setVisitorPasses(visitorPasses.filter(pass => pass.id !== id));
+
+      //hit the api here
+
+
+
+     setVisitorPasses(visitorPasses.filter(pass => pass.id !== id));
       toast.success('Visitor pass deleted successfully');
     }
   };
@@ -149,7 +155,6 @@ export default function VisitorPassList({ onEdit, onView ,passes}: VisitorPassLi
             <TableHeader>
               <TableRow>
                 <TableHead>Tag Number</TableHead>
-                <TableHead>Prisoner</TableHead>
                 <TableHead>Visitor</TableHead>
                 <TableHead>Valid From</TableHead>
                 <TableHead>Valid Until</TableHead>
@@ -169,7 +174,6 @@ export default function VisitorPassList({ onEdit, onView ,passes}: VisitorPassLi
                 paginatedData.map((pass) => (
                   <TableRow key={pass.id}>
                     <TableCell>{pass.visitor_tag_number}</TableCell>
-                    <TableCell>{pass.prisoner_name}</TableCell>
                     <TableCell>{pass.visitor_name}</TableCell>
                     <TableCell>{formatDate(pass.valid_from)}</TableCell>
                     <TableCell>{formatDate(pass.valid_until)}</TableCell>
@@ -194,7 +198,7 @@ export default function VisitorPassList({ onEdit, onView ,passes}: VisitorPassLi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleDelete(pass.id)}
+                          onClick={() => onDelete(pass)}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>

@@ -82,3 +82,10 @@ export const getvisitorspass = async (): Promise<WorkingPartyResponse[]> => {
   const response = await axiosInstance.get<WorkingPartyResponse[]>('gate-management/visitor-passes/');
   return response.data;
 };
+
+
+//delete visitor pass
+export const deletevisitorpass = async (id:String): Promise<Visitor[]> => {
+  const response = await axiosInstance.delete<Visitor[]>(`/gate-management/visitor-passes/${id}/`);
+  return response.data;
+};

@@ -16,7 +16,7 @@ export interface GatePass {
   gate_keeper: string;
   gate_pass_type: string;
   created_at?: string;
-  status?: 'active' | 'completed' | 'pending';
+  status?: string;
 }
 
 export  interface PrisonerRecord {

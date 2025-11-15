@@ -31,7 +31,7 @@ import { toast } from 'sonner@2.0.3';
 import { Prisoner } from '../../models/gate/Prisoner';
 import { Escort } from '../../models/gate/Escort';
 import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
-import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass } from '../../services/gateService';
+import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass } from '../../services/gateService';
 import VisitorPassForm from './VisitorPassForm';
 // Mock Data
 
@@ -461,14 +461,15 @@ getworkingparty().then((data) => {
       gate_keeper: formData.gate_pass_keeper,
       gate_pass_type: formData.gate_pass_type,
       created_at: dialogMode === 'create' ? new Date().toISOString() : selectedGatePass!.created_at,
-      status: 'active'
+      status: '0996439c-24cc-453e-87e4-1936a3e52820'
     };
 
     if (dialogMode === 'create') {
       //set loading
   setIsLoading(true);
       //submit to server here.
-    //  alert(JSON.stringify(newGatePass));
+    // alert(JSON.stringify(newGatePass));
+     console.log(JSON.stringify(newGatePass));
      // setGatePasses([newGatePass, ...gatePasses]);
   //get pass types
   submitGatePass(newGatePass).then((data) => {
@@ -484,7 +485,7 @@ getworkingparty().then((data) => {
       setGatePasses(gatePasses.map(gp => gp.id === selectedGatePass!.id ? newGatePass : gp));
       toast.success('Gate pass updated successfully');
     }
-   setIsDialogOpen(false);
+  setIsDialogOpen(false);
   };
 
   const addPrisonerRow = () => {
@@ -539,15 +540,34 @@ getworkingparty().then((data) => {
     setIsVisitorPassDialogOpen(true);
   };
 
+
   const handleViewVisitorPass = (pass: VisitorPass) => {
 
     setSelectedVisitorPass(pass);
     setIsVisitorPassViewDialogOpen(true);
   };
 
+    const handleEditVisitorPassDelete = (pass: VisitorPass) => {
+      if (confirm('Are you sure you want to delete this visitor pass?')) {
+      setIsLoading(true);
+      deletevisitorpass(pass.id).then((data) => {
+      toast.success('Visitor pass created successfully');
+      setIsLoading(false);
+       //alert(JSON.stringify(data));
+      })
+      .catch((error) => {
+        toast.error(error.message);
+        setIsLoading(false);
+      });
+            //hit the api here
+         //  setVisitorPasses(visitorPasses.filter(pass => pass.id !== pass.id));
+            toast.success('Visitor pass deleted successfully');
+          }
+  };
+
   const handleVisitorPassSubmit = (data: VisitorPass) => {
     //create visitor pass here
-    alert(JSON.stringify(data));
+   // alert(JSON.stringify(data));
     if (visitorPassDialogMode === 'create') {
       submitVisitorPass(data).then((data) => {
       toast.success('Visitor pass created successfully');
@@ -566,24 +586,7 @@ getworkingparty().then((data) => {
     setIsVisitorDialogOpen(true);
   };
 
-  const handleVisitorCreated = (visitor: any) => {
-    // Convert the full visitor object from VisitorRegistrationDialog to our simpler Visitor format
-    const newVisitor: Visitor = {
-      id: visitor.id || `v-${Date.now()}`,
-      first_name: visitor.first_name,
-      middle_name: visitor.middle_name,
-      last_name: visitor.last_name,
-      id_number: visitor.id_number,
-      contact_no: visitor.contact_no,
-      address: visitor.address,
-      relation: visitor.relation
-    };
-
-    setVisitors([...visitors, newVisitor]);
-    toast.success('Visitor registered successfully');
-    setIsVisitorDialogOpen(false);
-  };
-
+  
 
 
 
@@ -917,6 +920,7 @@ getworkingparty().then((data) => {
           <div className="overflow-x-auto">
             
              <VisitorPassList
+             onDelete={handleEditVisitorPassDelete}
             onEdit={handleEditVisitorPass}
             onView={handleViewVisitorPass}
             passes={visitorPasses}
