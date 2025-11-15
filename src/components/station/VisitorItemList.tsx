@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -50,6 +50,11 @@ import {
   Clock
 } from 'lucide-react';
 import VisitorItemForm from './VisitorItemForm';
+import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+
+interface VisitorListProps {
+  visitors: Visitor[]
+}
 
 interface VisitorItem {
   id: string;
@@ -176,7 +181,7 @@ const mockVisitorItems: VisitorItem[] = [
   }
 ];
 
-export default function VisitorItemList() {
+export default function VisitorItemList({ visitors }: VisitorListProps) {
   const [items, setItems] = useState<VisitorItem[]>(mockVisitorItems);
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -208,6 +213,7 @@ export default function VisitorItemList() {
 
     return matchesSearch && matchesCategory && matchesCollected;
   });
+  const [itemInfoLoading, setItemInfoLoading] = useState(false)
 
   const handleSubmit = async (data: VisitorItem) => {
     setLoading(true);
@@ -303,30 +309,49 @@ export default function VisitorItemList() {
               Add Item
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-            <div className="flex-1 overflow-y-auto p-6">
-              <DialogHeader>
-                <DialogTitle style={{ color: '#650000' }}>
-                  {editingItem ? 'Edit Visitor Item' : 'Add Visitor Item'}
-                </DialogTitle>
-                <DialogDescription>
-                  {editingItem
-                    ? 'Update visitor item information'
-                    : 'Add a new item brought by a visitor'}
-                </DialogDescription>
-              </DialogHeader>
+          <DialogContent className="max-w-[95vw] w-[10vw] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+            {
+                itemInfoLoading ? (
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <DialogHeader>
+                        <DialogTitle style={{ color: '#650000' }}></DialogTitle>
+                        <DialogDescription></DialogDescription>
+                      </DialogHeader>
+                      <div className="size-full flex items-center justify-center mt-6">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground text-sm">
+                            Fetching some data, Please wait...
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                ) : (
+                    <div className="flex-1 overflow-y-auto p-6">
+                      <DialogHeader>
+                        <DialogTitle style={{ color: '#650000' }}>
+                          {editingItem ? 'Edit Visitor Item' : 'Add Visitor Item'}
+                        </DialogTitle>
+                        <DialogDescription>
+                          {editingItem
+                            ? 'Update visitor item information'
+                            : 'Add a new item brought by a visitor'}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="mt-6">
+                        <VisitorItemForm
+                          item={editingItem}
+                          onSubmit={handleSubmit}
+                          onCancel={() => {
+                            setIsDialogOpen(false);
+                            setEditingItem(null);
+                          }}
+                        />
+                      </div>
+                    </div>
+                )
+              }
 
-              <div className="mt-6">
-                <VisitorItemForm
-                  item={editingItem}
-                  onSubmit={handleSubmit}
-                  onCancel={() => {
-                    setIsDialogOpen(false);
-                    setEditingItem(null);
-                  }}
-                />
-              </div>
-            </div>
           </DialogContent>
         </Dialog>
       </div>

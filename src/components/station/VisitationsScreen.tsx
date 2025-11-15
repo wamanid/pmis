@@ -61,7 +61,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import VisitorPassForm from "../gatePass/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
-import {getStationVisitors, Visitor} from "../../services/stationServices/VisitorsService";
+import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {handleResponseError} from "../../services/stationServices/utils";
 
 // Types based on API
@@ -1604,7 +1604,7 @@ export default function VisitationsScreen() {
 
         {/* Visitor Items Tab */}
         <TabsContent value="items" className="mt-6">
-          <VisitorItemList />
+          <VisitorItemList visitors={visitors} />
         </TabsContent>
       </Tabs>
 

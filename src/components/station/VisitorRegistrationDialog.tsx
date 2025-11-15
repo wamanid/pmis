@@ -39,7 +39,7 @@ import {
   getPrisoners, getRelationships, getVisitorStatus,
   getVisitorTypes, IdType, Prisoner, PrisonerItem, RelationShipItem,
   StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
-} from "../../services/stationServices/VisitorsService";
+} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
 import {handleResponseError} from "../../services/stationServices/utils";
 
@@ -345,7 +345,7 @@ export default function VisitorRegistrationDialog({
         delete newVisitor.photo;
       }
 
-      console.log(newVisitor)
+      // console.log(newVisitor)
 
       if (!editingVisitor) {
          const response = await addStationVisitor(newVisitor)
