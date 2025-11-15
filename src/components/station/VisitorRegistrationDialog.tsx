@@ -341,6 +341,10 @@ export default function VisitorRegistrationDialog({
         id: editingVisitor?.id || `visitor-${Date.now()}`,
       };
 
+      if (newVisitor.photo?.startsWith("https://")) {
+        delete newVisitor.photo;
+      }
+
       console.log(newVisitor)
 
       if (!editingVisitor) {
