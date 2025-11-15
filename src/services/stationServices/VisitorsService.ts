@@ -211,12 +211,20 @@ export interface VisitorStatus {
   results: VisitorStatusItem[];
 }
 
+export interface VisitorGet {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: Visitor[];
+}
+
 
 export interface ErrorResponse {
   error: string;
 }
 
 export type VisitorResponse = Visitor | ErrorResponse;
+export type VisitorGetResponse = VisitorGet | ErrorResponse;
 export type IdTypeResponse = IdTypes | ErrorResponse;
 export type GateResponse = Gate | ErrorResponse;
 export type PrisonerResponse = Prisoner | ErrorResponse;
@@ -225,7 +233,12 @@ export type RelationshipResponse = Relationship | ErrorResponse;
 export type VisitorStatusResponse = VisitorStatus | ErrorResponse;
 
 export const addStationVisitor = async (visitor: StationVisitor) : Promise<VisitorResponse> => {
-  const response = await axiosInstance.post<VisitorResponse>('/gate-management/api/station-visitors/', visitor);
+  const response = await axiosInstance.post<VisitorResponse>('/gate-management/station-visitors/', visitor);
+  return response.data;
+}
+
+export const getStationVisitors = async () : Promise<VisitorGetResponse> => {
+  const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/');
   return response.data;
 }
 

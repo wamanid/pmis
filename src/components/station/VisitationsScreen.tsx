@@ -61,38 +61,40 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import VisitorPassForm from "../gatePass/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
+import {getStationVisitors, Visitor} from "../../services/stationServices/VisitorsService";
+import {handleResponseError} from "../../services/stationServices/utils";
 
 // Types based on API
-interface Visitor {
-  id: string;
-  prisoner_name: string;
-  gate_name: string;
-  visitor_type_name: string;
-  visitor_status_name: string;
-  visitation_datetime: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  organisation: string;
-  vehicle_no: string;
-  time_in: string;
-  time_out: string;
-  reason_of_visitation: string;
-  id_number: string;
-  address: string;
-  contact_no: string;
-  place_visited: string;
-  remarks: string;
-  blacklist_reason: string;
-  photo: string;
-  gate: string;
-  prisoner: string;
-  visitor_type: string;
-  gate_keeper: string;
-  relation: string;
-  id_type: string;
-  visitor_status: string;
-}
+// interface Visitor {
+//   id: string;
+//   prisoner_name: string;
+//   gate_name: string;
+//   visitor_type_name: string;
+//   visitor_status_name: string;
+//   visitation_datetime: string;
+//   first_name: string;
+//   middle_name: string;
+//   last_name: string;
+//   organisation: string;
+//   vehicle_no: string;
+//   time_in: string;
+//   time_out: string;
+//   reason_of_visitation: string;
+//   id_number: string;
+//   address: string;
+//   contact_no: string;
+//   place_visited: string;
+//   remarks: string;
+//   blacklist_reason: string;
+//   photo: string;
+//   gate: string;
+//   prisoner: string;
+//   visitor_type: string;
+//   gate_keeper: string;
+//   relation: string;
+//   id_type: string;
+//   visitor_status: string;
+// }
 
 interface Region {
   id: string;
@@ -220,6 +222,8 @@ export default function VisitationsScreen() {
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
+  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(true)
+
   // Calendar state
   const [calendarOpen, setCalendarOpen] = useState(false);
 
@@ -290,69 +294,6 @@ export default function VisitationsScreen() {
       { id: "3", force_number: "UPS003", name: "Officer John", rank: "Inspector" },
     ]);
 
-    // Load mock visitors
-    setVisitors([
-      {
-        id: "1",
-        prisoner_name: "John Doe",
-        gate_name: "Main Gate",
-        visitor_type_name: "Family Member",
-        visitor_status_name: "Checked In",
-        visitation_datetime: "2025-10-25T10:00:00Z",
-        first_name: "Sarah",
-        middle_name: "Anne",
-        last_name: "Doe",
-        organisation: "",
-        vehicle_no: "UAH 123X",
-        time_in: "10:00:00",
-        time_out: "",
-        reason_of_visitation: "Family visit",
-        id_number: "CM123456789",
-        address: "Kampala, Uganda",
-        contact_no: "+256700123456",
-        place_visited: "Visitor's Hall",
-        remarks: "First time visitor",
-        blacklist_reason: "",
-        photo: "",
-        gate: "1",
-        prisoner: "1",
-        visitor_type: "1",
-        gate_keeper: "1",
-        relation: "1",
-        id_type: "1",
-        visitor_status: "1",
-      },
-      {
-        id: "2",
-        prisoner_name: "Jane Smith",
-        gate_name: "Main Gate",
-        visitor_type_name: "Legal Representative",
-        visitor_status_name: "Checked Out",
-        visitation_datetime: "2025-10-25T09:00:00Z",
-        first_name: "Michael",
-        middle_name: "",
-        last_name: "Johnson",
-        organisation: "Johnson & Associates Law Firm",
-        vehicle_no: "UBB 456Y",
-        time_in: "09:00:00",
-        time_out: "11:30:00",
-        reason_of_visitation: "Legal consultation",
-        id_number: "CM987654321",
-        address: "Kampala, Uganda",
-        contact_no: "+256701234567",
-        place_visited: "Legal Consultation Room",
-        remarks: "Regular visitor",
-        blacklist_reason: "",
-        photo: "",
-        gate: "1",
-        prisoner: "2",
-        visitor_type: "2",
-        gate_keeper: "2",
-        relation: "6",
-        id_type: "1",
-        visitor_status: "2",
-      },
-    ]);
   }, []);
 
   // Load districts when region changes
@@ -590,6 +531,50 @@ export default function VisitationsScreen() {
     setSelectedVisitorForPass(null);
   };
 
+  // APIs integration
+  useEffect(() => {
+      if (visitorRecordsLoading) {
+        async function fetchData() {
+          // setVisitorRecordsLoading(true)
+            try {
+              const response = await getStationVisitors()
+              if (handleResponseError(response)) return
+
+              if ("results" in response) {
+                const data = response.results
+                if (!data.length){
+                    toast.error("There are no visitor records");
+                    return true
+                }
+                setVisitors(data)
+                console.log(data)
+              }
+
+            }catch (error) {
+              if (!error?.response) {
+                toast.error('Failed to connect to server. Please try again.');
+              }
+
+            }finally {
+              setVisitorRecordsLoading(false)
+            }
+        }
+
+        fetchData()
+      }
+  }, [setVisitorRecordsLoading]);
+
+  function extractTimeHHMM(isoString: string): string {
+    const d = new Date(isoString);
+
+    if (isNaN(d.getTime())) return ""; // invalid date
+
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+
+    return `${hh}:${mm}`;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -719,10 +704,7 @@ export default function VisitationsScreen() {
                 resetForm();
               }
             }}
-            onVisitorCreated={(visitor) => {
-              // Refresh the visitors list - for now just close the dialog
-              // TODO: Implement actual data refresh when API is integrated
-            }}
+            setVisitors={setVisitors}
             editingVisitor={editingVisitor}
           />
 
@@ -1491,113 +1473,126 @@ export default function VisitationsScreen() {
           </div>
 
       {/* Visitors Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Visitor Records
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Visitor Name</TableHead>
-                  <TableHead>ID Number</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Visitor Type</TableHead>
-                  <TableHead>Gate</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredVisitors.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      No visitor records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredVisitors.map((visitor) => (
-                    <TableRow key={visitor.id}>
-                      <TableCell>
-                        <div>
-                          <p>
-                            {visitor.first_name} {visitor.middle_name}{" "}
-                            {visitor.last_name}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Visitor Records
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {
+                visitorRecordsLoading ? (
+                    <div className="size-full flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground text-sm">
+                              Fetching visitor records, Please wait...
                           </p>
-                          {visitor.organisation && (
-                            <p className="text-xs text-muted-foreground">
-                              {visitor.organisation}
-                            </p>
+                        </div>
+                    </div>
+                ) : (
+                   <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Visitor Name</TableHead>
+                            <TableHead>ID Number</TableHead>
+                            <TableHead>Contact</TableHead>
+                            <TableHead>Prisoner</TableHead>
+                            <TableHead>Visitor Type</TableHead>
+                            <TableHead>Gate</TableHead>
+                            <TableHead>Time In</TableHead>
+                            <TableHead>Time Out</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredVisitors.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={10}
+                                className="text-center py-8 text-muted-foreground"
+                              >
+                                No visitor records found
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredVisitors.map((visitor) => (
+                              <TableRow key={visitor.id}>
+                                <TableCell>
+                                  <div>
+                                    <p>
+                                      {visitor.first_name} {visitor.middle_name}{" "}
+                                      {visitor.last_name}
+                                    </p>
+                                    {visitor.organisation && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {visitor.organisation}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>{visitor.id_number}</TableCell>
+                                <TableCell>{visitor.contact_no}</TableCell>
+                                <TableCell>{visitor.prisoner_name}</TableCell>
+                                <TableCell>{visitor.visitor_type_name}</TableCell>
+                                <TableCell>{visitor.gate_name}</TableCell>
+                                <TableCell>
+                                  {visitor.time_in ? (
+                                    <div className="flex items-center gap-1 text-green-600">
+                                      <LogIn className="h-3 w-3" />
+                                      {extractTimeHHMM(visitor.time_in)}
+                                    </div>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {visitor.time_out ? (
+                                    <div className="flex items-center gap-1 text-red-600">
+                                      <LogOut className="h-3 w-3" />
+                                      {extractTimeHHMM(visitor.time_out)}
+                                    </div>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {getStatusBadge(visitor.visitor_status_name)}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(visitor)}
+                                      title="Edit visitor"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleGenerateVisitorPass(visitor)}
+                                      style={{ color: '#650000' }}
+                                      title="Generate visitor pass"
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
                           )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{visitor.id_number}</TableCell>
-                      <TableCell>{visitor.contact_no}</TableCell>
-                      <TableCell>{visitor.prisoner_name}</TableCell>
-                      <TableCell>{visitor.visitor_type_name}</TableCell>
-                      <TableCell>{visitor.gate_name}</TableCell>
-                      <TableCell>
-                        {visitor.time_in ? (
-                          <div className="flex items-center gap-1 text-green-600">
-                            <LogIn className="h-3 w-3" />
-                            {visitor.time_in}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {visitor.time_out ? (
-                          <div className="flex items-center gap-1 text-red-600">
-                            <LogOut className="h-3 w-3" />
-                            {visitor.time_out}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(visitor.visitor_status_name)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(visitor)}
-                            title="Edit visitor"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleGenerateVisitorPass(visitor)}
-                            style={{ color: '#650000' }}
-                            title="Generate visitor pass"
-                          >
-                            <FileText className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                        </TableBody>
+                      </Table>
+                   </div>
+                )
+              }
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Visitor Items Tab */}

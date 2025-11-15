@@ -1,5 +1,6 @@
 import {ManualLockUpItem} from "./manualLockupIntegration";
-import {StaffDeploymentResponse, Station} from "./staffDeploymentIntegration"
+import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
+import {toast} from "sonner";
 
 export const getStationsAndTypes = (lockups: ManualLockUpItem[]) => {
   const uniqueStations = Array.from(
@@ -107,3 +108,11 @@ export const getRegionSummary = (data: StaffDeploymentResponse[]): RegionFilter[
     return { region_name: key, count };
   });
 };
+
+export const handleResponseError = (response: any) => {
+  if ('error' in response){
+    toast.error(response.error);
+    return true
+  }
+  return false
+}
