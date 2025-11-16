@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Edit, Trash2, Loader2 } from "lucide-react";
 import { Button } from "../../ui/button";
 import { Card, CardContent } from "../../ui/card";
@@ -22,182 +23,42 @@ import { toast } from "sonner@2.0.3";
 import PrisonerBioDataView from "./PrisonerBioDataView";
 import PrisonerBioDataForm from "./PrisonerBioDataForm";
 import { PrisonerBioData } from "./PrisonerBioDataList";
+import { getPrisonerBiodataByPrisonerId, createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 
-interface PrisonerDetailScreenProps {
-  prisonerId: string;
-  onBack: () => void;
-}
-
-// Mock data - In production, this would fetch from API
-const mockBioDataDetails: Record<string, PrisonerBioData> = {
-  "1": {
-    id: "1",
-    is_active: true,
-    first_name: "John",
-    middle_name: "Paul",
-    surname: "Doe",
-    date_of_birth: "1990-05-15",
-    date_of_admission: "2024-10-01",
-    prisoner_personal_number: "PP-2024-001",
-    prisoner_number: "PN-2024-001",
-    sex: "sex-1",
-    sex_name: "Male",
-    nationality: "nationality-1",
-    nationality_name: "Ugandan",
-    habitual_criminal: false,
-    deformity: false,
-    age_on_admission: 34,
-    height: "175",
-    id_number: "CM90123456789",
-    id_type: "National ID",
-    marital_status: "Single",
-    fathers_name: "James Doe",
-    mothers_name: "Mary Doe",
-    tribe: "Muganda",
-    religion: "Christianity",
-    education_level: "Secondary",
-    employment_status: "Employed",
-    employer: "ABC Company Ltd",
-    employment_description: "Construction Worker",
-    address_region: "Central Region",
-    address_district: "Kampala",
-    address_county: "Makindye",
-    address_sub_county: "Makindye Division",
-    address_parish: "Nsambya",
-    address_village: "Kabalagala",
-    permanent_region: "Central Region",
-    permanent_district: "Masaka",
-    permanent_county: "Kyotera",
-    build: "Medium",
-    face: "Oval",
-    eyes: "Brown",
-    hair: "Black, Short",
-    marks: "Small scar on left cheek",
-    description: "Average build, brown eyes, short black hair",
-    created_by: 1,
-    updated_by: 1,
-  },
-  "2": {
-    id: "2",
-    is_active: true,
-    first_name: "Jane",
-    middle_name: "Marie",
-    surname: "Smith",
-    date_of_birth: "1985-08-22",
-    date_of_admission: "2024-09-15",
-    prisoner_personal_number: "PP-2024-002",
-    prisoner_number: "PN-2024-002",
-    sex: "sex-2",
-    sex_name: "Female",
-    nationality: "nationality-2",
-    nationality_name: "Kenyan",
-    habitual_criminal: true,
-    deformity: false,
-    age_on_admission: 39,
-    height: "165",
-    id_number: "KE85987654321",
-    id_type: "Passport",
-    marital_status: "Divorced",
-    fathers_name: "Robert Smith",
-    mothers_name: "Anna Smith",
-    tribe: "Kikuyu",
-    religion: "Christianity",
-    education_level: "University",
-    employment_status: "Self-Employed",
-    employer: "Self",
-    employment_description: "Business Owner",
-    address_region: "Eastern Region",
-    address_district: "Mbale",
-    address_county: "Mbale Municipality",
-    build: "Slim",
-    face: "Round",
-    eyes: "Dark Brown",
-    hair: "Black, Long",
-    marks: "Tattoo on right arm",
-    description: "Slim build, dark brown eyes, long black hair",
-    created_by: 1,
-    updated_by: 1,
-  },
-  "3": {
-    id: "3",
-    is_active: false,
-    first_name: "Robert",
-    middle_name: "Lee",
-    surname: "Johnson",
-    date_of_birth: "1995-03-10",
-    date_of_admission: "2024-08-20",
-    prisoner_personal_number: "PP-2024-003",
-    prisoner_number: "PN-2024-003",
-    sex: "sex-1",
-    sex_name: "Male",
-    nationality: "nationality-1",
-    nationality_name: "Ugandan",
-    habitual_criminal: false,
-    deformity: true,
-    age_on_admission: 29,
-    height: "182",
-    id_number: "CM95234567890",
-    id_type: "National ID",
-    marital_status: "Married",
-    fathers_name: "David Johnson",
-    mothers_name: "Grace Johnson",
-    tribe: "Acholi",
-    religion: "Islam",
-    education_level: "Primary",
-    employment_status: "Unemployed",
-    address_region: "Northern Region",
-    address_district: "Gulu",
-    address_county: "Aswa",
-    build: "Tall",
-    face: "Long",
-    eyes: "Brown",
-    hair: "Black, Curly",
-    marks: "Burn scar on left hand",
-    description:
-      "Tall build, brown eyes, curly black hair, visible deformity on left hand",
-    created_by: 1,
-    updated_by: 1,
-  },
-};
-
-const PrisonerDetailScreen: React.FC<
-  PrisonerDetailScreenProps
-> = ({ prisonerId, onBack }) => {
-  const [bioData, setBioData] =
-    useState<PrisonerBioData | null>(null);
+const PrisonerDetailScreen: React.FC = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const [bioData, setBioData] = useState<PrisonerBioData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditDialogOpen, setIsEditDialogOpen] =
-    useState(false);
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] =
-    useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch prisoner bio data on mount
   useEffect(() => {
     const fetchBioData = async () => {
+      if (!id) {
+        setError("No prisoner ID provided");
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
-        // Simulate API call
-        await new Promise((resolve) =>
-          setTimeout(resolve, 500),
-        );
-
-        const data = mockBioDataDetails[prisonerId];
-        if (data) {
-          setBioData(data);
-        } else {
-          toast.error("Prisoner bio data not found");
-          onBack();
-        }
-      } catch (error) {
-        toast.error("Failed to load prisoner bio data");
+        const data = await getPrisonerBiodataByPrisonerId(id);
+        setBioData(data);
+        setError(null);
+      } catch (error: any) {
         console.error("Error fetching bio data:", error);
+        setError(error.message || "Failed to load prisoner bio data");
+        toast.error("Failed to load prisoner bio data");
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchBioData();
-  }, [prisonerId, onBack]);
+  }, [id]);
 
   const handleEdit = () => {
     setIsEditDialogOpen(true);
@@ -207,18 +68,23 @@ const PrisonerDetailScreen: React.FC<
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    // TODO: Call API to delete prisoner bio data
-    toast.success("Prisoner bio data deleted successfully!");
+  const confirmDelete = async () => {
+    if (!id) return;
+    
+    // TODO: Implement delete functionality when API endpoint is available
+    toast.info("Delete functionality not yet implemented");
     setIsDeleteDialogOpen(false);
-    onBack();
   };
 
-  const handleFormSubmit = (data: PrisonerBioData) => {
-    // TODO: Call API to update prisoner bio data
+  const handleFormSubmit = async (data: PrisonerBioData) => {
+    // TODO: Implement update functionality when API endpoint is available
     setBioData(data);
     toast.success("Prisoner bio data updated successfully!");
     setIsEditDialogOpen(false);
+  };
+
+  const handleBack = () => {
+    navigate("/admissions-management/prisoners");
   };
 
   if (isLoading) {
@@ -234,16 +100,16 @@ const PrisonerDetailScreen: React.FC<
     );
   }
 
-  if (!bioData) {
+  if (error || !bioData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                Prisoner bio data not found
+                {error || "Prisoner bio data not found"}
               </p>
-              <Button onClick={onBack} variant="outline">
+              <Button onClick={handleBack} variant="outline">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Go Back
               </Button>
@@ -255,16 +121,16 @@ const PrisonerDetailScreen: React.FC<
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Button onClick={onBack} variant="outline" size="sm">
+          <Button onClick={handleBack} variant="outline" size="sm">
             <ArrowLeft className="h-4 w-4 mr-2" />
             Back to List
           </Button>
           <div>
-            <h1>Prisoner Bio Data Details</h1>
+            <h1 className="text-2xl font-bold">Prisoner Bio Data Details</h1>
             <p className="text-muted-foreground">
               {bioData.prisoner_number} -{" "}
               {`${bioData.first_name} ${bioData.middle_name || ""} ${bioData.surname}`.trim()}

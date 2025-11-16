@@ -25,3 +25,4 @@ export type { Teeth, TeethListResponse, TeethQueryParams } from './teeth';
 export type { Ear, EarListResponse, EarQueryParams } from './ear';
 export type { Hair, HairListResponse, HairQueryParams } from './hair';
 export type { Speech, SpeechListResponse, SpeechQueryParams } from './speech';
+export type { PrisonerClass, PrisonerClassListResponse, PrisonerClassParams } from './prisonerClass';

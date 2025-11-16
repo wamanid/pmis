@@ -1,5 +1,7 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useForm, Controller } from "react-hook-form@7.55.0";
+import { useNavigate } from "react-router-dom";
+import { toast } from "sonner@2.0.3";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -30,14 +32,17 @@ import { CountySelect } from "../../common/CountySelect";
 import { SubCountySelect } from "../../common/SubCountySelect";
 import { ParishSelect } from "../../common/ParishSelect";
 import { VillageSelect } from "../../common/VillageSelect";
+import { PrisonerClassSelect } from "../../common/PrisonerClassSelect";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { Separator } from "../../ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
 import { PrisonerBioData } from "./PrisonerBioDataList";
 import { ArmedPersonnel, ChildRecord, NextOfKin } from "../../../models/admission/";
 import { CardContent } from "../../ui/card";
 import { Card } from "../../ui/card";
 import { CardHeader } from "../../ui/card";
 import { CardTitle } from "../../ui/card";
+import { createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 import {
   Search,
   User,
@@ -73,6 +78,9 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
   onCancel,
   prisonerCategory,
 }) => {
+  const navigate = useNavigate();
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const {
     register,
     handleSubmit,
@@ -80,6 +88,8 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
     reset,
     watch,
     setValue,
+    setError,
+    clearErrors,
     formState: { errors },
   } = useForm<PrisonerBioData>({
     defaultValues: bioData || {
@@ -89,7 +99,34 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
       date_of_birth: "",
       date_of_admission: "",
     },
+    mode: 'onChange', // Enable validation on change
   });
+
+  // Load form state from localStorage on mount
+  useEffect(() => {
+    const loadFormState = () => {
+      try {
+        const storedFormData = localStorage.getItem("pmis_biodata_form_state");
+        if (storedFormData) {
+          const formData = JSON.parse(storedFormData);
+          reset(formData);
+          
+          // Populate all fields explicitly
+          Object.keys(formData).forEach((key) => {
+            if (formData[key] !== undefined && formData[key] !== null) {
+              setValue(key as keyof PrisonerBioData, formData[key]);
+            }
+          });
+        }
+      } catch (error) {
+        console.error("Error loading form state:", error);
+      }
+    };
+
+    if (!bioData) {
+      loadFormState();
+    }
+  }, []);
 
   useEffect(() => {
     if (bioData) {
@@ -110,6 +147,14 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
       if (bioData.permanent_parish) setValue("permanent_parish", bioData.permanent_parish);
       if (bioData.permanent_village) setValue("permanent_village", bioData.permanent_village);
       
+      // Populate birth location fields
+      if (bioData.birth_region) setValue("birth_region", bioData.birth_region);
+      if (bioData.birth_district) setValue("birth_district", bioData.birth_district);
+      if (bioData.birth_county) setValue("birth_county", bioData.birth_county);
+      if (bioData.birth_sub_county) setValue("birth_sub_county", bioData.birth_sub_county);
+      if (bioData.birth_parish) setValue("birth_parish", bioData.birth_parish);
+      if (bioData.birth_village) setValue("birth_village", bioData.birth_village);
+      
       // Populate physical characteristics fields
       if (bioData.build) setValue("build", bioData.build);
       if (bioData.face) setValue("face", bioData.face);
@@ -128,11 +173,140 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
       if (bioData.arrest_sub_county) setValue("arrest_sub_county", bioData.arrest_sub_county);
       if (bioData.arrest_parish) setValue("arrest_parish", bioData.arrest_parish);
       if (bioData.arrest_village) setValue("arrest_village", bioData.arrest_village);
+      
+      // Populate record fields
+      if (bioData.desired_district_of_release) setValue("desired_district_of_release", bioData.desired_district_of_release);
+      if (bioData.prisoner_class) setValue("prisoner_class", bioData.prisoner_class);
     }
   }, [bioData, reset, setValue]);
 
-  const handleFormSubmit = (data: PrisonerBioData) => {
-    onSubmit(data);
+  // Save form state to localStorage whenever form data changes
+  useEffect(() => {
+    const subscription = watch((formData) => {
+      try {
+        localStorage.setItem("pmis_biodata_form_state", JSON.stringify(formData));
+      } catch (error) {
+        console.error("Error saving form state:", error);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, [watch]);
+
+  // Helper function to set value and clear error
+  const setValueAndClearError = (field: keyof PrisonerBioData, value: any) => {
+    setValue(field, value);
+    clearErrors(field);
+  };
+
+  // Helper function to convert file to base64
+  const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = (error) => reject(error);
+    });
+  };
+
+  const handleFormSubmit = async (data: PrisonerBioData) => {
+    try {
+      setIsSubmitting(true);
+      
+      // Get prisoner IDs from localStorage
+      const storedReservation = localStorage.getItem("pmis_prisoner_number_reservation");
+      let prisonerId = null;
+      let prisonerPersonalNumberId = null;
+      let reservationId = null;
+      
+      if (storedReservation) {
+        const reservation = JSON.parse(storedReservation);
+        prisonerId = reservation.prisoner_id;  // Send prisoner_id
+        prisonerPersonalNumberId = reservation.prisoner_personal_number_details?.id;  // Send prisoner_personal_number_details.id
+        reservationId = reservation.id;  // Send reservation id
+      }
+      
+      if (!prisonerId || !prisonerPersonalNumberId) {
+        toast.error("Prisoner IDs not found. Please generate prisoner numbers first.");
+        setIsSubmitting(false);
+        return;
+      }
+      
+      // Prepare data for API submission
+      const submissionData: any = {
+        ...data,
+        prisoner_number: prisonerId,  // Send prisoner_id
+        prisoner_personal_number: prisonerPersonalNumberId,  // Send prisoner_personal_number_details.id
+        // Duplicate education_level to highest_education
+        highest_education: data.education_level,
+        // Replicate nationality to country_of_origin
+        country_of_origin: data.nationality,
+        // Replicate permanent_district to district_of_origin
+        district_of_origin: data.permanent_district,
+        // Convert height to decimal with 2 decimal places
+        height: data.height ? parseFloat(parseFloat(data.height as any).toFixed(2)) : null,
+      };
+
+      // Handle photo upload - convert to base64 if file is selected
+      if (data.photo && data.photo instanceof FileList && data.photo.length > 0) {
+        const photoFile = data.photo[0];
+        submissionData.photo = await fileToBase64(photoFile);
+      } else {
+        // Remove photo field if no file is uploaded
+        delete submissionData.photo;
+      }
+
+      // Handle fingerprint upload - convert to base64 if file is selected
+      if (data.finger_print && data.finger_print instanceof FileList && data.finger_print.length > 0) {
+        const fingerprintFile = data.finger_print[0];
+        submissionData.finger_print = await fileToBase64(fingerprintFile);
+      } else {
+        // Remove finger_print field if no file is uploaded
+        delete submissionData.finger_print;
+      }
+      
+      // Submit to API
+      const response = await createPrisonerBiodata(submissionData);
+      
+      toast.success("Prisoner biodata submitted successfully!");
+      
+      // Clear form state and prisoner_id from localStorage on successful submission
+      localStorage.removeItem("pmis_biodata_form_state");
+      localStorage.removeItem("pmis_prisoner_number_reservation");
+      localStorage.removeItem("pmis_admission_form_state");
+      
+      // Call the parent onSubmit callback
+      onSubmit(response);
+      
+      // Navigate to prisoner detail screen
+      navigate(`/admissions-management/prisoner/${response.id}`);
+    } catch (error: any) {
+      console.error("Error submitting biodata:", error);
+      
+      // Check if it's a 400 validation error
+      if (error?.response?.status === 400 && error?.response?.data) {
+        const validationErrors = error.response.data;
+        
+        // Count total errors
+        const errorCount = Object.keys(validationErrors).length;
+        
+        // Set field-level errors on the form
+        Object.entries(validationErrors).forEach(([field, messages]: [string, any]) => {
+          const errorMessage = Array.isArray(messages) ? messages[0] : messages;
+          setError(field as keyof PrisonerBioData, {
+            type: 'manual',
+            message: errorMessage,
+          });
+        });
+        
+        // Display summary toast
+        toast.error(`Validation failed: ${errorCount} field(s) require attention. Please check the form.`);
+      } else {
+        // Generic error message for other errors
+        toast.error("Failed to submit prisoner biodata. Please try again.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
 const {
@@ -199,7 +373,45 @@ const {
   const watchReligion = watch("religion");
   const watchTribe = watch("tribe");
   const watchIdType = watch("id_type");
+  const watchDesiredDistrictOfRelease = watch("desired_district_of_release");
+  const watchPrisonerClass = watch("prisoner_class");
   const isArmedPersonnel = watch("armed_personnel");
+
+  // State to store the selected sex object
+  const [selectedSexData, setSelectedSexData] = useState<any>(null);
+  
+  // State to store the selected status of woman object
+  const [selectedStatusOfWoman, setSelectedStatusOfWoman] = useState<any>(null);
+
+  // Computed value to check if selected sex is Female (based on text/name only)
+  const isFemale = useMemo(() => {
+    console.log("Checking isFemale, selectedSexData:", selectedSexData);
+    if (selectedSexData && selectedSexData.name) {
+      const sexName = selectedSexData.name.toLowerCase().trim();
+      console.log("Sex name:", sexName);
+      return sexName === 'female' || sexName === 'f';
+    }
+    return false;
+  }, [selectedSexData]);
+
+  // Computed value to check if status contains "pregnant"
+  const isPregnant = useMemo(() => {
+    if (selectedStatusOfWoman && selectedStatusOfWoman.name) {
+      const statusName = selectedStatusOfWoman.name.toLowerCase();
+      console.log("Status of woman:", statusName);
+      return statusName.includes('pregnant');
+    }
+    return false;
+  }, [selectedStatusOfWoman]);
+
+  // Computed value to check if status contains "with child"
+  const isWithChild = useMemo(() => {
+    if (selectedStatusOfWoman && selectedStatusOfWoman.name) {
+      const statusName = selectedStatusOfWoman.name.toLowerCase();
+      return statusName.includes('with child');
+    }
+    return false;
+  }, [selectedStatusOfWoman]);
 
   // Watch address fields for Current Address
   const watchCurrentRegion = watch("address_region");
@@ -216,6 +428,14 @@ const {
   const watchPermanentSubCounty = watch("permanent_sub_county");
   const watchPermanentParish = watch("permanent_parish");
   const watchPermanentVillage = watch("permanent_village");
+
+  // Watch address fields for Birth Location
+  const watchBirthRegion = watch("birth_region");
+  const watchBirthDistrict = watch("birth_district");
+  const watchBirthCounty = watch("birth_county");
+  const watchBirthSubCounty = watch("birth_sub_county");
+  const watchBirthParish = watch("birth_parish");
+  const watchBirthVillage = watch("birth_village");
 
   // Watch physical characteristics fields
   const watchBuild = watch("build");
@@ -235,6 +455,32 @@ const {
   const watchArrestSubCounty = watch("arrest_sub_county");
   const watchArrestParish = watch("arrest_parish");
   const watchArrestVillage = watch("arrest_village");
+
+  // Watch date fields for age calculation
+  const watchDateOfBirth = watch("date_of_birth");
+  const watchDateOfAdmission = watch("date_of_admission");
+
+  // Auto-calculate age_on_admission when date_of_birth or date_of_admission changes
+  useEffect(() => {
+    if (watchDateOfBirth && watchDateOfAdmission) {
+      const birthDate = new Date(watchDateOfBirth);
+      const admissionDate = new Date(watchDateOfAdmission);
+      
+      // Calculate age in years
+      let age = admissionDate.getFullYear() - birthDate.getFullYear();
+      const monthDiff = admissionDate.getMonth() - birthDate.getMonth();
+      
+      // Adjust age if birthday hasn't occurred yet in the admission year
+      if (monthDiff < 0 || (monthDiff === 0 && admissionDate.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      
+      // Only set if age is valid (non-negative)
+      if (age >= 0) {
+        setValueAndClearError("age_on_admission", age);
+      }
+    }
+  }, [watchDateOfBirth, watchDateOfAdmission]);
 
   // Child handlers
   const onSubmitChild = (data: ChildRecord) => {
@@ -471,9 +717,18 @@ const {
                       </Label>
                       <SexSelect
                         value={watchSex}
-                        onValueChange={(value) => setValue("sex", value)}
+                        onValueChange={(value, sexObject) => {
+                          setValueAndClearError("sex", value);
+                          setSelectedSexData(sexObject);
+                          console.log("Sex selected:", sexObject);
+                        }}
                         placeholder="Select sex"
                       />
+                      {errors.sex && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.sex.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -483,9 +738,14 @@ const {
                       </Label>
                       <CountrySelect
                         value={watchNationality}
-                        onValueChange={(value) => setValue("nationality", value)}
+                        onValueChange={(value) => setValueAndClearError("nationality", value)}
                         placeholder="Select nationality"
                       />
+                      {errors.nationality && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.nationality.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -494,7 +754,7 @@ const {
                       </Label>
                       <MaritalStatusSelect
                         value={watchMaritalStatus}
-                        onValueChange={(value) => setValue("marital_status", value)}
+                        onValueChange={(value) => setValueAndClearError("marital_status", value)}
                         placeholder="Select marital status"
                       />
                     </div>
@@ -503,9 +763,14 @@ const {
                       <Label htmlFor="religion">Religion</Label>
                       <ReligionSelect
                         value={watchReligion}
-                        onValueChange={(value) => setValue("religion", value)}
+                        onValueChange={(value) => setValueAndClearError("religion", value)}
                         placeholder="Select religion"
                       />
+                      {errors.religion && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.religion.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -517,6 +782,11 @@ const {
                         {...register("fathers_name")}
                         placeholder="Enter father's name"
                       />
+                      {errors.fathers_name && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.fathers_name.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -528,17 +798,279 @@ const {
                         {...register("mothers_name")}
                         placeholder="Enter mother's name"
                       />
+                      {errors.mothers_name && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.mothers_name.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label htmlFor="tribe">Tribe</Label>
                       <TribeSelect
                         value={watchTribe}
-                        onValueChange={(value) => setValue("tribe", value)}
+                        onValueChange={(value) => setValueAndClearError("tribe", value)}
                         placeholder="Select tribe"
                       />
+                      {errors.tribe && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.tribe.message}
+                        </p>
+                      )}
                     </div>
+
+                    {/* Status of Women - Only visible for Female prisoners */}
+                    {isFemale && (
+                      <div>
+                        <Label htmlFor="status_of_women">
+                          Status of Women
+                        </Label>
+                        <StatusOfWomanSelect
+                          value={watchStatusOfWomen}
+                          onValueChange={(value, statusObject) => {
+                            setValueAndClearError("status_of_women", value);
+                            setSelectedStatusOfWoman(statusObject);
+                            console.log("Status of woman selected:", statusObject);
+                          }}
+                          placeholder="Select status of women"
+                        />
+                        {errors.status_of_women && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.status_of_women.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Estimated Age of Pregnancy - Only visible when pregnant */}
+                    {isFemale && isPregnant && (
+                      <div>
+                        <Label htmlFor="estimated_age_of_pregnancy">
+                          Estimated Age of Pregnancy (weeks)
+                        </Label>
+                        <Input
+                          id="estimated_age_of_pregnancy"
+                          type="number"
+                          min="0"
+                          {...register("estimated_age_of_pregnancy", {
+                            valueAsNumber: true,
+                            min: { value: 0, message: "Must be a positive number" }
+                          })}
+                          placeholder="Enter weeks"
+                        />
+                        {errors.estimated_age_of_pregnancy && (
+                          <p className="text-red-500 text-sm mt-1">
+                            {errors.estimated_age_of_pregnancy.message}
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
+
+                  {/* Children Section - Only visible when status contains "with child" */}
+                  {isFemale && isWithChild && (
+                    <div className="mt-6 space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-sm font-medium">
+                          Children Records
+                        </h4>
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleAddChild}
+                          className="bg-[#650000] hover:bg-[#4a0000]"
+                        >
+                          <UserPlus className="h-4 w-4 mr-2" />
+                          Add Child
+                        </Button>
+                      </div>
+
+                      {children.length > 0 && (
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Date of Birth</TableHead>
+                              <TableHead>Sex</TableHead>
+                              <TableHead>Age on Admission</TableHead>
+                              <TableHead>Actions</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {children.map((child) => (
+                              <TableRow key={child.id}>
+                                <TableCell>{child.name}</TableCell>
+                                <TableCell>{child.date_of_birth}</TableCell>
+                                <TableCell>{child.sex}</TableCell>
+                                <TableCell>{child.age_on_admission}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEditChild(child)}
+                                    >
+                                      Edit
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() => handleDeleteChild(child.id!)}
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      )}
+
+                      {/* Child Form Dialog */}
+                      {showChildForm && (
+                        <Card className="border-2 border-[#650000]">
+                          <CardHeader>
+                            <CardTitle className="text-[#650000]">
+                              {currentChild ? "Edit Child Record" : "Add Child Record"}
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                  <Label htmlFor="child_name">
+                                    Child Name <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    id="child_name"
+                                    {...registerChild("name", {
+                                      required: "Child name is required",
+                                    })}
+                                    placeholder="Enter child's name"
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="child_date_of_birth">
+                                    Date of Birth <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    id="child_date_of_birth"
+                                    type="date"
+                                    {...registerChild("date_of_birth", {
+                                      required: "Date of birth is required",
+                                    })}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="child_sex">
+                                    Sex <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    id="child_sex"
+                                    {...registerChild("sex", {
+                                      required: "Sex is required",
+                                    })}
+                                    placeholder="Enter sex"
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="child_age_on_admission">
+                                    Age on Admission <span className="text-red-500">*</span>
+                                  </Label>
+                                  <Input
+                                    id="child_age_on_admission"
+                                    type="number"
+                                    {...registerChild("age_on_admission", {
+                                      required: "Age is required",
+                                    })}
+                                    placeholder="Enter age"
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="child_place_of_birth">
+                                    Place of Birth
+                                  </Label>
+                                  <Input
+                                    id="child_place_of_birth"
+                                    {...registerChild("place_of_birth")}
+                                    placeholder="Enter place of birth"
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <Label htmlFor="medical_condition">
+                                    Medical Condition
+                                  </Label>
+                                  <Textarea
+                                    id="medical_condition"
+                                    {...registerChild("medical_condition")}
+                                    placeholder="Describe any medical conditions..."
+                                    rows={2}
+                                  />
+                                </div>
+
+                                <div className="md:col-span-2">
+                                  <Label htmlFor="child_description">
+                                    Description
+                                  </Label>
+                                  <Textarea
+                                    id="child_description"
+                                    {...registerChild("description")}
+                                    placeholder="Additional information about the child..."
+                                    rows={2}
+                                  />
+                                </div>
+
+                                <div>
+                                  <Label htmlFor="child_photo">
+                                    Photo Upload
+                                  </Label>
+                                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                                    <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
+                                    <p className="text-sm text-gray-600">
+                                      Click to upload
+                                    </p>
+                                    <Input
+                                      id="child_photo"
+                                      type="file"
+                                      accept="image/*"
+                                      className="hidden"
+                                      {...registerChild("photo")}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={handleCancelChildForm}
+                                >
+                                  Cancel
+                                </Button>
+                                <Button
+                                  type="button"
+                                  className="bg-[#650000] hover:bg-[#4a0000]"
+                                  onClick={handleSubmitChild(onSubmitChild)}
+                                >
+                                  <Save className="h-4 w-4 mr-2" />
+                                  {currentChild ? "Update Child" : "Add Child"}
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Identification Tab */}
@@ -551,9 +1083,14 @@ const {
                       <Label htmlFor="id_type">ID Type</Label>
                       <IdTypeSelect
                         value={watchIdType}
-                        onValueChange={(value) => setValue("id_type", value)}
+                        onValueChange={(value) => setValueAndClearError("id_type", value)}
                         placeholder="Select ID type"
                       />
+                      {errors.id_type && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.id_type.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -565,6 +1102,11 @@ const {
                         {...register("id_number")}
                         placeholder="Enter ID number"
                       />
+                      {errors.id_number && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.id_number.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -573,9 +1115,14 @@ const {
                       </Label>
                       <EducationLevelSelect
                         value={watchEducationLevel}
-                        onValueChange={(value) => setValue("education_level", value)}
+                        onValueChange={(value) => setValueAndClearError("education_level", value)}
                         placeholder="Select education level"
                       />
+                      {errors.education_level && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.education_level.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -584,9 +1131,14 @@ const {
                       </Label>
                       <EmploymentStatusSelect
                         value={watchEmploymentStatus}
-                        onValueChange={(value) => setValue("employment_status", value)}
+                        onValueChange={(value) => setValueAndClearError("employment_status", value)}
                         placeholder="Select employment status"
                       />
+                      {errors.employment_status && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.employment_status.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -690,14 +1242,25 @@ const {
                     subCounty={watchCurrentSubCounty}
                     parish={watchCurrentParish}
                     village={watchCurrentVillage}
-                    onRegionChange={(value) => setValue("address_region", value)}
-                    onDistrictChange={(value) => setValue("address_district", value)}
-                    onCountyChange={(value) => setValue("address_county", value)}
-                    onSubCountyChange={(value) => setValue("address_sub_county", value)}
-                    onParishChange={(value) => setValue("address_parish", value)}
-                    onVillageChange={(value) => setValue("address_village", value)}
+                    onRegionChange={(value) => setValueAndClearError("address_region", value)}
+                    onDistrictChange={(value) => setValueAndClearError("address_district", value)}
+                    onCountyChange={(value) => setValueAndClearError("address_county", value)}
+                    onSubCountyChange={(value) => setValueAndClearError("address_sub_county", value)}
+                    onParishChange={(value) => setValueAndClearError("address_parish", value)}
+                    onVillageChange={(value) => setValueAndClearError("address_village", value)}
                     gridCols={3}
                   />
+                  {(errors.address_region || errors.address_district || errors.address_county || 
+                    errors.address_sub_county || errors.address_parish || errors.address_village) && (
+                    <div className="text-red-500 text-sm mt-2 space-y-1">
+                      {errors.address_region && <p>{errors.address_region.message}</p>}
+                      {errors.address_district && <p>{errors.address_district.message}</p>}
+                      {errors.address_county && <p>{errors.address_county.message}</p>}
+                      {errors.address_sub_county && <p>{errors.address_sub_county.message}</p>}
+                      {errors.address_parish && <p>{errors.address_parish.message}</p>}
+                      {errors.address_village && <p>{errors.address_village.message}</p>}
+                    </div>
+                  )}
 
                   <Separator />
 
@@ -711,14 +1274,57 @@ const {
                     subCounty={watchPermanentSubCounty}
                     parish={watchPermanentParish}
                     village={watchPermanentVillage}
-                    onRegionChange={(value) => setValue("permanent_region", value)}
-                    onDistrictChange={(value) => setValue("permanent_district", value)}
-                    onCountyChange={(value) => setValue("permanent_county", value)}
-                    onSubCountyChange={(value) => setValue("permanent_sub_county", value)}
-                    onParishChange={(value) => setValue("permanent_parish", value)}
-                    onVillageChange={(value) => setValue("permanent_village", value)}
+                    onRegionChange={(value) => setValueAndClearError("permanent_region", value)}
+                    onDistrictChange={(value) => setValueAndClearError("permanent_district", value)}
+                    onCountyChange={(value) => setValueAndClearError("permanent_county", value)}
+                    onSubCountyChange={(value) => setValueAndClearError("permanent_sub_county", value)}
+                    onParishChange={(value) => setValueAndClearError("permanent_parish", value)}
+                    onVillageChange={(value) => setValueAndClearError("permanent_village", value)}
                     gridCols={3}
                   />
+                  {(errors.permanent_region || errors.permanent_district || errors.permanent_county || 
+                    errors.permanent_sub_county || errors.permanent_parish || errors.permanent_village) && (
+                    <div className="text-red-500 text-sm mt-2 space-y-1">
+                      {errors.permanent_region && <p>{errors.permanent_region.message}</p>}
+                      {errors.permanent_district && <p>{errors.permanent_district.message}</p>}
+                      {errors.permanent_county && <p>{errors.permanent_county.message}</p>}
+                      {errors.permanent_sub_county && <p>{errors.permanent_sub_county.message}</p>}
+                      {errors.permanent_parish && <p>{errors.permanent_parish.message}</p>}
+                      {errors.permanent_village && <p>{errors.permanent_village.message}</p>}
+                    </div>
+                  )}
+
+                  <Separator />
+
+                  <h4 className="text-sm text-gray-600">
+                    Birth Location
+                  </h4>
+                  <AddressSelect
+                    region={watchBirthRegion}
+                    district={watchBirthDistrict}
+                    county={watchBirthCounty}
+                    subCounty={watchBirthSubCounty}
+                    parish={watchBirthParish}
+                    village={watchBirthVillage}
+                    onRegionChange={(value) => setValueAndClearError("birth_region", value)}
+                    onDistrictChange={(value) => setValueAndClearError("birth_district", value)}
+                    onCountyChange={(value) => setValueAndClearError("birth_county", value)}
+                    onSubCountyChange={(value) => setValueAndClearError("birth_sub_county", value)}
+                    onParishChange={(value) => setValueAndClearError("birth_parish", value)}
+                    onVillageChange={(value) => setValueAndClearError("birth_village", value)}
+                    gridCols={3}
+                  />
+                  {(errors.birth_region || errors.birth_district || errors.birth_county || 
+                    errors.birth_sub_county || errors.birth_parish || errors.birth_village) && (
+                    <div className="text-red-500 text-sm mt-2 space-y-1">
+                      {errors.birth_region && <p>{errors.birth_region.message}</p>}
+                      {errors.birth_district && <p>{errors.birth_district.message}</p>}
+                      {errors.birth_county && <p>{errors.birth_county.message}</p>}
+                      {errors.birth_sub_county && <p>{errors.birth_sub_county.message}</p>}
+                      {errors.birth_parish && <p>{errors.birth_parish.message}</p>}
+                      {errors.birth_village && <p>{errors.birth_village.message}</p>}
+                    </div>
+                  )}
                 </TabsContent>
 
                 {/* Physical Characteristics Tab */}
@@ -733,81 +1339,139 @@ const {
                       </Label>
                       <Input
                         id="height"
-                        {...register("height")}
-                        placeholder="Enter height in cm"
+                        type="number"
+                        step="0.01"
+                        max="500"
+                        min="1"
+                        {...register("height", {
+                          valueAsNumber: true,
+                          max: { value: 500, message: "Height must be no more than 500 cm" },
+                          min: { value: 1, message: "Height must be at least 1 cm" }
+                        })}
+                        placeholder="Enter height in cm (e.g., 75.50)"
                       />
+                      {errors.height && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.height.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Build</Label>
                       <BuildSelect
                         value={watchBuild}
-                        onValueChange={(value) => setValue("build", value)}
+                        onValueChange={(value) => setValueAndClearError("build", value)}
                       />
+                      {errors.build && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.build.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Face</Label>
                       <FaceSelect
                         value={watchFace}
-                        onValueChange={(value) => setValue("face", value)}
+                        onValueChange={(value) => setValueAndClearError("face", value)}
                       />
+                      {errors.face && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.face.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Eyes</Label>
                       <EyeSelect
                         value={watchEyes}
-                        onValueChange={(value) => setValue("eyes", value)}
+                        onValueChange={(value) => setValueAndClearError("eyes", value)}
                       />
+                      {errors.eyes && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.eyes.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Mouth</Label>
                       <MouthSelect
                         value={watchMouth}
-                        onValueChange={(value) => setValue("mouth", value)}
+                        onValueChange={(value) => setValueAndClearError("mouth", value)}
                       />
+                      {errors.mouth && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.mouth.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Teeth</Label>
                       <TeethSelect
                         value={watchTeeth}
-                        onValueChange={(value) => setValue("teeth", value)}
+                        onValueChange={(value) => setValueAndClearError("teeth", value)}
                       />
+                      {errors.teeth && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.teeth.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Lips</Label>
                       <LipSelect
                         value={watchLips}
-                        onValueChange={(value) => setValue("lips", value)}
+                        onValueChange={(value) => setValueAndClearError("lips", value)}
                       />
+                      {errors.lips && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.lips.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Ears</Label>
                       <EarSelect
                         value={watchEars}
-                        onValueChange={(value) => setValue("ears", value)}
+                        onValueChange={(value) => setValueAndClearError("ears", value)}
                       />
+                      {errors.ears && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.ears.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Hair</Label>
                       <HairSelect
                         value={watchHair}
-                        onValueChange={(value) => setValue("hair", value)}
+                        onValueChange={(value) => setValueAndClearError("hair", value)}
                       />
+                      {errors.hair && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.hair.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
                       <Label>Speech</Label>
                       <SpeechSelect
                         value={watchSpeech}
-                        onValueChange={(value) => setValue("speech", value)}
+                        onValueChange={(value) => setValueAndClearError("speech", value)}
                       />
+                      {errors.speech && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.speech.message}
+                        </p>
+                      )}
                     </div>
 
                     <div className="md:col-span-2">
@@ -842,6 +1506,40 @@ const {
                   value="record"
                   className="space-y-4"
                 >
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="prisoner_class">
+                        Prisoner Class
+                      </Label>
+                      <PrisonerClassSelect
+                        value={watchPrisonerClass}
+                        onValueChange={(value) => setValueAndClearError("prisoner_class", value)}
+                        placeholder="Select prisoner class"
+                      />
+                      {errors.prisoner_class && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.prisoner_class.message}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <Label htmlFor="desired_district_of_release">
+                        Desired District of Release
+                      </Label>
+                      <DistrictSelect
+                        value={watchDesiredDistrictOfRelease}
+                        onValueChange={(value) => setValueAndClearError("desired_district_of_release", value)}
+                        placeholder="Select district"
+                      />
+                      {errors.desired_district_of_release && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.desired_district_of_release.message}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
                   <Separator />
                   <div className="space-y-4">
                     <h4 className="mb-4">Prisoner Tagging</h4>
@@ -1087,12 +1785,12 @@ const {
                         subCounty={watchArrestSubCounty}
                         parish={watchArrestParish}
                         village={watchArrestVillage}
-                        onRegionChange={(value) => setValue("arrest_region", value)}
-                        onDistrictChange={(value) => setValue("arrest_district", value)}
-                        onCountyChange={(value) => setValue("arrest_county", value)}
-                        onSubCountyChange={(value) => setValue("arrest_sub_county", value)}
-                        onParishChange={(value) => setValue("arrest_parish", value)}
-                        onVillageChange={(value) => setValue("arrest_village", value)}
+                        onRegionChange={(value) => setValueAndClearError("arrest_region", value)}
+                        onDistrictChange={(value) => setValueAndClearError("arrest_district", value)}
+                        onCountyChange={(value) => setValueAndClearError("arrest_county", value)}
+                        onSubCountyChange={(value) => setValueAndClearError("arrest_sub_county", value)}
+                        onParishChange={(value) => setValueAndClearError("arrest_parish", value)}
+                        onVillageChange={(value) => setValueAndClearError("arrest_village", value)}
                         gridCols={3}
                       />
                     </div>
@@ -1510,6 +2208,11 @@ const {
                           {...register("photo")}
                         />
                       </div>
+                      {errors.photo && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.photo.message}
+                        </p>
+                      )}
                     </div>
 
                     <div>
@@ -1540,377 +2243,22 @@ const {
                         {...register("age_on_admission")}
                         placeholder="Enter age"
                       />
+                      {errors.age_on_admission && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {errors.age_on_admission.message}
+                        </p>
+                      )}
                     </div>
                   </div>
                 </TabsContent>
               </Tabs>
-
-              {/* Status of Women Section - Only visible for Female prisoners */}
-              {watchSex === "sex-2" && (
-                <div className="mt-6 space-y-4">
-                  <div className="pb-4 border-b">
-                    <Label htmlFor="status_of_women">
-                      Status of Women
-                    </Label>
-                    <StatusOfWomanSelect
-                      value={watchStatusOfWomen}
-                      onValueChange={(value) => setValue("status_of_women", value)}
-                      placeholder="Select status of women"
-                    />
-                  </div>
-
-                  {/* Estimated Duration of Pregnancy - Show if Pregnant or Pregnant + With Child */}
-                  {(watchStatusOfWomen === "sow-1" ||
-                    watchStatusOfWomen === "sow-3") && (
-                    <div>
-                      <Label htmlFor="estimated_age_of_pregnancy">
-                        Estimated Duration of Pregnancy (weeks)
-                      </Label>
-                      <Input
-                        id="estimated_age_of_pregnancy"
-                        type="number"
-                        {...register(
-                          "estimated_age_of_pregnancy",
-                        )}
-                        placeholder="Enter estimated duration in weeks"
-                      />
-                    </div>
-                  )}
-
-                  {/* Children Section - Show if With Child or Pregnant + With Child */}
-                  {(watchStatusOfWomen === "sow-2" ||
-                    watchStatusOfWomen === "sow-3") && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm">
-                          Children Records
-                        </h4>
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={handleAddChild}
-                          className="bg-[#650000] hover:bg-[#4a0000]"
-                        >
-                          <UserPlus className="h-4 w-4 mr-2" />
-                          Add Child
-                        </Button>
-                      </div>
-
-                      {children.length > 0 && (
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Name</TableHead>
-                              <TableHead>
-                                Date of Birth
-                              </TableHead>
-                              <TableHead>Sex</TableHead>
-                              <TableHead>
-                                Age on Admission
-                              </TableHead>
-                              <TableHead>Actions</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {children.map((child) => (
-                              <TableRow key={child.id}>
-                                <TableCell>
-                                  {child.name}
-                                </TableCell>
-                                <TableCell>
-                                  {child.date_of_birth}
-                                </TableCell>
-                                <TableCell>
-                                  {child.sex}
-                                </TableCell>
-                                <TableCell>
-                                  {child.age_on_admission}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        handleEditChild(child)
-                                      }
-                                    >
-                                      Edit
-                                    </Button>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() =>
-                                        handleDeleteChild(
-                                          child.id!,
-                                        )
-                                      }
-                                    >
-                                      <X className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      )}
-
-                      {/* Child Form Dialog */}
-                      {showChildForm && (
-                        <Card className="border-2 border-[#650000]">
-                          <CardHeader>
-                            <CardTitle className="text-[#650000]">
-                              {currentChild
-                                ? "Edit Child Record"
-                                : "Add Child Record"}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <Label htmlFor="child_name">
-                                    Child Name{" "}
-                                    <span className="text-red-500">
-                                      *
-                                    </span>
-                                  </Label>
-                                  <Input
-                                    id="child_name"
-                                    {...registerChild("name", {
-                                      required:
-                                        "Name is required",
-                                    })}
-                                    placeholder="Enter child's name"
-                                  />
-                                  {childErrors.name && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                      {childErrors.name.message}
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_dob">
-                                    Date of Birth{" "}
-                                    <span className="text-red-500">
-                                      *
-                                    </span>
-                                  </Label>
-                                  <Input
-                                    id="child_dob"
-                                    type="date"
-                                    {...registerChild(
-                                      "date_of_birth",
-                                      {
-                                        required:
-                                          "Date of birth is required",
-                                      },
-                                    )}
-                                  />
-                                  {childErrors.date_of_birth && (
-                                    <p className="text-red-500 text-sm mt-1">
-                                      {
-                                        childErrors
-                                          .date_of_birth.message
-                                      }
-                                    </p>
-                                  )}
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_sex">
-                                    Sex
-                                  </Label>
-                                  <SexSelect
-                                    value={watchChild("sex")}
-                                    onValueChange={(value) => setChildValue("sex", value)}
-                                    placeholder="Select sex"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_age">
-                                    Age on Admission
-                                  </Label>
-                                  <Input
-                                    id="child_age"
-                                    type="number"
-                                    {...registerChild(
-                                      "age_on_admission",
-                                    )}
-                                    placeholder="Age in years"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="fathers_name">
-                                    Father's Name
-                                  </Label>
-                                  <Input
-                                    id="fathers_name"
-                                    {...registerChild(
-                                      "fathers_name",
-                                    )}
-                                    placeholder="Enter father's name"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="mothers_name">
-                                    Mother's Name
-                                  </Label>
-                                  <Input
-                                    id="mothers_name"
-                                    {...registerChild(
-                                      "mothers_name",
-                                    )}
-                                    placeholder="Enter mother's name"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="hospital_of_birth">
-                                    Hospital of Birth
-                                  </Label>
-                                  <Input
-                                    id="hospital_of_birth"
-                                    {...registerChild(
-                                      "hospital_of_birth",
-                                    )}
-                                    placeholder="Enter hospital"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="district_of_birth">
-                                    District of Birth
-                                  </Label>
-                                  <Input
-                                    id="district_of_birth"
-                                    {...registerChild(
-                                      "district_of_birth",
-                                    )}
-                                    placeholder="Enter district"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="relation">
-                                    Relation to Prisoner
-                                  </Label>
-                                  <Input
-                                    id="relation"
-                                    {...registerChild(
-                                      "relation",
-                                    )}
-                                    placeholder="e.g., Son, Daughter"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="physical_condition">
-                                    Physical Condition
-                                  </Label>
-                                  <Input
-                                    id="physical_condition"
-                                    {...registerChild(
-                                      "physical_condition",
-                                    )}
-                                    placeholder="Describe physical condition"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label htmlFor="medical_condition">
-                                    Medical Condition
-                                  </Label>
-                                  <Textarea
-                                    id="medical_condition"
-                                    {...registerChild(
-                                      "medical_condition",
-                                    )}
-                                    placeholder="Describe any medical conditions..."
-                                    rows={2}
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label htmlFor="child_description">
-                                    Description
-                                  </Label>
-                                  <Textarea
-                                    id="child_description"
-                                    {...registerChild(
-                                      "description",
-                                    )}
-                                    placeholder="Additional information about the child..."
-                                    rows={2}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_photo">
-                                    Photo Upload
-                                  </Label>
-                                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                                    <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">
-                                      Click to upload
-                                    </p>
-                                    <Input
-                                      id="child_photo"
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      {...registerChild(
-                                        "photo",
-                                      )}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={
-                                    handleCancelChildForm
-                                  }
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="bg-[#650000] hover:bg-[#4a0000]"
-                                  onClick={handleSubmitChild(
-                                    onSubmitChild,
-                                  )}
-                                >
-                                  <Save className="h-4 w-4 mr-2" />
-                                  {currentChild
-                                    ? "Update Child"
-                                    : "Add Child"}
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
 
               <div className="flex justify-between mt-6">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onCancel}
+                  disabled={isSubmitting}
                 >
                   <ArrowLeft className="h-4 w-4 mr-2" />
                   Previous
@@ -1918,8 +2266,14 @@ const {
                 <Button
                   type="submit"
                   className="bg-[#650000] hover:bg-[#4a0000]"
+                  disabled={isSubmitting}
                 >
-                  {prisonerCategory === "DEBTOR" ? (
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Submitting...
+                    </>
+                  ) : prisonerCategory === "DEBTOR" ? (
                     <>
                       Next{" "}
                       <ArrowRight className="h-4 w-4 ml-2" />

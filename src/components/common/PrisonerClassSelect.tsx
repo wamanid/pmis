@@ -15,58 +15,56 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchDistricts } from '../../services/system_administration';
-import type { District } from '../../models/system_administration';
+import { fetchPrisonerClasses } from '../../services/system_administration/prisonerClassService';
+import type { PrisonerClass } from '../../models/system_administration/prisonerClass';
 
-export interface DistrictSelectProps {
+export interface PrisonerClassSelectProps {
   value?: string;
   onValueChange?: (value: string) => void;
-  regionId?: string;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
 }
 
-export function DistrictSelect({
+export function PrisonerClassSelect({
   value,
   onValueChange,
-  regionId,
-  placeholder = 'Select district...',
+  placeholder = 'Select prisoner class...',
   disabled = false,
   className,
-}: DistrictSelectProps) {
+}: PrisonerClassSelectProps) {
   const [open, setOpen] = useState(false);
-  const [districts, setDistricts] = useState<District[]>([]);
+  const [prisonerClasses, setPrisonerClasses] = useState<PrisonerClass[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch districts when component mounts, search query changes, or regionId changes
   useEffect(() => {
-    const loadDistricts = async () => {
+    const loadPrisonerClasses = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchDistricts({
+        const response = await fetchPrisonerClasses({
           search: searchQuery || undefined,
-          region: regionId || undefined,
-          is_active: true,
           ordering: 'name',
+          is_active: true,
         });
-        setDistricts(response.results);
-      } catch (err: any) {
-        console.error('Failed to load districts:', err);
-        setError(err.message || 'Failed to load districts');
+        setPrisonerClasses(response.results);
+      } catch (err) {
+        console.error('Error loading prisoner classes:', err);
+        setError('Failed to load prisoner classes');
+        setPrisonerClasses([]);
       } finally {
         setLoading(false);
       }
     };
 
-    loadDistricts();
-  }, [searchQuery, regionId]);
+    if (open) {
+      loadPrisonerClasses();
+    }
+  }, [open, searchQuery]);
 
-  // Find selected district
-  const selectedDistrict = districts.find((district) => district.id === value);
+  const selectedPrisonerClass = prisonerClasses.find((pc) => pc.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -75,62 +73,52 @@ export function DistrictSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
+          className={cn('w-full justify-between', className)}
           disabled={disabled}
-          className={cn(
-            'w-full justify-between',
-            !value && 'text-muted-foreground',
-            className
-          )}
         >
-          {selectedDistrict ? selectedDistrict.name : placeholder}
+          {selectedPrisonerClass ? selectedPrisonerClass.name : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-full p-0" align="start">
-        <Command shouldFilter={false}>
+      <PopoverContent className="w-full p-0">
+        <Command>
           <CommandInput
-            placeholder="Search districts..."
+            placeholder="Search prisoner class..."
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
           <CommandList>
             {loading ? (
-              <div className="flex items-center justify-center py-6">
+              <div className="flex items-center justify-center p-4">
                 <Loader2 className="h-4 w-4 animate-spin" />
+                <span className="ml-2 text-sm">Loading...</span>
               </div>
             ) : error ? (
-              <div className="py-6 text-center text-sm text-red-600">
-                {error}
-              </div>
+              <div className="p-4 text-sm text-red-500">{error}</div>
             ) : (
               <>
-                <CommandEmpty>No district found.</CommandEmpty>
+                <CommandEmpty>No prisoner class found.</CommandEmpty>
                 <CommandGroup>
-                  {districts.map((district) => (
+                  {prisonerClasses.map((prisonerClass) => (
                     <CommandItem
-                      key={district.id}
-                      value={district.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      key={prisonerClass.id}
+                      value={prisonerClass.name}
+                      onSelect={() => {
+                        onValueChange?.(prisonerClass.id === value ? '' : prisonerClass.id);
                         setOpen(false);
                       }}
                     >
                       <Check
                         className={cn(
                           'mr-2 h-4 w-4',
-                          value === district.id ? 'opacity-100' : 'opacity-0'
+                          value === prisonerClass.id ? 'opacity-100' : 'opacity-0'
                         )}
                       />
                       <div className="flex flex-col">
-                        <span>{district.name}</span>
-                        {district.description && (
+                        <span>{prisonerClass.name}</span>
+                        {prisonerClass.description && (
                           <span className="text-xs text-muted-foreground">
-                            {district.description}
-                          </span>
-                        )}
-                        {district.region_name && (
-                          <span className="text-xs text-muted-foreground">
-                            Region: {district.region_name}
+                            {prisonerClass.description}
                           </span>
                         )}
                       </div>

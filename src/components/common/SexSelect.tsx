@@ -20,7 +20,7 @@ import type { Sex } from '../../models/system_administration';
 
 export interface SexSelectProps {
   value?: string;
-  onValueChange?: (value: string) => void;
+  onValueChange?: (value: string, sex?: Sex) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -108,7 +108,8 @@ export function SexSelect({
                       key={sex.id}
                       value={sex.name}
                       onSelect={() => {
-                        onValueChange?.(sex.id === value ? '' : sex.id);
+                        const newValue = sex.id === value ? '' : sex.id;
+                        onValueChange?.(newValue, newValue ? sex : undefined);
                         setOpen(false);
                       }}
                     >

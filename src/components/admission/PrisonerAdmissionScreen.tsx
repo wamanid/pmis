@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form@7.55.0";
 import {
   Search,
@@ -67,14 +67,14 @@ import {
   DebtorInformation,
   ChildRecord,
   ArmedPersonnel} from "../../models/admission";
-import { generatePrisonerNumber } from "../../services/admission";
+import { generatePrisonerNumber, getPrisonerById } from "../../services/admission";
 
 // Admission types configuration
 const admissionTypes = [
-  { id: "NEW", name: "New Admission" },
-  { id: "READMISSION", name: "Re-admission" },
-  { id: "TRANSFER", name: "Transfer from Another Facility" },
-  { id: "RECALL", name: "Recall" },
+  { id: "COURT", name: "Court" },
+  { id: "TRANSFER", name: "Transfer" },
+  { id: "LODGER", name: "Lodger" },
+  { id: "RECAPTURE", name: "Recapture" },
 ];
 
 const PrisonerAdmissionScreen: React.FC = () => {
@@ -89,6 +89,7 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const [showRemandAlert, setShowRemandAlert] = useState(false);
   const [generatedPersonalNumber, setGeneratedPersonalNumber] = useState("");
   const [generatedPrisonerNumber, setGeneratedPrisonerNumber] = useState("");
+  const [prisonerId, setPrisonerId] = useState<string | null>(null);
   const [isGeneratingPrisonerNumber, setIsGeneratingPrisonerNumber] = useState(false);
   const [children, setChildren] = useState<ChildRecord[]>([]);
   const [currentChild, setCurrentChild] = useState<ChildRecord | null>(null);
@@ -162,6 +163,69 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const isArmedPersonnel = watch("armed_personnel");
   const watchArmedForce = watchArmedPersonnel("armed_force");
   const watchArmedForceStatus = watchArmedPersonnel("armed_forces_status");
+
+  // Check for existing prisoner data and form state on component mount
+  useEffect(() => {
+    const loadExistingData = async () => {
+      try {
+        // Load prisoner number reservation
+        const storedReservation = localStorage.getItem("pmis_prisoner_number_reservation");
+        
+        if (storedReservation) {
+          const reservation = JSON.parse(storedReservation);
+          
+          // Check if prisoner_id exists in the stored reservation
+          if (reservation.prisoner_id) {
+            // Fetch prisoner details from API
+            const prisonerData = await getPrisonerById(reservation.prisoner_id);
+            
+            // Populate the prisoner number fields with the values from API
+            setGeneratedPrisonerNumber(prisonerData.prisoner_number_value || "");
+            setGeneratedPersonalNumber(prisonerData.prisoner_personal_number_value || "");
+            setPrisonerId(prisonerData.id);
+            
+            toast.success("Prisoner data loaded from previous session");
+          }
+        }
+
+        // Load form state
+        const storedFormState = localStorage.getItem("pmis_admission_form_state");
+        if (storedFormState) {
+          const formState = JSON.parse(storedFormState);
+          
+          // Restore admission setup state
+          if (formState.admissionType) setAdmissionType(formState.admissionType);
+          if (formState.prisonerCategory) setPrisonerCategory(formState.prisonerCategory);
+          if (formState.isConscious !== undefined) setIsConscious(formState.isConscious);
+          if (formState.currentStep) setCurrentStep(formState.currentStep);
+          if (formState.children) setChildren(formState.children);
+          if (formState.nextOfKin) setNextOfKin(formState.nextOfKin);
+        }
+      } catch (error) {
+        console.error("Error loading existing data:", error);
+        // Don't show error toast as this is a background operation
+      }
+    };
+
+    loadExistingData();
+  }, []);
+
+  // Save form state to localStorage whenever it changes
+  useEffect(() => {
+    // Only save if there's actual data (not initial empty state)
+    if (admissionType || prisonerCategory || children.length > 0 || nextOfKin.length > 0) {
+      const formState = {
+        admissionType,
+        prisonerCategory,
+        isConscious,
+        currentStep,
+        children,
+        nextOfKin,
+      };
+
+      localStorage.setItem("pmis_admission_form_state", JSON.stringify(formState));
+    }
+  }, [admissionType, prisonerCategory, isConscious, currentStep, children, nextOfKin]);
 
   // Search for existing prisoner
   const handleSearch = () => {
@@ -348,6 +412,7 @@ const PrisonerAdmissionScreen: React.FC = () => {
         response.prisoner_personal_number_details.prisoner_personal_number,
       );
       setGeneratedPrisonerNumber(response.prisoner_number);
+      setPrisonerId(response.prisoner_id);
 
       localStorage.setItem(
         "pmis_prisoner_number_reservation",
@@ -366,18 +431,8 @@ const PrisonerAdmissionScreen: React.FC = () => {
   // Handle admission type change
   const handleAdmissionTypeChange = (value: string) => {
     setAdmissionType(value);
-
-    if (value === "NEW") {
-      // For new prisoner, generate numbers immediately via API
-      generatePrisonerNumbers();
-
-      setSelectedPrisoner(null);
-      reset();
-    } else {
-      // For others, they need to search first
-      setGeneratedPersonalNumber("");
-      setGeneratedPrisonerNumber("");
-    }
+    // All admission types allow prisoner search
+    // User must manually generate prisoner numbers
   };
 
   // Handle category change
@@ -404,11 +459,9 @@ const PrisonerAdmissionScreen: React.FC = () => {
         return;
       }
 
-      // For non-new prisoners, they must search and select a prisoner
-      if (admissionType !== "NEW" && !selectedPrisoner) {
-        toast.error(
-          "Please search and select an existing prisoner",
-        );
+      // Must have generated prisoner numbers before proceeding
+      if (!generatedPrisonerNumber || !generatedPersonalNumber) {
+        toast.error("Please generate prisoner numbers before proceeding");
         return;
       }
     }
@@ -564,6 +617,7 @@ const PrisonerAdmissionScreen: React.FC = () => {
       admission_type: admissionType,
       prisoner_category: prisonerCategory,
       is_conscious: isConscious,
+      prisoner_id: prisonerId,
       prisoner_personal_number:
         generatedPersonalNumber ||
         selectedPrisoner?.prisoner_personal_number,
@@ -598,6 +652,7 @@ const PrisonerAdmissionScreen: React.FC = () => {
     setShowRemandAlert(false);
     setGeneratedPersonalNumber("");
     setGeneratedPrisonerNumber("");
+    setPrisonerId(null);
     setChildren([]);
     setShowChildForm(false);
     setCurrentChild(null);
@@ -612,6 +667,10 @@ const PrisonerAdmissionScreen: React.FC = () => {
     resetChild();
     resetNextOfKin();
     resetArmedPersonnel();
+    
+    // Clear localStorage
+    localStorage.removeItem("pmis_prisoner_number_reservation");
+    localStorage.removeItem("pmis_admission_form_state");
   };
 
   return (
@@ -791,8 +850,8 @@ const PrisonerAdmissionScreen: React.FC = () => {
               </Alert>
             )}
 
-            {/* Search Section - Only for non-new prisoners */}
-            {admissionType && admissionType !== "NEW" && (
+            {/* Search Section - Available for all admission types */}
+            {admissionType && (
               <div className="space-y-4">
                 <Separator />
                 <div>

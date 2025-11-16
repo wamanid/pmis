@@ -263,3 +263,13 @@ export {
   updateSpeech,
   deleteSpeech
 } from './speechService';
+
+// Prisoner Class Service
+export {
+  fetchPrisonerClasses,
+  fetchPrisonerClassById,
+  createPrisonerClass,
+  updatePrisonerClass,
+  patchPrisonerClass,
+  deletePrisonerClass
+} from './prisonerClassService';

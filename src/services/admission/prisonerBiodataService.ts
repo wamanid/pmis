@@ -59,3 +59,14 @@ export const getPrisonerBiodataByPrisonerId = async (
   const response = await axiosInstance.get<PrisonerBiodata>(url);
   return response.data;
 };
+
+/**
+ * Create new prisoner biodata
+ */
+export const createPrisonerBiodata = async (
+  data: Partial<PrisonerBiodata>,
+): Promise<PrisonerBiodata> => {
+  const url = 'admission/prisoner-biodata/';
+  const response = await axiosInstance.post<PrisonerBiodata>(url, data);
+  return response.data;
+};

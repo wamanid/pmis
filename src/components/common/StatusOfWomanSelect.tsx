@@ -20,7 +20,7 @@ import type { StatusOfWoman } from '../../models/system_administration';
 
 export interface StatusOfWomanSelectProps {
   value?: string;
-  onValueChange?: (value: string) => void;
+  onValueChange?: (value: string, statusOfWoman?: StatusOfWoman) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
@@ -106,7 +106,8 @@ export function StatusOfWomanSelect({
                       key={status.id}
                       value={status.name}
                       onSelect={() => {
-                        onValueChange?.(status.id === value ? '' : status.id);
+                        const newValue = status.id === value ? '' : status.id;
+                        onValueChange?.(newValue, newValue ? status : undefined);
                         setOpen(false);
                       }}
                     >

@@ -11,10 +11,20 @@ interface PrisonerBioDataViewProps {
 }
 
 const PrisonerBioDataView: React.FC<PrisonerBioDataViewProps> = ({ bioData }) => {
-  const InfoRow = ({ label, value }: { label: string; value?: string | number | boolean | null }) => {
+  const InfoRow = ({ label, value }: { label: string; value?: any }) => {
     if (value === undefined || value === null || value === "") return null;
     
-    const displayValue = typeof value === "boolean" ? (value ? "Yes" : "No") : value;
+    // Handle different value types
+    let displayValue: string | number;
+    
+    if (typeof value === "boolean") {
+      displayValue = value ? "Yes" : "No";
+    } else if (typeof value === "object" && value !== null) {
+      // If it's an object, try to extract the name property
+      displayValue = value.name || value.id || JSON.stringify(value);
+    } else {
+      displayValue = value;
+    }
     
     return (
       <div className="grid grid-cols-3 gap-4 py-2">

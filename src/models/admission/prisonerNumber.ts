@@ -12,4 +12,5 @@ export interface PrisonerNumberReservationResponse {
   prisoner_number: string;
   reservation_id: string;
   created_datetime: string;
+  prisoner_id: string;
 }
