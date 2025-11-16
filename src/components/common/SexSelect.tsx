@@ -106,9 +106,9 @@ export function SexSelect({
                   {sexes.map((sex) => (
                     <CommandItem
                       key={sex.id}
-                      value={sex.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={sex.name}
+                      onSelect={() => {
+                        onValueChange?.(sex.id === value ? '' : sex.id);
                         setOpen(false);
                       }}
                     >

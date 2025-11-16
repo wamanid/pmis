@@ -7,7 +7,7 @@ import type {
   UpdateMaritalStatusData,
 } from '../../models/system_administration/maritalStatus';
 
-const BASE_URL = '/api/system-administration/marital-statuses/';
+const BASE_URL = '/system-administration/marital-statuses/';
 
 /**
  * Fetch marital statuses with optional query parameters

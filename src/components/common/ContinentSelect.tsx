@@ -106,9 +106,9 @@ export function ContinentSelect({
                   {continents.map((continent) => (
                     <CommandItem
                       key={continent.id}
-                      value={continent.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={continent.name}
+                      onSelect={() => {
+                        onValueChange?.(continent.id === value ? '' : continent.id);
                         setOpen(false);
                       }}
                     >

@@ -106,9 +106,9 @@ export function MaritalStatusSelect({
                   {maritalStatuses.map((status) => (
                     <CommandItem
                       key={status.id}
-                      value={status.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={status.name}
+                      onSelect={() => {
+                        onValueChange?.(status.id === value ? '' : status.id);
                         setOpen(false);
                       }}
                     >

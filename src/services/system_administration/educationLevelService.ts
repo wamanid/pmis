@@ -7,7 +7,7 @@ import type {
   UpdateEducationLevelData,
 } from '../../models/system_administration/educationLevel';
 
-const BASE_URL = '/api/system-administration/education-levels/';
+const BASE_URL = '/system-administration/education-levels/';
 
 /**
  * Fetch education levels with optional query parameters

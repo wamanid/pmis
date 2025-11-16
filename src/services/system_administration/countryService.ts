@@ -7,7 +7,7 @@ import type {
   UpdateCountryData,
 } from '../../models/system_administration/country';
 
-const BASE_URL = '/api/system-administration/countries/';
+const BASE_URL = '/system-administration/countries/';
 
 /**
  * Fetch countries with optional query parameters

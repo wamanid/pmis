@@ -14,3 +14,14 @@ export type { Continent, ContinentListResponse, ContinentQueryParams } from './c
 export type { Country, CountryListResponse, CountryQueryParams } from './country';
 export type { MaritalStatus, MaritalStatusListResponse, MaritalStatusQueryParams } from './maritalStatus';
 export type { StatusOfWoman, StatusOfWomanListResponse, StatusOfWomanQueryParams } from './statusOfWoman';
+export type { Religion, ReligionListResponse, ReligionQueryParams } from './religion';
+export type { IdType, IdTypeListResponse, IdTypeQueryParams } from './idType';
+export type { Build, BuildListResponse, BuildQueryParams } from './build';
+export type { FaceType, FaceTypeListResponse, FaceTypeQueryParams } from './faceType';
+export type { Eye, EyeListResponse, EyeQueryParams } from './eye';
+export type { Mouth, MouthListResponse, MouthQueryParams } from './mouth';
+export type { Lip, LipListResponse, LipQueryParams } from './lip';
+export type { Teeth, TeethListResponse, TeethQueryParams } from './teeth';
+export type { Ear, EarListResponse, EarQueryParams } from './ear';
+export type { Hair, HairListResponse, HairQueryParams } from './hair';
+export type { Speech, SpeechListResponse, SpeechQueryParams } from './speech';

@@ -106,9 +106,9 @@ export function EducationLevelSelect({
                   {educationLevels.map((level) => (
                     <CommandItem
                       key={level.id}
-                      value={level.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={level.name}
+                      onSelect={() => {
+                        onValueChange?.(level.id === value ? '' : level.id);
                         setOpen(false);
                       }}
                     >

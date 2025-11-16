@@ -7,7 +7,7 @@ import type {
   UpdateTribeData,
 } from '../../models/system_administration/tribe';
 
-const BASE_URL = '/api/system-administration/tribes/';
+const BASE_URL = '/system-administration/tribes/';
 
 /**
  * Fetch tribes with optional query parameters

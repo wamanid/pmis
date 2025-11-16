@@ -7,7 +7,7 @@ import type {
   UpdateContinentData,
 } from '../../models/system_administration/continent';
 
-const BASE_URL = '/api/system-administration/continents/';
+const BASE_URL = '/system-administration/continents/';
 
 /**
  * Fetch continents with optional query parameters

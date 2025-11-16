@@ -162,3 +162,104 @@ export {
   patchStatusOfWoman,
   deleteStatusOfWoman
 } from './statusOfWomanService';
+
+// Religion Service
+export {
+  fetchReligions,
+  fetchReligionById,
+  createReligion,
+  updateReligion,
+  patchReligion,
+  deleteReligion
+} from './religionService';
+
+// ID Type Service
+export {
+  fetchIdTypes,
+  fetchIdTypeById,
+  createIdType,
+  updateIdType,
+  patchIdType,
+  deleteIdType
+} from './idTypeService';
+
+// Build Service
+export {
+  fetchBuilds,
+  fetchBuildById,
+  createBuild,
+  updateBuild,
+  deleteBuild
+} from './buildService';
+
+// Face Type Service
+export {
+  fetchFaceTypes,
+  fetchFaceTypeById,
+  createFaceType,
+  updateFaceType,
+  deleteFaceType
+} from './faceTypeService';
+
+// Eye Service
+export {
+  fetchEyes,
+  fetchEyeById,
+  createEye,
+  updateEye,
+  deleteEye
+} from './eyeService';
+
+// Mouth Service
+export {
+  fetchMouths,
+  fetchMouthById,
+  createMouth,
+  updateMouth,
+  deleteMouth
+} from './mouthService';
+
+// Lip Service
+export {
+  fetchLips,
+  fetchLipById,
+  createLip,
+  updateLip,
+  deleteLip
+} from './lipService';
+
+// Teeth Service
+export {
+  fetchTeeth,
+  fetchTeethById,
+  createTeeth,
+  updateTeeth,
+  deleteTeeth
+} from './teethService';
+
+// Ear Service
+export {
+  fetchEars,
+  fetchEarById,
+  createEar,
+  updateEar,
+  deleteEar
+} from './earService';
+
+// Hair Service
+export {
+  fetchHairs,
+  fetchHairById,
+  createHair,
+  updateHair,
+  deleteHair
+} from './hairService';
+
+// Speech Service
+export {
+  fetchSpeeches,
+  fetchSpeechById,
+  createSpeech,
+  updateSpeech,
+  deleteSpeech
+} from './speechService';

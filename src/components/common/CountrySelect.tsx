@@ -109,9 +109,9 @@ export function CountrySelect({
                   {countries.map((country) => (
                     <CommandItem
                       key={country.id}
-                      value={country.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={country.name}
+                      onSelect={() => {
+                        onValueChange?.(country.id === value ? '' : country.id);
                         setOpen(false);
                       }}
                     >

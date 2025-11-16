@@ -7,7 +7,7 @@ import type {
   UpdateStatusOfWomanData,
 } from '../../models/system_administration/statusOfWoman';
 
-const BASE_URL = '/api/system-administration/status-of-women/';
+const BASE_URL = '/system-administration/status-of-women/';
 
 /**
  * Fetch status of women with optional query parameters

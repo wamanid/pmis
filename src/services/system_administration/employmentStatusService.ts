@@ -7,7 +7,7 @@ import type {
   UpdateEmploymentStatusData,
 } from '../../models/system_administration/employmentStatus';
 
-const BASE_URL = '/api/system-administration/employment-statuses/';
+const BASE_URL = '/system-administration/employment-statuses/';
 
 /**
  * Fetch employment statuses with optional query parameters

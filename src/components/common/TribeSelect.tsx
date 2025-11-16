@@ -106,9 +106,9 @@ export function TribeSelect({
                   {tribes.map((tribe) => (
                     <CommandItem
                       key={tribe.id}
-                      value={tribe.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      value={tribe.name}
+                      onSelect={() => {
+                        onValueChange?.(tribe.id === value ? '' : tribe.id);
                         setOpen(false);
                       }}
                     >
