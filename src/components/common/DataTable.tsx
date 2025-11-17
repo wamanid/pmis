@@ -324,7 +324,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
             {/* Search */}
             {mergedConfig.search && (
               <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder=" Search..."

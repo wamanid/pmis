@@ -33,6 +33,9 @@ import { SubCountySelect } from "../../common/SubCountySelect";
 import { ParishSelect } from "../../common/ParishSelect";
 import { VillageSelect } from "../../common/VillageSelect";
 import { PrisonerClassSelect } from "../../common/PrisonerClassSelect";
+import FileUpload from "../../common/FileUpload";
+import ChildRecordForm from "../ChildRecordForm";
+import NextOfKinForm from "../NextOfKinForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { Separator } from "../../ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
@@ -62,6 +65,7 @@ import {
   X,
   Fingerprint,
   Loader2,
+  Baby,
 } from "lucide-react";
 
 interface PrisonerBioDataFormProps {
@@ -319,28 +323,6 @@ const {
   formState: { errors: armedPersonnelErrors },
 } = useForm<ArmedPersonnel>();
 
-  // Child form hook
-  const {
-    register: registerChild,
-    handleSubmit: handleSubmitChild,
-    setValue: setChildValue,
-    watch: watchChild,
-    reset: resetChild,
-    control: controlChild,
-    formState: { errors: childErrors },
-  } = useForm<ChildRecord>();
-
-  // Next of Kin form hook
-  const {
-    register: registerNextOfKin,
-    handleSubmit: handleSubmitNextOfKin,
-    setValue: setNextOfKinValue,
-    watch: watchNextOfKin,
-    reset: resetNextOfKin,
-    control: controlNextOfKin,
-    formState: { errors: nextOfKinErrors },
-  } = useForm<NextOfKin>();
-
   // State for children management
   const [children, setChildren] = useState<ChildRecord[]>([]);
   const [currentChild, setCurrentChild] = useState<ChildRecord | null>(null);
@@ -502,24 +484,15 @@ const {
     }
     setShowChildForm(false);
     setCurrentChild(null);
-    resetChild();
   };
 
   const handleAddChild = () => {
     setCurrentChild(null);
-    resetChild();
     setShowChildForm(true);
   };
 
   const handleEditChild = (child: ChildRecord) => {
     setCurrentChild(child);
-    // Populate form with child data
-    Object.keys(child).forEach((key) => {
-      setChildValue(
-        key as keyof ChildRecord,
-        child[key as keyof ChildRecord],
-      );
-    });
     setShowChildForm(true);
   };
 
@@ -531,7 +504,6 @@ const {
   const handleCancelChildForm = () => {
     setShowChildForm(false);
     setCurrentChild(null);
-    resetChild();
   };
 
   // Next of Kin handlers
@@ -557,24 +529,15 @@ const {
     }
     setShowNextOfKinForm(false);
     setCurrentNextOfKin(null);
-    resetNextOfKin();
   };
 
   const handleAddNextOfKin = () => {
     setCurrentNextOfKin(null);
-    resetNextOfKin();
     setShowNextOfKinForm(true);
   };
 
   const handleEditNextOfKin = (nok: NextOfKin) => {
     setCurrentNextOfKin(nok);
-    // Populate form with next of kin data
-    Object.keys(nok).forEach((key) => {
-      setNextOfKinValue(
-        key as keyof NextOfKin,
-        nok[key as keyof NextOfKin],
-      );
-    });
     setShowNextOfKinForm(true);
   };
 
@@ -586,7 +549,6 @@ const {
   const handleCancelNextOfKinForm = () => {
     setShowNextOfKinForm(false);
     setCurrentNextOfKin(null);
-    resetNextOfKin();
   };
   
   return (
@@ -931,143 +893,11 @@ const {
 
                       {/* Child Form Dialog */}
                       {showChildForm && (
-                        <Card className="border-2 border-[#650000]">
-                          <CardHeader>
-                            <CardTitle className="text-[#650000]">
-                              {currentChild ? "Edit Child Record" : "Add Child Record"}
-                            </CardTitle>
-                          </CardHeader>
-                          <CardContent>
-                            <div className="space-y-4">
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <Label htmlFor="child_name">
-                                    Child Name <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    id="child_name"
-                                    {...registerChild("name", {
-                                      required: "Child name is required",
-                                    })}
-                                    placeholder="Enter child's name"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_date_of_birth">
-                                    Date of Birth <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    id="child_date_of_birth"
-                                    type="date"
-                                    {...registerChild("date_of_birth", {
-                                      required: "Date of birth is required",
-                                    })}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_sex">
-                                    Sex <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    id="child_sex"
-                                    {...registerChild("sex", {
-                                      required: "Sex is required",
-                                    })}
-                                    placeholder="Enter sex"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_age_on_admission">
-                                    Age on Admission <span className="text-red-500">*</span>
-                                  </Label>
-                                  <Input
-                                    id="child_age_on_admission"
-                                    type="number"
-                                    {...registerChild("age_on_admission", {
-                                      required: "Age is required",
-                                    })}
-                                    placeholder="Enter age"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_place_of_birth">
-                                    Place of Birth
-                                  </Label>
-                                  <Input
-                                    id="child_place_of_birth"
-                                    {...registerChild("place_of_birth")}
-                                    placeholder="Enter place of birth"
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label htmlFor="medical_condition">
-                                    Medical Condition
-                                  </Label>
-                                  <Textarea
-                                    id="medical_condition"
-                                    {...registerChild("medical_condition")}
-                                    placeholder="Describe any medical conditions..."
-                                    rows={2}
-                                  />
-                                </div>
-
-                                <div className="md:col-span-2">
-                                  <Label htmlFor="child_description">
-                                    Description
-                                  </Label>
-                                  <Textarea
-                                    id="child_description"
-                                    {...registerChild("description")}
-                                    placeholder="Additional information about the child..."
-                                    rows={2}
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="child_photo">
-                                    Photo Upload
-                                  </Label>
-                                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                                    <Upload className="h-6 w-6 mx-auto mb-2 text-gray-400" />
-                                    <p className="text-sm text-gray-600">
-                                      Click to upload
-                                    </p>
-                                    <Input
-                                      id="child_photo"
-                                      type="file"
-                                      accept="image/*"
-                                      className="hidden"
-                                      {...registerChild("photo")}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-
-                              <div className="flex justify-end gap-2">
-                                <Button
-                                  type="button"
-                                  variant="outline"
-                                  onClick={handleCancelChildForm}
-                                >
-                                  Cancel
-                                </Button>
-                                <Button
-                                  type="button"
-                                  className="bg-[#650000] hover:bg-[#4a0000]"
-                                  onClick={handleSubmitChild(onSubmitChild)}
-                                >
-                                  <Save className="h-4 w-4 mr-2" />
-                                  {currentChild ? "Update Child" : "Add Child"}
-                                </Button>
-                              </div>
-                            </div>
-                          </CardContent>
-                        </Card>
+                        <ChildRecordForm
+                          currentChild={currentChild}
+                          onSubmit={onSubmitChild}
+                          onCancel={handleCancelChildForm}
+                        />
                       )}
                     </div>
                   )}
@@ -1876,311 +1706,11 @@ const {
 
                     {/* Next of Kin Form Dialog */}
                     {showNextOfKinForm && (
-                      <Card className="border-2 border-[#650000]">
-                        <CardHeader>
-                          <CardTitle className="text-[#650000]">
-                            {currentNextOfKin
-                              ? "Edit Next of Kin"
-                              : "Add Next of Kin"}
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <div>
-                                <Label htmlFor="nok_first_name">
-                                  First Name{" "}
-                                  <span className="text-red-500">
-                                    *
-                                  </span>
-                                </Label>
-                                <Input
-                                  id="nok_first_name"
-                                  {...registerNextOfKin(
-                                    "first_name",
-                                    {
-                                      required:
-                                        "First name is required",
-                                    },
-                                  )}
-                                  placeholder="Enter first name"
-                                />
-                                {nextOfKinErrors.first_name && (
-                                  <p className="text-red-500 text-sm mt-1">
-                                    {
-                                      nextOfKinErrors.first_name
-                                        .message
-                                    }
-                                  </p>
-                                )}
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_middle_name">
-                                  Middle Name
-                                </Label>
-                                <Input
-                                  id="nok_middle_name"
-                                  {...registerNextOfKin(
-                                    "middle_name",
-                                  )}
-                                  placeholder="Enter middle name"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_surname">
-                                  Surname{" "}
-                                  <span className="text-red-500">
-                                    *
-                                  </span>
-                                </Label>
-                                <Input
-                                  id="nok_surname"
-                                  {...registerNextOfKin(
-                                    "surname",
-                                    {
-                                      required:
-                                        "Surname is required",
-                                    },
-                                  )}
-                                  placeholder="Enter surname"
-                                />
-                                {nextOfKinErrors.surname && (
-                                  <p className="text-red-500 text-sm mt-1">
-                                    {
-                                      nextOfKinErrors.surname
-                                        .message
-                                    }
-                                  </p>
-                                )}
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_relationship">
-                                  Relationship
-                                </Label>
-                                <Input
-                                  id="nok_relationship"
-                                  {...registerNextOfKin(
-                                    "relationship",
-                                  )}
-                                  placeholder="e.g., Father, Mother, Spouse"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_sex">
-                                  Sex
-                                </Label>
-                                <SexSelect
-                                  value={watchNextOfKin("sex")}
-                                  onValueChange={(value) => setNextOfKinValue("sex", value)}
-                                  placeholder="Select sex"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_phone">
-                                  Phone Number
-                                </Label>
-                                <Input
-                                  id="nok_phone"
-                                  {...registerNextOfKin(
-                                    "phone_number",
-                                  )}
-                                  placeholder="+256700000000"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_alt_phone">
-                                  Alternate Phone Number
-                                </Label>
-                                <Input
-                                  id="nok_alt_phone"
-                                  {...registerNextOfKin(
-                                    "alternate_phone_number",
-                                  )}
-                                  placeholder="+256700000000"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_id_type">
-                                  ID Type
-                                </Label>
-                                <Input
-                                  id="nok_id_type"
-                                  {...registerNextOfKin(
-                                    "id_type",
-                                  )}
-                                  placeholder="e.g., National ID, Passport"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_id_number">
-                                  ID Number
-                                </Label>
-                                <Input
-                                  id="nok_id_number"
-                                  {...registerNextOfKin(
-                                    "id_number",
-                                  )}
-                                  placeholder="Enter ID number"
-                                />
-                              </div>
-
-                              <div>
-                                <Label htmlFor="nok_lc1">
-                                  LC1 Chairman
-                                </Label>
-                                <Input
-                                  id="nok_lc1"
-                                  {...registerNextOfKin("lc1")}
-                                  placeholder="LC1 name"
-                                />
-                              </div>
-
-                              <div className="flex items-center gap-2">
-                                <Controller
-                                  name="discharge_property"
-                                  control={controlNextOfKin}
-                                  defaultValue={false}
-                                  render={({ field }) => (
-                                    <Checkbox
-                                      id="discharge_property"
-                                      checked={field.value}
-                                      onCheckedChange={
-                                        field.onChange
-                                      }
-                                    />
-                                  )}
-                                />
-                                <Label
-                                  htmlFor="discharge_property"
-                                  className="cursor-pointer"
-                                >
-                                  Discharge Property to this
-                                  person
-                                </Label>
-                              </div>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                              <h4 className="mb-4">
-                                Next of Kin Address
-                              </h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                  <Label htmlFor="nok_address_region">
-                                    Region
-                                  </Label>
-                                  <Input
-                                    id="nok_address_region"
-                                    {...registerNextOfKin(
-                                      "address_region",
-                                    )}
-                                    placeholder="Enter region"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="nok_address_district">
-                                    District
-                                  </Label>
-                                  <Input
-                                    id="nok_address_district"
-                                    {...registerNextOfKin(
-                                      "address_district",
-                                    )}
-                                    placeholder="Enter district"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="nok_address_county">
-                                    County
-                                  </Label>
-                                  <Input
-                                    id="nok_address_county"
-                                    {...registerNextOfKin(
-                                      "address_county",
-                                    )}
-                                    placeholder="Enter county"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="nok_address_sub_county">
-                                    Sub County
-                                  </Label>
-                                  <Input
-                                    id="nok_address_sub_county"
-                                    {...registerNextOfKin(
-                                      "address_sub_county",
-                                    )}
-                                    placeholder="Enter sub county"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="nok_address_parish">
-                                    Parish
-                                  </Label>
-                                  <Input
-                                    id="nok_address_parish"
-                                    {...registerNextOfKin(
-                                      "address_parish",
-                                    )}
-                                    placeholder="Enter parish"
-                                  />
-                                </div>
-
-                                <div>
-                                  <Label htmlFor="nok_address_village">
-                                    Village
-                                  </Label>
-                                  <Input
-                                    id="nok_address_village"
-                                    {...registerNextOfKin(
-                                      "address_village",
-                                    )}
-                                    placeholder="Enter village"
-                                  />
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                onClick={
-                                  handleCancelNextOfKinForm
-                                }
-                              >
-                                Cancel
-                              </Button>
-                              <Button
-                                type="button"
-                                className="bg-[#650000] hover:bg-[#4a0000]"
-                                onClick={handleSubmitNextOfKin(
-                                  onSubmitNextOfKin,
-                                )}
-                              >
-                                <Save className="h-4 w-4 mr-2" />
-                                {currentNextOfKin
-                                  ? "Update Next of Kin"
-                                  : "Add Next of Kin"}
-                              </Button>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <NextOfKinForm
+                        currentNextOfKin={currentNextOfKin}
+                        onSubmit={onSubmitNextOfKin}
+                        onCancel={handleCancelNextOfKinForm}
+                      />
                     )}
                   </div>
                 </TabsContent>
@@ -2195,19 +1725,18 @@ const {
                       <Label htmlFor="photo">
                         Photo Upload
                       </Label>
-                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-600">
-                          Click to upload photo
-                        </p>
-                        <Input
-                          id="photo"
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          {...register("photo")}
-                        />
-                      </div>
+                      <FileUpload
+                        id="photo"
+                        name="photo"
+                        allowedFileTypes={["image/png", "image/jpeg", "image/jpg", "image/webp"]}
+                        description="Upload prisoner's photo (PNG, JPEG, or WebP)"
+                        maxSizeMB={3}
+                        icon={<User className="h-10 w-10" />}
+                        onFileChange={(base64, file) => {
+                          setValue("photo", base64);
+                        }}
+                        value={watch("photo")}
+                      />
                       {errors.photo && (
                         <p className="text-red-500 text-sm mt-1">
                           {errors.photo.message}
@@ -2219,18 +1748,18 @@ const {
                       <Label htmlFor="finger_print">
                         Fingerprint Upload
                       </Label>
-                      <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                        <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                        <p className="text-sm text-gray-600">
-                          Click to upload fingerprint
-                        </p>
-                        <Input
-                          id="finger_print"
-                          type="file"
-                          className="hidden"
-                          {...register("finger_print")}
-                        />
-                      </div>
+                      <FileUpload
+                        id="finger_print"
+                        name="finger_print"
+                        allowedFileTypes={["image/png", "image/jpeg", "image/jpg", "application/pdf"]}
+                        description="Upload fingerprint scan (Image or PDF)"
+                        maxSizeMB={5}
+                        icon={<Fingerprint className="h-10 w-10" />}
+                        onFileChange={(base64, file) => {
+                          setValue("finger_print", base64);
+                        }}
+                        value={watch("finger_print")}
+                      />
                     </div>
 
                     <div>

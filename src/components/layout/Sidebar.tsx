@@ -147,7 +147,10 @@ export function Sidebar({ isOpen }: SidebarProps) {
   };
 
   // Load menus on mount and when location filters change
-  useFilterRefresh(loadMenus);
+  // useFilterRefresh(loadMenus);
+  useEffect(() => {
+    loadMenus();
+  }, []);
 
   // Helper function to find all parent IDs leading to active page
   const findParentsOfActivePath = (

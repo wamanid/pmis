@@ -4,6 +4,7 @@ import PrisonerAdmissionScreen from '../components/admission/PrisonerAdmissionSc
 import { PendingApprovals } from '../components/admission/PendingApprovals';
 import  PrisonersListScreen  from '../components/admission/PrisonerListScreen';
 import  PrisonerDetailScreen  from '../components/admission/prisoner-biodata/PrisonerDetailScreen';
+import  FileUploadDemo  from '../components/common/FileUploadDemo';
 /**
  * Admissions Management Routes
  * Handles prisoner admission, approvals, and admission-related functionality
@@ -28,5 +29,9 @@ export const admissionRoutes: RouteObject[] = [
   {
     path: '/admissions-management/prisoner/:id',
     element: <PrisonerDetailScreen />,
+  },
+  {
+    path: '/admissions-management/file-upload-demo',
+    element: <FileUploadDemo />,
   }
 ];
