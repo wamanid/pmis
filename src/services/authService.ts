@@ -82,6 +82,18 @@ function safeRemoveItem(key: string) {
   } catch (e) { /* ignore */ }
 }
 
+export function getAuthUser(): User | null {
+  try {
+    const raw = localStorage.getItem(USER_DATA_KEY);
+    if (!raw) return null;
+
+    const user = JSON.parse(raw);
+    return user?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
 export function setAuth(token: string, refresh?: string, user?: unknown) {
   // Note: storing tokens in localStorage is vulnerable to XSS.
   // Prefer httpOnly cookies from the server if possible.
