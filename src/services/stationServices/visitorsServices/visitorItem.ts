@@ -18,6 +18,7 @@ export interface Item {
   item: string;
   measurement_unit: string;
   item_status: string;
+  is_allowed: boolean;
 }
 
 export interface VisitorItem {
@@ -46,6 +47,13 @@ export interface VisitorItem {
   item: string;
   measurement_unit: string;
   item_status: string;
+}
+
+export interface VisitorItems {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: VisitorItem[];
 }
 
 export interface ItemCategory {
@@ -144,9 +152,15 @@ export type ItemCategoriesResponse = ItemCategories | ErrorResponse;
 export type ItemStatusesResponse = ItemStatuses | ErrorResponse;
 export type MeasurementUnitResponse = MeasurementUnit | ErrorResponse;
 export type StationItemsResponse = StationItems | ErrorResponse;
+export type VisitorItemsResponse = VisitorItems | ErrorResponse;
 
 export const addVisitorItem = async (item: Item) : Promise<VisitorItemResponse> => {
   const response = await axiosInstance.post<VisitorItemResponse>('/gate-management/visitor-items/', item);
+  return response.data;
+}
+
+export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
+  const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/');
   return response.data;
 }
 

@@ -63,6 +63,7 @@ import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {handleResponseError} from "../../services/stationServices/utils";
+import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 
 // Types based on API
 // interface Visitor {
@@ -154,6 +155,8 @@ interface Staff {
 
 export default function VisitationsScreen() {
   // Filter states
+  const [items, setItems] = useState<VisitorItem[]>([]);
+
   const [selectedRegion, setSelectedRegion] = useState<string>("");
   const [selectedDistrict, setSelectedDistrict] = useState<string>("");
   const [selectedStation, setSelectedStation] = useState<string>("");
@@ -549,6 +552,14 @@ export default function VisitationsScreen() {
                 }
                 setVisitors(data)
                 // console.log(data)
+              }
+
+              const response2 = await getVisitorItems()
+              if (handleResponseError(response2)) return
+              if ("results" in response2) {
+                const data = response2.results
+                setItems(data)
+                console.log(data)
               }
 
             }catch (error) {
@@ -1604,7 +1615,7 @@ export default function VisitationsScreen() {
 
         {/* Visitor Items Tab */}
         <TabsContent value="items" className="mt-6">
-          <VisitorItemList visitors={visitors} />
+          <VisitorItemList visitors={visitors} items={items} setItems={setItems} />
         </TabsContent>
       </Tabs>
 

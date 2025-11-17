@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -51,138 +51,147 @@ import {
 } from 'lucide-react';
 import VisitorItemForm from './VisitorItemForm';
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {
+  addVisitorItem,
+  getItemCategories, getItemStatuses, getStationItems, getUnits, Item, ItemCategory, ItemStatus,
+  StationItem,
+  StationItems, Unit, VisitorItem
+} from "../../services/stationServices/visitorsServices/visitorItem";
+import {handleResponseError} from "../../services/stationServices/utils";
 
 interface VisitorListProps {
-  visitors: Visitor[]
+  visitors: Visitor[];
+  items: VisitorItem[];
+  setItems: React.Dispatch<React.SetStateAction<VisitorItem[]>>;
 }
 
-interface VisitorItem {
-  id: string;
-  visitor_name: string;
-  item_name: string;
-  category_name: string;
-  quantity: number;
-  currency: string;
-  amount: string;
-  bag_no: string;
-  is_allowed: boolean;
-  photo: string;
-  remarks: string;
-  is_collected: boolean;
-  for_prisoner: boolean;
-  visitor: string;
-  item_category: string;
-  item: string;
-  measurement_unit: string;
-  item_status: string;
-}
+// interface VisitorItem {
+//   id: string;
+//   visitor_name: string;
+//   item_name: string;
+//   category_name: string;
+//   quantity: number;
+//   currency: string;
+//   amount: string;
+//   bag_no: string;
+//   is_allowed: boolean;
+//   photo: string;
+//   remarks: string;
+//   is_collected: boolean;
+//   for_prisoner: boolean;
+//   visitor: string;
+//   item_category: string;
+//   item: string;
+//   measurement_unit: string;
+//   item_status: string;
+// }
 
 // Mock data
-const mockVisitorItems: VisitorItem[] = [
-  {
-    id: '1',
-    visitor_name: 'Sarah Doe',
-    item_name: 'Rice',
-    category_name: 'Food Items',
-    quantity: 5,
-    currency: 'UGX',
-    amount: '25000',
-    bag_no: 'BAG-001',
-    is_allowed: true,
-    photo: '',
-    remarks: 'White rice, sealed package',
-    is_collected: false,
-    for_prisoner: true,
-    visitor: 'visitor-1',
-    item_category: 'cat-1',
-    item: 'item-1',
-    measurement_unit: 'unit-1',
-    item_status: 'status-1'
-  },
-  {
-    id: '2',
-    visitor_name: 'Michael Johnson',
-    item_name: 'T-Shirt',
-    category_name: 'Clothing',
-    quantity: 2,
-    currency: 'UGX',
-    amount: '40000',
-    bag_no: 'BAG-002',
-    is_allowed: true,
-    photo: '',
-    remarks: 'Blue and white t-shirts',
-    is_collected: true,
-    for_prisoner: true,
-    visitor: 'visitor-2',
-    item_category: 'cat-2',
-    item: 'item-4',
-    measurement_unit: 'unit-4',
-    item_status: 'status-4'
-  },
-  {
-    id: '3',
-    visitor_name: 'Emily Davis',
-    item_name: 'Soap',
-    category_name: 'Personal Care',
-    quantity: 3,
-    currency: 'UGX',
-    amount: '15000',
-    bag_no: 'BAG-003',
-    is_allowed: true,
-    photo: '',
-    remarks: 'Bathing soap',
-    is_collected: false,
-    for_prisoner: true,
-    visitor: 'visitor-3',
-    item_category: 'cat-3',
-    item: 'item-6',
-    measurement_unit: 'unit-6',
-    item_status: 'status-2'
-  },
-  {
-    id: '4',
-    visitor_name: 'Lisa Thompson',
-    item_name: 'Radio',
-    category_name: 'Electronics',
-    quantity: 1,
-    currency: 'UGX',
-    amount: '150000',
-    bag_no: 'BAG-004',
-    is_allowed: false,
-    photo: '',
-    remarks: 'Small FM radio - not allowed',
-    is_collected: false,
-    for_prisoner: true,
-    visitor: 'visitor-4',
-    item_category: 'cat-5',
-    item: 'item-10',
-    measurement_unit: 'unit-4',
-    item_status: 'status-3'
-  },
-  {
-    id: '5',
-    visitor_name: 'Maria Garcia',
-    item_name: 'Bible',
-    category_name: 'Books & Magazines',
-    quantity: 1,
-    currency: 'UGX',
-    amount: '20000',
-    bag_no: 'BAG-005',
-    is_allowed: true,
-    photo: '',
-    remarks: 'NIV Bible',
-    is_collected: true,
-    for_prisoner: true,
-    visitor: 'visitor-5',
-    item_category: 'cat-4',
-    item: 'item-8',
-    measurement_unit: 'unit-4',
-    item_status: 'status-4'
-  }
-];
+// const mockVisitorItems: VisitorItem[] = [
+//   {
+//     id: '1',
+//     visitor_name: 'Sarah Doe',
+//     item_name: 'Rice',
+//     category_name: 'Food Items',
+//     quantity: 5,
+//     currency: 'UGX',
+//     amount: '25000',
+//     bag_no: 'BAG-001',
+//     is_allowed: true,
+//     photo: '',
+//     remarks: 'White rice, sealed package',
+//     is_collected: false,
+//     for_prisoner: true,
+//     visitor: 'visitor-1',
+//     item_category: 'cat-1',
+//     item: 'item-1',
+//     measurement_unit: 'unit-1',
+//     item_status: 'status-1'
+//   },
+//   {
+//     id: '2',
+//     visitor_name: 'Michael Johnson',
+//     item_name: 'T-Shirt',
+//     category_name: 'Clothing',
+//     quantity: 2,
+//     currency: 'UGX',
+//     amount: '40000',
+//     bag_no: 'BAG-002',
+//     is_allowed: true,
+//     photo: '',
+//     remarks: 'Blue and white t-shirts',
+//     is_collected: true,
+//     for_prisoner: true,
+//     visitor: 'visitor-2',
+//     item_category: 'cat-2',
+//     item: 'item-4',
+//     measurement_unit: 'unit-4',
+//     item_status: 'status-4'
+//   },
+//   {
+//     id: '3',
+//     visitor_name: 'Emily Davis',
+//     item_name: 'Soap',
+//     category_name: 'Personal Care',
+//     quantity: 3,
+//     currency: 'UGX',
+//     amount: '15000',
+//     bag_no: 'BAG-003',
+//     is_allowed: true,
+//     photo: '',
+//     remarks: 'Bathing soap',
+//     is_collected: false,
+//     for_prisoner: true,
+//     visitor: 'visitor-3',
+//     item_category: 'cat-3',
+//     item: 'item-6',
+//     measurement_unit: 'unit-6',
+//     item_status: 'status-2'
+//   },
+//   {
+//     id: '4',
+//     visitor_name: 'Lisa Thompson',
+//     item_name: 'Radio',
+//     category_name: 'Electronics',
+//     quantity: 1,
+//     currency: 'UGX',
+//     amount: '150000',
+//     bag_no: 'BAG-004',
+//     is_allowed: false,
+//     photo: '',
+//     remarks: 'Small FM radio - not allowed',
+//     is_collected: false,
+//     for_prisoner: true,
+//     visitor: 'visitor-4',
+//     item_category: 'cat-5',
+//     item: 'item-10',
+//     measurement_unit: 'unit-4',
+//     item_status: 'status-3'
+//   },
+//   {
+//     id: '5',
+//     visitor_name: 'Maria Garcia',
+//     item_name: 'Bible',
+//     category_name: 'Books & Magazines',
+//     quantity: 1,
+//     currency: 'UGX',
+//     amount: '20000',
+//     bag_no: 'BAG-005',
+//     is_allowed: true,
+//     photo: '',
+//     remarks: 'NIV Bible',
+//     is_collected: true,
+//     for_prisoner: true,
+//     visitor: 'visitor-5',
+//     item_category: 'cat-4',
+//     item: 'item-8',
+//     measurement_unit: 'unit-4',
+//     item_status: 'status-4'
+//   }
+// ];
 
-export default function VisitorItemList({ visitors }: VisitorListProps) {
-  const [items, setItems] = useState<VisitorItem[]>(mockVisitorItems);
+export default function VisitorItemList({ visitors, items, setItems }: VisitorListProps) {
+
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VisitorItem | null>(null);
@@ -213,9 +222,15 @@ export default function VisitorItemList({ visitors }: VisitorListProps) {
 
     return matchesSearch && matchesCategory && matchesCollected;
   });
-  const [itemInfoLoading, setItemInfoLoading] = useState(false)
 
-  const handleSubmit = async (data: VisitorItem) => {
+
+  const [itemInfoLoading, setItemInfoLoading] = useState(false)
+  const [itemsX, setItemsX] = useState<StationItem[]>([])
+  const [itemCategories, setItemCategories] = useState<ItemCategory[]>([])
+  const [itemStatuses, setItemStatuses] = useState<ItemStatus[]>([])
+  const [units, setUnits] = useState<Unit[]>([])
+
+  const handleSubmit = async (data: Item) => {
     setLoading(true);
     try {
       // Simulate API call
@@ -223,12 +238,21 @@ export default function VisitorItemList({ visitors }: VisitorListProps) {
 
       if (editingItem) {
         // Update existing item
-        setItems(items.map((item) => (item.id === editingItem.id ? { ...data, id: item.id } : item)));
+        // setItems(items.map((item) => (item.id === editingItem.id ? { ...data, id: item.id } : item)));
         toast.success('Item updated successfully');
       } else {
         // Add new item
         const newItem = { ...data, id: String(Date.now()) };
-        setItems([newItem, ...items]);
+        if (newItem.photo === ""){
+          delete newItem.photo;
+        }
+        // console.log(newItem)
+
+        const response = await addVisitorItem(newItem)
+        if (handleResponseError(response)) return
+        const visitorItem = response as VisitorItem;
+        setItems([visitorItem, ...items])
+        // setItems([newItem, ...items]);
         toast.success('Item added successfully');
       }
 
@@ -279,7 +303,78 @@ export default function VisitorItemList({ visitors }: VisitorListProps) {
     return <Badge variant="secondary">Pending</Badge>;
   };
 
-  const uniqueCategories = Array.from(new Set(mockVisitorItems.map(i => i.category_name)));
+  const uniqueCategories = Array.from(new Set(items.map(i => i.category_name)));
+
+  // API integration
+
+  function handleServerError (response: any) {
+    if ('error' in response){
+          setIsDialogOpen(false)
+          setItemInfoLoading(false)
+          toast.error(response.error);
+          return true
+    }
+    return false
+  }
+
+  function handleEmptyList (data: any, msg: string) {
+    if (!data.length){
+          setIsDialogOpen(false)
+          setItemInfoLoading(false)
+          toast.error(msg);
+          return true
+    }
+    return false
+  }
+
+  function populateList(response: any, msg: string, setData: any) {
+    if (handleServerError(response)) return
+    if ("results" in response) {
+      const data = response.results
+      if(handleEmptyList(data, msg)) return
+      setData(data)
+    }
+  }
+
+  useEffect(() => {
+    if (isDialogOpen){
+      async function fetchData(){
+        setItemInfoLoading(true)
+        try{
+
+          if (!visitors){
+            setIsDialogOpen(false)
+            setItemInfoLoading(false)
+            toast.error("There are no visitors");
+            return true
+          }
+
+          const response1 = await getItemCategories()
+          populateList(response1, "There are no item categories", setItemCategories)
+
+          const response2 = await getStationItems()
+          populateList(response2, "There are no items", setItemsX)
+
+          const response3 = await getItemStatuses()
+          populateList(response3, "There are no item statuses", setItemStatuses)
+
+          const response4 = await getUnits()
+          populateList(response4, "There are no item categories", setUnits)
+
+          setItemInfoLoading(false)
+
+        }catch (error) {
+           if (!error?.response) {
+            toast.error('Failed to connect to server. Please try again.');
+          }
+          setIsDialogOpen(false);
+          setItemInfoLoading(false)
+        }
+      }
+      fetchData()
+    }
+  }, [isDialogOpen]);
+
 
   return (
     <div className="space-y-6">
@@ -346,6 +441,12 @@ export default function VisitorItemList({ visitors }: VisitorListProps) {
                             setIsDialogOpen(false);
                             setEditingItem(null);
                           }}
+                          itemStatuses={itemStatuses}
+                          itemsX={itemsX}
+                          itemCategories={itemCategories}
+                          units={units}
+                          visitors={visitors}
+                          loading={loading}
                         />
                       </div>
                     </div>
