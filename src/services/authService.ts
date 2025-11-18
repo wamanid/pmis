@@ -116,7 +116,6 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
   const response = await axiosInstance.post<LoginResponse>('/auth/login/', credentials);
   
   if (!response.data.mfa_required && response.data.access_token) {
-<<<<<<< HEAD
     localStorage.setItem('auth_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token!);
     localStorage.setItem('user_data', JSON.stringify(response.data.user));
@@ -127,9 +126,6 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
         response.data.user.profile.staff_profile_details.station
       );
     }
-=======
-    setAuth(response.data.access_token, response.data.refresh_token, response.data.user);
->>>>>>> station
   }
   
   return response.data;
@@ -142,7 +138,6 @@ export const verifyOtp = async (otpData: VerifyOtpRequest): Promise<VerifyOtpRes
   const response = await axiosInstance.post<VerifyOtpResponse>('/auth/mfa/verify/', otpData);
   
   if (response.data.access_token) {
-<<<<<<< HEAD
     localStorage.setItem('auth_token', response.data.access_token);
     localStorage.setItem('refresh_token', response.data.refresh_token!);
     localStorage.setItem('user_data', JSON.stringify(response.data.user));
@@ -153,9 +148,6 @@ export const verifyOtp = async (otpData: VerifyOtpRequest): Promise<VerifyOtpRes
         response.data.user.profile.staff_profile_details.station
       );
     }
-=======
-    setAuth(response.data.access_token, response.data.refresh_token, response.data.user);
->>>>>>> station
   }
   
   return response.data;
@@ -176,15 +168,11 @@ export const logout = async (): Promise<void> => {
   try {
     await axiosInstance.post('/auth/logout/');
   } finally {
-<<<<<<< HEAD
     // Clear local storage regardless of API response
     localStorage.removeItem('auth_token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('user_data');
     localStorage.removeItem('pmis_user_filters');
-=======
-    clearAuth();
->>>>>>> station
   }
 };
 
