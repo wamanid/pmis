@@ -158,6 +158,11 @@ export const addVisitorItem = async (item: Item) : Promise<VisitorItemResponse> 
   return response.data;
 }
 
+export const updateVisitorItem = async (item: Item, id: string) : Promise<VisitorItemResponse> => {
+  const response = await axiosInstance.put<VisitorItemResponse>(`/gate-management/visitor-items/${id}/`, item);
+  return response.data;
+}
+
 export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
   const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/');
   return response.data;

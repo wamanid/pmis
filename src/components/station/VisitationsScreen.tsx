@@ -559,7 +559,7 @@ export default function VisitationsScreen() {
               if ("results" in response2) {
                 const data = response2.results
                 setItems(data)
-                // console.log(data)
+                console.log(data)
               }
 
             }catch (error) {

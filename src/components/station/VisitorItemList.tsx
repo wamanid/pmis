@@ -55,7 +55,7 @@ import {
   addVisitorItem, deleteVisitorItem,
   getItemCategories, getItemStatuses, getStationItems, getUnits, Item, ItemCategory, ItemStatus,
   StationItem,
-  StationItems, Unit, VisitorItem
+  StationItems, Unit, updateVisitorItem, VisitorItem
 } from "../../services/stationServices/visitorsServices/visitorItem";
 import {handleResponseError} from "../../services/stationServices/utils";
 
@@ -238,21 +238,28 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
 
       if (editingItem) {
         // Update existing item
-        // setItems(items.map((item) => (item.id === editingItem.id ? { ...data, id: item.id } : item)));
+        const newItem = { ...data, id: editingItem.id };
+        if (newItem.photo === "" || newItem.photo?.startsWith("https://")){
+          delete newItem.photo;
+        }
+
+        const response = await updateVisitorItem(newItem, editingItem.id)
+        if (handleResponseError(response)) return
+        const visitorItem = response as VisitorItem;
+        setItems(items.map((item) => (item.id === visitorItem.id ? { ...data, id: item.id } : item)));
         toast.success('Item updated successfully');
-      } else {
+      }
+      else {
         // Add new item
         const newItem = { ...data, id: String(Date.now()) };
         if (newItem.photo === ""){
           delete newItem.photo;
         }
-        // console.log(newItem)
 
         const response = await addVisitorItem(newItem)
         if (handleResponseError(response)) return
         const visitorItem = response as VisitorItem;
         setItems([visitorItem, ...items])
-        // setItems([newItem, ...items]);
         toast.success('Item added successfully');
       }
 
@@ -635,17 +642,17 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">Status</p>
                 <div className="flex gap-2 flex-wrap">
-                  {viewingItem.is_allowed ? (
-                    <Badge className="bg-green-600 flex items-center gap-1">
-                      <CheckCircle className="h-3 w-3" />
-                      Allowed
-                    </Badge>
-                  ) : (
-                    <Badge variant="destructive" className="flex items-center gap-1">
-                      <XCircle className="h-3 w-3" />
-                      Not Allowed
-                    </Badge>
-                  )}
+                  {/*{viewingItem.is_allowed ? (*/}
+                  {/*  <Badge className="bg-green-600 flex items-center gap-1">*/}
+                  {/*    <CheckCircle className="h-3 w-3" />*/}
+                  {/*    Allowed*/}
+                  {/*  </Badge>*/}
+                  {/*) : (*/}
+                  {/*  <Badge variant="destructive" className="flex items-center gap-1">*/}
+                  {/*    <XCircle className="h-3 w-3" />*/}
+                  {/*    Not Allowed*/}
+                  {/*  </Badge>*/}
+                  {/*)}*/}
                   {viewingItem.is_collected ? (
                     <Badge className="bg-blue-600 flex items-center gap-1">
                       <CheckCircle className="h-3 w-3" />
