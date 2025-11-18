@@ -26,9 +26,6 @@ export interface DataTableColumn {
   /** Whether this column can be sorted (default: false) */
   sortable?: boolean;
   
-  /** Whether this column can be filtered (default: false) */
-  filterable?: boolean;
-  
   /** 
    * Custom render function for the cell content
    * @param value - The value of the cell
@@ -57,11 +54,6 @@ export interface DataTableExportConfig {
 }
 
 /**
- * Row spacing options for the DataTable
- */
-export type RowSpacing = 'compact' | 'normal' | 'cozy';
-
-/**
  * Configuration options for the DataTable
  * 
  * All options are optional and have sensible defaults.
@@ -73,7 +65,6 @@ export type RowSpacing = 'compact' | 'normal' | 'cozy';
  *   lengthMenu: [10, 25, 50, 100],
  *   pagination: true,
  *   summary: true,
- *   rowSpacing: 'normal',
  * };
  */
 export interface DataTableConfig {
@@ -98,14 +89,6 @@ export interface DataTableConfig {
   
   /** Show record count summary (default: true) */
   summary?: boolean;
-  
-  /** 
-   * Row spacing mode (default: 'normal')
-   * - compact: Minimal padding for dense data
-   * - normal: Standard padding
-   * - cozy: Extra padding for comfortable reading
-   */
-  rowSpacing?: RowSpacing;
 }
 
 /**
@@ -159,7 +142,6 @@ export const DEFAULT_CONFIG: Required<DataTableConfig> = {
   lengthMenu: [10, 50, 100, -1],
   pagination: true,
   summary: true,
-  rowSpacing: 'normal',
 };
 
 /**

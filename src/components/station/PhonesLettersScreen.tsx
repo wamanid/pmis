@@ -32,6 +32,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { Textarea } from "../ui/textarea";
 import {
   Select,
@@ -480,42 +481,20 @@ export default function PhonesLettersScreen() {
       </div>
 
       {/* Tabs */}
-      <Card>
-        <CardContent className="p-0">
-          {/* Custom Tabs Navigation */}
-          <div className="flex gap-2 p-4 bg-gray-100 border-b">
-            <button
-              onClick={() => setActiveTab("calls")}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
-                activeTab === "calls"
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor: activeTab === "calls" ? '#650000' : undefined,
-              }}
-            >
-              <Phone className="h-4 w-4" />
-              Phone Calls ({filteredCalls.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("letters")}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
-                activeTab === "letters"
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor: activeTab === "letters" ? '#650000' : undefined,
-              }}
-            >
-              <Mail className="h-4 w-4" />
-              Letters ({filteredLetters.length})
-            </button>
-          </div>
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="calls" className="flex items-center gap-2">
+            <Phone className="h-4 w-4" />
+            Phone Calls ({filteredCalls.length})
+          </TabsTrigger>
+          <TabsTrigger value="letters" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Letters ({filteredLetters.length})
+          </TabsTrigger>
+        </TabsList>
 
         {/* Phone Calls Table */}
-        {activeTab === "calls" && (
+        <TabsContent value="calls">
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -591,10 +570,10 @@ export default function PhonesLettersScreen() {
               </Table>
             </CardContent>
           </Card>
-        )}
+        </TabsContent>
 
         {/* Letters Table */}
-        {activeTab === "letters" && (
+        <TabsContent value="letters">
           <Card>
             <CardContent className="p-0">
               <Table>
@@ -684,14 +663,12 @@ export default function PhonesLettersScreen() {
               </Table>
             </CardContent>
           </Card>
-        )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+      </Tabs>
 
       {/* Call Record Dialog */}
       <Dialog open={isCallDialogOpen} onOpenChange={setIsCallDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
               <Phone className="h-5 w-5" />
@@ -916,14 +893,12 @@ export default function PhonesLettersScreen() {
               </Button>
             </div>
           </form>
-          </div>
         </DialogContent>
       </Dialog>
 
       {/* Letter Dialog */}
       <Dialog open={isLetterDialogOpen} onOpenChange={setIsLetterDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -1165,7 +1140,6 @@ export default function PhonesLettersScreen() {
               </Button>
             </div>
           </form>
-          </div>
         </DialogContent>
       </Dialog>
     </div>

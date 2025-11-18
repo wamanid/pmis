@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axiosInstance from '../../services/axiosInstance';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import axios from 'axios';
 import { 
   Search, 
   Download, 
@@ -10,8 +9,7 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Loader2,
-  AlignJustify
+  Loader2
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -26,8 +24,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import type { 
   DataTableColumn, 
   DataTableConfig, 
-  DataTableProps,
-  RowSpacing
+  DataTableProps 
 } from './DataTable.types';
 
 const defaultConfig: DataTableConfig = {
@@ -40,7 +37,6 @@ const defaultConfig: DataTableConfig = {
   lengthMenu: [10, 50, 100, -1], // -1 represents "All"
   pagination: true,
   summary: true,
-  rowSpacing: 'normal',
 };
 
 export function DataTable({ url, title, columns, config }: DataTableProps) {
@@ -50,67 +46,39 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(mergedConfig.lengthMenu?.[0] || 10);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
-  const [rowSpacing, setRowSpacing] = useState<RowSpacing>(mergedConfig.rowSpacing || 'normal');
 
   // Fetch data from URL
-  const fetchData = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axiosInstance.get(url);
-      // Handle different response formats:
-      // 1. Direct array: [...]
-      // 2. Paginated: { results: [...] }
-      // 3. Wrapped: { data: [...] }
-      if (Array.isArray(response.data)) {
-        setData(response.data);
-      } else if (response.data.results) {
-        setData(response.data.results);
-      } else if (response.data.data) {
-        setData(response.data.data);
-      } else {
-        setData([]);
+  useEffect(() => {
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const response = await axios.get(url);
+        setData(Array.isArray(response.data) ? response.data : response.data.data || []);
+      } catch (err: any) {
+        setError(err.message || 'Failed to fetch data');
+      } finally {
+        setLoading(false);
       }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch data');
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
-  // Fetch data on mount and when filters change
-  useFilterRefresh(fetchData, [url]);
+    fetchData();
+  }, [url]);
 
-  // Filter data based on search term and column filters
+  // Filter data based on search term
   const filteredData = useMemo(() => {
-    let filtered = data;
+    if (!mergedConfig.search || !searchTerm) return data;
 
-    // Apply global search
-    if (mergedConfig.search && searchTerm) {
-      filtered = filtered.filter((row) =>
-        columns.some((column) => {
-          const value = row[column.key];
-          return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-        })
-      );
-    }
-
-    // Apply column filters
-    Object.entries(columnFilters).forEach(([columnKey, filterValue]) => {
-      if (filterValue) {
-        filtered = filtered.filter((row) => {
-          const value = row[columnKey];
-          return value?.toString().toLowerCase().includes(filterValue.toLowerCase());
-        });
-      }
-    });
-
-    return filtered;
-  }, [data, searchTerm, columnFilters, columns, mergedConfig.search]);
+    return data.filter((row) =>
+      columns.some((column) => {
+        const value = row[column.key];
+        return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
+      })
+    );
+  }, [data, searchTerm, columns, mergedConfig.search]);
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -234,27 +202,6 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
     setCurrentPage(1);
   };
 
-  // Get row spacing classes
-  const getRowSpacingClasses = () => {
-    switch (rowSpacing) {
-      case 'compact':
-        return 'px-2 py-1';
-      case 'cozy':
-        return 'px-6 py-4';
-      case 'normal':
-      default:
-        return 'px-4 py-3';
-    }
-  };
-
-  // Cycle through row spacing options
-  const cycleRowSpacing = () => {
-    const spacings: RowSpacing[] = ['compact', 'normal', 'cozy'];
-    const currentIndex = spacings.indexOf(rowSpacing);
-    const nextIndex = (currentIndex + 1) % spacings.length;
-    setRowSpacing(spacings[nextIndex]);
-  };
-
   if (loading) {
     return (
       <Card>
@@ -327,7 +274,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                 <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder=" Search..."
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);
@@ -337,18 +284,6 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                 />
               </div>
             )}
-
-            {/* Row Spacing Button */}
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={cycleRowSpacing}
-              className="gap-2"
-              title={`Row spacing: ${rowSpacing}`}
-            >
-              <AlignJustify className="h-4 w-4" />
-              <span className="capitalize">{rowSpacing}</span>
-            </Button>
 
             {/* Export Buttons */}
             {mergedConfig.export && (
@@ -399,7 +334,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className={`${getRowSpacingClasses()} text-left text-sm font-medium ${
+                    className={`px-4 py-3 text-left text-sm font-medium ${
                       column.sortable ? 'cursor-pointer hover:bg-muted select-none' : ''
                     }`}
                     onClick={() => column.sortable && handleSort(column.key)}
@@ -415,31 +350,6 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                   </th>
                 ))}
               </tr>
-              {/* Column Filters Row */}
-              {columns.some(col => col.filterable) && (
-                <tr className="border-b bg-muted/30">
-                  {columns.map((column) => (
-                    <th key={`filter-${column.key}`} className="px-4 py-2">
-                      {column.filterable ? (
-                        <Input
-                          type="text"
-                          placeholder={`Filter ${column.label}...`}
-                          value={columnFilters[column.key] || ''}
-                          onChange={(e) => {
-                            setColumnFilters(prev => ({
-                              ...prev,
-                              [column.key]: e.target.value
-                            }));
-                            setCurrentPage(1);
-                          }}
-                          className="h-8 text-xs"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : null}
-                    </th>
-                  ))}
-                </tr>
-              )}
             </thead>
             <tbody>
               {paginatedData.length === 0 ? (
@@ -458,7 +368,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                     className="border-b hover:bg-muted/50 transition-colors"
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className={`${getRowSpacingClasses()} text-sm`}>
+                      <td key={column.key} className="px-4 py-3 text-sm">
                         {column.render
                           ? column.render(row[column.key], row)
                           : row[column.key]}
