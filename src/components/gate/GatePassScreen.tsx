@@ -174,7 +174,7 @@ getvisitors().then((data) => {
   getgatepasses().then((data) => {
   mockGatePasses = data.results;
   setGatePasses(mockGatePasses);
- // alert(JSON.stringify(data.results));
+ //alert(JSON.stringify(data.results));
 }).catch((error) => {
   alert(error);
     setIsLoading(false);
@@ -586,9 +586,6 @@ getworkingparty().then((data) => {
     setIsVisitorDialogOpen(true);
   };
 
-  
-
-
 
     const getMainGateBatch = (status?: string) => {
     if(status=="true")
@@ -601,18 +598,19 @@ getworkingparty().then((data) => {
      
   };
 
-
-
   const getStatusBadge = (status?: string) => {
     switch (status) {
-      case 'active':
-        return <Badge className="bg-blue-600">Active</Badge>;
-      case 'completed':
+      case 'Active':
+        return <Badge>Active</Badge>;
+      case 'Completed':
         return <Badge className="bg-green-600">Completed</Badge>;
-      case 'pending':
+      case 'Pending':
         return <Badge className="bg-yellow-600">Pending</Badge>;
       default:
-        return <Badge>Unknown</Badge>;
+        return <Badge>
+        
+          
+          Unknown</Badge>;
     }
   };
 
@@ -681,7 +679,7 @@ getworkingparty().then((data) => {
               <div>
                 <p className="text-sm text-gray-600">Active Gate Passes</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').length}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').length}
                 </p>
               </div>
               <AlertCircle className="h-8 w-8 text-blue-600" />
@@ -695,7 +693,7 @@ getworkingparty().then((data) => {
               <div>
                 <p className="text-sm text-gray-600">Completed Today</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'completed').length}
+                  {gatePasses.filter(gp => gp.status_name === 'Completed').length}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -709,7 +707,7 @@ getworkingparty().then((data) => {
               <div>
                 <p className="text-sm text-gray-600">Prisoners Out</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').reduce((sum, gp) => sum + gp.prisoners.length, 0)}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').reduce((sum, gp) => sum + gp.prisoners.length, 0)}
                 </p>
               </div>
               <UserPlus className="h-8 w-8 text-orange-600" />
@@ -723,7 +721,7 @@ getworkingparty().then((data) => {
               <div>
                 <p className="text-sm text-gray-600">Escorts on Duty</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').reduce((sum, gp) => sum + gp.escorts.length, 0)}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').reduce((sum, gp) => sum + gp.escorts.length, 0)}
                 </p>
               </div>
               <Shield className="h-8 w-8" style={{ color: '#650000' }} />
@@ -818,7 +816,7 @@ getworkingparty().then((data) => {
                       </TableCell>
                       <TableCell>
                         {gatePass.main_gate_required ? (
-                          <Badge className="bg-green-600">Required</Badge>
+                          <Badge>Required</Badge>
                         ) : (
                              <>Not Required</>
                            
@@ -826,7 +824,7 @@ getworkingparty().then((data) => {
                            
                         
                       </TableCell>
-                      <TableCell>{getStatusBadge(gatePass.status)}</TableCell>
+                      <TableCell>{getStatusBadge(gatePass.status_name)}</TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {gatePass.created_at ? formatDateTime(gatePass.created_at) : '-'}
                       </TableCell>

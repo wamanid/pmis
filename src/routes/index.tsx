@@ -5,6 +5,8 @@ import { stationRoutes } from './station.routes';
 import { admissionRoutes } from './admission.routes';
 import { demoRoutes } from './demo.routes';
 import  {gateRoutes}  from './gate.routes';
+import  {stageRoutes}  from './stage.routes';
+
 
 /**
  * Application Routes Configuration
@@ -31,6 +33,9 @@ export const routes: RouteObject[] = [
 
   //gate management routes
   ...gateRoutes,
+
+    //stage classification
+  ...stageRoutes,
 
   // Default/Fallback Route
   {

@@ -17,6 +17,7 @@ export interface GatePass {
   gate_pass_type: string;
   created_at?: string;
   status?: string;
+  status_name:String
 }
 
 export  interface PrisonerRecord {
