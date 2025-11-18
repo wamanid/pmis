@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchRegions } from '../../services/system_administration';
+import { fetchRegions } from '../../services/systemAdministrationService';
 import type { Region } from '../../models/system_administration';
 
 export interface RegionSelectProps {
