@@ -77,3 +77,7 @@ public
 # Temporary files
 *.tmp
 *.temp
+src/services/authService_BACKUP_85.ts
+src/services/authService_BASE_85.ts
+src/services/authService_LOCAL_85.ts
+src/services/authService_REMOTE_85.ts

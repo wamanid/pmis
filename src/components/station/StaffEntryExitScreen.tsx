@@ -1,430 +1,631 @@
-import { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
-import { Plus, Search, Scan, CheckCircle2, XCircle, Clock, UserCheck, User, AlertCircle, Loader2, Edit, Trash2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { Plus, Search, Scan, CheckCircle2, XCircle, Clock, User, Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { Textarea } from '../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '../ui/alert-dialog';
+import { DataTable } from '../common/DataTable';
+import type { DataTableColumn } from '../common/DataTable.types';
+import * as StaffEntryService from '../../services/stationServices/staffEntryService';
 
-// Mock data for foreign key references
-const mockStations = [
-  { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440002', name: 'East Wing Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440003', name: 'West Wing Station' },
-];
-
-const mockStaffCategories = [
-  { id: 'cat-001', name: 'Officer' },
-  { id: 'cat-002', name: 'Guard' },
-  { id: 'cat-003', name: 'Administrator' },
-  { id: 'cat-004', name: 'Medical Staff' },
-];
-
-const mockStaffRanks = [
-  { id: '990e8400-e29b-41d4-a716-446655440001', name: 'Commissioner' },
-  { id: '990e8400-e29b-41d4-a716-446655440002', name: 'Assistant Commissioner' },
-  { id: '990e8400-e29b-41d4-a716-446655440003', name: 'Senior Superintendent' },
-  { id: '990e8400-e29b-41d4-a716-446655440004', name: 'Superintendent' },
-  { id: '990e8400-e29b-41d4-a716-446655440005', name: 'Assistant Superintendent' },
-  { id: '990e8400-e29b-41d4-a716-446655440006', name: 'Officer' },
-];
-
-// Mock staff database
-const mockStaffDatabase = [
-  {
-    staff_id: 1,
-    force_number: 'UPS001234',
-    full_name: 'John Musoke',
-    category: 'cat-001',
-    rank: '990e8400-e29b-41d4-a716-446655440004',
-  },
-  {
-    staff_id: 2,
-    force_number: 'UPS005678',
-    full_name: 'Sarah Nakato',
-    category: 'cat-002',
-    rank: '990e8400-e29b-41d4-a716-446655440006',
-  },
-  {
-    staff_id: 3,
-    force_number: 'UPS009012',
-    full_name: 'David Okello',
-    category: 'cat-003',
-    rank: '990e8400-e29b-41d4-a716-446655440005',
-  },
-  {
-    staff_id: 4,
-    force_number: 'UPS003456',
-    full_name: 'Grace Nabirye',
-    category: 'cat-004',
-    rank: '990e8400-e29b-41d4-a716-446655440006',
-  },
-];
-
-interface StaffEntryExit {
+interface StaffEntryRow {
   id: string;
-  is_active: boolean;
+  // match backend: use created_datetime (ISO) and station_name / staff_rank_name etc.
+  created_datetime?: string | null;
   staff_name: string;
   staff_force_number: string;
-  staff_category: string;
-  time_in: string;
-  time_out?: string;
+  senior?: boolean | null;
+  time_in?: string | null;
+  time_out?: string | null;
+  attendance_type?: 'PRESENT' | 'ABSENT' | null;
+  station_name?: string;
+  staff_rank_name?: string;
   remark?: string;
-  attendance_type: 'PRESENT' | 'ABSENT';
-  station: string;
-  staff: number;
-  staff_rank: string;
-  gate_keeper: number;
-  date: string;
 }
 
-// Mock existing records
-const mockRecords: StaffEntryExit[] = [
-  {
-    id: '1',
-    is_active: true,
-    staff_name: 'John Musoke',
-    staff_force_number: 'UPS001234',
-    staff_category: 'cat-001',
-    time_in: '08:00',
-    time_out: '17:00',
-    remark: 'Regular shift',
-    attendance_type: 'PRESENT',
-    station: '550e8400-e29b-41d4-a716-446655440001',
-    staff: 1,
-    staff_rank: '990e8400-e29b-41d4-a716-446655440004',
-    gate_keeper: 100,
-    date: '2025-10-16',
-  },
-  {
-    id: '2',
-    is_active: true,
-    staff_name: 'Sarah Nakato',
-    staff_force_number: 'UPS005678',
-    staff_category: 'cat-002',
-    time_in: '08:30',
-    remark: 'Morning patrol',
-    attendance_type: 'PRESENT',
-    station: '550e8400-e29b-41d4-a716-446655440002',
-    staff: 2,
-    staff_rank: '990e8400-e29b-41d4-a716-446655440006',
-    gate_keeper: 100,
-    date: '2025-10-16',
-  },
-];
+// small hook: detect barcode scanner by fast key input
+function useBarcodeScanner(onScan: (code: string) => void, enabled: boolean) {
+  const bufferRef = useRef<{ chars: string[]; lastTime: number }>({ chars: [], lastTime: 0 });
+  useEffect(() => {
+    if (!enabled) return;
+    const handleKey = (e: KeyboardEvent) => {
+      const now = Date.now();
+      // ignore meta keys
+      if (e.key.length > 1 && e.key !== 'Enter') return;
+      if (now - bufferRef.current.lastTime > 100) {
+        // reset if pause > 100ms
+        bufferRef.current.chars = [];
+      }
+      bufferRef.current.lastTime = now;
+      if (e.key === 'Enter') {
+        const code = bufferRef.current.chars.join('');
+        bufferRef.current.chars = [];
+        if (code) onScan(code);
+      } else {
+        bufferRef.current.chars.push(e.key);
+      }
+    };
+    window.addEventListener('keydown', handleKey);
+    return () => window.removeEventListener('keydown', handleKey);
+  }, [enabled, onScan]);
+}
 
 export function StaffEntryExitScreen() {
-  const [records, setRecords] = useState<StaffEntryExit[]>(mockRecords);
-  const [searchTerm, setSearchTerm] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [loading, setLoading] = useState(false);
-  const [scanning, setScanning] = useState(false);
-  const [staffDetails, setStaffDetails] = useState<any>(null);
-  const [barcode, setBarcode] = useState('');
+  // split loading states so fetch and submit don't share the same spinner
+  const [fetchLoading, setFetchLoading] = useState(false);
+  const [submitLoading, setSubmitLoading] = useState(false);
+  const [scanningMode, setScanningMode] = useState(false);
+  const [forceInput, setForceInput] = useState('');
+  const [staffDetails, setStaffDetails] = useState<StaffEntryService.StaffProfile | null>(null);
+  const [stationOptions, setStationOptions] = useState<any[]>([]);
+  const [attendanceType, setAttendanceType] = useState<'PRESENT' | 'ABSENT'>('PRESENT');
+  const [timeOut, setTimeOut] = useState('');
+  const [remark, setRemark] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const barcodeInputRef = useRef<HTMLInputElement>(null);
+  // whether we've fetched staff details successfully (freeze inputs)
+  const [hasFetched, setHasFetched] = useState(false);
+  const [fetchFailed, setFetchFailed] = useState(false);
+  // always controlled: '' means "no selection" so SelectValue placeholder shows
+  const [selectedStation, setSelectedStation] = useState<string>('');
+  // local search text used inside the station Select (matches complaints implementation)
+  const [stationSearch, setStationSearch] = useState('');
+  const stationSearchRef = useRef<HTMLInputElement | null>(null);
+  // form validation errors (reactive)
+  const [formErrors, setFormErrors] = useState<{ station?: string; attendanceType?: string } | null>(null);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    station: '',
-    time_out: '',
-    remark: '',
-    attendance_type: 'PRESENT' as 'PRESENT' | 'ABSENT',
-  });
+  // table load error (log details to console; show small inline message instead of toast)
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  // Mock function to fetch staff details from backend
-  const fetchStaffDetails = async (forceNumber: string) => {
-    setScanning(true);
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    const staff = mockStaffDatabase.find(
-      s => s.force_number.toLowerCase() === forceNumber.toLowerCase()
-    );
-    
-    setScanning(false);
-    
-    if (staff) {
-      setStaffDetails(staff);
-      toast.success('Staff details retrieved successfully');
-      return staff;
+  // DataTable server state
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableData, setTableData] = useState<StaffEntryRow[]>([]);
+  const [total, setTotal] = useState(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  const [search, setSearch] = useState('');
+
+  // derived stats for cards
+  const presentCount = tableData.filter((t) => t.attendance_type === 'PRESENT').length;
+  const absentCount = tableData.filter((t) => t.attendance_type === 'ABSENT').length;
+  const onDutyCount = tableData.filter((t) => !t.time_out || t.time_out === '').length;
+
+  const loadStations = useCallback(async () => {
+    const s = await StaffEntryService.fetchStations();
+    setStationOptions(s || []);
+  }, []);
+
+  // helpers
+  // when staffDetails is set, initialize selectedStation and reset fetchFailed
+  useEffect(() => {
+    // Do NOT auto-select the first station. The station dropdown is not "attached"
+    // to staff here — user must explicitly pick a station. If the staff profile
+    // already has an assigned station id and you want to prefill, change this.
+    if (staffDetails) {
+      // only prefill if staffDetails explicitly contains a station id
+      if (staffDetails.station) {
+        setSelectedStation(staffDetails.station ?? '');
+      } else {
+        setSelectedStation('');
+      }
+      setFetchFailed(false);
     } else {
-      toast.error('Staff not found. Please check the force number.');
-      return null;
+      setSelectedStation('');
+    }
+  }, [staffDetails, stationOptions]);
+
+  const resetForm = () => {
+    setHasFetched(false);
+    setScanningMode(false);
+    setForceInput('');
+    setStaffDetails(null);
+    setRemark('');
+    setTimeOut('');
+    setAttendanceType('PRESENT');
+    setFormErrors(null);
+    setFetchLoading(false);
+    setSubmitLoading(false);
+    setFetchFailed(false);
+    setSelectedStation('');
+    setStationSearch('');
+    if (stationSearchRef.current) stationSearchRef.current.blur();
+  };
+
+  const getCurrentUserId = () => {
+    try {
+      const raw = localStorage.getItem('user_data') || localStorage.getItem('user') || localStorage.getItem('currentUser');
+      if (!raw) return undefined;
+      const parsed = JSON.parse(raw);
+      return parsed?.id ?? parsed?.user?.id ?? parsed?.pk ?? undefined;
+    } catch {
+      return undefined;
     }
   };
 
-  const handleBarcodeSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!barcode.trim()) {
+  // load table data from backend
+// load table data: abort previous requests, debounce handled by effect, safe page handling
+  const abortRef = useRef<AbortController | null>(null);
+  const loadTable = useCallback(async (p = page, ps = pageSize, sf?: string, sd?: string, q?: string) => {
+    // cancel previous
+    if (abortRef.current) {
+      try { abortRef.current.abort(); } catch {}
+    }
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    setTableLoading(true);
+    setLoadError(null);
+    try {
+      const params: Record<string, any> = {};
+      if (ps !== -1) {
+        params.page = Math.max(1, Number(p) || 1);
+        params.page_size = Number(ps) || 10;
+      }
+      if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
+      if (q) params.search = q;
+
+      const res = await StaffEntryService.fetchEntries(params, controller.signal);
+      const items = res.results ?? res ?? [];
+      const totalCount = Number(res.count ?? (items.length || 0));
+
+      const mapped = (items || []).map((it: any): StaffEntryRow => ({
+        id: it.id,
+        created_datetime: it.created_datetime ?? null,
+        staff_name: it.staff_name ?? '',
+        staff_force_number: it.staff_force_number ?? '',
+        senior: typeof it.senior === 'boolean' ? it.senior : null,
+        staff_rank_name: it.staff_rank_name ?? it.staff_rank ?? '',
+        station_name: it.station_name ?? it.station ?? '',
+        time_in: it.time_in ?? null,
+        time_out: it.time_out ?? null,
+        attendance_type: it.attendance_type ?? null,
+        remark: it.remark ?? '',
+      }));
+
+      // compute total pages and guard against invalid page requests
+      const effectivePageSize = ps === -1 ? totalCount || mapped.length : ps;
+      const totalPages = effectivePageSize > 0 ? Math.max(1, Math.ceil(totalCount / effectivePageSize)) : 1;
+      if (ps !== -1 && params.page && params.page > totalPages) {
+        setPage(totalPages);
+        return; // effect will re-run and fetch safe page
+      }
+
+      setTableData(mapped);
+      setTotal(totalCount);
+      setPage(params.page ?? 1);
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.message === 'canceled') return;
+      console.error('loadTable error:', err?.response ?? err);
+      const status = err?.response?.status;
+      const detail = String(err?.response?.data?.detail ?? '').toLowerCase();
+      if (status === 404 && detail.includes('invalid page')) {
+        setPage(1); // safe fallback
+        return;
+      }
+      setLoadError(status ? `Failed to load records (status ${status}).` : 'Failed to load records (network error).');
+    } finally {
+      setTableLoading(false);
+    }
+  }, []);
+
+  // load stations once
+  useEffect(() => { loadStations(); }, [loadStations]);
+
+  // debounced / single effect to fetch table whenever page/pageSize/sort/search change
+  const searchDebounceRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    // 300ms debounce for search + avoid double calls during quick UI interactions
+    searchDebounceRef.current = window.setTimeout(() => {
+      const usePage = Math.max(1, page || 1);
+      loadTable(usePage, pageSize, sortField, sortDir, search || undefined);
+    }, 300);
+    return () => {
+      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
+    };
+  }, [page, pageSize, sortField, sortDir, search, loadTable]);
+
+  // barcode scanner hook: when enabled, global key capture sends scanned value to onScan
+  useBarcodeScanner(async (code) => {
+    // treat scanned code as force number and auto fetch
+    setForceInput(code);
+    await fetchStaffDetails(code);
+  }, scanningMode);
+
+  const fetchStaffDetails = async (forceNumber: string) => {
+    setFetchLoading(true);
+    setFetchFailed(false);
+    try {
+      // try server search by force_number param
+      const profiles = await StaffEntryService.fetchStaffProfiles({ force_number: forceNumber });
+      // server may return multiple or none; our service now returns exact-match array if provided
+      const staff = profiles[0] ?? null;
+      if (!staff) {
+        // no exact match -> show failed banner and return
+        setStaffDetails(null);
+        setHasFetched(false);
+        setFetchFailed(true);
+        toast.error('No staff found for that force number.');
+        return null;
+      }
+      setStaffDetails(staff);
+      setHasFetched(true);
+      setScanningMode(false); // stop scanning once we have a valid staff
+      setFetchFailed(false);
+      toast.success('Staff details retrieved successfully');
+      return staff;
+    } catch (err) {
+      console.error('fetchStaffDetails error', err?.response ?? err);
+      setFetchFailed(true);
+      toast.error('Failed to fetch staff details');
+      return null;
+    } finally {
+      setFetchLoading(false);
+    }
+  };
+
+  const handleBarcodeModeToggle = () => {
+    if (hasFetched) return; // freeze toggle after fetch
+    setScanningMode((s) => !s);
+    setStaffDetails(null);
+    setForceInput('');
+  };
+
+  const handleFetchClick = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!forceInput.trim()) {
       toast.error('Please enter a force number');
       return;
     }
-    await fetchStaffDetails(barcode.trim());
+    await fetchStaffDetails(forceInput.trim());
   };
 
   const handleConfirmEntry = async () => {
+    // basic client-side validation
     if (!staffDetails) {
       toast.error('No staff details available');
       return;
     }
 
-    if (!formData.station) {
-      toast.error('Please select a station');
+    // station must be chosen (selectedStation holds the chosen value)
+    const stationToSend = selectedStation ?? staffDetails.station ?? stationOptions[0]?.id;
+    if (!stationToSend) {
+      setFormErrors({ station: 'Station is required' });
+      toast.error('Please select a station.');
       return;
     }
 
-    setLoading(true);
-    
-    // Simulate API call to save record
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    
-    const now = new Date();
-    const currentTime = now.toTimeString().slice(0, 5);
-    
-    const newRecord: StaffEntryExit = {
-      id: Date.now().toString(),
-      is_active: true,
-      staff_name: staffDetails.full_name,
-      staff_force_number: staffDetails.force_number,
-      staff_category: staffDetails.category,
-      time_in: currentTime,
-      time_out: formData.time_out || undefined,
-      remark: formData.remark || undefined,
-      attendance_type: formData.attendance_type,
-      station: formData.station,
-      staff: staffDetails.staff_id,
-      staff_rank: staffDetails.rank,
-      gate_keeper: 100, // Current logged in user
-      date: now.toISOString().split('T')[0],
-    };
+    if (!attendanceType) {
+      setFormErrors({ attendanceType: 'Attendance type is required' });
+      toast.error('Please select attendance type.');
+      return;
+    }
 
-    setRecords([newRecord, ...records]);
-    setDialogOpen(false);
-    setLoading(false);
-    toast.success('Staff entry recorded successfully');
-    
-    // Reset form
-    resetForm();
-  };
+    // clear previous errors once validation passed
+    setFormErrors(null);
+    setSubmitLoading(true);
+    try {
+      const now = new Date();
+      const currentUserId = getCurrentUserId();
 
-  const resetForm = () => {
-    setBarcode('');
-    setStaffDetails(null);
-    setFormData({
-      station: '',
-      time_out: '',
-      remark: '',
-      attendance_type: 'PRESENT',
-    });
+      // map senior boolean to staff_category expected by backend (adjust values if backend expects different strings)
+      const staffCategory = staffDetails.raw?.senior === true ? 'SENIOR' : 'JUNIOR';
+
+      const payload: StaffEntryService.StaffEntryPayload = {
+        staff: staffDetails.id,
+        station: stationToSend,
+        time_in: now.toTimeString().slice(0,5),
+        time_out: timeOut || null,
+        remark: remark || null,
+        attendance_type: attendanceType,
+        date: now.toISOString().split('T')[0],
+        // ...(currentUserId ? { gate_keeper: currentUserId } : {}),
+        staff_rank: staffDetails.rank,
+        staff_name: `${staffDetails.first_name ?? ''} ${staffDetails.last_name ?? ''}`.trim(),
+        staff_force_number: staffDetails.force_number,
+        staff_category: staffCategory,
+      };
+
+      await StaffEntryService.createEntry(payload);
+      toast.success('Staff entry recorded successfully');
+      loadTable(1, pageSize, sortField, sortDir, search);
+      setDialogOpen(false);
+      resetForm();
+    } catch (err: any) {
+      console.error('createEntry error', err?.response ?? err);
+      if (err?.response?.data) {
+        console.error('createEntry validation errors:', err.response.data);
+        toast.error('Failed to save entry. Check required fields.');
+      } else {
+        toast.error('Failed to save entry.');
+      }
+    } finally {
+      setSubmitLoading(false);
+    }
   };
 
   const handleDelete = async () => {
     if (!recordToDelete) return;
-
-    setLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 500));
-    
-    setRecords(records.filter(r => r.id !== recordToDelete));
-    toast.success('Record deleted successfully');
-    setLoading(false);
-    setDeleteDialogOpen(false);
-    setRecordToDelete(null);
+    try {
+      await StaffEntryService.deleteEntry(recordToDelete);
+      toast.success('Record deleted');
+      setDeleteDialogOpen(false);
+      setRecordToDelete(null);
+      loadTable(1, pageSize, sortField, sortDir, search);
+    } catch (err) {
+      console.error('delete error', err?.response ?? err);
+      toast.error('Failed to delete record');
+    }
   };
 
-  const getStationName = (id: string) => mockStations.find(s => s.id === id)?.name || 'Unknown';
-  const getCategoryName = (id: string) => mockStaffCategories.find(c => c.id === id)?.name || 'Unknown';
-  const getRankName = (id: string) => mockStaffRanks.find(r => r.id === id)?.name || 'Unknown';
+  const formatTime = (t?: string | null) => {
+  if (!t) return '-';
+  try {
+    const date = new Date(`1970-01-01T${t}`);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return t;
+  }
+};
 
-  const filteredRecords = records.filter(record => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      record.staff_name.toLowerCase().includes(searchLower) ||
-      record.staff_force_number.toLowerCase().includes(searchLower) ||
-      getStationName(record.station).toLowerCase().includes(searchLower) ||
-      getCategoryName(record.staff_category).toLowerCase().includes(searchLower)
-    );
-  });
+// keys must match the API fields (created_datetime, staff_force_number, staff_name, senior, staff_rank_name, station_name, remark)
+  const userColumns: DataTableColumn[] = [
+    // { key: 'created_datetime', label: 'Date', sortable: true },
+    {
+      key: 'created_datetime',
+      label: 'Date',
+      sortable: true,
+      render: (value: string | null) => (value ? String(value).split('T')[0] : '-'),
+    },
+    { key: 'staff_force_number', label: 'Force Number', sortable: true },
+    { key: 'staff_name', label: 'Staff Name', sortable: true },
+    {
+      key: 'senior',
+      label: 'Category',
+      sortable: true,
+      render: (value) => (typeof value === 'boolean' ? (value ? 'Senior' : 'Junior') : (value ?? '-')),
+    },
+    { key: 'staff_rank_name', label: 'Rank', sortable: true },
+    { key: 'station_name', label: 'Station', sortable: true }, 
+    {
+      key: 'time_in',
+      label: 'Time In',
+      sortable: true,
+      render: (value) => (
+        <div className="flex items-center gap-1">
+          <Clock className="h-3 w-3 text-muted-foreground" />
+          {formatTime(value)}
+        </div>
+      ),
+    },
+    {
+      key: 'time_out',
+      label: 'Time Out',
+      sortable: true,
+      render: (value) =>
+        value ? (
+          <div className="flex items-center gap-1">
+            <Clock className="h-3 w-3 text-muted-foreground" />
+            {formatTime(value)}
+          </div>
+        ) : (
+          <span className="text-muted-foreground text-sm">-</span>
+        ),
+    },
+    {
+      key: 'attendance_type',
+      label: 'Attendance',
+      sortable: true,
+      render: (value) => (
+        <span
+          className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs font-medium ${
+            value === 'PRESENT'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+          }`}
+        >
+          {value === 'PRESENT' ? (
+            <>
+              <CheckCircle2 className="h-3 w-3" /> Present
+            </>
+          ) : (
+            <>
+              <XCircle className="h-3 w-3" /> Absent
+            </>
+          )}
+        </span>
+      ),
+    },
 
-  const presentCount = records.filter(r => r.attendance_type === 'PRESENT').length;
-  const absentCount = records.filter(r => r.attendance_type === 'ABSENT').length;
-  const activeStaffCount = records.filter(r => !r.time_out).length;
-
-  // Auto-focus barcode input when dialog opens
-  useEffect(() => {
-    if (dialogOpen && barcodeInputRef.current) {
-      setTimeout(() => {
-        barcodeInputRef.current?.focus();
-      }, 100);
-    }
-  }, [dialogOpen]);
+    {
+      key: 'remark',
+      label: 'Remarks',
+      sortable: true,
+    },
+    {
+      key: 'id',
+      label: 'Actions',
+      sortable: false,
+      render: (_value, row) => (
+        <div className="flex justify-end">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setRecordToDelete(row.id);
+              setDeleteDialogOpen(true);
+            }}
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      ),
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-[#650000] mb-2">Staff Entry & Exit</h1>
+          <h1 className="text-[#650000] mb-1">Staff Entry & Exit</h1>
           <p className="text-muted-foreground">Track staff attendance and movements</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={(open) => {
-          setDialogOpen(open);
-          if (!open) resetForm();
-        }}>
+
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { resetForm(); } }}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90">
               <Plus className="mr-2 h-4 w-4" />
               Record Entry/Exit
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          {/* provide aria-describedby + sr-only description to satisfy accessibility check */}
+          <DialogContent className="max-w-2xl" aria-describedby="record-entry-desc">
             <DialogHeader>
               <DialogTitle>Record Staff Entry/Exit</DialogTitle>
               <DialogDescription>
-                Scan staff barcode or enter force number to record attendance
+                Fill in the staff attendance details before submitting.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="space-y-6 py-4">
-              {/* Barcode Scanner Section */}
-              {!staffDetails ? (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                    <Scan className="h-5 w-5 text-blue-600" />
-                    <p className="text-sm text-blue-900">
-                      Scan staff barcode or manually enter force number below
-                    </p>
+            <div className="space-y-4 py-2">
+              {/* hide scan/manual inputs once we have fetched a valid staff */}
+              {!hasFetched && (
+                <>
+                  <div className="flex items-center gap-4">
+                    <Button variant={scanningMode ? 'default' : 'outline'} onClick={handleBarcodeModeToggle} disabled={hasFetched}>
+                      <Scan className="mr-2 h-4 w-4" />
+                      {scanningMode ? 'Scanning (press Esc to stop)' : 'Scan Barcode'}
+                    </Button>
+                    <div className="text-sm text-muted-foreground">Or enter force number manually</div>
                   </div>
 
-                  <form onSubmit={handleBarcodeSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="barcode">Force Number / Barcode</Label>
-                      <div className="flex gap-2">
-                        <div className="relative flex-1">
-                          <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            ref={barcodeInputRef}
-                            id="barcode"
-                            type="text"
-                            placeholder="Enter or scan force number"
-                            className="pl-9"
-                            value={barcode}
-                            onChange={(e) => setBarcode(e.target.value)}
-                            disabled={scanning}
-                            autoFocus
-                          />
-                        </div>
-                        <Button type="submit" disabled={scanning || !barcode.trim()}>
-                          {scanning ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Fetching...
-                            </>
-                          ) : (
-                            <>
-                              <Search className="mr-2 h-4 w-4" />
-                              Fetch
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                  <form onSubmit={(e) => { e.preventDefault(); handleFetchClick(e); }} className="space-y-2">
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Force number / Barcode"
+                        value={forceInput}
+                        onChange={(e) => setForceInput(e.target.value)}
+                        disabled={scanningMode || hasFetched}
+                        autoFocus={!scanningMode && !hasFetched}
+                      />
+                      <Button type="submit" disabled={!forceInput.trim() || fetchLoading || hasFetched}>
+                        {fetchLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Fetch</> : 'Fetch'}
+                      </Button>
                     </div>
                   </form>
+                </>
+              )}
 
-                  {/* Sample Force Numbers */}
-                  <div className="p-4 bg-muted rounded-lg">
-                    <p className="text-sm mb-2">Sample Force Numbers for Testing:</p>
-                    <div className="flex flex-wrap gap-2">
-                      {mockStaffDatabase.map((staff) => (
-                        <Badge
-                          key={staff.staff_id}
-                          variant="outline"
-                          className="cursor-pointer hover:bg-primary hover:text-white"
-                          onClick={() => {
-                            setBarcode(staff.force_number);
-                            fetchStaffDetails(staff.force_number);
-                          }}
-                        >
-                          {staff.force_number}
-                        </Badge>
-                      ))}
-                    </div>
+              {/* success / failure banners */}
+              {hasFetched && staffDetails && (
+                <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <CheckCircle2 className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="text-sm text-green-900">Staff details verified and loaded</p>
+                    {/* <p className="text-xs text-green-800">{`${staffDetails.first_name ?? ''} ${staffDetails.last_name ?? ''}`.trim()} • {staffDetails.force_number} • {staffDetails.rank_name ?? staffDetails.rank}</p> */}
                   </div>
                 </div>
-              ) : (
-                <>
-                  {/* Staff Details Display (Non-editable) */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2 p-4 bg-green-50 border border-green-200 rounded-lg">
-                      <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      <p className="text-sm text-green-900">
-                        Staff details verified and loaded
+              )}
+
+              {fetchFailed && !staffDetails && (
+                <div className="flex items-center gap-2 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <XCircle className="h-5 w-5 text-red-600" />
+                  <p className="text-sm text-red-900">No staff found for that force number</p>
+                </div>
+              )}
+
+              {/* fetched staff details + form */}
+              {staffDetails && (
+                <div className="p-4 border rounded-md space-y-3">
+                  <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border border-border">
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Full Name</Label>
+                      <p className="mt-1">{`${staffDetails.first_name ?? ''} ${staffDetails.last_name ?? ''}`.trim()}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Force Number</Label>
+                      <p className="mt-1">{staffDetails.force_number}</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Rank</Label>
+                      <p className="mt-1">{staffDetails.rank_name ?? staffDetails.rank}</p>
+                    </div>
+ 
+                    <div>
+                      <Label className="text-muted-foreground text-xs">Category</Label>
+                      <p className="mt-1">
+                        {(() => {
+                          const rawSenior = staffDetails?.raw?.senior;
+                          const topSenior = (staffDetails as any)?.senior;
+                          if (typeof rawSenior === 'boolean') return rawSenior ? 'Senior' : 'Junior';
+                          if (typeof topSenior === 'boolean') return topSenior ? 'Senior' : 'Junior';
+                          // fallback to any existing string value
+                          const maybe = (staffDetails as any)?.staff_category ?? staffDetails?.raw?.staff_category;
+                          return maybe ?? '-';
+                        })()}
                       </p>
                     </div>
+                  </div>
 
-                    <div className="grid grid-cols-2 gap-4 p-4 bg-muted/50 rounded-lg border border-border">
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Full Name</Label>
-                        <p className="mt-1">{staffDetails.full_name}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Force Number</Label>
-                        <p className="mt-1">{staffDetails.force_number}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Category</Label>
-                        <p className="mt-1">{getCategoryName(staffDetails.category)}</p>
-                      </div>
-                      <div>
-                        <Label className="text-muted-foreground text-xs">Rank</Label>
-                        <p className="mt-1">{getRankName(staffDetails.rank)}</p>
-                      </div>
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="space-y-2">
+                      <Label>Station <span className="text-red-500">*</span></Label>
+                      <Select
+                        value={selectedStation}
+                        onValueChange={(v) => { setSelectedStation(v || ''); setFormErrors(null); }}
+                        // focus the internal search input when the menu opens
+                        onOpenChange={(open) => {
+                          if (open) {
+                            // small delay to wait until SelectContent is mounted
+                            setTimeout(() => stationSearchRef.current?.focus(), 60);
+                          }
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a station" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="px-3 py-2">
+                            <Input
+                              ref={stationSearchRef}
+                              placeholder="Search station..."
+                              value={stationSearch}
+                              onChange={(e) => setStationSearch(e.target.value)}
+                              className="mb-2"
+                              // prevent clicks/typing in this input from closing the Select
+                              onMouseDown={(e) => e.stopPropagation()}
+                              onKeyDown={(e) => e.stopPropagation()}
+                            />
+                          </div>
+                          {stationOptions
+                            .filter((s: any) => {
+                              if (!stationSearch) return true;
+                              return s.name?.toLowerCase().includes(stationSearch.toLowerCase());
+                            })
+                            .map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                      {formErrors?.station && <p className="text-xs text-red-600 mt-1">{formErrors.station}</p>}
                     </div>
 
-                    {/* Editable Fields */}
-                    <div className="space-y-4 pt-4 border-t">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       <div className="space-y-2">
-                        <Label htmlFor="station">
-                          Station <span className="text-red-500">*</span>
-                        </Label>
-                        <Select
-                          value={formData.station}
-                          onValueChange={(value) => setFormData({ ...formData, station: value })}
-                          required
-                        >
-                          <SelectTrigger id="station">
-                            <SelectValue placeholder="Select station" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {mockStations.map((station) => (
-                              <SelectItem key={station.id} value={station.id}>
-                                {station.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="attendance_type">
-                          Attendance Type <span className="text-red-500">*</span>
-                        </Label>
-                        <Select
-                          value={formData.attendance_type}
-                          onValueChange={(value: 'PRESENT' | 'ABSENT') => 
-                            setFormData({ ...formData, attendance_type: value })
-                          }
-                        >
-                          <SelectTrigger id="attendance_type">
-                            <SelectValue />
-                          </SelectTrigger>
+                        <Label>Attendance Type <span className="text-red-500">*</span></Label>
+                        <Select value={attendanceType} onValueChange={(v) => { setAttendanceType(v as any); setFormErrors(null); }}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="PRESENT">
                               <div className="flex items-center gap-2">
@@ -440,81 +641,46 @@ export function StaffEntryExitScreen() {
                             </SelectItem>
                           </SelectContent>
                         </Select>
+                        {formErrors?.attendanceType && <p className="text-xs text-red-600 mt-1">{formErrors.attendanceType}</p>}
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="time_out">Time Out (Optional)</Label>
-                        <div className="relative">
-                          <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                          <Input
-                            id="time_out"
-                            type="time"
-                            className="pl-9"
-                            value={formData.time_out}
-                            onChange={(e) => setFormData({ ...formData, time_out: e.target.value })}
-                          />
-                        </div>
+                        <Label>Time Out (Optional)</Label>
+                        <Input type="time" value={timeOut} onChange={(e) => setTimeOut(e.target.value)} />
                       </div>
 
-                      <div className="space-y-2">
-                        <Label htmlFor="remark">Remarks (Optional)</Label>
-                        <Textarea
-                          id="remark"
-                          placeholder="Enter any remarks..."
-                          rows={3}
-                          value={formData.remark}
-                          onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
-                        />
-                      </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label>Remark (Optional)</Label>
+                      <Textarea
+                        placeholder="Enter any remarks here..."
+                        rows={3}
+                        value={remark} onChange={(e) => setRemark(e.target.value)}
+                      />
+                    </div>
+
                   </div>
-                </>
+
+                  <div className="flex gap-2 justify-end mt-4">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={fetchLoading || submitLoading}
+                      onClick={() => { setDialogOpen(false); resetForm(); }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button variant="outline" onClick={() => { resetForm(); }}>
+                      Scan Another
+                    </Button>
+                    <Button onClick={handleConfirmEntry} className="bg-primary hover:bg-primary/90" disabled={submitLoading}>
+                      {submitLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Recording...</> : <> <CheckCircle2 className="mr-2 h-4 w-4" /> Confirm Entry</>}
+                    </Button>
+                  </div>
+                </div>
               )}
             </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setDialogOpen(false);
-                  resetForm();
-                }}
-                disabled={loading}
-              >
-                Cancel
-              </Button>
-              {staffDetails && (
-                <>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={resetForm}
-                    disabled={loading}
-                  >
-                    Scan Another
-                  </Button>
-                  <Button
-                    type="button"
-                    onClick={handleConfirmEntry}
-                    disabled={loading || !formData.station}
-                    className="bg-primary hover:bg-primary/90"
-                  >
-                    {loading ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Recording...
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                        Confirm Entry
-                      </>
-                    )}
-                  </Button>
-                </>
-              )}
-            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -522,153 +688,86 @@ export function StaffEntryExitScreen() {
       {/* Stats Cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Total Records</CardDescription>
-            <CardTitle className="text-3xl text-[#650000]">{records.length}</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Total Records</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl text-[#650000]">{total}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Present Today</CardDescription>
-            <CardTitle className="text-3xl text-green-600">{presentCount}</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Present</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl text-green-600">{presentCount}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Absent Today</CardDescription>
-            <CardTitle className="text-3xl text-red-600">{absentCount}</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Absent</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl text-red-600">{absentCount}</div></CardContent>
         </Card>
         <Card>
-          <CardHeader className="pb-2">
-            <CardDescription>Currently On Duty</CardDescription>
-            <CardTitle className="text-3xl text-blue-600">{activeStaffCount}</CardTitle>
-          </CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">On Duty</CardTitle></CardHeader>
+          <CardContent><div className="text-2xl text-blue-600">{onDutyCount}</div></CardContent>
         </Card>
       </div>
 
-      {/* Table Card */}
+      {/* DataTable */}
       <Card>
         <CardHeader>
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex items-center justify-between">
             <div>
               <CardTitle>Staff Entry & Exit Records</CardTitle>
-              <CardDescription>View and manage staff attendance records</CardDescription>
             </div>
-            <div className="relative w-full md:w-72">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search records..."
-                className="pl-9"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
+            <div className="flex gap-2 items-center">
+              <div className="relative w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search..." className="pl-10" value={search} onChange={(e) => setSearch(e.target.value)} />
+              </div>
             </div>
           </div>
         </CardHeader>
         <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Force Number</TableHead>
-                  <TableHead>Staff Name</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Rank</TableHead>
-                  <TableHead>Station</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Attendance</TableHead>
-                  <TableHead>Remarks</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={11} className="text-center text-muted-foreground h-24">
-                      No records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{record.date}</TableCell>
-                      <TableCell>
-                        <span className="font-mono text-sm">{record.staff_force_number}</span>
-                      </TableCell>
-                      <TableCell>{record.staff_name}</TableCell>
-                      <TableCell>{getCategoryName(record.staff_category)}</TableCell>
-                      <TableCell>{getRankName(record.staff_rank)}</TableCell>
-                      <TableCell>{getStationName(record.station)}</TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Clock className="h-3 w-3 text-muted-foreground" />
-                          {record.time_in}
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        {record.time_out ? (
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3 text-muted-foreground" />
-                            {record.time_out}
-                          </div>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={record.attendance_type === 'PRESENT' ? 'default' : 'destructive'}
-                          className={
-                            record.attendance_type === 'PRESENT'
-                              ? 'bg-green-100 text-green-800 hover:bg-green-100'
-                              : ''
-                          }
-                        >
-                          {record.attendance_type === 'PRESENT' ? (
-                            <>
-                              <CheckCircle2 className="mr-1 h-3 w-3" />
-                              Present
-                            </>
-                          ) : (
-                            <>
-                              <XCircle className="mr-1 h-3 w-3" />
-                              Absent
-                            </>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        {record.remark ? (
-                          <span className="text-sm">{record.remark}</span>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            setRecordToDelete(record.id);
-                            setDeleteDialogOpen(true);
-                          }}
-                        >
-                          <Trash2 className="h-4 w-4 text-red-600" />
-                        </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
+          {loadError && (
+            <div className="mb-3 text-sm text-red-600">
+              {loadError}
+            </div>
+          )}
+
+          {/* <DataTable
+            url="/station-management/api/attendance/"
+            title="Staff Entry & Exit Records"
+            columns={userColumns}
+          /> */}
+
+          <DataTable
+            /* controlled mode: we already fetch server data in this component (loadTable) */
+            data={tableData}
+            loading={tableLoading}
+            total={total}
+            title="Staff Entry & Exit Records"
+            columns={userColumns}
+            externalSearch={search}
+            // onSearch={(q) => {
+            //   setSearch(q);
+            //   setPage(1);
+            //   loadTable(1, pageSize, sortField, sortDir, q);
+            // }}
+            // onPageChange={(p) => {
+            //   setPage(p);
+            //   loadTable(p, pageSize, sortField, sortDir, search);
+            // }}
+            // onPageSizeChange={(size) => {
+            //   setPageSize(size);
+            //   setPage(1);
+            //   loadTable(1, size, sortField, sortDir, search);
+            // }}
+            // onSort={(field, dir) => {
+            //   setSortField(field ?? undefined);
+            //   setSortDir(dir ?? undefined);
+            //   loadTable(1, pageSize, field ?? undefined, dir ?? undefined, search);
+            // }}
+
+            
+          />
+          
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation Dialog */}
+      {/* Delete Confirmation */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -679,15 +778,12 @@ export function StaffEntryExitScreen() {
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
 }
+
+export default StaffEntryExitScreen;
