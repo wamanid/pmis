@@ -41,7 +41,7 @@ import {
   StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
-import {handleResponseError} from "../../services/stationServices/utils";
+import {fileToBinaryString, handleResponseError} from "../../services/stationServices/utils";
 
 // Types
 interface Visitor {
@@ -293,22 +293,6 @@ export default function VisitorRegistrationDialog({
       }
     }
   };
-
-  async function fileToBinaryString(file: File): Promise<string> {
-    const base64Data = await fileToBase64(file);
-    // Remove the "data:image/jpeg;base64," prefix
-    const [, rawBase64] = base64Data.split(",");
-    return rawBase64;
-  }
-
-  function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

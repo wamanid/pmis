@@ -18,7 +18,6 @@ export interface Item {
   item: string;
   measurement_unit: string;
   item_status: string;
-  is_allowed: boolean;
 }
 
 export interface VisitorItem {
@@ -162,6 +161,19 @@ export const addVisitorItem = async (item: Item) : Promise<VisitorItemResponse> 
 export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
   const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/');
   return response.data;
+}
+
+export const deleteVisitorItem = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/gate-management/visitor-items/${id}/`);
+
+    return { message: "Visitor tem deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to delete visitor item."
+    };
+  }
 }
 
 export const getItemCategories = async () : Promise<ItemCategoriesResponse> => {

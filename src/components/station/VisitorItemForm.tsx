@@ -17,6 +17,7 @@ import {
   StationItem, Unit
 } from "../../services/stationServices/visitorsServices/visitorItem";
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {fileToBinaryString} from "../../services/stationServices/utils";
 
 interface VisitorItem {
   id?: string;
@@ -125,7 +126,6 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
     is_active: true,
     deleted_datetime: null,
     deleted_by: null,
-    is_allowed: true,
   });
 
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -160,7 +160,6 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
         item: item.item || '',
         measurement_unit: item.measurement_unit || '',
         item_status: item.item_status || '',
-        is_allowed: item.is_allowed ?? false,
       });
       if (item.photo) {
         setPhotoPreview(item.photo);
@@ -201,16 +200,19 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
     onSubmit(formData);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
+
+      const binaryString = await fileToBinaryString(file);
+      setFormData({ ...formData, photo: binaryString });
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
-        setFormData({ ...formData, photo: reader.result as string });
       };
       reader.readAsDataURL(file);
+      toast.success("Photo uploaded successfully");
     }
   };
 
@@ -688,19 +690,20 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
 
           {/* Switches */}
           <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="is_allowed">Item Allowed</Label>
-                <p className="text-sm text-muted-foreground">
-                  Item is allowed to be brought in
-                </p>
-              </div>
-              <Switch
-                id="is_allowed"
-                checked={formData.is_allowed}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_allowed: checked })}
-              />
-            </div>
+
+            {/*<div className="flex items-center justify-between">*/}
+            {/*  <div className="space-y-0.5">*/}
+            {/*    <Label htmlFor="is_allowed">Item Allowed</Label>*/}
+            {/*    <p className="text-sm text-muted-foreground">*/}
+            {/*      Item is allowed to be brought in*/}
+            {/*    </p>*/}
+            {/*  </div>*/}
+            {/*  <Switch*/}
+            {/*    id="is_allowed"*/}
+            {/*    checked={formData.is_allowed}*/}
+            {/*    onCheckedChange={(checked) => setFormData({ ...formData, is_allowed: checked })}*/}
+            {/*  />*/}
+            {/*</div>*/}
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">

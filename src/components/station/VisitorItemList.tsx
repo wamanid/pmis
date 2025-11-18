@@ -52,7 +52,7 @@ import {
 import VisitorItemForm from './VisitorItemForm';
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
-  addVisitorItem,
+  addVisitorItem, deleteVisitorItem,
   getItemCategories, getItemStatuses, getStationItems, getUnits, Item, ItemCategory, ItemStatus,
   StationItem,
   StationItems, Unit, VisitorItem
@@ -234,7 +234,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
     setLoading(true);
     try {
       // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      // await new Promise((resolve) => setTimeout(resolve, 1000));
 
       if (editingItem) {
         // Update existing item
@@ -279,18 +279,13 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
     if (!deleteItem) return;
 
     setLoading(true);
-    try {
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      setItems(items.filter((item) => item.id !== deleteItem.id));
-      toast.success('Item deleted successfully');
-      setDeleteItem(null);
-    } catch (error) {
-      toast.error('Failed to delete item');
-    } finally {
-      setLoading(false);
-    }
+    const response = await deleteVisitorItem(deleteItem.id)
+    if (handleResponseError(response)) return;
+    setItems(items.filter((item) => item.id !== deleteItem.id));
+    toast.success('Item deleted successfully');
+    setDeleteItem(null);
+    setLoading(false);
   };
 
   const getStatusBadge = (item: VisitorItem) => {
@@ -527,7 +522,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
                   <TableHead>Quantity</TableHead>
                   <TableHead>Value</TableHead>
                   <TableHead>Bag No.</TableHead>
-                  <TableHead>Status</TableHead>
+                  {/*<TableHead>Status</TableHead>*/}
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -560,7 +555,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
                         {item.currency} {parseFloat(item.amount).toLocaleString()}
                       </TableCell>
                       <TableCell>{item.bag_no || '-'}</TableCell>
-                      <TableCell>{getStatusBadge(item)}</TableCell>
+                      {/*<TableCell>{getStatusBadge(item)}</TableCell>*/}
                       <TableCell>
                         <div className="flex gap-1">
                           <Button
