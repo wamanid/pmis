@@ -3,35 +3,27 @@
  * Centralized export for all system administration API services
  */
 
-// Region Service
+// Re-export from parent systemAdministrationService
 export {
   fetchRegions,
   fetchRegionById,
   createRegion,
   updateRegion,
   patchRegion,
-  deleteRegion
-} from './regionService';
-
-// District Service
-export {
+  deleteRegion,
   fetchDistricts,
   fetchDistrictById,
   createDistrict,
   updateDistrict,
   patchDistrict,
-  deleteDistrict
-} from './districtService';
-
-// Station Service
-export {
+  deleteDistrict,
   fetchStations,
   fetchStationById,
   createStation,
   updateStation,
   patchStation,
-  deleteStation
-} from './stationService';
+  deleteStation,
+} from '../systemAdministrationService';
 
 // Prisoner Category Service
 export {

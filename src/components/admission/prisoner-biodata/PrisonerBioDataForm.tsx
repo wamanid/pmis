@@ -45,7 +45,7 @@ import { CardContent } from "../../ui/card";
 import { Card } from "../../ui/card";
 import { CardHeader } from "../../ui/card";
 import { CardTitle } from "../../ui/card";
-import { createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
+import { createPrisonerBiodata } from "../../../services/prisonerBiodataService";
 import {
   Search,
   User,

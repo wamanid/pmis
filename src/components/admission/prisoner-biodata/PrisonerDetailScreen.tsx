@@ -19,11 +19,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from "../../ui/dialog";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import PrisonerBioDataView from "./PrisonerBioDataView";
 import PrisonerBioDataForm from "./PrisonerBioDataForm";
 import { PrisonerBioData } from "./PrisonerBioDataList";
-import { getPrisonerBiodataByPrisonerId, createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
+import { getPrisonerBiodataByPrisonerId, createPrisonerBiodata } from "../../../services/prisonerBiodataService";
 
 const PrisonerDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>();

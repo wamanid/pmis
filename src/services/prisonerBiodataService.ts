@@ -1,9 +1,9 @@
-import axiosInstance from "../axiosInstance";
+import axiosInstance from "./axiosInstance";
 import {
   PrisonerBiodata,
   PrisonerBiodataListResponse,
   PrisonerBiodataFilters,
-} from "../../models/admission";
+} from "../models/admission";
 
 /**
  * Prisoner Biodata Service
