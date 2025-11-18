@@ -10,7 +10,6 @@ export const gateRoutes: RouteObject[] = [
     path: '/gate-management/gate-passes',
     element: <GatePassScreen />,
   },
-
     {
     path: '/gate-management/prisoner-entry-exit',
     element: <PrisonerEntryExitScreen />,

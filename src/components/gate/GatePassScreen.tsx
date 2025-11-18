@@ -31,7 +31,7 @@ import { toast } from 'sonner@2.0.3';
 import { Prisoner } from '../../models/gate/Prisoner';
 import { Escort } from '../../models/gate/Escort';
 import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
-import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass } from '../../services/gateService';
+import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass, editVisitorPass } from '../../services/gateService';
 import VisitorPassForm from './VisitorPassForm';
 // Mock Data
 
@@ -540,11 +540,9 @@ getworkingparty().then((data) => {
 
 
   const handleViewVisitorPass = (pass: VisitorPass) => {
-
     setSelectedVisitorPass(pass);
     setIsVisitorPassViewDialogOpen(true);
   };
-
     const handleEditVisitorPassDelete = (pass: VisitorPass) => {
       if (confirm('Are you sure you want to delete this visitor pass?')) {
       setIsLoading(true);
@@ -574,16 +572,22 @@ getworkingparty().then((data) => {
         toast.error(error.message);
       });
     } else {
+      alert(JSON.stringify(data));
+      editVisitorPass(data).then((data) => {
       toast.success('Visitor pass updated successfully');
+      setIsVisitorPassDialogOpen(false);
+      })
+      .catch((error) => {
+        toast.error(error.message);
+      });
+      
     }
-   // setIsVisitorPassDialogOpen(false);
+ 
   };
-
   // Visitor management handlers
   const handleAddNewVisitor = () => {
     setIsVisitorDialogOpen(true);
   };
-
 
     const getMainGateBatch = (status?: string) => {
     if(status=="true")
@@ -1380,7 +1384,7 @@ getworkingparty().then((data) => {
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <div className="mt-1">{getStatusBadge(selectedGatePass.status)}</div>
+                        <div className="mt-1">{getStatusBadge(selectedGatePass.status_name)}</div>
                       </div>
                       <div>
                         <Label className="text-gray-600">Gatekeeper</Label>
