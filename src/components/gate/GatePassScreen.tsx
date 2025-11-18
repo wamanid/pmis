@@ -524,8 +524,6 @@ getworkingparty().then((data) => {
   };
 
 
-
-
   //visitor pass
 
   // Visitor Pass handlers

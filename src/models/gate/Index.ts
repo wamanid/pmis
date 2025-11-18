@@ -24,7 +24,7 @@ export  interface PrisonerRecord {
   id: string;
   full_name: string;
   prisoner_number: string;
-  category: string;
+  category?: string;
 }
 
 export interface WorkingParty {

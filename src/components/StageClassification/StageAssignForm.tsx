@@ -35,8 +35,10 @@ import {
 import { Badge } from '../ui/badge';
 import { ScrollArea } from '../ui/scroll-area';
 import { CalendarIcon, Search, X, UserPlus, Users, ChevronsUpDown, Check } from 'lucide-react';
-import { format } from 'date-fns';
+import { format} from 'date-fns';
 import { toast } from 'sonner';
+import { PrisonerRecord } from '../../models/gate/Index';
+import { getprisoners } from '../../services/gateService';
 
 export interface StageAssignment {
   id: string;
@@ -86,8 +88,8 @@ export function StageAssignForm({
   // Form fields
   const [selectedPrisoners, setSelectedPrisoners] = useState<Prisoner[]>([]);
   const [selectedStage, setSelectedStage] = useState('');
-  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
-  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
+  const [startDate, setStartDate] = useState<String>('');
+  const [endDate, setEndDate] = useState<String>('');
   const [remark, setRemark] = useState('');
 
   // Load stages and prisoners on mount
@@ -107,8 +109,8 @@ export function StageAssignForm({
         full_name: stageAssignment.prisoner_name,
       }]);
       setSelectedStage(stageAssignment.stage);
-      setStartDate(new Date(stageAssignment.start_date));
-      setEndDate(stageAssignment.end_date ? new Date(stageAssignment.end_date) : undefined);
+     // setStartDate(new Date(stageAssignment.start_date));
+      //setEndDate(stageAssignment.end_date ? new Date(stageAssignment.end_date) : undefined);
       setRemark(stageAssignment.remark);
     } else if (open) {
       resetForm();
@@ -158,38 +160,19 @@ export function StageAssignForm({
       // const response = await fetch('/admission/api/prisoner-records/');
       // const data = await response.json();
       // setAllPrisoners(data.results);
-
       // Mock data - expanded list for demonstration
-      const mockPrisoners: Prisoner[] = [
-        { id: '1', prisoner_number: 'P-2024-001', full_name: 'John Doe' },
-        { id: '2', prisoner_number: 'P-2024-002', full_name: 'Jane Smith' },
-        { id: '3', prisoner_number: 'P-2024-003', full_name: 'Robert Johnson' },
-        { id: '4', prisoner_number: 'P-2024-004', full_name: 'Mary Williams' },
-        { id: '5', prisoner_number: 'P-2024-005', full_name: 'James Brown' },
-        { id: '6', prisoner_number: 'P-2024-006', full_name: 'Patricia Davis' },
-        { id: '7', prisoner_number: 'P-2024-007', full_name: 'Michael Miller' },
-        { id: '8', prisoner_number: 'P-2024-008', full_name: 'Linda Wilson' },
-        { id: '9', prisoner_number: 'P-2024-009', full_name: 'David Moore' },
-        { id: '10', prisoner_number: 'P-2024-010', full_name: 'Elizabeth Taylor' },
-        { id: '11', prisoner_number: 'P-2024-011', full_name: 'Richard Anderson' },
-        { id: '12', prisoner_number: 'P-2024-012', full_name: 'Sarah Thomas' },
-        { id: '13', prisoner_number: 'P-2024-013', full_name: 'Joseph Jackson' },
-        { id: '14', prisoner_number: 'P-2024-014', full_name: 'Nancy White' },
-        { id: '15', prisoner_number: 'P-2024-015', full_name: 'Thomas Harris' },
-        { id: '16', prisoner_number: 'P-2024-016', full_name: 'Charles Martin' },
-        { id: '17', prisoner_number: 'P-2024-017', full_name: 'Barbara Thompson' },
-        { id: '18', prisoner_number: 'P-2024-018', full_name: 'Daniel Garcia' },
-        { id: '19', prisoner_number: 'P-2024-019', full_name: 'Susan Martinez' },
-        { id: '20', prisoner_number: 'P-2024-020', full_name: 'Matthew Robinson' },
-        { id: '21', prisoner_number: 'P-2024-021', full_name: 'Jessica Clark' },
-        { id: '22', prisoner_number: 'P-2024-022', full_name: 'Christopher Rodriguez' },
-        { id: '23', prisoner_number: 'P-2024-023', full_name: 'Ashley Lewis' },
-        { id: '24', prisoner_number: 'P-2024-024', full_name: 'Andrew Lee' },
-        { id: '25', prisoner_number: 'P-2024-025', full_name: 'Amanda Walker' },
-      ];
-
-      setAllPrisoners(mockPrisoners);
+      let mockPrisoners: Prisoner[] = [];
+        getprisoners().then((data) => {
+         mockPrisoners = data.results;
+          setAllPrisoners(mockPrisoners);
       setPrisoners(mockPrisoners);
+    //alert(JSON.stringify(data.results));
+       
+      }).catch((error) => {
+        alert(error);
+
+      });
+     
     } catch (error) {
       console.error('Failed to load prisoners:', error);
       toast.error('Failed to load prisoners');
@@ -221,8 +204,8 @@ export function StageAssignForm({
   const resetForm = () => {
     setSelectedPrisoners([]);
     setSelectedStage('');
-    setStartDate(undefined);
-    setEndDate(undefined);
+    setStartDate('');
+    setEndDate('');
     setRemark('');
     setPrisonerSearch('');
     setPrisoners(allPrisoners);
@@ -264,11 +247,10 @@ export function StageAssignForm({
         const payload = {
           prisoner: selectedPrisoners[0].id,
           stage: selectedStage,
-          start_date: format(startDate!, 'yyyy-MM-dd'),
-          end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+          start_date: startDate!,
+          end_date: endDate ,
           remark: remark,
         };
-
         // TODO: Replace with actual API call
         // const response = await fetch(`/api/stage-management/prisoner-stages/${stageAssignment.id}/`, {
         //   method: 'PUT',
@@ -284,8 +266,8 @@ export function StageAssignForm({
         const assignments = selectedPrisoners.map((prisoner) => ({
           prisoner: prisoner.id,
           stage: selectedStage,
-          start_date: format(startDate!, 'yyyy-MM-dd'),
-          end_date: endDate ? format(endDate, 'yyyy-MM-dd') : null,
+          start_date: startDate,
+          end_date: endDate ,
           remark: remark,
         }));
 
@@ -377,7 +359,7 @@ export function StageAssignForm({
                           const searchLower = prisonerSearch.toLowerCase();
                           return (
                             prisoner.full_name.toLowerCase().includes(searchLower) ||
-                            prisoner.prisoner_number.toLowerCase().includes(searchLower)
+                            prisoner.prisoner_number_value.toLowerCase().includes(searchLower)
                           );
                         })
                         .map((prisoner) => {
@@ -402,7 +384,7 @@ export function StageAssignForm({
                                   <div>
                                     <p className="font-medium">{prisoner.full_name}</p>
                                     <p className="text-sm text-muted-foreground">
-                                      {prisoner.prisoner_number}
+                                      {prisoner.prisoner_number_value}
                                     </p>
                                   </div>
                                 </div>
@@ -503,7 +485,7 @@ export function StageAssignForm({
                     className="w-full justify-start text-left font-normal"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate ? format(startDate, 'PPP') : <span>Pick a date</span>}
+                    {startDate} <span>Pick a date</span>
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">
@@ -517,6 +499,22 @@ export function StageAssignForm({
               </Popover>
             </div>
 
+
+                   <div className="space-y-2">
+          <Label>
+            Issue Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="datetime-local"
+            value={startDate}
+            onChange={(e) => {
+            
+            }}
+         
+          />
+      
+        </div>
+
             <div className="space-y-2">
               <Label>End Date</Label>
               <Popover>
@@ -526,7 +524,7 @@ export function StageAssignForm({
                     className="w-full justify-start text-left font-normal"
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? format(endDate, 'PPP') : <span>Pick a date</span>}
+                    {endDate ? endDate: <span>Pick a date</span>}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-auto p-0">

@@ -9,4 +9,5 @@ export interface Prisoner {
   prisoner: string;
   gate_pass: string;
   working_party: string | null;
+  prisoner_number: string;
 }
