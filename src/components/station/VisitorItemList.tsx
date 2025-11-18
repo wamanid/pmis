@@ -654,7 +654,8 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
                   {/*  </Badge>*/}
                   {/*)}*/}
                   {viewingItem.is_collected ? (
-                    <Badge className="bg-blue-600 flex items-center gap-1">
+                    // <Badge className="bg-blue-600 flex items-center gap-1">
+                    <Badge>
                       <CheckCircle className="h-3 w-3" />
                       Collected
                     </Badge>
