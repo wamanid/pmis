@@ -101,7 +101,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setStationState('');
     localStorage.removeItem(STORAGE_KEY);
   };
-
   return (
     <FilterContext.Provider
       value={{
