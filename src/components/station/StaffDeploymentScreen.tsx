@@ -23,9 +23,23 @@ import {
   HRMISStaff
 } from '../../services/mockApi';
 import { cn } from '../ui/utils';
+import {
+  addStaffDeployment, getStaffDeployment,
+  getStaffProfile,
+  StaffDeployment, StaffDeploymentResponse,
+  StaffItem
+} from "../../services/stationServices/staffDeploymentService";
+import {getStation} from "../../services/stationServices/manualLockupIntegration";
+import {
+  DistrictFilter,
+  getDistrictSummary, getRegionSummary,
+  getStationSummary,
+  RegionFilter,
+  StationFilter
+} from "../../services/stationServices/utils"
 
 export function StaffDeploymentScreen() {
-  const [deployments, setDeployments] = useState<StaffDeploymentRecord[]>([]);
+  const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);
   const [summary, setSummary] = useState<StaffDeploymentSummary | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
@@ -35,13 +49,14 @@ export function StaffDeploymentScreen() {
   // HRMIS Staff Search
   const [hrmisSearchOpen, setHrmisSearchOpen] = useState(false);
   const [hrmisSearchQuery, setHrmisSearchQuery] = useState('');
-  const [hrmisResults, setHrmisResults] = useState<HRMISStaff[]>([]);
-  const [selectedStaff, setSelectedStaff] = useState<HRMISStaff | null>(null);
+  const [hrmisResults, setHrmisResults] = useState<StaffItem[]>([]);
+  const [selectedStaff, setSelectedStaff] = useState<StaffItem | null>(null);
   const [loadingHRMIS, setLoadingHRMIS] = useState(false);
   
   // Station Search for deployment
   const [stationSearchOpen, setStationSearchOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
+  const [summaryX, setSummaryX] = useState({staff: 0, deployed: 0, stations: 0})
   
   // Form data
   const [deployFormData, setDeployFormData] = useState({
@@ -49,30 +64,102 @@ export function StaffDeploymentScreen() {
     end_date: ''
   });
 
+  const [staffProfile, setStaffProfile] = useState<StaffItem[]>([])
+  const [staffProfileLoading, setStaffProfileLoading] = useState(true)
+  const [stationsX, setStationsX] = useState([])
+  const [stationSummary, setStationSummary] = useState<StationFilter[]>([])
+  const [regionSummary, setRegionSummary] = useState<RegionFilter[]>([])
+  const [districtSummary, setDistrictSummary] = useState<DistrictFilter[]>([])
+
   useEffect(() => {
-    loadData();
+    // loadData();
+    fetchData()
   }, []);
 
-  useEffect(() => {
-    const searchHRMIS = async () => {
-      if (hrmisSearchQuery.length >= 2) {
-        setLoadingHRMIS(true);
-        try {
-          const results = await searchHRMISStaff(hrmisSearchQuery);
-          setHrmisResults(results);
-        } catch (error) {
-          console.error('Failed to search HRMIS:', error);
-        } finally {
-          setLoadingHRMIS(false);
-        }
-      } else {
-        setHrmisResults([]);
-      }
-    };
+  // useEffect(() => {
+  //   const searchHRMIS = async () => {
+  //     if (hrmisSearchQuery.length >= 2) {
+  //       setLoadingHRMIS(true);
+  //       try {
+  //         const results = await searchHRMISStaff(hrmisSearchQuery);
+  //         setHrmisResults(results);
+  //       } catch (error) {
+  //         console.error('Failed to search HRMIS:', error);
+  //       } finally {
+  //         setLoadingHRMIS(false);
+  //       }
+  //     } else {
+  //       setHrmisResults([]);
+  //     }
+  //   };
+  //
+  //   const debounce = setTimeout(searchHRMIS, 300);
+  //   return () => clearTimeout(debounce);
+  // }, [hrmisSearchQuery]);
+  const fetchData = async () => {
+    setLoading(true);
+    try {
 
-    const debounce = setTimeout(searchHRMIS, 300);
-    return () => clearTimeout(debounce);
-  }, [hrmisSearchQuery]);
+      let data1 = []
+      let data = []
+      let data2 = []
+
+      const response = await getStaffDeployment()
+      if ('error' in response){
+         toast.error(response.error);
+      }
+
+      if ("results" in response) {
+        data = response.results
+         setDeployments(data)
+        setStationSummary(getStationSummary(data))
+        setDistrictSummary(getDistrictSummary(data))
+        setRegionSummary(getRegionSummary(data))
+      }
+
+      const response1 = await getStaffProfile()
+       if ('error' in response1){
+         toast.error(response1.error)
+       }
+      if ("results" in response1) {
+        data1 = response1.results
+        if (data1.length === 0){
+          toast.error("There are no staff members")
+        }
+        setStaffProfile(data1)
+        setHrmisResults(data1)
+      }
+
+      const response2 = await getStation()
+
+       if ('error' in response2){
+         toast.error(response2.error)
+       }
+      if ("results" in response2) {
+        data2 = response2.results
+        if (data2.length === 0){
+         toast.error("There are no staff members")
+       }
+        setStationsX(data2)
+      }
+
+      handleSummary(data, data1, data2)
+
+    }catch (error) {
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
+    }finally {
+      setLoading(false)
+    }
+  }
+
+  const handleSummary = (data: [], data1: [], data2: []) => {
+      const is_active = (data ?? []).filter(da => da.is_active).length
+      const uniqueStations = new Set(data.map(item => item.station_name));
+      const uniqueStationCount = uniqueStations.size;
+      setSummaryX({staff: data1.length, deployed: is_active, stations: uniqueStationCount})
+  }
 
   const loadData = async () => {
     try {
@@ -110,33 +197,66 @@ export function StaffDeploymentScreen() {
     }
 
     try {
-      // Split name into parts
-      const nameParts = selectedStaff.name.trim().split(' ');
-      const first_name = nameParts[0] || '';
-      const last_name = nameParts[nameParts.length - 1] || '';
-      const middle_name = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
 
-      await createStaffDeployment({
-        first_name,
-        middle_name,
-        last_name,
-        force_number: selectedStaff.force_number,
-        date_of_birth: selectedStaff.dob,
-        rank: selectedStaff.rank,
-        station: selectedStation.id.toString(),
+      const deployment : StaffDeployment = {
+        is_active: true,
         start_date: deployFormData.start_date,
-        end_date: deployFormData.end_date || undefined
-      });
-      
+        end_date: deployFormData.end_date,
+        station: selectedStation.id,
+        profile: selectedStaff.id
+      }
+
+      const response = await addStaffDeployment(deployment)
+      if ('error' in response){
+         toast.error(response.error);
+         return
+      }
+
       toast.success('Staff member deployed successfully');
       setDeployOpen(false);
       resetForm();
-      loadData();
+      addDeployment(response as StaffDeploymentResponse)
+      // setDeployments((prev) => [...prev, response as StaffDeploymentResponse]);
+      // loadData()
+
+      // Split name into parts
+      // const nameParts = selectedStaff.name.trim().split(' ');
+      // const first_name = nameParts[0] || '';
+      // const last_name = nameParts[nameParts.length - 1] || '';
+      // const middle_name = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
+      //
+      // await createStaffDeployment({
+      //   first_name,
+      //   middle_name,
+      //   last_name,
+      //   force_number: selectedStaff.force_number,
+      //   date_of_birth: selectedStaff.dob,
+      //   rank: selectedStaff.rank,
+      //   station: selectedStation.id.toString(),
+      //   start_date: deployFormData.start_date,
+      //   end_date: deployFormData.end_date || undefined
+      // });
+      //
+      // toast.success('Staff member deployed successfully');
+      // setDeployOpen(false);
+      // resetForm();
+      // loadData();
     } catch (error) {
-      console.error('Failed to deploy staff:', error);
-      toast.error('Failed to deploy staff member');
+      if (!error?.response) {
+        toast.error('Failed to connect to server. Please try again.');
+      }
     }
   };
+
+  const addDeployment = (response: StaffDeploymentResponse) => {
+    setDeployments((prev) => {
+      const updatedDeployments = [...prev, response]
+      setStationSummary(getStationSummary(updatedDeployments));
+      setDistrictSummary(getDistrictSummary(updatedDeployments));
+      setRegionSummary(getRegionSummary(updatedDeployments));
+      return updatedDeployments
+    })
+  }
 
   const resetForm = () => {
     setSelectedStaff(null);
@@ -158,6 +278,27 @@ export function StaffDeploymentScreen() {
       deployment.rank.toLowerCase().includes(query)
     );
   });
+
+  useEffect(() => {
+      const fetchData = async () => {
+        setStaffProfileLoading(true)
+        if(deployOpen){
+          if (staffProfile.length == 0){
+             toast.error("There are no staff members")
+             setDeployOpen(false);
+             return
+          }
+
+          if (stationsX.length == 0){
+             toast.error("There are no stations")
+             setDeployOpen(false);
+             return
+          }
+           setStaffProfileLoading(false)
+        }
+      }
+      fetchData()
+  }, [deployOpen]);
 
   if (loading) {
     return (
@@ -193,150 +334,169 @@ export function StaffDeploymentScreen() {
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-lg">
-            <DialogHeader>
-              <DialogTitle>Deploy Staff Member</DialogTitle>
-              <DialogDescription>Search HRMIS and assign a staff member to a station</DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              {/* HRMIS Staff Search */}
-              <div className="space-y-2">
-                <Label>Staff Member (from HRMIS)</Label>
-                <Popover open={hrmisSearchOpen} onOpenChange={setHrmisSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={hrmisSearchOpen}
-                      className="w-full justify-between"
-                    >
-                      {selectedStaff ? (
-                        <span>{selectedStaff.force_number} - {selectedStaff.name}</span>
-                      ) : (
-                        <span className="text-muted-foreground">Search by force number or name...</span>
-                      )}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0">
-                    <Command>
-                      <CommandInput 
-                        placeholder="Search staff..." 
-                        value={hrmisSearchQuery}
-                        onValueChange={setHrmisSearchQuery}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {loadingHRMIS ? 'Searching HRMIS...' : 'No staff found. Try searching by force number or name.'}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          {hrmisResults.map((staff) => (
-                            <CommandItem
-                              key={staff.force_number}
-                              value={staff.force_number}
-                              onSelect={() => {
-                                setSelectedStaff(staff);
-                                setHrmisSearchOpen(false);
-                              }}
-                            >
-                              <CheckIcon
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedStaff?.force_number === staff.force_number
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              <div className="flex flex-col">
-                                <span>{staff.force_number} - {staff.name}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  {staff.rank} • DOB: {staff.dob}
-                                </span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+            {
+              staffProfileLoading ? (
+                  <>
+                    <DialogHeader>
+                      <DialogTitle></DialogTitle>
+                      <DialogDescription></DialogDescription>
+                    </DialogHeader>
+                    <div className="size-full flex items-center justify-center">
+                    <div className="text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground text-sm">
+                        Fetching station data, Please wait...
+                      </p>
+                    </div>
+                  </div>
+                  </>
 
-              {/* Display selected staff details */}
-              {selectedStaff && (
-                <div className="p-3 bg-muted rounded-lg space-y-1 text-sm">
-                  <div><span className="font-medium">Force Number:</span> {selectedStaff.force_number}</div>
-                  <div><span className="font-medium">Name:</span> {selectedStaff.name}</div>
-                  <div><span className="font-medium">Rank:</span> {selectedStaff.rank}</div>
-                  <div><span className="font-medium">Date of Birth:</span> {selectedStaff.dob}</div>
-                </div>
-              )}
+              ) : (
+                 <>
+                   <DialogHeader>
+                    <DialogTitle>Deploy Staff Member</DialogTitle>
+                    <DialogDescription>Search HRMIS and assign a staff member to a station</DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    {/* HRMIS Staff Search */}
+                    <div className="space-y-2">
+                      <Label>Staff Member (from HRMIS)</Label>
+                      <Popover open={hrmisSearchOpen} onOpenChange={setHrmisSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={hrmisSearchOpen}
+                            className="w-full justify-between"
+                          >
+                            {selectedStaff ? (
+                              <span>{selectedStaff.force_number} - {selectedStaff.first_name} {selectedStaff.first_name}</span>
+                            ) : (
+                              <span className="text-muted-foreground">Search by force number or name...</span>
+                            )}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <Command>
+                            <CommandInput
+                              placeholder="Search staff..."
+                              value={hrmisSearchQuery}
+                              onValueChange={setHrmisSearchQuery}
+                            />
+                            <CommandList>
+                              <CommandEmpty>
+                                {loadingHRMIS ? 'Searching HRMIS...' : 'No staff found. Try searching by force number or name.'}
+                              </CommandEmpty>
+                              <CommandGroup>
+                                {hrmisResults.map((staff) => (
+                                  <CommandItem
+                                    key={staff.force_number}
+                                    value={staff.force_number}
+                                    onSelect={() => {
+                                      setSelectedStaff(staff);
+                                      setHrmisSearchOpen(false);
+                                    }}
+                                  >
+                                    <CheckIcon
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedStaff?.force_number === staff.force_number
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span>{staff.force_number} - {staff.first_name} {staff.last_name}</span>
+                                      <span className="text-xs text-muted-foreground">
+                                        {staff.rank_name} • DOB: {staff.date_of_birth}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
 
-              {/* Station Selection */}
-              <div className="space-y-2">
-                <Label>Station</Label>
-                <Popover open={stationSearchOpen} onOpenChange={setStationSearchOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      role="combobox"
-                      aria-expanded={stationSearchOpen}
-                      className="w-full justify-between"
-                    >
-                      {selectedStation ? selectedStation.name : "Select station..."}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-[400px] p-0">
-                    <Command>
-                      <CommandInput placeholder="Search station..." />
-                      <CommandList>
-                        <CommandEmpty>No station found.</CommandEmpty>
-                        <CommandGroup>
-                          {stations.map((station) => (
-                            <CommandItem
-                              key={station.id}
-                              value={station.name}
-                              onSelect={() => {
-                                setSelectedStation(station);
-                                setStationSearchOpen(false);
-                              }}
-                            >
-                              <CheckIcon
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  selectedStation?.id === station.id
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {station.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-              </div>
+                    {/* Display selected staff details */}
+                    {selectedStaff && (
+                      <div className="p-3 bg-muted rounded-lg space-y-1 text-sm">
+                        <div><span className="font-medium">Force Number:</span> {selectedStaff.force_number}</div>
+                        <div><span className="font-medium">Name:</span> {selectedStaff.first_name} {selectedStaff.last_name}</div>
+                        <div><span className="font-medium">Rank:</span> {selectedStaff.rank_name}</div>
+                        <div><span className="font-medium">Date of Birth:</span> {selectedStaff.date_of_birth}</div>
+                      </div>
+                    )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Start Date</Label>
-                  <Input
-                    type="date"
-                    value={deployFormData.start_date}
-                    onChange={(e) => setDeployFormData({ ...deployFormData, start_date: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>End Date (Optional)</Label>
-                  <Input
-                    type="date"
-                    value={deployFormData.end_date}
-                    onChange={(e) => setDeployFormData({ ...deployFormData, end_date: e.target.value })}
-                  />
-                </div>
-              </div>
-            </div>
-            <DialogFooter>
+                    {/* Station Selection */}
+                    <div className="space-y-2">
+                      <Label>Station</Label>
+                      <Popover open={stationSearchOpen} onOpenChange={setStationSearchOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={stationSearchOpen}
+                            className="w-full justify-between"
+                          >
+                            {selectedStation ? selectedStation.name : "Select station..."}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[400px] p-0">
+                          <Command>
+                            <CommandInput placeholder="Search station..." />
+                            <CommandList>
+                              <CommandEmpty>No station found.</CommandEmpty>
+                              <CommandGroup>
+                                {stationsX.map((station) => (
+                                  <CommandItem
+                                    key={station.id}
+                                    value={station.name}
+                                    onSelect={() => {
+                                      setSelectedStation(station);
+                                      setStationSearchOpen(false);
+                                    }}
+                                  >
+                                    <CheckIcon
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        selectedStation?.id === station.id
+                                          ? "opacity-100"
+                                          : "opacity-0"
+                                      )}
+                                    />
+                                    {station.name}
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Start Date</Label>
+                        <Input
+                          type="date"
+                          value={deployFormData.start_date}
+                          onChange={(e) => setDeployFormData({ ...deployFormData, start_date: e.target.value })}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>End Date (Optional)</Label>
+                        <Input
+                          type="date"
+                          value={deployFormData.end_date}
+                          onChange={(e) => setDeployFormData({ ...deployFormData, end_date: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
               <Button variant="outline" onClick={() => { setDeployOpen(false); resetForm(); }}>
                 Cancel
               </Button>
@@ -344,6 +504,9 @@ export function StaffDeploymentScreen() {
                 Deploy Staff
               </Button>
             </DialogFooter>
+                 </>
+              )
+            }
           </DialogContent>
         </Dialog>
       </div>
@@ -358,7 +521,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <Users className="h-8 w-8 text-muted-foreground" />
               <div>
-                <div className="text-2xl">{summary?.total_staff || 0}</div>
+                <div className="text-2xl">{summaryX.staff}</div>
                 <p className="text-xs text-muted-foreground">All deployed staff</p>
               </div>
             </div>
@@ -373,7 +536,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <Building2 className="h-8 w-8" style={{ color: '#650000' }} />
               <div>
-                <div className="text-2xl">{summary?.deployed_staff || 0}</div>
+                <div className="text-2xl">{summaryX.deployed}</div>
                 <p className="text-xs text-muted-foreground">Currently deployed</p>
               </div>
             </div>
@@ -388,7 +551,7 @@ export function StaffDeploymentScreen() {
             <div className="flex items-center gap-2">
               <MapPin className="h-8 w-8 text-blue-500" />
               <div>
-                <div className="text-2xl">{summary?.by_station.length || 0}</div>
+                <div className="text-2xl">{summaryX.stations}</div>
                 <p className="text-xs text-muted-foreground">Stations with staff</p>
               </div>
             </div>
@@ -478,7 +641,7 @@ export function StaffDeploymentScreen() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <span className="text-sm">{deployment.age_at_deployment} years</span>
+                            <span className="text-sm">{deployment.age_at_deployment}</span>
                           </TableCell>
                           <TableCell>
                             <Badge 
@@ -517,8 +680,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_station.map(item => (
-                      <TableRow key={item.station_id}>
+                    {stationSummary?.map(item => (
+                      <TableRow key={item.station_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <Building2 className="h-4 w-4" style={{ color: '#650000' }} />
@@ -528,7 +691,7 @@ export function StaffDeploymentScreen() {
                         <TableCell>{item.district_name}</TableCell>
                         <TableCell>{item.region_name}</TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -557,8 +720,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_district.map(item => (
-                      <TableRow key={item.district_id}>
+                    {districtSummary?.map(item => (
+                      <TableRow key={item.district_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-blue-500" />
@@ -567,7 +730,7 @@ export function StaffDeploymentScreen() {
                         </TableCell>
                         <TableCell>{item.region_name}</TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -595,8 +758,8 @@ export function StaffDeploymentScreen() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {summary?.by_region.map(item => (
-                      <TableRow key={item.region_id}>
+                    {regionSummary?.map(item => (
+                      <TableRow key={item.region_name}>
                         <TableCell>
                           <div className="flex items-center gap-2">
                             <MapPin className="h-4 w-4 text-green-500" />
@@ -604,7 +767,7 @@ export function StaffDeploymentScreen() {
                           </div>
                         </TableCell>
                         <TableCell className="text-right">
-                          <Badge style={{ backgroundColor: '#650000' }}>{item.staff_count}</Badge>
+                          <Badge style={{ backgroundColor: '#650000' }}>{item.count}</Badge>
                         </TableCell>
                       </TableRow>
                     ))}

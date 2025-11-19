@@ -120,8 +120,8 @@ export interface DataTableConfig {
  * />
  */
 export interface DataTableProps {
-  /** API endpoint URL to fetch data from */
-  url: string;
+  /** API endpoint URL to fetch data from (optional when using controlled mode with `data`) */
+  url?: string;
   
   /** Title displayed in the table header */
   title: string;

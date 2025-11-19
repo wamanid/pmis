@@ -227,7 +227,7 @@ export interface StationAttendanceSummary {
 }
 
 // Mock API functions - Replace these with actual API calls
-const API_BASE_URL = 'https://pmis.angstrom-technologies.ug/api'; // Replace with your actual API base URL
+const API_BASE_URL = 'http://localhost:8000/api/'; // Replace with your actual API base URL
 const STATION_ID = 1; // Replace with actual station ID from authentication/context
 
 /**
@@ -922,21 +922,21 @@ export const fetchMenus = async (): Promise<MenuApiResponse> => {
         deleted_by: null,
         parent: null
       },
-      {
-        id: "4",
-        parent_name: null,
-        created_datetime: "2025-10-20T09:53:28.460Z",
-        is_active: true,
-        updated_datetime: "2025-10-20T09:53:28.460Z",
-        deleted_datetime: null,
-        name: "Property Management",
-        url: "/property-management",
-        icon: "Package",
-        created_by: 1,
-        updated_by: null,
-        deleted_by: null,
-        parent: null
-      },
+      // {
+      //   id: "4",
+      //   parent_name: null,
+      //   created_datetime: "2025-10-20T09:53:28.460Z",
+      //   is_active: true,
+      //   updated_datetime: "2025-10-20T09:53:28.460Z",
+      //   deleted_datetime: null,
+      //   name: "Property Management",
+      //   url: "/property-management",
+      //   icon: "Package",
+      //   created_by: 1,
+      //   updated_by: null,
+      //   deleted_by: null,
+      //   parent: null
+      // },
       {
         id: "5",
         parent_name: null,

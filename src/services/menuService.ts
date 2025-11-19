@@ -1,5 +1,4 @@
 import axiosInstance from './axiosInstance';
-<<<<<<< HEAD
 
 export interface ApiMenuItem {
   id: string;
@@ -23,11 +22,6 @@ export interface MenuResponse {
   previous: string | null;
   results: ApiMenuItem[];
 }
-=======
-import { ApiMenuItem, MenuResponse } from '../models/common/menu';
-
-export type { ApiMenuItem, MenuResponse };
->>>>>>> upstream/main
 
 /**
  * Fetch menu items from backend

@@ -56,50 +56,6 @@ export interface VerifyOtpResponse {
   scope?: string;
 }
 
-const AUTH_TOKEN_KEY = 'auth_token';
-const REFRESH_TOKEN_KEY = 'refresh_token';
-const USER_DATA_KEY = 'user_data';
-
-function safeSetItem(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch (e) {
-    // storage may be unavailable (privacy mode) — fail silently
-  }
-}
-
-function safeGetItem(key: string) {
-  try {
-    return localStorage.getItem(key);
-  } catch (e) {
-    return null;
-  }
-}
-
-function safeRemoveItem(key: string) {
-  try {
-    localStorage.removeItem(key);
-  } catch (e) { /* ignore */ }
-}
-
-export function setAuth(token: string, refresh?: string, user?: unknown) {
-  // Note: storing tokens in localStorage is vulnerable to XSS.
-  // Prefer httpOnly cookies from the server if possible.
-  safeSetItem(AUTH_TOKEN_KEY, token);
-  if (refresh) safeSetItem(REFRESH_TOKEN_KEY, refresh);
-  if (user) safeSetItem(USER_DATA_KEY, JSON.stringify(user));
-}
-
-export function clearAuth() {
-  safeRemoveItem(AUTH_TOKEN_KEY);
-  safeRemoveItem(REFRESH_TOKEN_KEY);
-  safeRemoveItem(USER_DATA_KEY);
-}
-
-export function getAuthToken() {
-  return safeGetItem(AUTH_TOKEN_KEY);
-}
-
 /**
  * Send login credentials and authenticate
  * If MFA is not required, returns tokens immediately
@@ -108,8 +64,11 @@ export function getAuthToken() {
 export const login = async (credentials: LoginCredentials): Promise<LoginResponse> => {
   const response = await axiosInstance.post<LoginResponse>('/auth/login/', credentials);
   
+  // If MFA is not required, store tokens immediately
   if (!response.data.mfa_required && response.data.access_token) {
-    setAuth(response.data.access_token, response.data.refresh_token, response.data.user);
+    localStorage.setItem('auth_token', response.data.access_token);
+    localStorage.setItem('refresh_token', response.data.refresh_token!);
+    localStorage.setItem('user_data', JSON.stringify(response.data.user));
   }
   
   return response.data;
@@ -121,8 +80,11 @@ export const login = async (credentials: LoginCredentials): Promise<LoginRespons
 export const verifyOtp = async (otpData: VerifyOtpRequest): Promise<VerifyOtpResponse> => {
   const response = await axiosInstance.post<VerifyOtpResponse>('/auth/mfa/verify/', otpData);
   
+  // Store token and user data if successful
   if (response.data.access_token) {
-    setAuth(response.data.access_token, response.data.refresh_token, response.data.user);
+    localStorage.setItem('auth_token', response.data.access_token);
+    localStorage.setItem('refresh_token', response.data.refresh_token!);
+    localStorage.setItem('user_data', JSON.stringify(response.data.user));
   }
   
   return response.data;
@@ -143,7 +105,10 @@ export const logout = async (): Promise<void> => {
   try {
     await axiosInstance.post('/auth/logout/');
   } finally {
-    clearAuth();
+    // Clear local storage regardless of API response
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('user_data');
   }
 };
 
@@ -151,10 +116,13 @@ export const logout = async (): Promise<void> => {
  * Get current user data from localStorage
  */
 export const getCurrentUser = () => {
-  const userData = safeGetItem(USER_DATA_KEY);
+  const userData = localStorage.getItem('user_data');
   return userData ? JSON.parse(userData) : null;
 };
 
+/**
+ * Check if user is authenticated
+ */
 export const isAuthenticated = (): boolean => {
-  return !!getAuthToken();
+  return !!localStorage.getItem('auth_token');
 };

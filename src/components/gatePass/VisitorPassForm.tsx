@@ -9,6 +9,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Check, ChevronsUpDown, AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Pass} from "../../services/stationServices/visitorsServices/visitorPass";
 
 interface VisitorPass {
   id?: string;
@@ -59,7 +60,9 @@ const mockVisitors = [
 ];
 
 export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFields, onAddNewVisitor, visitors }: VisitorPassFormProps) {
-  const [formData, setFormData] = useState<VisitorPass>({
+  const [formData, setFormData] = useState<Pass>({
+    is_active: true,
+    is_valid: true,
     visitor_tag_number: '',
     valid_from: '',
     valid_until: '',
@@ -70,7 +73,9 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
     suspended_reason: '',
     prisoner: '',
     visitor: '',
-    suspended_by: 0
+    suspended_by: '',
+    deleted_by: null,
+    deleted_datetime: null
   });
 
   const [prisonerOpen, setPrisonerOpen] = useState(false);
