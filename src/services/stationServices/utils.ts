@@ -1,5 +1,6 @@
 import {ManualLockUpItem} from "./manualLockupIntegration";
-import {StaffDeploymentResponse, Station} from "./staffDeploymentIntegration"
+import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
+import {toast} from "sonner";
 
 export const getStationsAndTypes = (lockups: ManualLockUpItem[]) => {
   const uniqueStations = Array.from(
@@ -107,3 +108,27 @@ export const getRegionSummary = (data: StaffDeploymentResponse[]): RegionFilter[
     return { region_name: key, count };
   });
 };
+
+export const handleResponseError = (response: any) => {
+  if ('error' in response){
+    toast.error(response.error);
+    return true
+  }
+  return false
+}
+
+export async function fileToBinaryString(file: File): Promise<string> {
+    const base64Data = await fileToBase64(file);
+    // Remove the "data:image/jpeg;base64," prefix
+    const [, rawBase64] = base64Data.split(",");
+    return rawBase64;
+  }
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

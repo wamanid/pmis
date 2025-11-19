@@ -86,7 +86,7 @@ axiosInstance.interceptors.response.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+      console.log(error.response)
       switch (status) {
         case 400:
           toast.error(data?.message || 'Bad request. Please check your input.');

@@ -28,7 +28,7 @@ import {
   getStaffProfile,
   StaffDeployment, StaffDeploymentResponse,
   StaffItem
-} from "../../services/stationServices/staffDeploymentIntegration";
+} from "../../services/stationServices/staffDeploymentService";
 import {getStation} from "../../services/stationServices/manualLockupIntegration";
 import {
   DistrictFilter,
