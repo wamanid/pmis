@@ -13,7 +13,7 @@ import {
   XCircle,
 } from "lucide-react";
 import ComplaintForm from "./ComplaintForm";
-import * as ComplaintsService from "../../services/stationServices/complaintsService";
+import * as ComplaintsService from '../../services/stationServices/complaintsService';
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -83,393 +83,7 @@ interface Complaint {
   rank: string;
 }
 
-// Mock data
-// const mockComplaints: Complaint[] = [
-//   {
-//     id: "1",
-//     station_name: "Central Police Station",
-//     prisoner_name: "John Doe",
-//     nature_of_complaint_name: "Medical Emergency",
-//     complaint_priority_name: "High",
-//     officer_requested_username: "officer.smith",
-//     rank_name: "Inspector",
-//     created_by_name: "Admin User",
-//     actions: [
-//       {
-//         id: "a1",
-//         created_by_name: "Officer Smith",
-//         created_datetime: "2025-10-23T10:30:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-23T10:30:00.000Z",
-//         deleted_datetime: null,
-//         action: "Initial assessment conducted",
-//         action_date: "2025-10-23T10:30:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Patient assessed, requires immediate medical attention",
-//         created_by: 1,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "1",
-//       },
-//       {
-//         id: "a2",
-//         created_by_name: "Dr. Johnson",
-//         created_datetime: "2025-10-23T11:15:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-23T11:15:00.000Z",
-//         deleted_datetime: null,
-//         action: "Medical treatment provided",
-//         action_date: "2025-10-23T11:15:00.000Z",
-//         action_status: "IN_PROGRESS",
-//         action_remark: "Medication administered, monitoring ongoing",
-//         created_by: 2,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "1",
-//       },
-//     ],
-//     created_datetime: "2025-10-23T09:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-23T11:15:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Prisoner experiencing severe chest pain and difficulty breathing",
-//     complaint_date: "2025-10-23T09:00:00.000Z",
-//     complaint_status: "IN_PROGRESS",
-//     complaint_remark: "Urgent medical attention required",
-//     date_of_response: "2025-10-23T10:30:00.000Z",
-//     force_number: "PF-12345",
-//     response: "Medical team dispatched immediately",
-//     created_by: 1,
-//     updated_by: 1,
-//     deleted_by: null,
-//     station: "station-1",
-//     prisoner: "prisoner-1",
-//     nature_of_complaint: "nature-1",
-//     complaint_priority: "priority-1",
-//     officer_requested: 1,
-//     rank: "rank-1",
-//   },
-//   {
-//     id: "2",
-//     station_name: "North Division Station",
-//     prisoner_name: "Jane Smith",
-//     nature_of_complaint_name: "Poor Cell Conditions",
-//     complaint_priority_name: "Medium",
-//     officer_requested_username: "officer.jones",
-//     rank_name: "Sergeant",
-//     created_by_name: "Duty Officer",
-//     actions: [
-//       {
-//         id: "a3",
-//         created_by_name: "Officer Jones",
-//         created_datetime: "2025-10-22T14:00:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-22T14:00:00.000Z",
-//         deleted_datetime: null,
-//         action: "Cell inspection scheduled",
-//         action_date: "2025-10-22T14:00:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Inspection team assigned",
-//         created_by: 3,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "2",
-//       },
-//     ],
-//     created_datetime: "2025-10-22T13:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-22T14:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Cell ventilation not working properly, water leakage from ceiling",
-//     complaint_date: "2025-10-22T13:00:00.000Z",
-//     complaint_status: "OPEN",
-//     complaint_remark: "Requires maintenance team review",
-//     date_of_response: null,
-//     force_number: "PF-67890",
-//     response: "",
-//     created_by: 3,
-//     updated_by: 3,
-//     deleted_by: null,
-//     station: "station-2",
-//     prisoner: "prisoner-2",
-//     nature_of_complaint: "nature-2",
-//     complaint_priority: "priority-2",
-//     officer_requested: 2,
-//     rank: "rank-2",
-//   },
-//   {
-//     id: "3",
-//     station_name: "Central Police Station",
-//     prisoner_name: "Robert Wilson",
-//     nature_of_complaint_name: "Food Quality",
-//     complaint_priority_name: "Low",
-//     officer_requested_username: "officer.davis",
-//     rank_name: "Constable",
-//     created_by_name: "Admin User",
-//     actions: [
-//       {
-//         id: "a4",
-//         created_by_name: "Kitchen Supervisor",
-//         created_datetime: "2025-10-21T16:30:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-21T16:30:00.000Z",
-//         deleted_datetime: null,
-//         action: "Kitchen inspection conducted",
-//         action_date: "2025-10-21T16:30:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Quality standards verified, menu reviewed",
-//         created_by: 4,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "3",
-//       },
-//     ],
-//     created_datetime: "2025-10-21T15:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-21T17:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Food served is often cold and tasteless",
-//     complaint_date: "2025-10-21T15:00:00.000Z",
-//     complaint_status: "RESOLVED",
-//     complaint_remark: "Issue addressed with kitchen staff",
-//     date_of_response: "2025-10-21T16:30:00.000Z",
-//     force_number: "PF-11223",
-//     response: "Kitchen procedures updated, quality monitoring increased",
-//     created_by: 1,
-//     updated_by: 1,
-//     deleted_by: null,
-//     station: "station-1",
-//     prisoner: "prisoner-3",
-//     nature_of_complaint: "nature-3",
-//     complaint_priority: "priority-3",
-//     officer_requested: 3,
-//     rank: "rank-3",
-//   },
-//   {
-//     id: "4",
-//     station_name: "South District Station",
-//     prisoner_name: "Maria Garcia",
-//     nature_of_complaint_name: "Visitation Rights",
-//     complaint_priority_name: "High",
-//     officer_requested_username: "officer.brown",
-//     rank_name: "Inspector",
-//     created_by_name: "Officer Brown",
-//     actions: [],
-//     created_datetime: "2025-10-23T08:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-23T08:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Family visit denied without proper explanation",
-//     complaint_date: "2025-10-23T08:00:00.000Z",
-//     complaint_status: "OPEN",
-//     complaint_remark: "Requires review by senior officer",
-//     date_of_response: null,
-//     force_number: "PF-44556",
-//     response: "",
-//     created_by: 5,
-//     updated_by: null,
-//     deleted_by: null,
-//     station: "station-3",
-//     prisoner: "prisoner-4",
-//     nature_of_complaint: "nature-4",
-//     complaint_priority: "priority-1",
-//     officer_requested: 4,
-//     rank: "rank-1",
-//   },
-//   {
-//     id: "5",
-//     station_name: "East Division Station",
-//     prisoner_name: "Ahmed Khan",
-//     nature_of_complaint_name: "Physical Assault",
-//     complaint_priority_name: "Critical",
-//     officer_requested_username: "officer.anderson",
-//     rank_name: "Chief Inspector",
-//     created_by_name: "Duty Officer",
-//     actions: [
-//       {
-//         id: "a5",
-//         created_by_name: "Officer Anderson",
-//         created_datetime: "2025-10-23T07:30:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-23T07:30:00.000Z",
-//         deleted_datetime: null,
-//         action: "Formal investigation initiated",
-//         action_date: "2025-10-23T07:30:00.000Z",
-//         action_status: "IN_PROGRESS",
-//         action_remark: "Witness statements being collected",
-//         created_by: 6,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "5",
-//       },
-//       {
-//         id: "a6",
-//         created_by_name: "Medical Officer",
-//         created_datetime: "2025-10-23T08:15:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-23T08:15:00.000Z",
-//         deleted_datetime: null,
-//         action: "Medical examination conducted",
-//         action_date: "2025-10-23T08:15:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Injuries documented, medical report filed",
-//         created_by: 7,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "5",
-//       },
-//     ],
-//     created_datetime: "2025-10-23T07:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-23T08:15:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Claims to have been assaulted by another prisoner during exercise period",
-//     complaint_date: "2025-10-23T07:00:00.000Z",
-//     complaint_status: "IN_PROGRESS",
-//     complaint_remark: "Critical - requires immediate investigation",
-//     date_of_response: "2025-10-23T07:30:00.000Z",
-//     force_number: "PF-78901",
-//     response: "Investigation team assigned, prisoner moved to secure cell",
-//     created_by: 8,
-//     updated_by: 8,
-//     deleted_by: null,
-//     station: "station-4",
-//     prisoner: "prisoner-5",
-//     nature_of_complaint: "nature-5",
-//     complaint_priority: "priority-4",
-//     officer_requested: 5,
-//     rank: "rank-4",
-//   },
-//   {
-//     id: "6",
-//     station_name: "West Division Station",
-//     prisoner_name: "Carlos Mendez",
-//     nature_of_complaint_name: "Legal Access",
-//     complaint_priority_name: "Medium",
-//     officer_requested_username: "officer.taylor",
-//     rank_name: "Sergeant",
-//     created_by_name: "Legal Officer",
-//     actions: [
-//       {
-//         id: "a7",
-//         created_by_name: "Officer Taylor",
-//         created_datetime: "2025-10-20T11:00:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-20T11:00:00.000Z",
-//         deleted_datetime: null,
-//         action: "Legal counsel meeting arranged",
-//         action_date: "2025-10-20T11:00:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Meeting scheduled for tomorrow",
-//         created_by: 9,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "6",
-//       },
-//     ],
-//     created_datetime: "2025-10-20T10:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-21T09:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Unable to meet with legal counsel for case preparation",
-//     complaint_date: "2025-10-20T10:00:00.000Z",
-//     complaint_status: "CLOSED",
-//     complaint_remark: "Resolved - meeting completed",
-//     date_of_response: "2025-10-20T11:00:00.000Z",
-//     force_number: "PF-22334",
-//     response: "Legal access provided as per protocol",
-//     created_by: 9,
-//     updated_by: 9,
-//     deleted_by: null,
-//     station: "station-5",
-//     prisoner: "prisoner-6",
-//     nature_of_complaint: "nature-6",
-//     complaint_priority: "priority-2",
-//     officer_requested: 6,
-//     rank: "rank-2",
-//   },
-//   {
-//     id: "7",
-//     station_name: "Central Police Station",
-//     prisoner_name: "Thomas Anderson",
-//     nature_of_complaint_name: "Property Damage",
-//     complaint_priority_name: "Low",
-//     officer_requested_username: "officer.white",
-//     rank_name: "Constable",
-//     created_by_name: "Property Officer",
-//     actions: [],
-//     created_datetime: "2025-10-23T12:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-23T12:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Personal belongings damaged during search",
-//     complaint_date: "2025-10-23T12:00:00.000Z",
-//     complaint_status: "OPEN",
-//     complaint_remark: "Inventory verification required",
-//     date_of_response: null,
-//     force_number: "PF-55667",
-//     response: "",
-//     created_by: 10,
-//     updated_by: null,
-//     deleted_by: null,
-//     station: "station-1",
-//     prisoner: "prisoner-7",
-//     nature_of_complaint: "nature-7",
-//     complaint_priority: "priority-3",
-//     officer_requested: 7,
-//     rank: "rank-3",
-//   },
-//   {
-//     id: "8",
-//     station_name: "North Division Station",
-//     prisoner_name: "Sarah Johnson",
-//     nature_of_complaint_name: "Hygiene Issues",
-//     complaint_priority_name: "Medium",
-//     officer_requested_username: "officer.martin",
-//     rank_name: "Sergeant",
-//     created_by_name: "Health Officer",
-//     actions: [
-//       {
-//         id: "a8",
-//         created_by_name: "Sanitation Team",
-//         created_datetime: "2025-10-22T09:00:00.000Z",
-//         is_active: true,
-//         updated_datetime: "2025-10-22T09:00:00.000Z",
-//         deleted_datetime: null,
-//         action: "Deep cleaning conducted",
-//         action_date: "2025-10-22T09:00:00.000Z",
-//         action_status: "COMPLETED",
-//         action_remark: "Facilities sanitized and inspected",
-//         created_by: 11,
-//         updated_by: null,
-//         deleted_by: null,
-//         complaint: "8",
-//       },
-//     ],
-//     created_datetime: "2025-10-22T08:00:00.000Z",
-//     is_active: true,
-//     updated_datetime: "2025-10-22T10:00:00.000Z",
-//     deleted_datetime: null,
-//     complaint: "Bathroom facilities not cleaned regularly, strong odor present",
-//     complaint_date: "2025-10-22T08:00:00.000Z",
-//     complaint_status: "RESOLVED",
-//     complaint_remark: "Cleaning schedule updated",
-//     date_of_response: "2025-10-22T09:00:00.000Z",
-//     force_number: "PF-88990",
-//     response: "Increased cleaning frequency, daily inspections implemented",
-//     created_by: 11,
-//     updated_by: 11,
-//     deleted_by: null,
-//     station: "station-2",
-//     prisoner: "prisoner-8",
-//     nature_of_complaint: "nature-8",
-//     complaint_priority: "priority-2",
-//     officer_requested: 8,
-//     rank: "rank-2",
-//   },
-// ];
-
-const ComplaintsScreen: React.FC = () => {
+export function ComplaintsScreen() {
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [stations, setStations] = useState<any[]>([]);
   const [prisoners, setPrisoners] = useState<any[]>([]);
@@ -489,6 +103,44 @@ const ComplaintsScreen: React.FC = () => {
   const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(
     null,
   );
+  const [complaintStatuses, setComplaintStatuses] = useState<any[]>([]);
+  const [priorityOptions, setPriorityOptions] = useState<any[]>([]);
+
+  // load complaint statuses once
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        const sts = await ComplaintsService.fetchComplaintStatuses(c.signal);
+        if (!mounted) return;
+        setComplaintStatuses(sts || []);
+      } catch (err) {
+        console.error('load complaint statuses error', err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, []);
+
+  // load statuses & priorities when component mounts (inside existing load() or separate)
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        const [sts, prios] = await Promise.all([
+          ComplaintsService.fetchComplaintStatuses(c.signal),
+          ComplaintsService.fetchPriorities()
+        ]);
+        if (!mounted) return;
+        setComplaintStatuses(sts || []);
+        setPriorityOptions(prios || []);
+      } catch (err) {
+        console.error('load statuses/priorities error', err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, []);
 
   // Filter complaints
   const filteredComplaints = complaints.filter((complaint) => {
@@ -510,27 +162,65 @@ const ComplaintsScreen: React.FC = () => {
     return matchesSearch && matchesStatus && matchesPriority;
   });
 
-  // Get status badge
-  const getStatusBadge = (
-    status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED",
-  ) => {
-    const statusConfig = {
-      OPEN: { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle },
-      IN_PROGRESS: { color: "bg-blue-100 text-blue-800", icon: Clock },
-      RESOLVED: { color: "bg-green-100 text-green-800", icon: CheckCircle },
-      CLOSED: { color: "bg-gray-100 text-gray-800", icon: XCircle },
+  // Build filteredComplaints with resolution
+  const resolvedComplaints = complaints.map(cmp => {
+    const statusObj = complaintStatuses.find(s => String(s.id) === String(cmp.complaint_status));
+    const statusName = statusObj?.name ?? cmp.complaint_status;
+    const priorityObj = priorityOptions.find(p => String(p.id) === String(cmp.complaint_priority));
+    const priorityName = priorityObj?.name ?? cmp.complaint_priority_name ?? cmp.complaint_priority_name;
+    return {
+      ...cmp,
+      _statusName: statusName,
+      _priorityName: priorityName
     };
+  });
 
-    const config = statusConfig[status];
+  const finalFilteredComplaints = resolvedComplaints.filter((complaint) => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch =
+      String(complaint.prisoner_name || '').toLowerCase().includes(q) ||
+      String(complaint.complaint || '').toLowerCase().includes(q) ||
+      String(complaint.nature_of_complaint_name || '').toLowerCase().includes(q) ||
+      String(complaint.station_name || '').toLowerCase().includes(q);
+
+    const matchesStatus = statusFilter === "all" || String(complaint.complaint_status) === String(statusFilter);
+    const matchesPriority = priorityFilter === "all" || String(complaint.complaint_priority) === String(priorityFilter);
+
+    return matchesSearch && matchesStatus && matchesPriority;
+  });
+
+  // Get status badge
+  const getStatusBadge = (status?: string | number) => {
+    // Try to resolve status object from API list (match id or name)
+    const resolved = complaintStatuses.find(s =>
+      String(s.id) === String(status) || String(s.name) === String(status)
+    );
+    const name = resolved?.name ?? (typeof status === 'string' ? status : undefined);
+
+    // derive visual style from name (fallbacks provided)
+    const n = (name || '').toLowerCase();
+    const isOpen = n.includes('open');
+    const isInProgress = n.includes('progress') || n.includes('in_progress');
+    const isResolved = n.includes('resolve') || n.includes('resolved');
+    const isClosed = n.includes('close') || n.includes('closed');
+
+    const config = isOpen
+      ? { color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle }
+      : isInProgress
+      ? { color: 'bg-blue-100 text-blue-800', icon: Clock }
+      : isResolved
+      ? { color: 'bg-green-100 text-green-800', icon: CheckCircle }
+      : isClosed
+      ? { color: 'bg-gray-100 text-gray-800', icon: XCircle }
+      : { color: 'bg-gray-100 text-gray-700', icon: AlertCircle };
+
     const Icon = config.icon;
+    const label = name ? String(name).replace(/_/g, ' ') : 'Unknown';
 
     return (
-      <Badge
-        className={`${config.color} flex items-center gap-1`}
-        variant="secondary"
-      >
+      <Badge className={`${config.color} flex items-center gap-1`} variant="secondary">
         <Icon className="h-3 w-3" />
-        {status.replace("_", " ")}
+        {label}
       </Badge>
     );
   };
@@ -672,11 +362,19 @@ const ComplaintsScreen: React.FC = () => {
   // Statistics
   const stats = {
     total: complaints.length,
-    open: complaints.filter((c) => c.complaint_status === "OPEN").length,
-    inProgress: complaints.filter((c) => c.complaint_status === "IN_PROGRESS")
-      .length,
-    resolved: complaints.filter((c) => c.complaint_status === "RESOLVED").length,
-    closed: complaints.filter((c) => c.complaint_status === "CLOSED").length,
+    open: resolvedComplaints.filter((c) =>
+      (c._statusName ?? "").toLowerCase().includes("open")
+    ).length,
+    inProgress: resolvedComplaints.filter((c) => {
+      const n = (c._statusName ?? "").toLowerCase();
+      return n.includes("progress") || n.includes("in progress") || n.includes("in_progress");
+    }).length,
+    resolved: resolvedComplaints.filter((c) =>
+      (c._statusName ?? "").toLowerCase().includes("resolve")
+    ).length,
+    closed: resolvedComplaints.filter((c) =>
+      (c._statusName ?? "").toLowerCase().includes("close")
+    ).length,
   };
 
   return (
@@ -761,10 +459,7 @@ const ComplaintsScreen: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="OPEN">Open</SelectItem>
-                <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                <SelectItem value="RESOLVED">Resolved</SelectItem>
-                <SelectItem value="CLOSED">Closed</SelectItem>
+                {complaintStatuses.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={priorityFilter} onValueChange={setPriorityFilter}>
@@ -773,10 +468,7 @@ const ComplaintsScreen: React.FC = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Priorities</SelectItem>
-                <SelectItem value="Critical">Critical</SelectItem>
-                <SelectItem value="High">High</SelectItem>
-                <SelectItem value="Medium">Medium</SelectItem>
-                <SelectItem value="Low">Low</SelectItem>
+                {priorityOptions.map(p => <SelectItem key={p.id} value={p.id}>{p.name ?? p.display ?? p}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -801,14 +493,14 @@ const ComplaintsScreen: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredComplaints.length === 0 ? (
+                {finalFilteredComplaints.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="text-center p-8 text-gray-500">
                       No complaints found
                     </td>
                   </tr>
                 ) : (
-                  filteredComplaints.map((complaint) => (
+                  finalFilteredComplaints.map((complaint) => (
                     <tr
                       key={complaint.id}
                       className="border-b hover:bg-gray-50 transition-colors"
