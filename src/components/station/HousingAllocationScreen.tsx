@@ -54,6 +54,8 @@ import {
   CommandList,
 } from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {useFilterRefresh} from "../../hooks/useFilterRefresh";
+import {useFilters} from "../../contexts/FilterContext";
 
 interface Region {
   id: string;
@@ -185,6 +187,9 @@ export default function HousingAllocationScreen() {
   const [wardSearchOpen, setWardSearchOpen] = useState(false);
   const [cellSearchOpen, setCellSearchOpen] = useState(false);
   const [selectedWardForCells, setSelectedWardForCells] = useState("");
+
+  const [housingLoading, setHousingLoading] = useState(false)
+  const { region, district, station } = useFilters();
 
   // Forms
   const {
@@ -600,6 +605,28 @@ export default function HousingAllocationScreen() {
     return "secondary";
   };
 
+  //API Integration
+
+  const loadData = async () => {
+
+    // console.log("hhheheh")
+    // console.log("Loading with filters:", region, district, station);
+    setHousingLoading(true);
+    if (station){
+      fetchData()
+      // setHousingLoading(false);
+    }
+    else {
+      toast.error("Please select a station first");
+    }
+  };
+
+  useFilterRefresh(loadData, [region, district, station]);
+
+  async function fetchData () {
+
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -612,211 +639,136 @@ export default function HousingAllocationScreen() {
         </div>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="h-5 w-5" />
-              Filters
-            </CardTitle>
-            {(selectedRegion || selectedDistrict || selectedStation) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSelectedRegion("");
-                  setSelectedDistrict("");
-                  setSelectedStation("");
-                }}
-              >
-                Clear Filters
-              </Button>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Region Filter */}
-            <div>
-              <Label htmlFor="region">Region</Label>
-              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Regions" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* District Filter */}
-            <div>
-              <Label htmlFor="district">District</Label>
-              <Select
-                value={selectedDistrict}
-                onValueChange={setSelectedDistrict}
-                disabled={!selectedRegion}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedRegion ? "All Districts" : "Select region first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredDistricts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Station Filter */}
-            <div>
-              <Label htmlFor="station">Station</Label>
-              <Select
-                value={selectedStation}
-                onValueChange={setSelectedStation}
-                disabled={!selectedDistrict}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder={selectedDistrict ? "All Stations" : "Select district first"} />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredStations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Overview Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Capacity</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Building className="h-5 w-5 text-[#650000]" />
-                <span className="text-2xl">{overviewData.capacity.toLocaleString()}</span>
+      {
+        housingLoading ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Housing Information, Please wait...
+                    </p>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+        ) : (
+           <>
+              {/* Overview Statistics */}
+              <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">Capacity</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <Building className="h-5 w-5 text-[#650000]" />
+                        <span className="text-2xl">{overviewData.capacity.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Occupancy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Users className="h-5 w-5 text-[#650000]" />
-                <span className="text-2xl">{overviewData.occupancy.toLocaleString()}</span>
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">Occupancy</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <Users className="h-5 w-5 text-[#650000]" />
+                        <span className="text-2xl">{overviewData.occupancy.toLocaleString()}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">
+                        Congestion Level
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle
+                            className={`h-5 w-5 ${getCongestionColor(
+                              overviewData.congestion_level
+                            )}`}
+                          />
+                          <span
+                            className={`text-2xl ${getCongestionColor(
+                              overviewData.congestion_level
+                            )}`}
+                          >
+                            {overviewData.congestion_level}%
+                          </span>
+                        </div>
+                        <Progress
+                          value={overviewData.congestion_level}
+                          className="h-2"
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">Blocks</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-[#650000]" />
+                        <span className="text-2xl">{overviewData.blocks}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">Wards</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <Home className="h-5 w-5 text-[#650000]" />
+                        <span className="text-2xl">{overviewData.wards}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm text-gray-600">Cells</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-2">
+                        <DoorClosed className="h-5 w-5 text-[#650000]" />
+                        <span className="text-2xl">{overviewData.cells}</span>
+                      </div>
+                    </CardContent>
+                  </Card>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">
-                Congestion Level
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle
-                    className={`h-5 w-5 ${getCongestionColor(
-                      overviewData.congestion_level
-                    )}`}
+              {/* Search and Add */}
+              <div className="flex items-center gap-4">
+                <div className="relative flex-1 max-w-md">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
                   />
-                  <span
-                    className={`text-2xl ${getCongestionColor(
-                      overviewData.congestion_level
-                    )}`}
-                  >
-                    {overviewData.congestion_level}%
-                  </span>
                 </div>
-                <Progress
-                  value={overviewData.congestion_level}
-                  className="h-2"
-                />
+                {activeTab === "assignments" && (
+                  <Button
+                    onClick={handleAddAssignment}
+                    className="bg-[#650000] hover:bg-[#4a0000]"
+                    disabled={!selectedStation}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Assign Prisoner
+                  </Button>
+                )}
               </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Blocks</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Layers className="h-5 w-5 text-[#650000]" />
-                <span className="text-2xl">{overviewData.blocks}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Wards</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <Home className="h-5 w-5 text-[#650000]" />
-                <span className="text-2xl">{overviewData.wards}</span>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm text-gray-600">Cells</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center gap-2">
-                <DoorClosed className="h-5 w-5 text-[#650000]" />
-                <span className="text-2xl">{overviewData.cells}</span>
-              </div>
-            </CardContent>
-          </Card>
-      </div>
-
-      {/* Search and Add */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-          <Input
-            placeholder="Search..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-        {activeTab === "assignments" && (
-          <Button
-            onClick={handleAddAssignment}
-            className="bg-[#650000] hover:bg-[#4a0000]"
-            disabled={!selectedStation}
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Assign Prisoner
-          </Button>
-        )}
-      </div>
-
-      {/* Tabs */}
-      <Card>
+              { /* Tabs */}
+              <Card>
         <CardContent className="p-0">
           {/* Custom Tabs Navigation */}
           <div className="flex gap-2 p-4 bg-gray-100 border-b">
@@ -996,6 +948,9 @@ export default function HousingAllocationScreen() {
         )}
         </CardContent>
       </Card>
+            </>
+        )
+      }
 
       {/* Housing Assignment Dialog */}
       <Dialog

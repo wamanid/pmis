@@ -66,6 +66,6 @@ export const stationRoutes: RouteObject[] = [
   },
   {
     path: '/station-management/visitations',
-    element: <StationDashboard />,
+    element: <VisitationsScreen />,
   },
 ];
