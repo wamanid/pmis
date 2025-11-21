@@ -56,6 +56,8 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import {useFilters} from "../../contexts/FilterContext";
+import {getPrisoners} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {getStationWards} from "../../services/stationServices/housing";
 
 interface Region {
   id: string;
@@ -614,17 +616,76 @@ export default function HousingAllocationScreen() {
     setHousingLoading(true);
     if (station){
       fetchData()
-      // setHousingLoading(false);
     }
     else {
       toast.error("Please select a station first");
+      setHousingLoading(false);
     }
   };
 
   useFilterRefresh(loadData, [region, district, station]);
 
-  async function fetchData () {
+  function handleServerError (response: any) {
+    if ('error' in response){
+          setHousingLoading(false);
+          toast.error(response.error);
+          return true
+    }
+    return false
+  }
 
+  function handleEmptyList (data: any, msg: string) {
+    if (!data.length){
+          setHousingLoading(false);
+          toast.error(msg);
+          return true
+    }
+    return false
+  }
+
+  // function populateList(response: any, msg: string, setData: any) {
+  //   if (handleServerError(response)) return
+  //
+  //   if ("results" in response) {
+  //     const data = response.results
+  //     if(handleEmptyList(data, msg)) return
+  //     setData(data)
+  //   }
+  // }
+
+  function populateList(response: any, msg: string) {
+    if (handleServerError(response)) return
+
+    if ("results" in response) {
+      const data = response.results
+      console.log(data)
+      if(handleEmptyList(data, msg)) return
+      if (msg === "There are no prisoners in the selected station") {
+        const newData = data.filter(prisoner => prisoner.current_station === station)
+        console.log(newData)
+      }
+      // console.log(data)
+    }
+  }
+
+  async function fetchData () {
+      try {
+        const response1 = await getPrisoners()
+        handleServerError(response1)
+        populateList(response1, "There are no prisoners in the selected station")
+
+        const response2 = await getStationWards(station)
+        handleServerError(response2)
+        populateList(response2, "There are no wards in the selected station")
+
+        setHousingLoading(false)
+
+      }
+      catch (error) {
+        if (!error?.response) {
+          toast.error('Failed to connect to server. Please try again.');
+        }
+      }
   }
 
   return (
