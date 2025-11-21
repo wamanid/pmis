@@ -1,5 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
-import { DataTable } from "../common/DataTable";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -55,7 +54,6 @@ import VisitorPassForm from "../gatePass/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
-import axiosInstance from "../../services/axiosInstance"; // << ensure path matches your project
 import {handleResponseError} from "../../services/stationServices/utils";
 import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 
@@ -120,6 +118,9 @@ interface Staff {
 export default function VisitationsScreen() {
   // Filter & data states
   const [items, setItems] = useState<VisitorItem[]>([]);
+
+  // Note: region/district/station filter UI removed — filters are handled globally via useFilterRefresh in the top nav.
+  // If you still need these data arrays for other UI parts, re-introduce them; currently we keep only the states used elsewhere.
   const [gates, setGates] = useState<Gate[]>([]);
   const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
   const [visitorTypes, setVisitorTypes] = useState<VisitorType[]>([]);
@@ -132,14 +133,7 @@ export default function VisitationsScreen() {
   // UI states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVisitor, setEditingVisitor] = useState<Visitor | null>(null);
-  // external search (shown in header). Debounced before triggering API.
   const [searchQuery, setSearchQuery] = useState("");
-  // Debounced search so we don't call API on every keystroke
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
-    return () => window.clearTimeout(id);
-  }, [searchQuery]);
   const [loading, setLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [useCamera, setUseCamera] = useState(false);
@@ -188,16 +182,6 @@ export default function VisitationsScreen() {
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
   const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(true)
-  // DataTable states
-  const [tableData, setTableData] = useState<Visitor[]>([]);
-  const [tableLoading, setTableLoading] = useState<boolean>(true);
-  const [total, setTotal] = useState<number>(0);
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-  const [sortField, setSortField] = useState<string | undefined>(undefined);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
-  const requestIdRef = useRef(0);
-  const abortRef = useRef<AbortController | null>(null);
 
   // Calendar state
   const [calendarOpen, setCalendarOpen] = useState(false);
@@ -208,62 +192,20 @@ export default function VisitationsScreen() {
     // intentionally left blank: lookups should be loaded from services instead of hardcoded data
   }, []);
 
-  // debounced search (avoid API calls on every keystroke)
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
-    return () => window.clearTimeout(id);
-  }, [searchQuery]);
-
-  // Map / normalize server item -> table row (we keep original fields, renderers read them)
-  const mapVisitor = useCallback((it: any): Visitor => ({
-    ...it,
-  }), []);
-
-  // loadTable: server-side load with abort + request id guard
-  const loadTable = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setTableLoading(true);
-    try {
-      const params: Record<string, any> = {};
-      params.page = Math.max(1, Number(_page) || 1);
-      params.page_size = Number(_pageSize) || 10;
-      if (_sortField) params.ordering = _sortDir === 'desc' ? `-${_sortField}` : _sortField;
-      if (_search) params.search = _search;
-
-      // const res = await getStationVisitors(params, controller.signal);
-      // const itemsRes = res?.results ?? res ?? [];
-
-      // DEBUG: log params so we can inspect what the UI is sending
-      // call axios directly so query params are forwarded exactly
-      console.debug("calling API with params:", params);
-      const apiRes = await axiosInstance.get("/gate-management/station-visitors/", { params });
-      const res = apiRes.data;
-      console.debug("loadTable response:", res);
-      const itemsRes = res?.results ?? res ?? [];
-      const count = Number(res?.count ?? itemsRes.length ?? 0);
-
-      if (requestIdRef.current === reqId) {
-        setTableData((itemsRes || []).map(mapVisitor));
-        setVisitors(itemsRes || []); // keep visitors state for VisitorItemList
-        setTotal(count);
-      }
-    } catch (err: any) {
-      if (err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') return;
-      console.error('load visitors error', err?.response ?? err);
-      toast.error('Failed to load visitor records');
-    } finally {
-      if (requestIdRef.current === reqId) setTableLoading(false);
-      setVisitorRecordsLoading(false);
+  // Filter visitors
+  const filteredVisitors = visitors.filter((visitor) => {
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      return (
+        visitor.first_name.toLowerCase().includes(query) ||
+        visitor.last_name.toLowerCase().includes(query) ||
+        visitor.prisoner_name.toLowerCase().includes(query) ||
+        visitor.id_number.toLowerCase().includes(query) ||
+        visitor.contact_no.toLowerCase().includes(query)
+      );
     }
-  }, [page, pageSize, sortField, sortDir, debouncedSearch, mapVisitor]);
-
-  // trigger load when paging/sorting/search change
-  useEffect(() => {
-    loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
-  }, [page, pageSize, sortField, sortDir, debouncedSearch, loadTable]);
+    return true;
+  });
 
   // Camera functions
   const startCamera = async () => {
@@ -528,7 +470,7 @@ export default function VisitationsScreen() {
               <Input
                 placeholder="Search by name, ID number, or contact..."
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -1319,42 +1261,126 @@ export default function VisitationsScreen() {
           </div>
 
       {/* Visitors Table */}
-          <div>
-            {visitorRecordsLoading || tableLoading ? (
-              <div className="size-full flex items-center justify-center py-8">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground text-sm">Fetching visitor records, Please wait...</p>
-                </div>
-              </div>
-            ) : (
-              <DataTable
-                data={tableData}
-                loading={tableLoading}
-                total={total}
-                title="Visitor Records"
-                columns={[
-                  { key: 'full_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => (<div><p>{`${row.first_name ?? ''} ${row.middle_name ?? ''} ${row.last_name ?? ''}`.trim()}</p>{row.organisation && <p className="text-xs text-muted-foreground">{row.organisation}</p>}</div>) },
-                  { key: 'id_number', label: 'ID Number', sortable: true },
-                  { key: 'contact_no', label: 'Contact', sortable: true },
-                  { key: 'prisoner_name', label: 'Prisoner', sortable: true },
-                  { key: 'visitor_type_name', label: 'Visitor Type', sortable: true },
-                  { key: 'gate_name', label: 'Gate', sortable: true },
-                  { key: 'time_in', label: 'Time In', sortable: true, render: (_v: any, row: any) => row.time_in ? (<div className="flex items-center gap-1 text-green-600"><LogIn className="h-3 w-3" />{extractTimeHHMM(row.time_in)}</div>) : '-' },
-                  { key: 'time_out', label: 'Time Out', sortable: true, render: (_v: any, row: any) => row.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(row.time_out)}</div>) : '-' },
-                  { key: 'visitor_status_name', label: 'Status', sortable: true, render: (v: any) => getStatusBadge(v) },
-                  { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(row)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>)},
-                ]}
-                // externalSearch={searchQuery}
-                onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
-                onPageChange={(p: number) => setPage(p)}
-                onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
-                onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
-                page={page}
-                pageSize={pageSize}
-              />
-            )}
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Visitor Records
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {
+                visitorRecordsLoading ? (
+                    <div className="size-full flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                          <p className="text-muted-foreground text-sm">
+                              Fetching visitor records, Please wait...
+                          </p>
+                        </div>
+                    </div>
+                ) : (
+                   <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Visitor Name</TableHead>
+                            <TableHead>ID Number</TableHead>
+                            <TableHead>Contact</TableHead>
+                            <TableHead>Prisoner</TableHead>
+                            <TableHead>Visitor Type</TableHead>
+                            <TableHead>Gate</TableHead>
+                            <TableHead>Time In</TableHead>
+                            <TableHead>Time Out</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredVisitors.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={10}
+                                className="text-center py-8 text-muted-foreground"
+                              >
+                                No visitor records found
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredVisitors.map((visitor) => (
+                              <TableRow key={visitor.id}>
+                                <TableCell>
+                                  <div>
+                                    <p>
+                                      {visitor.first_name} {visitor.middle_name}{" "}
+                                      {visitor.last_name}
+                                    </p>
+                                    {visitor.organisation && (
+                                      <p className="text-xs text-muted-foreground">
+                                        {visitor.organisation}
+                                      </p>
+                                    )}
+                                  </div>
+                                </TableCell>
+                                <TableCell>{visitor.id_number}</TableCell>
+                                <TableCell>{visitor.contact_no}</TableCell>
+                                <TableCell>{visitor.prisoner_name}</TableCell>
+                                <TableCell>{visitor.visitor_type_name}</TableCell>
+                                <TableCell>{visitor.gate_name}</TableCell>
+                                <TableCell>
+                                  {visitor.time_in ? (
+                                    <div className="flex items-center gap-1 text-green-600">
+                                      <LogIn className="h-3 w-3" />
+                                      {extractTimeHHMM(visitor.time_in)}
+                                    </div>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {visitor.time_out ? (
+                                    <div className="flex items-center gap-1 text-red-600">
+                                      <LogOut className="h-3 w-3" />
+                                      {extractTimeHHMM(visitor.time_out)}
+                                    </div>
+                                  ) : (
+                                    "-"
+                                  )}
+                                </TableCell>
+                                <TableCell>
+                                  {getStatusBadge(visitor.visitor_status_name)}
+                                </TableCell>
+                                <TableCell>
+                                  <div className="flex gap-1">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(visitor)}
+                                      title="Edit visitor"
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleGenerateVisitorPass(visitor)}
+                                      style={{ color: '#650000' }}
+                                      title="Generate visitor pass"
+                                    >
+                                      <FileText className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                   </div>
+                )
+              }
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* Visitor Items Tab */}
