@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Search,
   Plus,
@@ -31,6 +31,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Badge } from "../ui/badge";
+import { DataTable } from "../common/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 
@@ -84,7 +85,17 @@ interface Complaint {
 }
 
 export function ComplaintsScreen() {
+  // data table / server side
   const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   const [stations, setStations] = useState<any[]>([]);
   const [prisoners, setPrisoners] = useState<any[]>([]);
   const [natures, setNatures] = useState<any[]>([]);
@@ -142,51 +153,13 @@ export function ComplaintsScreen() {
     return () => { mounted = false; c.abort(); };
   }, []);
 
-  // Filter complaints
-  const filteredComplaints = complaints.filter((complaint) => {
-    const matchesSearch =
-      complaint.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.complaint.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      complaint.nature_of_complaint_name
-        .toLowerCase()
-        .includes(searchTerm.toLowerCase()) ||
-      complaint.station_name.toLowerCase().includes(searchTerm.toLowerCase());
-
-    const matchesStatus =
-      statusFilter === "all" || complaint.complaint_status === statusFilter;
-
-    const matchesPriority =
-      priorityFilter === "all" ||
-      complaint.complaint_priority_name === priorityFilter;
-
-    return matchesSearch && matchesStatus && matchesPriority;
-  });
-
-  // Build filteredComplaints with resolution
-  const resolvedComplaints = complaints.map(cmp => {
-    const statusObj = complaintStatuses.find(s => String(s.id) === String(cmp.complaint_status));
+  // client-side resolved fields (keeps existing resolved name helpers)
+  const resolvedComplaints = complaints.map((cmp) => {
+    const statusObj = complaintStatuses.find((s) => String(s.id) === String(cmp.complaint_status));
     const statusName = statusObj?.name ?? cmp.complaint_status;
-    const priorityObj = priorityOptions.find(p => String(p.id) === String(cmp.complaint_priority));
+    const priorityObj = priorityOptions.find((p) => String(p.id) === String(cmp.complaint_priority));
     const priorityName = priorityObj?.name ?? cmp.complaint_priority_name ?? cmp.complaint_priority_name;
-    return {
-      ...cmp,
-      _statusName: statusName,
-      _priorityName: priorityName
-    };
-  });
-
-  const finalFilteredComplaints = resolvedComplaints.filter((complaint) => {
-    const q = searchTerm.toLowerCase();
-    const matchesSearch =
-      String(complaint.prisoner_name || '').toLowerCase().includes(q) ||
-      String(complaint.complaint || '').toLowerCase().includes(q) ||
-      String(complaint.nature_of_complaint_name || '').toLowerCase().includes(q) ||
-      String(complaint.station_name || '').toLowerCase().includes(q);
-
-    const matchesStatus = statusFilter === "all" || String(complaint.complaint_status) === String(statusFilter);
-    const matchesPriority = priorityFilter === "all" || String(complaint.complaint_priority) === String(priorityFilter);
-
-    return matchesSearch && matchesStatus && matchesPriority;
+    return { ...cmp, _statusName: statusName, _priorityName: priorityName };
   });
 
   // Get status badge
@@ -331,37 +304,72 @@ export function ComplaintsScreen() {
   };
 
   // Load data on mount
+  // server-side load function (pagination, sorting, search)
+  const loadComplaints = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = searchTerm) => {
+    try { abortRef.current?.abort(); } catch {}
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const reqId = ++requestIdRef.current;
+    setTableLoading(true);
+    try {
+      const params: Record<string, any> = {};
+      params.page = Math.max(1, Number(_page) || 1);
+      params.page_size = Number(_pageSize) || 10;
+      if (_sortField) params.ordering = _sortDir === 'desc' ? `-${_sortField}` : _sortField;
+      if (_search) params.search = _search;
+
+      const res = await ComplaintsService.fetchComplaints(params);
+      const items = res?.results ?? res ?? [];
+      const count = Number(res?.count ?? items.length ?? 0);
+      if (requestIdRef.current === reqId) {
+        setComplaints(items);
+        setTotal(count);
+      }
+    } catch (err: any) {
+      if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
+      console.error('load complaints error', err?.response ?? err);
+      // axiosInstance already toasts
+    } finally {
+      if (requestIdRef.current === reqId) setTableLoading(false);
+    }
+  }, [page, pageSize, sortField, sortDir, searchTerm]);
+
+  // initial lookups (stations/prisoners/natures/priorities/ranks) and first load
   useEffect(() => {
-    const load = async () => {
+    let mounted = true;
+    const controller = new AbortController();
+    (async () => {
       try {
-        const [complaintsRes, stationsRes, prisonersRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
-          ComplaintsService.fetchComplaints({ page_size: 100 }),
+        const [stationsRes, prisonersRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
           ComplaintsService.fetchStations(),
           ComplaintsService.fetchPrisoners(),
           ComplaintsService.fetchComplaintNatures(),
           ComplaintsService.fetchPriorities(),
           ComplaintsService.fetchRanks(),
         ]);
-
-        // Normalize complaints list
-        const items = complaintsRes?.results ?? complaintsRes ?? [];
-        setComplaints(items);
+        if (!mounted) return;
         setStations(stationsRes || []);
         setPrisoners(prisonersRes || []);
         setNatures(naturesRes || []);
         setPriorities(prioritiesRes || []);
         setRanks(ranksRes || []);
-      } catch (e) {
-        // errors handled by axiosInstance interceptors
+      } catch (err) {
+        // handled by services
       }
-    };
+      // load first page
+      loadComplaints(page, pageSize, sortField, sortDir, searchTerm);
+    })();
+    return () => { mounted = false; controller.abort(); };
+  }, []); // run once
 
-    load();
-  }, []);
+  // reload when pagination/sort/search changes
+  useEffect(() => {
+    loadComplaints(page, pageSize, sortField, sortDir, searchTerm);
+  }, [page, pageSize, sortField, sortDir, searchTerm, loadComplaints]);
 
-  // Statistics
+  // Statistics (derived from current in-memory resolved list)
   const stats = {
-    total: complaints.length,
+    total: complaints.length > 0 ? total : 0,
     open: resolvedComplaints.filter((c) =>
       (c._statusName ?? "").toLowerCase().includes("open")
     ).length,
@@ -475,92 +483,38 @@ export function ComplaintsScreen() {
         </CardContent>
       </Card>
 
-      {/* Complaints Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left p-4 text-gray-600">Prisoner</th>
-                  <th className="text-left p-4 text-gray-600">Station</th>
-                  <th className="text-left p-4 text-gray-600">Complaint</th>
-                  <th className="text-left p-4 text-gray-600">Nature</th>
-                  <th className="text-left p-4 text-gray-600">Priority</th>
-                  <th className="text-left p-4 text-gray-600">Status</th>
-                  <th className="text-left p-4 text-gray-600">Date</th>
-                  <th className="text-left p-4 text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {finalFilteredComplaints.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="text-center p-8 text-gray-500">
-                      No complaints found
-                    </td>
-                  </tr>
-                ) : (
-                  finalFilteredComplaints.map((complaint) => (
-                    <tr
-                      key={complaint.id}
-                      className="border-b hover:bg-gray-50 transition-colors"
-                    >
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span>{complaint.prisoner_name}</span>
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-600">
-                        {complaint.station_name}
-                      </td>
-                      <td className="p-4 max-w-xs">
-                        <div className="truncate" title={complaint.complaint}>
-                          {complaint.complaint}
-                        </div>
-                      </td>
-                      <td className="p-4 text-gray-600">
-                        {complaint.nature_of_complaint_name}
-                      </td>
-                      <td className="p-4">
-                        {getPriorityBadge(complaint.complaint_priority_name)}
-                      </td>
-                      <td className="p-4">
-                        {getStatusBadge(complaint.complaint_status)}
-                      </td>
-                      <td className="p-4 text-gray-600">
-                        <div className="flex items-center gap-1 text-sm">
-                          <Calendar className="h-3 w-3" />
-                          {new Date(complaint.complaint_date).toLocaleDateString()}
-                        </div>
-                      </td>
-                      <td className="p-4">
-                        <div className="flex gap-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => viewComplaintDetails(complaint)}
-                          >
-                            <Eye className="h-4 w-4 mr-1" />
-                            View
-                          </Button>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleEditComplaint(complaint)}
-                            className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"
-                          >
-                            <Edit className="h-4 w-4 mr-1" />
-                            Edit
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+      {/* Complaints DataTable (server-side) */}
+      <Card className="pt-6">
+        <CardContent>
+          <DataTable
+            data={resolvedComplaints}
+            loading={tableLoading}
+            total={total}
+            title="Complaints"
+            columns={[
+              { key: 'prisoner_name', label: 'Prisoner' },
+              { key: 'station_name', label: 'Station' },
+              { key: 'complaint', label: 'Complaint', render: (v: any, row: any) => <div className="truncate max-w-xs" title={row.complaint}>{row.complaint}</div> },
+              { key: 'nature_of_complaint_name', label: 'Nature' },
+              { key: '_priorityName', label: 'Priority', render: (v: any) => getPriorityBadge(v) },
+              { key: '_statusName', label: 'Status', render: (v: any, row: any) => getStatusBadge(row.complaint_status) },
+              { key: 'complaint_date', label: 'Date' },
+              { key: 'actions', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4 mr-1" />View</Button>
+                    <Button variant="outline" size="sm" onClick={() => handleEditComplaint(row)} className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"><Edit className="h-4 w-4 mr-1" />Edit</Button>
+                  </div>
+                )},
+            ]}
+            externalSearch={searchTerm}
+            onSearch={(q: string) => { setSearchTerm(q); setPage(1); }}
+            onPageChange={(p: number) => setPage(p)}
+            onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+            onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
+            // optional server-side props the DataTable supports: page, pageSize
+            page={page}
+            pageSize={pageSize}
+          />
         </CardContent>
       </Card>
 
