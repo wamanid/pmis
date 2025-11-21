@@ -2,6 +2,13 @@ import {ManualLockUpItem} from "./manualLockupIntegration";
 import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
 import {toast} from "sonner";
 
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
 export const getStationsAndTypes = (lockups: ManualLockUpItem[]) => {
   const uniqueStations = Array.from(
     new Map(
@@ -131,4 +138,67 @@ function fileToBase64(file: File): Promise<string> {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+}
+
+export function handleCatchError(error: any) {
+  if (!error?.response) {
+    toast.error('Failed to connect to server. Please try again.');
+  }
+}
+
+export function handleEffectLoad(
+  region: string | null,
+  district: string | null,
+  station: string | null,
+  setLoading: (value: boolean) => void,
+  fetchData: () => void
+) {
+  setLoading(true);
+
+  if (!region && !district && !station) {
+    toast.error("Please select the region, district and station to load this information");
+    setLoading(false);
+    return false;
+  }
+
+  else if (region && !district && !station) {
+    toast.error("Please select the district and station too");
+    setLoading(false);
+    return false;
+  }
+
+  else if (region && district && !station) {
+    toast.error("Please select the station to load station information");
+    setLoading(false);
+    return false;
+  }
+
+  else if (region && district && station) {
+    fetchData();
+    return true;
+  }
+
+  else {
+    setLoading(false);
+    return false;
+  }
+
+}
+
+export function handleServerError (response: any, setLoading: any) {
+  if ('error' in response){
+        setLoading(false);
+        toast.error(response.error);
+        return true
+  }
+  return false
+}
+
+export function handleEmptyList (data: any, msg: string, setLoading: any) {
+  if (!data.length){
+        setLoading(false);
+        toast.error(msg);
+        return true
+  }
+  return false
 }

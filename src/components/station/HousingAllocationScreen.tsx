@@ -57,7 +57,8 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import {useFilters} from "../../contexts/FilterContext";
 import {getPrisoners} from "../../services/stationServices/visitorsServices/VisitorsService";
-import {getStationWards} from "../../services/stationServices/housing";
+import {getStationWards} from "../../services/stationServices/housingService";
+import {handleEffectLoad} from "../../services/stationServices/utils";
 
 interface Region {
   id: string;
@@ -610,17 +611,7 @@ export default function HousingAllocationScreen() {
   //API Integration
 
   const loadData = async () => {
-
-    // console.log("hhheheh")
-    // console.log("Loading with filters:", region, district, station);
-    setHousingLoading(true);
-    if (station){
-      fetchData()
-    }
-    else {
-      toast.error("Please select a station first");
-      setHousingLoading(false);
-    }
+    handleEffectLoad(region, district, station, setHousingLoading, fetchData)
   };
 
   useFilterRefresh(loadData, [region, district, station]);

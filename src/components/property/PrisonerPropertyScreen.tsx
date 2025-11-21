@@ -40,6 +40,8 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { cn } from '../ui/utils';
+import {handleCatchError, handleEmptyList, handleServerError} from "../../services/stationServices/utils";
+import {getProperties, PrisonerProperty} from "../../services/stationServices/propertyService";
 
 interface Property {
   id: string;
@@ -405,7 +407,7 @@ const mockVisitorItems: VisitorItemData[] = [
 ];
 
 export default function PrisonerPropertyScreen() {
-  const [properties, setProperties] = useState<Property[]>(mockProperties);
+  const [properties, setProperties] = useState<PrisonerProperty[]>([]);
   const [visitors, setVisitors] = useState<Visitor[]>(mockVisitors);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -421,6 +423,9 @@ export default function PrisonerPropertyScreen() {
   const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
   const [previousPropertyStatus, setPreviousPropertyStatus] = useState('');
   const [statusChangeData, setStatusChangeData] = useState<any>(null);
+
+  // APIs integration
+  const [propertyLoading, setPropertyLoading] = useState(true)
 
   // Separate state for prisoner and visitor info (for create mode)
   const [prisonerInfo, setPrisonerInfo] = useState({
@@ -2068,6 +2073,36 @@ export default function PrisonerPropertyScreen() {
     );
   };
 
+  function populateList(response: any, msg: string) {
+    if(handleServerError(response, setPropertyLoading)) return
+
+    if ("results" in response) {
+      const data = response.results
+      console.log(data)
+      if(handleEmptyList(data, msg, setPropertyLoading)) return
+      setProperties(data)
+    }
+  }
+
+  // APIs integration
+  useEffect(() => {
+    if (propertyLoading){
+      async function fetchData () {
+         try {
+           const response = await getProperties()
+           if(handleServerError(response, setPropertyLoading)) return
+           populateList(response, "There are no prisoner properties", setProperties)
+         }catch (error) {
+           handleCatchError(error)
+         }finally {
+           setPropertyLoading(false)
+         }
+      }
+
+      fetchData()
+    }
+  }, [propertyLoading]);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -2078,67 +2113,79 @@ export default function PrisonerPropertyScreen() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Properties</p>
-                <p className="text-2xl" style={{ color: '#650000' }}>
-                  {totalProperties}
+      {
+        propertyLoading ? (
+          <div className="size-full flex items-center justify-center">
+            <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                <p className="text-muted-foreground text-sm">
+                  Fetching Prisoner Property Information, Please wait...
                 </p>
-              </div>
-              <Package className="h-8 w-8 text-gray-400" />
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        ) : (
+          <>
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Total Properties</p>
+                      <p className="text-2xl" style={{ color: '#650000' }}>
+                        {totalProperties}
+                      </p>
+                    </div>
+                    <Package className="h-8 w-8 text-gray-400" />
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Stored</p>
-                <p className="text-2xl" style={{ color: '#650000' }}>
-                  {storedProperties}
-                </p>
-              </div>
-              <Tag className="h-8 w-8 text-blue-600" />
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Stored</p>
+                      <p className="text-2xl" style={{ color: '#650000' }}>
+                        {storedProperties}
+                      </p>
+                    </div>
+                    <Tag className="h-8 w-8 text-blue-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Released</p>
+                      <p className="text-2xl" style={{ color: '#650000' }}>
+                        {releasedProperties}
+                      </p>
+                    </div>
+                    <FileText className="h-8 w-8 text-green-600" />
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-600">Total Value</p>
+                      <p className="text-xl" style={{ color: '#650000' }}>
+                        {formatCurrency(totalValue.toString())}
+                      </p>
+                    </div>
+                    <DollarSign className="h-8 w-8 text-gray-400" />
+                  </div>
+                </CardContent>
+              </Card>
             </div>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Released</p>
-                <p className="text-2xl" style={{ color: '#650000' }}>
-                  {releasedProperties}
-                </p>
-              </div>
-              <FileText className="h-8 w-8 text-green-600" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Total Value</p>
-                <p className="text-xl" style={{ color: '#650000' }}>
-                  {formatCurrency(totalValue.toString())}
-                </p>
-              </div>
-              <DollarSign className="h-8 w-8 text-gray-400" />
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Tabs */}
-      <Tabs defaultValue="properties" className="space-y-4">
+            {/* Tabs */}
+            <Tabs defaultValue="properties" className="space-y-4">
         <TabsList>
           <TabsTrigger value="properties">Properties</TabsTrigger>
         </TabsList>
@@ -2302,6 +2349,9 @@ export default function PrisonerPropertyScreen() {
           </Card>
         </TabsContent>
       </Tabs>
+          </>
+        )
+      }
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>

@@ -62,8 +62,10 @@ import VisitorPassForm from "../gatePass/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
-import {handleResponseError} from "../../services/stationServices/utils";
+import {handleCatchError, handleEffectLoad, handleResponseError} from "../../services/stationServices/utils";
 import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {useFilters} from "../../contexts/FilterContext";
+import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 
 // Types based on API
 // interface Visitor {
@@ -225,10 +227,12 @@ export default function VisitationsScreen() {
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
-  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(true)
+  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
 
   // Calendar state
   const [calendarOpen, setCalendarOpen] = useState(false);
+
+  const { region, district, station } = useFilters();
 
   // Mock data
   useEffect(() => {
@@ -536,45 +540,48 @@ export default function VisitationsScreen() {
   };
 
   // APIs integration
-  useEffect(() => {
-      if (visitorRecordsLoading) {
-        async function fetchData() {
-          // setVisitorRecordsLoading(true)
-            try {
-              const response = await getStationVisitors()
-              if (handleResponseError(response)) return
+  async function fetchData() {
+    // setVisitorRecordsLoading(true)
+      try {
+        console.log(station)
+        const response = await getStationVisitors(station)
+        if (handleResponseError(response)) return
 
-              if ("results" in response) {
-                const data = response.results
-                if (!data.length){
-                    toast.error("There are no visitor records");
-                    return true
-                }
-                setVisitors(data)
-                // console.log(data)
-              }
-
-              const response2 = await getVisitorItems()
-              if (handleResponseError(response2)) return
-              if ("results" in response2) {
-                const data = response2.results
-                setItems(data)
-                // console.log(data)
-              }
-
-            }catch (error) {
-              if (!error?.response) {
-                toast.error('Failed to connect to server. Please try again.');
-              }
-
-            }finally {
-              setVisitorRecordsLoading(false)
-            }
+        if ("results" in response) {
+          const data = response.results
+          if (!data.length){
+              toast.error("There are no visitor records");
+              return true
+          }
+          setVisitors(data)
+          // console.log(data)
         }
 
-        fetchData()
+        const response2 = await getVisitorItems()
+        if (handleResponseError(response2)) return
+        if ("results" in response2) {
+          const data = response2.results
+          setItems(data)
+          // console.log(data)
+        }
+
+      }catch (error) {
+          handleCatchError(error)
+      }finally {
+        setVisitorRecordsLoading(false)
       }
-  }, [setVisitorRecordsLoading]);
+  }
+
+  const loadData = async () => {
+    console.log("Loading with filters:", region, district, station);
+    const reload = handleEffectLoad(region, district, station, setVisitorRecordsLoading, fetchData)
+    if (!reload) {
+      setItems([])
+      setVisitors([])
+    }
+  };
+
+  useFilterRefresh(loadData, [region, district, station]);
 
   useEffect(() => {
     if (!isDialogOpen){
@@ -603,1021 +610,953 @@ export default function VisitationsScreen() {
         </p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                <SelectTrigger id="region">
-                  <SelectValue placeholder="Select Region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="district">District</Label>
-              <Select
-                value={selectedDistrict}
-                onValueChange={setSelectedDistrict}
-                disabled={!selectedRegion}
-              >
-                <SelectTrigger id="district">
-                  <SelectValue placeholder="Select District" />
-                </SelectTrigger>
-                <SelectContent>
-                  {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="station">Station</Label>
-              <Select
-                value={selectedStation}
-                onValueChange={setSelectedStation}
-                disabled={!selectedDistrict}
-              >
-                <SelectTrigger id="station">
-                  <SelectValue placeholder="Select Station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Main Tabs */}
-      <Tabs defaultValue="records" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
-          <TabsTrigger 
-            value="records" 
-            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
-          >
-            <Users className="h-4 w-4 mr-2" />
-            Visitor Records
-          </TabsTrigger>
-          <TabsTrigger 
-            value="items" 
-            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
-          >
-            <FileText className="h-4 w-4 mr-2" />
-            Visitor Items
-          </TabsTrigger>
-        </TabsList>
-
-        {/* Visitor Records Tab */}
-        <TabsContent value="records" className="space-y-6 mt-6">
-          {/* Search and Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, ID number, or contact..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+      {
+        visitorRecordsLoading ? (
+            <div className="size-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground text-sm">
+                      Fetching visitor records, Please wait...
+                  </p>
+                </div>
             </div>
+        ) : (
+           <Tabs defaultValue="records" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+                <TabsTrigger
+                  value="records"
+                  className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+                >
+                  <Users className="h-4 w-4 mr-2" />
+                  Visitor Records
+                </TabsTrigger>
+                <TabsTrigger
+                  value="items"
+                  className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+                >
+                  <FileText className="h-4 w-4 mr-2" />
+                  Visitor Items
+                </TabsTrigger>
+              </TabsList>
 
-            <Button 
-              className="bg-primary hover:bg-primary/90"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Register Visitor
-            </Button>
-          </div>
-
-          <VisitorRegistrationDialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                resetForm();
-              }
-            }}
-            setVisitors={setVisitors}
-            editingVisitor={editingVisitor}
-          />
-
-          {/* Placeholder for form - will be removed */}
-          <div style={{display: 'none'}}>
-            <form onSubmit={handleSubmit} className="space-y-6 mt-4">
-              <Tabs defaultValue="personal" className="w-full">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="personal">Personal Info</TabsTrigger>
-                  <TabsTrigger value="visit">Visit Details</TabsTrigger>
-                  <TabsTrigger value="security">Security</TabsTrigger>
-                  <TabsTrigger value="photo">Photo</TabsTrigger>
-                </TabsList>
-
-                {/* Personal Information Tab */}
-                <TabsContent value="personal" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="first_name">First Name *</Label>
-                      <Input
-                        id="first_name"
-                        value={form.first_name}
-                        onChange={(e) =>
-                          setForm({ ...form, first_name: e.target.value })
-                        }
-                        placeholder="Enter first name"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="middle_name">Middle Name</Label>
-                      <Input
-                        id="middle_name"
-                        value={form.middle_name}
-                        onChange={(e) =>
-                          setForm({ ...form, middle_name: e.target.value })
-                        }
-                        placeholder="Enter middle name"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="last_name">Last Name *</Label>
-                      <Input
-                        id="last_name"
-                        value={form.last_name}
-                        onChange={(e) =>
-                          setForm({ ...form, last_name: e.target.value })
-                        }
-                        placeholder="Enter last name"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="contact_no">Contact Number *</Label>
-                      <Input
-                        id="contact_no"
-                        value={form.contact_no}
-                        onChange={(e) =>
-                          setForm({ ...form, contact_no: e.target.value })
-                        }
-                        placeholder="+256700123456"
-                        required
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="organisation">Organisation</Label>
-                      <Input
-                        id="organisation"
-                        value={form.organisation}
-                        onChange={(e) =>
-                          setForm({ ...form, organisation: e.target.value })
-                        }
-                        placeholder="Enter organisation name"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
-                    <Textarea
-                      id="address"
-                      value={form.address}
-                      onChange={(e) =>
-                        setForm({ ...form, address: e.target.value })
-                      }
-                      placeholder="Enter full address"
-                      rows={2}
-                      required
+              {/* Visitor Records Tab */}
+              <TabsContent value="records" className="space-y-6 mt-6">
+                {/* Search and Actions */}
+                <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Search by name, ID number, or contact..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
                     />
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* ID Type */}
-                    <div className="space-y-2">
-                      <Label>ID Type *</Label>
-                      <Popover
-                        open={openIDTypeCombo}
-                        onOpenChange={setOpenIDTypeCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openIDTypeCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.id_type
-                              ? idTypes.find((t) => t.id === form.id_type)?.name
-                              : "Select ID type..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search ID type..." />
-                            <CommandEmpty>No ID type found.</CommandEmpty>
-                            <CommandGroup>
-                              {idTypes.map((type) => (
-                                <CommandItem
-                                  key={type.id}
-                                  value={type.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, id_type: type.id });
-                                    setOpenIDTypeCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.id_type === type.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {type.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                  <Button
+                    className="bg-primary hover:bg-primary/90"
+                    onClick={() => setIsDialogOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Register Visitor
+                  </Button>
+                </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="id_number">ID Number *</Label>
-                      <Input
-                        id="id_number"
-                        value={form.id_number}
-                        onChange={(e) =>
-                          setForm({ ...form, id_number: e.target.value })
-                        }
-                        placeholder="Enter ID number"
-                        required
-                      />
-                    </div>
-                  </div>
-                </TabsContent>
-
-                {/* Visit Details Tab */}
-                <TabsContent value="visit" className="space-y-4 mt-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Gate */}
-                    <div className="space-y-2">
-                      <Label>Gate *</Label>
-                      <Popover
-                        open={openGateCombo}
-                        onOpenChange={setOpenGateCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openGateCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.gate
-                              ? gates.find((g) => g.id === form.gate)?.name
-                              : "Select gate..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search gate..." />
-                            <CommandEmpty>No gate found.</CommandEmpty>
-                            <CommandGroup>
-                              {gates.map((gate) => (
-                                <CommandItem
-                                  key={gate.id}
-                                  value={gate.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, gate: gate.id });
-                                    setOpenGateCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.gate === gate.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {gate.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Gate Keeper */}
-                    <div className="space-y-2">
-                      <Label>Gate Keeper *</Label>
-                      <Popover
-                        open={openGateKeeperCombo}
-                        onOpenChange={setOpenGateKeeperCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openGateKeeperCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.gate_keeper
-                              ? staffList.find((s) => s.id === form.gate_keeper)
-                                  ?.name
-                              : "Select gate keeper..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search staff..." />
-                            <CommandEmpty>No staff found.</CommandEmpty>
-                            <CommandGroup>
-                              {staffList.map((staff) => (
-                                <CommandItem
-                                  key={staff.id}
-                                  value={staff.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, gate_keeper: staff.id });
-                                    setOpenGateKeeperCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.gate_keeper === staff.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {staff.name} ({staff.force_number}) - {staff.rank}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Prisoner */}
-                    <div className="space-y-2">
-                      <Label>Prisoner to Visit *</Label>
-                      <Popover
-                        open={openPrisonerCombo}
-                        onOpenChange={setOpenPrisonerCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openPrisonerCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.prisoner
-                              ? prisoners.find((p) => p.id === form.prisoner)
-                                  ?.full_name
-                              : "Select prisoner..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search prisoner..." />
-                            <CommandEmpty>No prisoner found.</CommandEmpty>
-                            <CommandGroup>
-                              {prisoners.map((prisoner) => (
-                                <CommandItem
-                                  key={prisoner.id}
-                                  value={prisoner.full_name}
-                                  onSelect={() => {
-                                    setForm({ ...form, prisoner: prisoner.id });
-                                    setOpenPrisonerCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.prisoner === prisoner.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {prisoner.full_name} ({prisoner.prisoner_number})
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Relationship */}
-                    <div className="space-y-2">
-                      <Label>Relationship *</Label>
-                      <Popover
-                        open={openRelationCombo}
-                        onOpenChange={setOpenRelationCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openRelationCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.relation
-                              ? relationships.find((r) => r.id === form.relation)
-                                  ?.name
-                              : "Select relationship..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search relationship..." />
-                            <CommandEmpty>No relationship found.</CommandEmpty>
-                            <CommandGroup>
-                              {relationships.map((relation) => (
-                                <CommandItem
-                                  key={relation.id}
-                                  value={relation.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, relation: relation.id });
-                                    setOpenRelationCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.relation === relation.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {relation.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {/* Visitor Type */}
-                    <div className="space-y-2">
-                      <Label>Visitor Type *</Label>
-                      <Popover
-                        open={openVisitorTypeCombo}
-                        onOpenChange={setOpenVisitorTypeCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openVisitorTypeCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.visitor_type
-                              ? visitorTypes.find(
-                                  (t) => t.id === form.visitor_type
-                                )?.name
-                              : "Select visitor type..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search visitor type..." />
-                            <CommandEmpty>No visitor type found.</CommandEmpty>
-                            <CommandGroup>
-                              {visitorTypes.map((type) => (
-                                <CommandItem
-                                  key={type.id}
-                                  value={type.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, visitor_type: type.id });
-                                    setOpenVisitorTypeCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.visitor_type === type.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {type.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Visitor Status */}
-                    <div className="space-y-2">
-                      <Label>Visitor Status *</Label>
-                      <Popover
-                        open={openVisitorStatusCombo}
-                        onOpenChange={setOpenVisitorStatusCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openVisitorStatusCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.visitor_status
-                              ? visitorStatuses.find(
-                                  (s) => s.id === form.visitor_status
-                                )?.name
-                              : "Select status..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search status..." />
-                            <CommandEmpty>No status found.</CommandEmpty>
-                            <CommandGroup>
-                              {visitorStatuses.map((status) => (
-                                <CommandItem
-                                  key={status.id}
-                                  value={status.name}
-                                  onSelect={() => {
-                                    setForm({
-                                      ...form,
-                                      visitor_status: status.id,
-                                    });
-                                    setOpenVisitorStatusCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.visitor_status === status.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {status.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {/* Visitation Date */}
-                    <div className="space-y-2">
-                      <Label>Visitation Date *</Label>
-                      <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            className={cn(
-                              "w-full justify-start text-left",
-                              !form.visitation_datetime &&
-                                "text-muted-foreground"
-                            )}
-                          >
-                            <CalendarIcon className="mr-2 h-4 w-4" />
-                            {form.visitation_datetime ? (
-                              format(form.visitation_datetime, "PPP")
-                            ) : (
-                              <span>Pick a date</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0" align="start">
-                          <Calendar
-                            mode="single"
-                            selected={form.visitation_datetime}
-                            onSelect={(date) => {
-                              if (date) {
-                                setForm({ ...form, visitation_datetime: date });
-                                setCalendarOpen(false);
-                              }
-                            }}
-                            initialFocus
-                          />
-                        </PopoverContent>
-                      </Popover>
-                    </div>
-
-                    {/* Time In */}
-                    <div className="space-y-2">
-                      <Label htmlFor="time_in">Time In</Label>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="time_in"
-                          type="time"
-                          value={form.time_in}
-                          onChange={(e) =>
-                            setForm({ ...form, time_in: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
-
-                    {/* Time Out */}
-                    <div className="space-y-2">
-                      <Label htmlFor="time_out">Time Out</Label>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <Input
-                          id="time_out"
-                          type="time"
-                          value={form.time_out}
-                          onChange={(e) =>
-                            setForm({ ...form, time_out: e.target.value })
-                          }
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="vehicle_no">Vehicle Number</Label>
-                      <Input
-                        id="vehicle_no"
-                        value={form.vehicle_no}
-                        onChange={(e) =>
-                          setForm({ ...form, vehicle_no: e.target.value })
-                        }
-                        placeholder="e.g., UAH 123X"
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="place_visited">Place Visited</Label>
-                      <Input
-                        id="place_visited"
-                        value={form.place_visited}
-                        onChange={(e) =>
-                          setForm({ ...form, place_visited: e.target.value })
-                        }
-                        placeholder="e.g., Visitor's Hall"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="reason_of_visitation">
-                      Reason of Visitation
-                    </Label>
-                    <Textarea
-                      id="reason_of_visitation"
-                      value={form.reason_of_visitation}
-                      onChange={(e) =>
-                        setForm({
-                          ...form,
-                          reason_of_visitation: e.target.value,
-                        })
-                      }
-                      placeholder="Enter reason for visit"
-                      rows={2}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="remarks">Remarks</Label>
-                    <Textarea
-                      id="remarks"
-                      value={form.remarks}
-                      onChange={(e) =>
-                        setForm({ ...form, remarks: e.target.value })
-                      }
-                      placeholder="Additional remarks or notes"
-                      rows={2}
-                    />
-                  </div>
-                </TabsContent>
-
-                {/* Security Tab */}
-                <TabsContent value="security" className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="blacklist_reason">
-                      Blacklist Reason (if applicable)
-                    </Label>
-                    <Textarea
-                      id="blacklist_reason"
-                      value={form.blacklist_reason}
-                      onChange={(e) =>
-                        setForm({ ...form, blacklist_reason: e.target.value })
-                      }
-                      placeholder="Enter reason if visitor is blacklisted"
-                      rows={3}
-                    />
-                  </div>
-
-                  <div className="p-4 border rounded-lg bg-amber-50">
-                    <p className="text-sm text-amber-800">
-                      <strong>Security Note:</strong> Ensure all visitor
-                      information is verified before granting access. Check ID
-                      documents and compare with photo.
-                    </p>
-                  </div>
-                </TabsContent>
-
-                {/* Photo Tab */}
-                <TabsContent value="photo" className="space-y-4 mt-4">
-                  <div className="space-y-4">
-                    {!useCamera && (
-                      <div className="flex gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={startCamera}
-                          className="flex-1"
-                        >
-                          <Camera className="h-4 w-4 mr-2" />
-                          Use Camera
-                        </Button>
-                        <Label
-                          htmlFor="photo-upload"
-                          className="flex-1 cursor-pointer"
-                        >
-                          <div className="flex items-center justify-center gap-2 h-10 px-4 py-2 bg-white border border-input rounded-md hover:bg-accent hover:text-accent-foreground">
-                            <Upload className="h-4 w-4" />
-                            Upload Photo
-                          </div>
-                          <Input
-                            id="photo-upload"
-                            type="file"
-                            accept="image/*"
-                            onChange={handleFileUpload}
-                            className="hidden"
-                          />
-                        </Label>
-                      </div>
-                    )}
-
-                    {useCamera && (
-                      <div className="space-y-2">
-                        <video
-                          ref={videoRef}
-                          autoPlay
-                          playsInline
-                          className="w-full rounded-lg border"
-                        />
-                        <canvas ref={canvasRef} className="hidden" />
-                        <div className="flex gap-2">
-                          <Button
-                            type="button"
-                            onClick={capturePhoto}
-                            className="flex-1"
-                          >
-                            <Camera className="h-4 w-4 mr-2" />
-                            Capture Photo
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={stopCamera}
-                            className="flex-1"
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-
-                    {photoPreview && (
-                      <div className="space-y-2">
-                        <Label>Preview</Label>
-                        <img
-                          src={photoPreview}
-                          alt="Visitor"
-                          className="w-full max-w-sm rounded-lg border"
-                        />
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setPhotoPreview("");
-                            setForm({ ...form, photo: null });
-                          }}
-                        >
-                          Remove Photo
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </TabsContent>
-              </Tabs>
-
-              <div className="flex justify-end gap-2 pt-4 border-t">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => {
-                    setIsDialogOpen(false);
-                    resetForm();
+                <VisitorRegistrationDialog
+                  open={isDialogOpen}
+                  onOpenChange={(open) => {
+                    setIsDialogOpen(open);
+                    if (!open) {
+                      resetForm();
+                    }
                   }}
-                  disabled={loading}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  className="bg-primary hover:bg-primary/90"
-                  disabled={
-                    loading ||
-                    !form.first_name ||
-                    !form.last_name ||
-                    !form.contact_no ||
-                    !form.id_number ||
-                    !form.gate ||
-                    !form.prisoner ||
-                    !form.visitor_type
-                  }
-                >
-                  {loading
-                    ? "Saving..."
-                    : editingVisitor
-                    ? "Update Visitor"
-                    : "Register Visitor"}
-                </Button>
-              </div>
-            </form>
-          </div>
+                  setVisitors={setVisitors}
+                  editingVisitor={editingVisitor}
+                />
 
-      {/* Visitors Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Users className="h-5 w-5" />
-                Visitor Records
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {
-                visitorRecordsLoading ? (
-                    <div className="size-full flex items-center justify-center">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                          <p className="text-muted-foreground text-sm">
-                              Fetching visitor records, Please wait...
+                {/* Placeholder for form - will be removed */}
+                <div style={{display: 'none'}}>
+                  <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+                    <Tabs defaultValue="personal" className="w-full">
+                      <TabsList className="grid w-full grid-cols-4">
+                        <TabsTrigger value="personal">Personal Info</TabsTrigger>
+                        <TabsTrigger value="visit">Visit Details</TabsTrigger>
+                        <TabsTrigger value="security">Security</TabsTrigger>
+                        <TabsTrigger value="photo">Photo</TabsTrigger>
+                      </TabsList>
+
+                      {/* Personal Information Tab */}
+                      <TabsContent value="personal" className="space-y-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="first_name">First Name *</Label>
+                            <Input
+                              id="first_name"
+                              value={form.first_name}
+                              onChange={(e) =>
+                                setForm({ ...form, first_name: e.target.value })
+                              }
+                              placeholder="Enter first name"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="middle_name">Middle Name</Label>
+                            <Input
+                              id="middle_name"
+                              value={form.middle_name}
+                              onChange={(e) =>
+                                setForm({ ...form, middle_name: e.target.value })
+                              }
+                              placeholder="Enter middle name"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="last_name">Last Name *</Label>
+                            <Input
+                              id="last_name"
+                              value={form.last_name}
+                              onChange={(e) =>
+                                setForm({ ...form, last_name: e.target.value })
+                              }
+                              placeholder="Enter last name"
+                              required
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="contact_no">Contact Number *</Label>
+                            <Input
+                              id="contact_no"
+                              value={form.contact_no}
+                              onChange={(e) =>
+                                setForm({ ...form, contact_no: e.target.value })
+                              }
+                              placeholder="+256700123456"
+                              required
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="organisation">Organisation</Label>
+                            <Input
+                              id="organisation"
+                              value={form.organisation}
+                              onChange={(e) =>
+                                setForm({ ...form, organisation: e.target.value })
+                              }
+                              placeholder="Enter organisation name"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="address">Address *</Label>
+                          <Textarea
+                            id="address"
+                            value={form.address}
+                            onChange={(e) =>
+                              setForm({ ...form, address: e.target.value })
+                            }
+                            placeholder="Enter full address"
+                            rows={2}
+                            required
+                          />
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* ID Type */}
+                          <div className="space-y-2">
+                            <Label>ID Type *</Label>
+                            <Popover
+                              open={openIDTypeCombo}
+                              onOpenChange={setOpenIDTypeCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openIDTypeCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.id_type
+                                    ? idTypes.find((t) => t.id === form.id_type)?.name
+                                    : "Select ID type..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search ID type..." />
+                                  <CommandEmpty>No ID type found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {idTypes.map((type) => (
+                                      <CommandItem
+                                        key={type.id}
+                                        value={type.name}
+                                        onSelect={() => {
+                                          setForm({ ...form, id_type: type.id });
+                                          setOpenIDTypeCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.id_type === type.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {type.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="id_number">ID Number *</Label>
+                            <Input
+                              id="id_number"
+                              value={form.id_number}
+                              onChange={(e) =>
+                                setForm({ ...form, id_number: e.target.value })
+                              }
+                              placeholder="Enter ID number"
+                              required
+                            />
+                          </div>
+                        </div>
+                      </TabsContent>
+
+                      {/* Visit Details Tab */}
+                      <TabsContent value="visit" className="space-y-4 mt-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Gate */}
+                          <div className="space-y-2">
+                            <Label>Gate *</Label>
+                            <Popover
+                              open={openGateCombo}
+                              onOpenChange={setOpenGateCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openGateCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.gate
+                                    ? gates.find((g) => g.id === form.gate)?.name
+                                    : "Select gate..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search gate..." />
+                                  <CommandEmpty>No gate found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {gates.map((gate) => (
+                                      <CommandItem
+                                        key={gate.id}
+                                        value={gate.name}
+                                        onSelect={() => {
+                                          setForm({ ...form, gate: gate.id });
+                                          setOpenGateCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.gate === gate.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {gate.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Gate Keeper */}
+                          <div className="space-y-2">
+                            <Label>Gate Keeper *</Label>
+                            <Popover
+                              open={openGateKeeperCombo}
+                              onOpenChange={setOpenGateKeeperCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openGateKeeperCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.gate_keeper
+                                    ? staffList.find((s) => s.id === form.gate_keeper)
+                                        ?.name
+                                    : "Select gate keeper..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search staff..." />
+                                  <CommandEmpty>No staff found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {staffList.map((staff) => (
+                                      <CommandItem
+                                        key={staff.id}
+                                        value={staff.name}
+                                        onSelect={() => {
+                                          setForm({ ...form, gate_keeper: staff.id });
+                                          setOpenGateKeeperCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.gate_keeper === staff.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {staff.name} ({staff.force_number}) - {staff.rank}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Prisoner */}
+                          <div className="space-y-2">
+                            <Label>Prisoner to Visit *</Label>
+                            <Popover
+                              open={openPrisonerCombo}
+                              onOpenChange={setOpenPrisonerCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openPrisonerCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.prisoner
+                                    ? prisoners.find((p) => p.id === form.prisoner)
+                                        ?.full_name
+                                    : "Select prisoner..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search prisoner..." />
+                                  <CommandEmpty>No prisoner found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {prisoners.map((prisoner) => (
+                                      <CommandItem
+                                        key={prisoner.id}
+                                        value={prisoner.full_name}
+                                        onSelect={() => {
+                                          setForm({ ...form, prisoner: prisoner.id });
+                                          setOpenPrisonerCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.prisoner === prisoner.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {prisoner.full_name} ({prisoner.prisoner_number})
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Relationship */}
+                          <div className="space-y-2">
+                            <Label>Relationship *</Label>
+                            <Popover
+                              open={openRelationCombo}
+                              onOpenChange={setOpenRelationCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openRelationCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.relation
+                                    ? relationships.find((r) => r.id === form.relation)
+                                        ?.name
+                                    : "Select relationship..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search relationship..." />
+                                  <CommandEmpty>No relationship found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {relationships.map((relation) => (
+                                      <CommandItem
+                                        key={relation.id}
+                                        value={relation.name}
+                                        onSelect={() => {
+                                          setForm({ ...form, relation: relation.id });
+                                          setOpenRelationCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.relation === relation.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {relation.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Visitor Type */}
+                          <div className="space-y-2">
+                            <Label>Visitor Type *</Label>
+                            <Popover
+                              open={openVisitorTypeCombo}
+                              onOpenChange={setOpenVisitorTypeCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openVisitorTypeCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.visitor_type
+                                    ? visitorTypes.find(
+                                        (t) => t.id === form.visitor_type
+                                      )?.name
+                                    : "Select visitor type..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search visitor type..." />
+                                  <CommandEmpty>No visitor type found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {visitorTypes.map((type) => (
+                                      <CommandItem
+                                        key={type.id}
+                                        value={type.name}
+                                        onSelect={() => {
+                                          setForm({ ...form, visitor_type: type.id });
+                                          setOpenVisitorTypeCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.visitor_type === type.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {type.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Visitor Status */}
+                          <div className="space-y-2">
+                            <Label>Visitor Status *</Label>
+                            <Popover
+                              open={openVisitorStatusCombo}
+                              onOpenChange={setOpenVisitorStatusCombo}
+                            >
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={openVisitorStatusCombo}
+                                  className="w-full justify-between"
+                                >
+                                  {form.visitor_status
+                                    ? visitorStatuses.find(
+                                        (s) => s.id === form.visitor_status
+                                      )?.name
+                                    : "Select status..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search status..." />
+                                  <CommandEmpty>No status found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {visitorStatuses.map((status) => (
+                                      <CommandItem
+                                        key={status.id}
+                                        value={status.name}
+                                        onSelect={() => {
+                                          setForm({
+                                            ...form,
+                                            visitor_status: status.id,
+                                          });
+                                          setOpenVisitorStatusCombo(false);
+                                        }}
+                                      >
+                                        <Check
+                                          className={cn(
+                                            "mr-2 h-4 w-4",
+                                            form.visitor_status === status.id
+                                              ? "opacity-100"
+                                              : "opacity-0"
+                                          )}
+                                        />
+                                        {status.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          {/* Visitation Date */}
+                          <div className="space-y-2">
+                            <Label>Visitation Date *</Label>
+                            <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  className={cn(
+                                    "w-full justify-start text-left",
+                                    !form.visitation_datetime &&
+                                      "text-muted-foreground"
+                                  )}
+                                >
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {form.visitation_datetime ? (
+                                    format(form.visitation_datetime, "PPP")
+                                  ) : (
+                                    <span>Pick a date</span>
+                                  )}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="single"
+                                  selected={form.visitation_datetime}
+                                  onSelect={(date) => {
+                                    if (date) {
+                                      setForm({ ...form, visitation_datetime: date });
+                                      setCalendarOpen(false);
+                                    }
+                                  }}
+                                  initialFocus
+                                />
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+
+                          {/* Time In */}
+                          <div className="space-y-2">
+                            <Label htmlFor="time_in">Time In</Label>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="time_in"
+                                type="time"
+                                value={form.time_in}
+                                onChange={(e) =>
+                                  setForm({ ...form, time_in: e.target.value })
+                                }
+                              />
+                            </div>
+                          </div>
+
+                          {/* Time Out */}
+                          <div className="space-y-2">
+                            <Label htmlFor="time_out">Time Out</Label>
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-4 w-4 text-muted-foreground" />
+                              <Input
+                                id="time_out"
+                                type="time"
+                                value={form.time_out}
+                                onChange={(e) =>
+                                  setForm({ ...form, time_out: e.target.value })
+                                }
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-2">
+                            <Label htmlFor="vehicle_no">Vehicle Number</Label>
+                            <Input
+                              id="vehicle_no"
+                              value={form.vehicle_no}
+                              onChange={(e) =>
+                                setForm({ ...form, vehicle_no: e.target.value })
+                              }
+                              placeholder="e.g., UAH 123X"
+                            />
+                          </div>
+
+                          <div className="space-y-2">
+                            <Label htmlFor="place_visited">Place Visited</Label>
+                            <Input
+                              id="place_visited"
+                              value={form.place_visited}
+                              onChange={(e) =>
+                                setForm({ ...form, place_visited: e.target.value })
+                              }
+                              placeholder="e.g., Visitor's Hall"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="reason_of_visitation">
+                            Reason of Visitation
+                          </Label>
+                          <Textarea
+                            id="reason_of_visitation"
+                            value={form.reason_of_visitation}
+                            onChange={(e) =>
+                              setForm({
+                                ...form,
+                                reason_of_visitation: e.target.value,
+                              })
+                            }
+                            placeholder="Enter reason for visit"
+                            rows={2}
+                          />
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label htmlFor="remarks">Remarks</Label>
+                          <Textarea
+                            id="remarks"
+                            value={form.remarks}
+                            onChange={(e) =>
+                              setForm({ ...form, remarks: e.target.value })
+                            }
+                            placeholder="Additional remarks or notes"
+                            rows={2}
+                          />
+                        </div>
+                      </TabsContent>
+
+                      {/* Security Tab */}
+                      <TabsContent value="security" className="space-y-4 mt-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="blacklist_reason">
+                            Blacklist Reason (if applicable)
+                          </Label>
+                          <Textarea
+                            id="blacklist_reason"
+                            value={form.blacklist_reason}
+                            onChange={(e) =>
+                              setForm({ ...form, blacklist_reason: e.target.value })
+                            }
+                            placeholder="Enter reason if visitor is blacklisted"
+                            rows={3}
+                          />
+                        </div>
+
+                        <div className="p-4 border rounded-lg bg-amber-50">
+                          <p className="text-sm text-amber-800">
+                            <strong>Security Note:</strong> Ensure all visitor
+                            information is verified before granting access. Check ID
+                            documents and compare with photo.
                           </p>
                         </div>
-                    </div>
-                ) : (
-                   <div className="rounded-md border">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Visitor Name</TableHead>
-                            <TableHead>ID Number</TableHead>
-                            <TableHead>Contact</TableHead>
-                            <TableHead>Prisoner</TableHead>
-                            <TableHead>Visitor Type</TableHead>
-                            <TableHead>Gate</TableHead>
-                            <TableHead>Time In</TableHead>
-                            <TableHead>Time Out</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredVisitors.length === 0 ? (
-                            <TableRow>
-                              <TableCell
-                                colSpan={10}
-                                className="text-center py-8 text-muted-foreground"
-                              >
-                                No visitor records found
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredVisitors.map((visitor) => (
-                              <TableRow key={visitor.id}>
-                                <TableCell>
-                                  <div>
-                                    <p>
-                                      {visitor.first_name} {visitor.middle_name}{" "}
-                                      {visitor.last_name}
-                                    </p>
-                                    {visitor.organisation && (
-                                      <p className="text-xs text-muted-foreground">
-                                        {visitor.organisation}
-                                      </p>
-                                    )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>{visitor.id_number}</TableCell>
-                                <TableCell>{visitor.contact_no}</TableCell>
-                                <TableCell>{visitor.prisoner_name}</TableCell>
-                                <TableCell>{visitor.visitor_type_name}</TableCell>
-                                <TableCell>{visitor.gate_name}</TableCell>
-                                <TableCell>
-                                  {visitor.time_in ? (
-                                    <div className="flex items-center gap-1 text-green-600">
-                                      <LogIn className="h-3 w-3" />
-                                      {extractTimeHHMM(visitor.time_in)}
-                                    </div>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {visitor.time_out ? (
-                                    <div className="flex items-center gap-1 text-red-600">
-                                      <LogOut className="h-3 w-3" />
-                                      {extractTimeHHMM(visitor.time_out)}
-                                    </div>
-                                  ) : (
-                                    "-"
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {getStatusBadge(visitor.visitor_status_name)}
-                                </TableCell>
-                                <TableCell>
-                                  <div className="flex gap-1">
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleEdit(visitor)}
-                                      title="Edit visitor"
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => handleGenerateVisitorPass(visitor)}
-                                      style={{ color: '#650000' }}
-                                      title="Generate visitor pass"
-                                    >
-                                      <FileText className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
-                   </div>
-                )
-              }
-            </CardContent>
-          </Card>
-        </TabsContent>
+                      </TabsContent>
 
-        {/* Visitor Items Tab */}
-        <TabsContent value="items" className="mt-6">
-          <VisitorItemList visitors={visitors} items={items} setItems={setItems} />
-        </TabsContent>
-      </Tabs>
+                      {/* Photo Tab */}
+                      <TabsContent value="photo" className="space-y-4 mt-4">
+                        <div className="space-y-4">
+                          {!useCamera && (
+                            <div className="flex gap-2">
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={startCamera}
+                                className="flex-1"
+                              >
+                                <Camera className="h-4 w-4 mr-2" />
+                                Use Camera
+                              </Button>
+                              <Label
+                                htmlFor="photo-upload"
+                                className="flex-1 cursor-pointer"
+                              >
+                                <div className="flex items-center justify-center gap-2 h-10 px-4 py-2 bg-white border border-input rounded-md hover:bg-accent hover:text-accent-foreground">
+                                  <Upload className="h-4 w-4" />
+                                  Upload Photo
+                                </div>
+                                <Input
+                                  id="photo-upload"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={handleFileUpload}
+                                  className="hidden"
+                                />
+                              </Label>
+                            </div>
+                          )}
+
+                          {useCamera && (
+                            <div className="space-y-2">
+                              <video
+                                ref={videoRef}
+                                autoPlay
+                                playsInline
+                                className="w-full rounded-lg border"
+                              />
+                              <canvas ref={canvasRef} className="hidden" />
+                              <div className="flex gap-2">
+                                <Button
+                                  type="button"
+                                  onClick={capturePhoto}
+                                  className="flex-1"
+                                >
+                                  <Camera className="h-4 w-4 mr-2" />
+                                  Capture Photo
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  onClick={stopCamera}
+                                  className="flex-1"
+                                >
+                                  Cancel
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+
+                          {photoPreview && (
+                            <div className="space-y-2">
+                              <Label>Preview</Label>
+                              <img
+                                src={photoPreview}
+                                alt="Visitor"
+                                className="w-full max-w-sm rounded-lg border"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  setPhotoPreview("");
+                                  setForm({ ...form, photo: null });
+                                }}
+                              >
+                                Remove Photo
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </TabsContent>
+                    </Tabs>
+
+                    <div className="flex justify-end gap-2 pt-4 border-t">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsDialogOpen(false);
+                          resetForm();
+                        }}
+                        disabled={loading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        className="bg-primary hover:bg-primary/90"
+                        disabled={
+                          loading ||
+                          !form.first_name ||
+                          !form.last_name ||
+                          !form.contact_no ||
+                          !form.id_number ||
+                          !form.gate ||
+                          !form.prisoner ||
+                          !form.visitor_type
+                        }
+                      >
+                        {loading
+                          ? "Saving..."
+                          : editingVisitor
+                          ? "Update Visitor"
+                          : "Register Visitor"}
+                      </Button>
+                    </div>
+                  </form>
+                </div>
+
+            {/* Visitors Table */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                      <Users className="h-5 w-5" />
+                      Visitor Records
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="rounded-md border">
+                            <Table>
+                              <TableHeader>
+                                <TableRow>
+                                  <TableHead>Visitor Name</TableHead>
+                                  <TableHead>ID Number</TableHead>
+                                  <TableHead>Contact</TableHead>
+                                  <TableHead>Prisoner</TableHead>
+                                  <TableHead>Visitor Type</TableHead>
+                                  <TableHead>Gate</TableHead>
+                                  <TableHead>Time In</TableHead>
+                                  <TableHead>Time Out</TableHead>
+                                  <TableHead>Status</TableHead>
+                                  <TableHead>Actions</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {filteredVisitors.length === 0 ? (
+                                  <TableRow>
+                                    <TableCell
+                                      colSpan={10}
+                                      className="text-center py-8 text-muted-foreground"
+                                    >
+                                      No visitor records found
+                                    </TableCell>
+                                  </TableRow>
+                                ) : (
+                                  filteredVisitors.map((visitor) => (
+                                    <TableRow key={visitor.id}>
+                                      <TableCell>
+                                        <div>
+                                          <p>
+                                            {visitor.first_name} {visitor.middle_name}{" "}
+                                            {visitor.last_name}
+                                          </p>
+                                          {visitor.organisation && (
+                                            <p className="text-xs text-muted-foreground">
+                                              {visitor.organisation}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </TableCell>
+                                      <TableCell>{visitor.id_number}</TableCell>
+                                      <TableCell>{visitor.contact_no}</TableCell>
+                                      <TableCell>{visitor.prisoner_name}</TableCell>
+                                      <TableCell>{visitor.visitor_type_name}</TableCell>
+                                      <TableCell>{visitor.gate_name}</TableCell>
+                                      <TableCell>
+                                        {visitor.time_in ? (
+                                          <div className="flex items-center gap-1 text-green-600">
+                                            <LogIn className="h-3 w-3" />
+                                            {extractTimeHHMM(visitor.time_in)}
+                                          </div>
+                                        ) : (
+                                          "-"
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        {visitor.time_out ? (
+                                          <div className="flex items-center gap-1 text-red-600">
+                                            <LogOut className="h-3 w-3" />
+                                            {extractTimeHHMM(visitor.time_out)}
+                                          </div>
+                                        ) : (
+                                          "-"
+                                        )}
+                                      </TableCell>
+                                      <TableCell>
+                                        {getStatusBadge(visitor.visitor_status_name)}
+                                      </TableCell>
+                                      <TableCell>
+                                        <div className="flex gap-1">
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleEdit(visitor)}
+                                            title="Edit visitor"
+                                          >
+                                            <Edit className="h-4 w-4" />
+                                          </Button>
+                                          <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => handleGenerateVisitorPass(visitor)}
+                                            style={{ color: '#650000' }}
+                                            title="Generate visitor pass"
+                                          >
+                                            <FileText className="h-4 w-4" />
+                                          </Button>
+                                        </div>
+                                      </TableCell>
+                                    </TableRow>
+                                  ))
+                                )}
+                              </TableBody>
+                            </Table>
+                         </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              {/* Visitor Items Tab */}
+              <TabsContent value="items" className="mt-6">
+                <VisitorItemList visitors={visitors} items={items} setItems={setItems} />
+              </TabsContent>
+            </Tabs>
+        )
+      }
+
 
       {/* Visitor Pass Generation Dialog */}
       <Dialog 
