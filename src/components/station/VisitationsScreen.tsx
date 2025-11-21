@@ -573,12 +573,13 @@ export default function VisitationsScreen() {
   }
 
   const loadData = async () => {
-    console.log("Loading with filters:", region, district, station);
-    const reload = handleEffectLoad(region, district, station, setVisitorRecordsLoading, fetchData)
-    if (!reload) {
-      setItems([])
-      setVisitors([])
-    }
+    // console.log("Loading with filters:", region, district, station);
+    // const reload = handleEffectLoad(region, district, station, setVisitorRecordsLoading, fetchData)
+    // if (!reload) {
+    //   setItems([])
+    //   setVisitors([])
+    // }
+    fetchData()
   };
 
   useFilterRefresh(loadData, [region, district, station]);

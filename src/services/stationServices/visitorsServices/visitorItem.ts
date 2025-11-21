@@ -168,6 +168,15 @@ export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
   return response.data;
 }
 
+export const getVisitorItems2 = async (visitorId: string) : Promise<VisitorItemsResponse> => {
+  const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/', {
+    params: {
+      visitor: visitorId
+    }
+  });
+  return response.data;
+}
+
 export const deleteVisitorItem = async (id: string) : Promise<{ message: string } | { error: string }> => {
   try {
     await axiosInstance.delete(`/gate-management/visitor-items/${id}/`);
