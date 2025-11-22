@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import {
   Plus,
@@ -34,6 +34,7 @@ import { Badge } from "../ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { toast } from "sonner";
+import * as ComplaintsService from "../../services/stationServices/complaintsService";
 
 interface ComplaintAction {
   id: string;
@@ -68,7 +69,8 @@ interface Complaint {
   deleted_datetime: string | null;
   complaint: string;
   complaint_date: string;
-  complaint_status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  // backend provides UUID for statuses, store as string
+  complaint_status: string;
   complaint_remark: string;
   date_of_response: string | null;
   force_number: string;
@@ -93,7 +95,7 @@ interface ComplaintFormData {
   complaint: string;
   complaint_remark: string;
   complaint_date: string;
-  complaint_status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  complaint_status: string; // UUID from backend
   officer_requested_username: string;
   force_number: string;
   rank: string;
@@ -103,7 +105,8 @@ interface ComplaintFormData {
 interface ActionFormData {
   action: string;
   action_date: string;
-  action_status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  // store as string (may be UUID or name); we'll resolve to UUID when persisting
+  action_status: string;
   action_remark: string;
 }
 
@@ -120,53 +123,6 @@ interface ComplaintFormProps {
   priorities?: { id: string; name: string }[];
   ranks?: { id: string; name: string }[];
 }
-
-// Mock options
-// const mockStations = [
-//   { id: "station-1", name: "Centralzz Police Station" },
-//   { id: "station-2", name: "North Division Station" },
-//   { id: "station-3", name: "South District Station" },
-//   { id: "station-4", name: "East Division Station" },
-//   { id: "station-5", name: "West Division Station" },
-// ];
-
-// const mockPrisoners = [
-//   { id: "prisoner-1", name: "John Doe" },
-//   { id: "prisoner-2", name: "Jane Smith" },
-//   { id: "prisoner-3", name: "Robert Wilson" },
-//   { id: "prisoner-4", name: "Maria Garcia" },
-//   { id: "prisoner-5", name: "Ahmed Khan" },
-//   { id: "prisoner-6", name: "Carlos Mendez" },
-//   { id: "prisoner-7", name: "Thomas Anderson" },
-//   { id: "prisoner-8", name: "Sarah Johnson" },
-// ];
-
-// const complaintNatures = [
-//   { id: "nature-1", name: "Medical Emergency" },
-//   { id: "nature-2", name: "Poor Cell Conditions" },
-//   { id: "nature-3", name: "Food Quality" },
-//   { id: "nature-4", name: "Visitation Rights" },
-//   { id: "nature-5", name: "Physical Assault" },
-//   { id: "nature-6", name: "Legal Access" },
-//   { id: "nature-7", name: "Property Damage" },
-//   { id: "nature-8", name: "Hygiene Issues" },
-//   { id: "nature-9", name: "Harassment" },
-//   { id: "nature-10", name: "Other" },
-// ];
-
-// const priorities = [
-//   { id: "priority-1", name: "Critical" },
-//   { id: "priority-2", name: "High" },
-//   { id: "priority-3", name: "Medium" },
-//   { id: "priority-4", name: "Low" },
-// ];
-
-// const ranks = [
-//   { id: "rank-1", name: "Chief Inspector" },
-//   { id: "rank-2", name: "Inspector" },
-//   { id: "rank-3", name: "Sergeant" },
-//   { id: "rank-4", name: "Constable" },
-// ];
 
 const ComplaintForm: React.FC<ComplaintFormProps> = ({
   isOpen,
@@ -191,6 +147,17 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     action_status: "OPEN",
     action_remark: "",
   });
+  const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
+  const [staffSearch, setStaffSearch] = useState<string>("");
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+
+  // display name for station (auto-populated when prisoner selected)
+  const [stationDisplay, setStationDisplay] = useState<string>("");
+
+  // complaint statuses loaded from backend (ids + names)
+  const [complaintStatuses, setComplaintStatuses] = useState<any[]>([]);
+  // track actions that are pending (not yet persisted)
+  const [pendingActions, setPendingActions] = useState<ComplaintAction[]>([]);
 
   const {
     register,
@@ -224,12 +191,15 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   const watchStatus = watch("complaint_status");
   const watchRank = watch("rank");
   const watchPrisoner = watch("prisoner");
+  const watchForceNumber = watch("force_number");
 
   // Initialize form with complaint data if editing
   useEffect(() => {
     if (complaint && mode === "edit") {
       setValue("prisoner", complaint.prisoner);
       setValue("station", complaint.station);
+      // set human-friendly display for station (use complaint.station_name if present)
+      setStationDisplay(complaint.station_name ?? "");
       setValue("nature_of_complaint", complaint.nature_of_complaint);
       setValue("complaint_priority", complaint.complaint_priority);
       setValue("complaint", complaint.complaint);
@@ -265,6 +235,83 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     }
   }, [isOpen, reset]);
 
+  // load staff profiles once
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const st = await ComplaintsService.fetchStaffProfiles();
+        if (!mounted) return;
+        setStaffProfiles(st || []);
+        // if editing and complaint has officer_requested, set selectedStaffId
+        if (complaint?.officer_requested) {
+          setSelectedStaffId(String(complaint.officer_requested));
+        }
+      } catch (err) {}
+    })();
+    return () => { mounted = false; };
+  }, [complaint]);
+
+  // when selectedStaffId changes populate form values
+  useEffect(() => {
+    if (!selectedStaffId) {
+      setValue("officer_requested", "");
+      setValue("force_number", "");
+      setValue("officer_requested_username", "");
+      setValue("rank", "");
+      setValue("rank_name", "");
+      return;
+    }
+    const s = staffProfiles.find(sp => String(sp.id) === String(selectedStaffId));
+    if (s) {
+      // submitable values
+      setValue("officer_requested", s.id);           // PK expected by backend
+      setValue("force_number", s.force_number ?? ""); // textual
+      setValue("rank", s.rank ?? "");                // UUID (submit)
+      // user-facing / disabled values
+      setValue("officer_requested_username", s.username ?? "");
+      setValue("rank_name", s.rank_name ?? "");
+    }
+  }, [selectedStaffId, staffProfiles, setValue]);
+
+  // When prisoner changes, auto-populate station (read-only)
+  useEffect(() => {
+    const pid = watchPrisoner;
+    if (!pid) {
+      setValue("station", "");
+      setStationDisplay("");
+      return;
+    }
+    const p = prisoners.find((pr: any) => String(pr.id) === String(pid));
+    if (p) {
+      // p.raw may contain current_station (id) and current_station_name
+      const stationId = p.raw?.current_station ?? p.raw?.current_station_name ?? "";
+      const stationName = p.raw?.current_station_name ?? p.raw?.current_station ?? p.name ?? "";
+      // if stationId looks like an id vs name, set station id; otherwise set to name to preserve original behavior
+      setValue("station", stationId || "");
+      setStationDisplay(stationName || "");
+    } else {
+      setValue("station", "");
+      setStationDisplay("");
+    }
+  }, [watchPrisoner, prisoners, setValue]);
+
+  // load complaint statuses from backend
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        const sts = await ComplaintsService.fetchComplaintStatuses(c.signal);
+        if (!mounted) return;
+        setComplaintStatuses(sts ?? []);
+      } catch (err) {
+        console.error('load complaint statuses', err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, []);
+
   const onSubmit = async (data: ComplaintFormData) => {
     // Get names from IDs
     const stationName = stations.find((s) => s.id === data.station)?.name || "";
@@ -289,6 +336,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       deleted_datetime: null,
       complaint: data.complaint,
       complaint_date: new Date(data.complaint_date).toISOString(),
+      // data.complaint_status is UUID from API list
       complaint_status: data.complaint_status,
       complaint_remark: data.complaint_remark,
       date_of_response: data.response ? new Date().toISOString() : null,
@@ -301,12 +349,48 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       prisoner: (data as any).prisoner || data.prisoner_name,
       nature_of_complaint: data.nature_of_complaint,
       complaint_priority: data.complaint_priority,
-      officer_requested: 1,
+      officer_requested: (data as any).officer_requested || undefined,
       rank: data.rank,
     };
 
+    // submitPayload to ensure correct UUIDs are sent
+    const submitPayload = {
+      ...data,
+      complaint_status: data.complaint_status, // UUID from API
+      complaint_priority: data.complaint_priority, // ensure id
+      officer_requested: data.officer_requested, // staff.id
+      rank: data.rank, // rank UUID
+      force_number: data.force_number, // string
+    };
     try {
-      await onSave(complaintData);
+      const created = await onSave(submitPayload);
+      // if there are pending actions (created while adding new complaint), persist them now
+      const createdId = created?.id ?? created;
+      if (createdId && pendingActions.length > 0) {
+        for (const a of pendingActions) {
+          try {
+            const payload = {
+              action: a.action,
+              action_date: new Date(a.action_date).toISOString(),
+              action_remark: a.action_remark,
+              complaint: createdId,
+              // resolve action_status -> uuid if possible
+              action_status: (() => {
+                // if value already looks like a UUID (contains -) assume it's an id
+                if (String(a.action_status).includes("-")) return a.action_status;
+                const resolved = complaintStatuses.find(s =>
+                  String(s.name).toLowerCase().includes(String(a.action_status).toLowerCase())
+                );
+                return resolved?.id ?? a.action_status;
+              })(),
+            };
+            await ComplaintsService.createComplaintAction(payload);
+          } catch (err) {
+            console.error('create pending action error', err);
+          }
+        }
+        setPendingActions([]);
+      }
       toast.success(
         mode === "add" ? "Complaint created successfully" : "Complaint updated successfully",
       );
@@ -317,13 +401,13 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     }
   };
 
-  const handleAddAction = () => {
+  const handleAddAction = async () => {
     if (!currentActionForm.action.trim()) {
       toast.error("Please enter an action description");
       return;
     }
 
-    const newAction: ComplaintAction = {
+    const tempAction: ComplaintAction = {
       id: `action-${Date.now()}`,
       created_by_name: "Current User",
       created_datetime: new Date().toISOString(),
@@ -340,7 +424,53 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       complaint: complaint?.id || "",
     };
 
-    setActions([...actions, newAction]);
+    // If complaint exists (editing), persist action immediately.
+    if (complaint?.id) {
+      try {
+        const payload = {
+          action: tempAction.action,
+          action_date: new Date(tempAction.action_date).toISOString(),
+          action_remark: tempAction.action_remark,
+          complaint: complaint.id,
+          action_status: (() => {
+            if (String(tempAction.action_status).includes("-")) return tempAction.action_status;
+            const resolved = complaintStatuses.find(s =>
+              String(s.name).toLowerCase().includes(String(tempAction.action_status).toLowerCase())
+            );
+            return resolved?.id ?? tempAction.action_status;
+          })(),
+        };
+        const created = await ComplaintsService.createComplaintAction(payload);
+        // normalize returned action (many APIs return created object)
+        const createdAction: ComplaintAction = {
+          id: created?.id ?? tempAction.id,
+          created_by_name: created?.created_by_name ?? tempAction.created_by_name,
+          created_datetime: created?.created_datetime ?? tempAction.created_datetime,
+          is_active: created?.is_active ?? true,
+          updated_datetime: created?.updated_datetime ?? tempAction.updated_datetime,
+          deleted_datetime: created?.deleted_datetime ?? null,
+          action: created?.action ?? tempAction.action,
+          action_date: created?.action_date ?? tempAction.action_date,
+          action_status: created?.action_status ?? tempAction.action_status,
+          action_remark: created?.action_remark ?? tempAction.action_remark,
+          created_by: created?.created_by ?? tempAction.created_by,
+          updated_by: created?.updated_by ?? tempAction.updated_by,
+          deleted_by: created?.deleted_by ?? tempAction.deleted_by,
+          complaint: created?.complaint ?? tempAction.complaint,
+        };
+        setActions(prev => [...prev, createdAction]);
+      } catch (err) {
+        console.error('persist action error', err);
+        toast.error('Failed to save action. It will be kept locally until the complaint is saved.');
+        // fallback to keeping locally so user doesn't lose input
+        setActions(prev => [...prev, tempAction]);
+      }
+    } else {
+      // For new complaint: keep locally in pendingActions and UI
+      setPendingActions(prev => [...prev, tempAction]);
+      setActions(prev => [...prev, tempAction]);
+    }
+
     setCurrentActionForm({
       action: "",
       action_date: new Date().toISOString().split("T")[0],
@@ -397,30 +527,8 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
               Basic Information
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* <div>
-                <Label htmlFor="prisoner">
-                  Prisoner <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={watchPrisoner}
-                  onValueChange={(value) => setValue("prisoner", value)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select prisoner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prisoners.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {errors.prisoner && (
-                  <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
-                )}
-              </div> */}
-                <div>
+
+              <div>
                 <Label htmlFor="prisoner">
                   Prisoner <span className="text-red-500">*</span>
                 </Label>
@@ -455,46 +563,27 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 {errors.prisoner && (
                   <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
                 )}
-                </div>
+              </div>
 
-                <div>
-                  <Label htmlFor="station">
-                    Station <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={watchStation}
-                    onValueChange={(value) => setValue("station", value)}
-                  >
-                    <SelectTrigger>
-                    <SelectValue placeholder="Select station" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    <div className="px-3 py-2">
-                      <Input
-                      placeholder="Search station..."
-                      value={stationSearch}
-                      onChange={(e) => setStationSearch(e.target.value)}
-                      className="mb-2"
-                      />
-                    </div>
-                    {stations
-                      .filter((s) => {
-                      if (!stationSearch) return true;
-                      return s.name?.toLowerCase().includes(stationSearch.toLowerCase());
-                      })
-                      .map((station) => (
-                      <SelectItem key={station.id} value={station.id}>
-                        {station.name}
-                      </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.station && (
-                    <p className="text-red-500 text-sm mt-1">
+              <div>
+                <Label htmlFor="station">
+                  Station (auto-populated) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="station_display"
+                  value={stationDisplay}
+                  placeholder="Station will be filled when prisoner is selected"
+                  disabled
+                  readOnly
+                />
+                {/* hidden value to submit station id/name */}
+                <input type="hidden" {...register("station")} />
+                {errors.station && (
+                  <p className="text-red-500 text-sm mt-1">
                     {errors.station.message}
-                    </p>
-                  )}
-                </div>
+                  </p>
+                )}
+              </div>
 
               <div>
                 <Label htmlFor="complaint_date">
@@ -519,22 +608,18 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                   Status <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={watchStatus}
-                  onValueChange={(value) =>
-                    setValue(
-                      "complaint_status",
-                      value as "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED",
-                    )
-                  }
+                  value={watchStatus ?? ""}
+                  onValueChange={(value) => setValue("complaint_status", value)}
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="OPEN">Open</SelectItem>
-                    <SelectItem value="IN_PROGRESS">In Progress</SelectItem>
-                    <SelectItem value="RESOLVED">Resolved</SelectItem>
-                    <SelectItem value="CLOSED">Closed</SelectItem>
+                    {(complaintStatuses || []).map((s) => (
+                      <SelectItem key={s.id} value={s.id}>
+                        {s.name}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -647,42 +732,66 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="officer_requested_username">
-                  Officer Username
-                </Label>
-                <Input
-                  id="officer_requested_username"
-                  {...register("officer_requested_username")}
-                  placeholder="officer.username"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="force_number">Force Number</Label>
-                <Input
-                  id="force_number"
-                  {...register("force_number")}
-                  placeholder="PF-12345"
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="rank">Rank</Label>
+                <Label htmlFor="force_number">Force Number <span className="text-red-500">*</span></Label>
                 <Select
-                  value={watchRank}
-                  onValueChange={(value) => setValue("rank", value)}
+                  value={selectedStaffId ?? ""}
+                  onValueChange={(val) => {
+                    setSelectedStaffId(val || null);
+                  }}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select rank" />
+                    {/* show only force_number for selected staff */}
+                    <SelectValue placeholder="Select force number">
+                      {selectedStaffId ? (staffProfiles.find(s => String(s.id) === String(selectedStaffId))?.force_number ?? "") : undefined}
+                    </SelectValue>
                   </SelectTrigger>
+
                   <SelectContent>
-                    {ranks.map((rank) => (
-                      <SelectItem key={rank.id} value={rank.id}>
-                        {rank.name}
-                      </SelectItem>
+                    <div className="px-3 py-2">
+                      <Input
+                        placeholder="Search force number or username..."
+                        value={staffSearch}
+                        // prevent Select from consuming key events (fixes focus/keyboard issue)
+                        onKeyDown={(e) => e.stopPropagation()}
+                        onKeyUp={(e) => e.stopPropagation()}
+                        onChange={(e) => setStaffSearch(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+
+                    {(staffProfiles || [])
+                      .filter(sp => {
+                        if (!staffSearch) return true;
+                        const q = staffSearch.toLowerCase();
+                        return String(sp.force_number ?? "").toLowerCase().includes(q)
+                          || String(sp.username ?? "").toLowerCase().includes(q)
+                          || String(sp.name ?? "").toLowerCase().includes(q);
+                      })
+                      .map(sp => (
+                        <SelectItem key={sp.id} value={String(sp.id)}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{sp.force_number}</span>
+                            <span className="text-xs text-muted-foreground">{sp.username}</span>
+                          </div>
+                        </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.force_number && <p className="text-red-500 text-sm mt-1">{(errors as any).force_number?.message}</p>}
+              </div>
+
+              {/* Officer Username - disabled */}
+              <div>
+                <Label htmlFor="officer_requested_username">Officer Username</Label>
+                <Input id="officer_requested_username" {...register("officer_requested_username")} disabled readOnly />
+              </div>
+
+              {/* Rank - visible rank_name disabled, but submit rank UUID in hidden field */}
+              <div>
+                <Label htmlFor="rank_name">Rank</Label>
+                <Input id="rank_name" {...register("rank_name")} disabled readOnly />
+                {/* hidden actual rank id value for submission */}
+                <input type="hidden" {...register("rank")} />
               </div>
 
               <div className="md:col-span-3">

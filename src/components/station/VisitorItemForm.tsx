@@ -9,6 +9,15 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, AlertCircle, Upload, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { cn } from '../ui/utils';
+import {
+  Item,
+  ItemCategories,
+  ItemCategory, ItemStatus,
+  ItemStatuses,
+  StationItem, Unit
+} from "../../services/stationServices/visitorsServices/visitorItem";
+import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {fileToBinaryString} from "../../services/stationServices/utils";
 
 interface VisitorItem {
   id?: string;
@@ -35,6 +44,12 @@ interface VisitorItemFormProps {
   item?: VisitorItem | null;
   onSubmit: (data: VisitorItem) => void;
   onCancel: () => void;
+  itemStatuses: ItemStatus[];
+  itemsX: StationItem[];
+  itemCategories: ItemCategory[];
+  units: Unit[];
+  visitors: Visitor[];
+  loading: boolean;
 }
 
 // Mock data for dropdowns
@@ -93,13 +108,12 @@ const mockCurrencies = [
   { code: 'GBP', name: 'British Pounds (GBP)' }
 ];
 
-export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorItemFormProps) {
-  const [formData, setFormData] = useState<VisitorItem>({
+export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses, itemsX, itemCategories, units, visitors, loading }: VisitorItemFormProps) {
+  const [formData, setFormData] = useState<Item>({
     quantity: 1,
     currency: 'UGX',
     amount: '0',
     bag_no: '',
-    is_allowed: true,
     photo: '',
     remarks: '',
     is_collected: false,
@@ -108,7 +122,10 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
     item_category: '',
     item: '',
     measurement_unit: '',
-    item_status: ''
+    item_status: '',
+    is_active: true,
+    deleted_datetime: null,
+    deleted_by: null,
   });
 
   const [photoPreview, setPhotoPreview] = useState<string>('');
@@ -131,7 +148,9 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
         currency: item.currency || 'UGX',
         amount: item.amount || '0',
         bag_no: item.bag_no || '',
-        is_allowed: item.is_allowed ?? true,
+        deleted_by: null,
+        deleted_datetime: null,
+        is_active: true,
         photo: item.photo || '',
         remarks: item.remarks || '',
         is_collected: item.is_collected ?? false,
@@ -140,7 +159,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
         item_category: item.item_category || '',
         item: item.item || '',
         measurement_unit: item.measurement_unit || '',
-        item_status: item.item_status || ''
+        item_status: item.item_status || '',
       });
       if (item.photo) {
         setPhotoPreview(item.photo);
@@ -181,16 +200,19 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
     onSubmit(formData);
   };
 
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoFile(file);
+
+      const binaryString = await fileToBinaryString(file);
+      setFormData({ ...formData, photo: binaryString });
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
-        setFormData({ ...formData, photo: reader.result as string });
       };
       reader.readAsDataURL(file);
+      toast.success("Photo uploaded successfully");
     }
   };
 
@@ -202,14 +224,14 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
 
   // Filter items based on selected category
   const filteredItems = formData.item_category
-    ? mockItems.filter(i => i.category_id === formData.item_category)
-    : mockItems;
+    ? itemsX.filter(i => i.category === formData.item_category)
+    : itemsX;
 
-  const selectedVisitor = mockVisitors.find(v => v.id === formData.visitor);
-  const selectedCategory = mockItemCategories.find(c => c.id === formData.item_category);
-  const selectedItem = mockItems.find(i => i.id === formData.item);
-  const selectedUnit = mockMeasurementUnits.find(u => u.id === formData.measurement_unit);
-  const selectedStatus = mockItemStatuses.find(s => s.id === formData.item_status);
+  const selectedVisitor = visitors.find(v => v.id === formData.visitor);
+  const selectedCategory = itemCategories.find(c => c.id === formData.item_category);
+  const selectedItem = itemsX.find(i => i.id === formData.item);
+  const selectedUnit = units.find(u => u.id === formData.measurement_unit);
+  const selectedStatus = itemStatuses.find(s => s.id === formData.item_status);
   const selectedCurrency = mockCurrencies.find(c => c.code === formData.currency);
 
   return (
@@ -231,7 +253,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                   className={`w-full justify-between ${errors.visitor ? 'border-red-500' : ''}`}
                 >
                   {selectedVisitor
-                    ? `${selectedVisitor.name} (${selectedVisitor.id_number})`
+                    ? `${selectedVisitor.first_name} (${selectedVisitor.id_number})`
                     : 'Select visitor...'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -242,10 +264,10 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                   <CommandList>
                     <CommandEmpty>No visitor found.</CommandEmpty>
                     <CommandGroup>
-                      {mockVisitors.map((visitor) => (
+                      {visitors.map((visitor) => (
                         <CommandItem
                           key={visitor.id}
-                          value={`${visitor.name} ${visitor.id_number}`}
+                          value={`${visitor.first_name} ${visitor.last_name} ${visitor.id_number}`}
                           onSelect={() => {
                             setFormData({ ...formData, visitor: visitor.id });
                             setVisitorOpen(false);
@@ -258,7 +280,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                               formData.visitor === visitor.id ? 'opacity-100' : 'opacity-0'
                             )}
                           />
-                          {visitor.name} ({visitor.id_number})
+                          {visitor.first_name} {visitor.last_name} ({visitor.id_number})
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -297,7 +319,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                   <CommandList>
                     <CommandEmpty>No category found.</CommandEmpty>
                     <CommandGroup>
-                      {mockItemCategories.map((category) => (
+                      {itemCategories.map((category) => (
                         <CommandItem
                           key={category.id}
                           value={category.name}
@@ -433,7 +455,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                     <CommandList>
                       <CommandEmpty>No unit found.</CommandEmpty>
                       <CommandGroup>
-                        {mockMeasurementUnits.map((unit) => (
+                        {units.map((unit) => (
                           <CommandItem
                             key={unit.id}
                             value={unit.name}
@@ -584,7 +606,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
                   <CommandList>
                     <CommandEmpty>No status found.</CommandEmpty>
                     <CommandGroup>
-                      {mockItemStatuses.map((status) => (
+                      {itemStatuses.map((status) => (
                         <CommandItem
                           key={status.id}
                           value={status.name}
@@ -668,19 +690,20 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
 
           {/* Switches */}
           <div className="space-y-4 p-4 border rounded-lg bg-muted/50">
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label htmlFor="is_allowed">Item Allowed</Label>
-                <p className="text-sm text-muted-foreground">
-                  Item is allowed to be brought in
-                </p>
-              </div>
-              <Switch
-                id="is_allowed"
-                checked={formData.is_allowed}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_allowed: checked })}
-              />
-            </div>
+
+            {/*<div className="flex items-center justify-between">*/}
+            {/*  <div className="space-y-0.5">*/}
+            {/*    <Label htmlFor="is_allowed">Item Allowed</Label>*/}
+            {/*    <p className="text-sm text-muted-foreground">*/}
+            {/*      Item is allowed to be brought in*/}
+            {/*    </p>*/}
+            {/*  </div>*/}
+            {/*  <Switch*/}
+            {/*    id="is_allowed"*/}
+            {/*    checked={formData.is_allowed}*/}
+            {/*    onCheckedChange={(checked) => setFormData({ ...formData, is_allowed: checked })}*/}
+            {/*  />*/}
+            {/*</div>*/}
 
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -718,7 +741,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel }: VisitorIte
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
+        <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90" disabled={loading}>
           {item?.id ? 'Update Item' : 'Add Item'}
         </Button>
       </div>
