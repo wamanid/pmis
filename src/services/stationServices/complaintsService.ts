@@ -9,17 +9,9 @@ const PRISONERS_ENDPOINT = '/admission/prisoners/';
 const NATURES_ENDPOINT = '/station-management/api/nature-of-complaints/';
 const PRIORITIES_ENDPOINT = '/station-management/api/complaint-priorities/';
 const RANKS_ENDPOINT = '/system-administration/ranks/';
-
-// Use mock ranks instead of hitting an API
-// export const MOCK_RANKS = [
-//     { id: 'd3b07384-9f2e-4b6d-9f3a-1a2b3c4d5e6f', name: 'Chief Inspector' },
-//     { id: 'a1e2b3c4-5d6f-4a7b-8c9d-0e1f2a3b4c5d', name: 'Inspector' },
-//     { id: 'f1e2d3c4-b5a6-4c7d-9e8f-1234567890ab', name: 'Sergeant' },
-//     { id: '0a1b2c3d-4e5f-4f6a-8b9c-abcdef012345', name: 'Constable' },
-// ];
-
-// To use the mock in this file, replace the fetchRanks implementation with:
-// export const fetchRanks = async () => MOCK_RANKS;
+const OFFICER_ENDPOINT = '/auth/staff-profiles/';
+const COMPLAINT_STATUS_ENDPOINT = '/station-management/api/complaint-status/';
+const COMPLAINT_ACTIONS_ENDPOINT = '/station-management/api/complaint-actions/';
 
 export const fetchComplaints = async (params?: Record<string, any>) => {
     const res = await axiosInstance.get(BASE, { params });
@@ -56,17 +48,6 @@ export const fetchStations = async () => {
         return [];
     }
 };
-
-// export const fetchPrisoners = async () => {
-//     try {
-//         const res = await axiosInstance.get(PRISONERS_ENDPOINT);
-//         return res.data.results ?? res.data ?? [];
-//     } catch (err: any) {
-//         console.error('fetchPrisoners error:', err?.response ?? err);
-//         toast.error(`Failed to load prisoners: ${err?.response?.status || err?.message || 'unknown'}`);
-//         return [];
-//     }
-// };
 
 export const fetchPrisoners = async () => {
     try {
@@ -119,4 +100,53 @@ export const fetchRanks = async () => {
     } catch {
         return [];
     }
+};
+
+// fetch staff profiles (used by ComplaintForm)
+export const fetchStaffProfiles = async () => {
+    try {
+        const res = await axiosInstance.get(OFFICER_ENDPOINT);
+        const items = res.data?.results ?? res.data ?? [];
+        return (items || []).map((p: any) => {
+            // robust extraction
+            const username = p.username ?? p.user?.username ?? `${(p.first_name ?? '').toLowerCase()}.${(p.last_name ?? '').toLowerCase()}`.replace(/\s+/g, '.');
+            const name = (p.first_name || p.last_name) ? `${(p.first_name ?? '').trim()} ${(p.last_name ?? '').trim()}`.trim() : (p.name ?? '');
+            return {
+                id: p.id,
+                force_number: p.force_number ?? '',
+                username,
+                name,
+                rank: p.rank ?? null,
+                rank_name: p.rank_name ?? null,
+                station: p.station ?? null,
+                raw: p,
+            };
+        });
+    } catch (err: any) {
+        console.error('fetchStaffProfiles error', err?.response ?? err);
+        toast.error('Failed to load staff profiles');
+        return [];
+    }
+}
+
+// Fetch complaint statuses (used to render status badges)
+export const fetchComplaintStatuses = async (signal?: AbortSignal) => {
+  try {
+    const res = await axiosInstance.get(COMPLAINT_STATUS_ENDPOINT, { signal });
+    return res.data?.results ?? res.data ?? [];
+  } catch (err) {
+    console.error('fetchComplaintStatuses error', err);
+    return [];
+  }
+};
+
+// Create a complaint action
+export const createComplaintAction = async (payload: any) => {
+  try {
+    const res = await axiosInstance.post(COMPLAINT_ACTIONS_ENDPOINT, payload, { skipErrorToast: true });
+    return res.data;
+  } catch (err: any) {
+    console.error('createComplaintAction error', err?.response ?? err);
+    throw err;
+  }
 };
