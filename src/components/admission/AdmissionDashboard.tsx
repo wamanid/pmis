@@ -34,6 +34,8 @@ import {
 import { admissionService } from '../../services/admissionService';
 import { DashboardResponse, DashboardFilters } from '../../models/admission';
 import { toast } from 'sonner';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
 
 // Transform API response to chart data format
 interface CategoryData {
@@ -44,28 +46,35 @@ interface CategoryData {
 
 export function AdmissionDashboard() {
   const navigate = useNavigate();
+  const { region, district, station } = useFilters();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>({
     period: 'daily'
   });
 
-  useEffect(() => {
-    const loadData = async () => {
-      setLoading(true);
-      try {
-        const data = await admissionService.getAdmissionDashboard(filters);
-        setDashboardData(data);
-      } catch (error) {
-        console.error('Error loading admission dashboard:', error);
-        toast.error('Failed to load admission dashboard data');
-      } finally {
-        setLoading(false);
-      }
-    };
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      // Include global filter context in API call
+      const apiFilters: DashboardFilters = {
+        ...filters,
+        ...(region && { region: parseInt(region) }),
+        ...(district && { district: parseInt(district) }),
+        ...(station && { station: parseInt(station) }),
+      };
+      const data = await admissionService.getAdmissionDashboard(apiFilters);
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Error loading admission dashboard:', error);
+      toast.error('Failed to load admission dashboard data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    loadData();
-  }, [filters]);
+  // Load data on mount and when filters change (including global filters)
+  useFilterRefresh(loadData, [filters, region, district, station]);
 
   // Transform category data from API response
   const getCategoryData = (): CategoryData[] => {

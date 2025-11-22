@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,6 +7,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { getprisonerMovements,getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass } from '../../services/gateService';
+import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
+
 import { 
   Search, 
   Eye, 
@@ -27,8 +30,9 @@ interface PrisonerGatePass {
   time_in: string | null;
   reason: string;
   prisoner: string;
-  gate_pass: string;
+  gate_pass?: string;
   working_party: string | null;
+  remark?: string | null;
 }
 
 interface GatePassDetail {
@@ -61,8 +65,8 @@ interface PrisonerDetail {
 }
 
 // Mock Data
-const mockPrisonerGatePasses: PrisonerGatePass[] = [
-  {
+let mockPrisonerGatePasses: PrisonerGatePass[] = [
+  /*{
     id: '1',
     prisoner_name: 'John Doe',
     working_party_name: '',
@@ -133,7 +137,7 @@ const mockPrisonerGatePasses: PrisonerGatePass[] = [
     prisoner: 'pr6',
     gate_pass: 'gp5',
     working_party: null
-  }
+  }*/
 ];
 
 const mockGatePassDetails: Record<string, GatePassDetail> = {
@@ -262,15 +266,34 @@ const mockPrisonerDetails: Record<string, PrisonerDetail> = {
   }
 };
 
-export default function PrisonerEntryExitScreen() {
+export  function PrisonerEntryExitScreen() {
   const [prisonerGatePasses, setPrisonerGatePasses] = useState<PrisonerGatePass[]>(mockPrisonerGatePasses);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerGatePass | null>(null);
-
   const itemsPerPage = 10;
+  const [isLoading, setIsLoading]=useState(true);
+
+  const loadData = async () => { 
+   // getvisitors
+  setIsLoading(true);
+    getprisonerMovements().then((data) => {
+    mockPrisonerGatePasses = data.results;
+    setPrisonerGatePasses(mockPrisonerGatePasses);
+   // alert(JSON.stringify(data.results));
+        setIsLoading(false);
+  }).catch((error) => {
+    alert(error);
+      setIsLoading(false);
+  });
+
+  }
+
+useEffect(() => {
+loadData();
+    }, []);
 
   // Get status based on time_out
   const getInOutStatus = (timeOut: string | null) => {
@@ -280,7 +303,7 @@ export default function PrisonerEntryExitScreen() {
   // Filter prisoner gate passes
   const filteredRecords = prisonerGatePasses.filter(record => {
     const matchesSearch = 
-      record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.working_party_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -335,6 +358,18 @@ export default function PrisonerEntryExitScreen() {
   const prisonersOut = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'OUT').length;
   const prisonersIn = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'IN').length;
   const onWorkingParty = prisonerGatePasses.filter(p => p.working_party).length;
+
+
+    if (isLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading  data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -442,15 +477,15 @@ export default function PrisonerEntryExitScreen() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
-                  <TableHead>Prisoner Name</TableHead>
-                  <TableHead>Destination</TableHead>
-                  <TableHead>Working Party</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>IN/OUT Station</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
+                <TableRow style={{ backgroundColor: '#650000' }}>
+                  <TableHead className="text-white">Prisoner Name</TableHead>
+                  <TableHead className="text-white">Destination</TableHead>
+                  <TableHead className="text-white">Working Party</TableHead>
+                  <TableHead className="text-white">Reason</TableHead>
+                  <TableHead className="text-white">Time Out</TableHead>
+                  <TableHead className="text-white">Time In</TableHead>
+                  <TableHead className="text-white">IN/OUT Station</TableHead>
+                  <TableHead className="text-right text-white">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -472,7 +507,7 @@ export default function PrisonerEntryExitScreen() {
                           <span className="text-gray-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">{record.reason}</TableCell>
+                      <TableCell className="max-w-xs truncate">{record.remarks}</TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {formatDateTime(record.time_out)}
                       </TableCell>
@@ -532,7 +567,8 @@ export default function PrisonerEntryExitScreen() {
 
       {/* View Details Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>
               Prisoner Movement Details
@@ -549,27 +585,27 @@ export default function PrisonerEntryExitScreen() {
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Prisoner Information</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {mockPrisonerDetails[selectedRecord.prisoner] ? (
+                    {selectedRecord.prisoner ? (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Full Name</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].full_name}</p>
+                          <p>{selectedRecord.prisoner.first_name} &nbsp {selectedRecord.prisoner.lastname_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Prisoner Number</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].prisoner_number}</p>
+                          <p>{selectedRecord.prisoner.prisoner_number}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Category</p>
-                          <Badge variant="outline">{mockPrisonerDetails[selectedRecord.prisoner].category}</Badge>
+                          <Badge variant="outline">{selectedRecord.prisoner.prisoner_category}</Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gender</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].gender}</p>
+                          <p>{selectedRecord.prisoner.sex}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Date of Birth</p>
-                          <p>{new Date(mockPrisonerDetails[selectedRecord.prisoner].date_of_birth).toLocaleDateString()}</p>
+                          <p>{new Date(selectedRecord.prisoner.date_of_birth).toLocaleDateString()}</p>
                         </div>
                       </div>
                     ) : (
@@ -619,42 +655,27 @@ export default function PrisonerEntryExitScreen() {
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Gate Pass Details</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {mockGatePassDetails[selectedRecord.gate_pass] ? (
+                    {selectedRecord.gate_pass? (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Gate Pass Type</p>
-                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_pass_type_name}</p>
+                          <p>{selectedRecord.gate_pass.gate_pass_type_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gatekeeper</p>
-                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_keeper_username}</p>
+                          <p>{selectedRecord.gate_pass.gate_keeper_username}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Main Gate Required</p>
-                          <Badge className={mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'bg-green-600' : ''}>
-                            {mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'Yes' : 'No'}
+                          <Badge className={selectedRecord.gate_pass.main_gate_required ? 'bg-green-600' : ''}>
+                            {selectedRecord.gate_pass.main_gate_required ? 'Yes' : 'No'}
                           </Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Status</p>
-                          <Badge variant="outline">{mockGatePassDetails[selectedRecord.gate_pass].status}</Badge>
+                          <Badge variant="outline">{selectedRecord.gate_pass.status_name}</Badge>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Created At</p>
-                          <p>{formatDateTime(mockGatePassDetails[selectedRecord.gate_pass].created_at)}</p>
-                        </div>
-                        {mockGatePassDetails[selectedRecord.gate_pass].exception_reason && (
-                          <div className="col-span-2">
-                            <p className="text-sm text-gray-600">Exception Reason</p>
-                            <p>{mockGatePassDetails[selectedRecord.gate_pass].exception_reason}</p>
-                          </div>
-                        )}
-                        {mockGatePassDetails[selectedRecord.gate_pass].remarks && (
-                          <div className="col-span-2">
-                            <p className="text-sm text-gray-600">Remarks</p>
-                            <p>{mockGatePassDetails[selectedRecord.gate_pass].remarks}</p>
-                          </div>
-                        )}
+                      
                       </div>
                     ) : (
                       <p className="text-gray-500">Gate pass details not available</p>
@@ -662,28 +683,23 @@ export default function PrisonerEntryExitScreen() {
                   </CardContent>
                 </Card>
               </div>
-
               {/* Working Party Details */}
-              {selectedRecord.working_party && (
+              {selectedRecord.working_party_name && (
                 <>
                   <Separator />
                   <div>
                     <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Working Party Details</h3>
                     <Card>
                       <CardContent className="p-4">
-                        {mockWorkingPartyDetails[selectedRecord.working_party] ? (
+                        {selectedRecord.working_party ? (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-gray-600">Name</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].name}</p>
-                            </div>
-                            <div>
-                              <p className="text-sm text-gray-600">Capacity</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].current_members} / {mockWorkingPartyDetails[selectedRecord.working_party].capacity}</p>
+                              <p>{selectedRecord.working_party_name}</p>
                             </div>
                             <div className="col-span-2">
                               <p className="text-sm text-gray-600">Description</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].description}</p>
+                              <p>{selectedRecord.remark}</p>
                             </div>
                           </div>
                         ) : (
@@ -696,8 +712,11 @@ export default function PrisonerEntryExitScreen() {
               )}
             </div>
           )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>
   );
 }
+
+

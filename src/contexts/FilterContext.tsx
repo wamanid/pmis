@@ -7,6 +7,7 @@ interface FilterContextType {
   setRegion: (value: string) => void;
   setDistrict: (value: string) => void;
   setStation: (value: string) => void;
+  setAllFilters: (region: string, district: string, station: string) => void;
   getFilterParams: () => Record<string, string>;
   clearFilters: () => void;
 }
@@ -68,6 +69,22 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(filters));
   }, [region, district, station]);
 
+  // Listen for external filter changes (e.g., from login)
+  useEffect(() => {
+    const handleFilterChanged = (event: CustomEvent) => {
+      const { region: newRegion, district: newDistrict, station: newStation } = event.detail;
+      if (newRegion !== undefined) setRegionState(newRegion);
+      if (newDistrict !== undefined) setDistrictState(newDistrict);
+      if (newStation !== undefined) setStationState(newStation);
+    };
+
+    window.addEventListener('filterChanged', handleFilterChanged as EventListener);
+    
+    return () => {
+      window.removeEventListener('filterChanged', handleFilterChanged as EventListener);
+    };
+  }, []);
+
   const setRegion = (value: string) => {
     setRegionState(value);
     // Clear dependent filters
@@ -83,6 +100,17 @@ export function FilterProvider({ children }: { children: ReactNode }) {
 
   const setStation = (value: string) => {
     setStationState(value);
+  };
+
+  // Set all filters at once (used during login initialization)
+  const setAllFilters = (regionValue: string, districtValue: string, stationValue: string) => {
+    setRegionState(regionValue);
+    setDistrictState(districtValue);
+    setStationState(stationValue);
+    // Emit event to notify components to refetch data
+    window.dispatchEvent(new CustomEvent('filterChanged', { 
+      detail: { region: regionValue, district: districtValue, station: stationValue } 
+    }));
   };
 
   // Get filter params for API requests
@@ -101,7 +129,6 @@ export function FilterProvider({ children }: { children: ReactNode }) {
     setStationState('');
     localStorage.removeItem(STORAGE_KEY);
   };
-
   return (
     <FilterContext.Provider
       value={{
@@ -111,6 +138,7 @@ export function FilterProvider({ children }: { children: ReactNode }) {
         setRegion,
         setDistrict,
         setStation,
+        setAllFilters,
         getFilterParams,
         clearFilters,
       }}

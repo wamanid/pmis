@@ -68,9 +68,6 @@ export function DistrictSelect({
   // Find selected district
   const selectedDistrict = districts.find((district) => district.id === value);
 
-  // Determine if component should be disabled
-  const isDisabled = disabled || (!regionId && districts.length === 0);
-
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -78,7 +75,7 @@ export function DistrictSelect({
           variant="outline"
           role="combobox"
           aria-expanded={open}
-          disabled={isDisabled}
+          disabled={disabled}
           className={cn(
             'w-full justify-between',
             !value && 'text-muted-foreground',
@@ -104,10 +101,6 @@ export function DistrictSelect({
             ) : error ? (
               <div className="py-6 text-center text-sm text-red-600">
                 {error}
-              </div>
-            ) : !regionId ? (
-              <div className="py-6 text-center text-sm text-muted-foreground">
-                Please select a region first
               </div>
             ) : (
               <>
