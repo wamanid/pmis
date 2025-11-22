@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useForm, Controller } from "react-hook-form@7.55.0";
 import {
   Home,
@@ -30,7 +30,7 @@ import {
 } from "../ui/table";
 import {
   Dialog,
-  DialogContent,
+  DialogContent, DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
@@ -56,9 +56,16 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import {useFilters} from "../../contexts/FilterContext";
-import {getPrisoners} from "../../services/stationServices/visitorsServices/VisitorsService";
-import {getStationWards} from "../../services/stationServices/housingService";
-import {handleEffectLoad} from "../../services/stationServices/utils";
+import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {
+  addHousingAssignment,
+  Assignment, AssignmentResponse,
+  Cell, getHousingAssignments,
+  getStationWards,
+  getWardCells, HousingAssignment,
+  Ward
+} from "../../services/stationServices/housingService";
+import {handleCatchError, handleEffectLoad, handleResponseError} from "../../services/stationServices/utils";
 
 interface Region {
   id: string;
@@ -83,31 +90,31 @@ interface Block {
   station: string;
 }
 
-interface Ward {
-  id: string;
-  station_name?: string;
-  ward_type_name?: string;
-  block_name?: string;
-  security_classification_name?: string;
-  created_by_name?: string;
-  ward_capacity?: string;
-  occupancy?: string;
-  congestion?: string;
-  name: string;
-  ward_number: string;
-  ward_area?: string;
-  description?: string;
-  station: string;
-  ward_type: string;
-  block: string;
-  security_classification: string;
-}
+// interface Ward {
+//   id: string;
+//   station_name?: string;
+//   ward_type_name?: string;
+//   block_name?: string;
+//   security_classification_name?: string;
+//   created_by_name?: string;
+//   ward_capacity?: string;
+//   occupancy?: string;
+//   congestion?: string;
+//   name: string;
+//   ward_number: string;
+//   ward_area?: string;
+//   description?: string;
+//   station: string;
+//   ward_type: string;
+//   block: string;
+//   security_classification: string;
+// }
 
-interface Cell {
-  id: string;
-  name: string;
-  ward: string;
-}
+// interface Cell {
+//   id: string;
+//   name: string;
+//   ward: string;
+// }
 
 interface WardType {
   id: string;
@@ -125,15 +132,15 @@ interface Prisoner {
   prisoner_number: string;
 }
 
-interface HousingAssignment {
-  id?: string;
-  prisoner: string;
-  prisoner_name?: string;
-  ward: string;
-  ward_name?: string;
-  cell: string;
-  cell_name?: string;
-}
+// interface HousingAssignment {
+//   id?: string;
+//   prisoner: string;
+//   prisoner_name?: string;
+//   ward: string;
+//   ward_name?: string;
+//   cell: string;
+//   cell_name?: string;
+// }
 
 interface OverviewData {
   capacity: number;
@@ -164,7 +171,7 @@ export default function HousingAllocationScreen() {
   const [securityClassifications, setSecurityClassifications] = useState<
     SecurityClassification[]
   >([]);
-  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
+  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([]);
   const [housingAssignments, setHousingAssignments] = useState<
     HousingAssignment[]
   >([]);
@@ -193,6 +200,9 @@ export default function HousingAllocationScreen() {
 
   const [housingLoading, setHousingLoading] = useState(false)
   const { region, district, station } = useFilters();
+  const [cellVisible, setCellVisible] = useState(false)
+  const [cellLoading, setCellLoading] = useState(false)
+  // const [assignment, setAssignment] = useState<Assignment>(null)
 
   // Forms
   const {
@@ -288,87 +298,87 @@ export default function HousingAllocationScreen() {
     setSecurityClassifications(mockSecurityClassifications);
 
     // Mock wards
-    const mockWards: Ward[] = [
-      {
-        id: "ward-1",
-        station_name: "Luzira Prison",
-        ward_type_name: "Male Ward",
-        block_name: "Block A",
-        security_classification_name: "Maximum Security",
-        created_by_name: "Admin User",
-        ward_capacity: "100",
-        occupancy: "85",
-        congestion: "85",
-        name: "Ward A1",
-        ward_number: "WA-001",
-        ward_area: "500 sq m",
-        description: "Maximum security male ward",
-        station: "st-1",
-        ward_type: "wt-1",
-        block: "blk-1",
-        security_classification: "sc-1",
-      },
-      {
-        id: "ward-2",
-        station_name: "Luzira Prison",
-        ward_type_name: "Female Ward",
-        block_name: "Block B",
-        security_classification_name: "Medium Security",
-        created_by_name: "Admin User",
-        ward_capacity: "50",
-        occupancy: "42",
-        congestion: "84",
-        name: "Ward B1",
-        ward_number: "WB-001",
-        ward_area: "300 sq m",
-        description: "Medium security female ward",
-        station: "st-1",
-        ward_type: "wt-2",
-        block: "blk-2",
-        security_classification: "sc-2",
-      },
-    ];
-    setWards(mockWards);
+    // const mockWards: Ward[] = [
+    //   {
+    //     id: "ward-1",
+    //     station_name: "Luzira Prison",
+    //     ward_type_name: "Male Ward",
+    //     block_name: "Block A",
+    //     security_classification_name: "Maximum Security",
+    //     created_by_name: "Admin User",
+    //     ward_capacity: "100",
+    //     occupancy: "85",
+    //     congestion: "85",
+    //     name: "Ward A1",
+    //     ward_number: "WA-001",
+    //     ward_area: "500 sq m",
+    //     description: "Maximum security male ward",
+    //     station: "st-1",
+    //     ward_type: "wt-1",
+    //     block: "blk-1",
+    //     security_classification: "sc-1",
+    //   },
+    //   {
+    //     id: "ward-2",
+    //     station_name: "Luzira Prison",
+    //     ward_type_name: "Female Ward",
+    //     block_name: "Block B",
+    //     security_classification_name: "Medium Security",
+    //     created_by_name: "Admin User",
+    //     ward_capacity: "50",
+    //     occupancy: "42",
+    //     congestion: "84",
+    //     name: "Ward B1",
+    //     ward_number: "WB-001",
+    //     ward_area: "300 sq m",
+    //     description: "Medium security female ward",
+    //     station: "st-1",
+    //     ward_type: "wt-2",
+    //     block: "blk-2",
+    //     security_classification: "sc-2",
+    //   },
+    // ];
+    // setWards(mockWards);
 
     // Mock cells
-    const mockCells: Cell[] = [
-      { id: "cell-1", name: "Cell A1-01", ward: "ward-1" },
-      { id: "cell-2", name: "Cell A1-02", ward: "ward-1" },
-      { id: "cell-3", name: "Cell B1-01", ward: "ward-2" },
-      { id: "cell-4", name: "Cell B1-02", ward: "ward-2" },
-    ];
-    setCells(mockCells);
+    // const mockCells: Cell[] = [
+    //   { id: "cell-1", name: "Cell A1-01", ward: "ward-1" },
+    //   { id: "cell-2", name: "Cell A1-02", ward: "ward-1" },
+    //   { id: "cell-3", name: "Cell B1-01", ward: "ward-2" },
+    //   { id: "cell-4", name: "Cell B1-02", ward: "ward-2" },
+    // ];
+    // setCells(mockCells);
 
     // Mock prisoners
-    const mockPrisoners: Prisoner[] = [
-      { id: "p-1", prisoner_name: "John Doe", prisoner_number: "P001" },
-      { id: "p-2", prisoner_name: "Jane Smith", prisoner_number: "P002" },
-      { id: "p-3", prisoner_name: "Robert Johnson", prisoner_number: "P003" },
-    ];
-    setPrisoners(mockPrisoners);
+    // const mockPrisoners: Prisoner[] = [
+    //   { id: "p-1", prisoner_name: "John Doe", prisoner_number: "P001" },
+    //   { id: "p-2", prisoner_name: "Jane Smith", prisoner_number: "P002" },
+    //   { id: "p-3", prisoner_name: "Robert Johnson", prisoner_number: "P003" },
+    // ];
+    // setPrisoners(mockPrisoners);
 
     // Mock housing assignments
-    const mockAssignments: HousingAssignment[] = [
-      {
-        id: "ha-1",
-        prisoner: "p-1",
-        prisoner_name: "John Doe (P001)",
-        ward: "ward-1",
-        ward_name: "Ward A1 (WA-001)",
-        cell: "cell-1",
-        cell_name: "Cell A1-01",
-      },
-      {
-        id: "ha-2",
-        prisoner: "p-2",
-        prisoner_name: "Jane Smith (P002)",
-        ward: "ward-2",
-        ward_name: "Ward B1 (WB-001)",
-        cell: "cell-3",
-        cell_name: "Cell B1-01",
-      },
-    ];
-    setHousingAssignments(mockAssignments);
+    // const mockAssignments: HousingAssignment[] = [
+    //   {
+    //     id: "ha-1",
+    //     prisoner: "p-1",
+    //     prisoner_name: "John Doe (P001)",
+    //     ward: "ward-1",
+    //     ward_name: "Ward A1 (WA-001)",
+    //     cell: "cell-1",
+    //     cell_name: "Cell A1-01",
+    //   },
+    //   {
+    //     id: "ha-2",
+    //     prisoner: "p-2",
+    //     prisoner_name: "Jane Smith (P002)",
+    //     ward: "ward-2",
+    //     ward_name: "Ward B1 (WB-001)",
+    //     cell: "cell-3",
+    //     cell_name: "Cell B1-01",
+    //   },
+    // ];
+    // setHousingAssignments(mockAssignments);
   };
 
   const loadOverviewData = () => {
@@ -476,44 +486,67 @@ export default function HousingAllocationScreen() {
     toast.success("Housing assignment deleted successfully");
   };
 
-  const onSubmitAssignment = (data: HousingAssignment) => {
+  const onSubmitAssignment = async (data: HousingAssignment) => {
     setLoading(true);
 
     const prisoner = prisoners.find((p) => p.id === data.prisoner);
     const ward = wards.find((w) => w.id === data.ward);
     const cell = cells.find((c) => c.id === data.cell);
 
-    const assignmentData = {
-      ...data,
-      prisoner_name: prisoner
-        ? `${prisoner.prisoner_name} (${prisoner.prisoner_number})`
-        : "",
-      ward_name: ward ? `${ward.name} (${ward.ward_number})` : "",
-      cell_name: cell?.name || "",
-    };
+    // const assignmentData = {
+    //   ...data,
+    //   prisoner_name: prisoner
+    //     ? `${prisoner.prisoner_name} (${prisoner.prisoner_number})`
+    //     : "",
+    //   ward_name: ward ? `${ward.name} (${ward.ward_number})` : "",
+    //   cell_name: cell?.name || "",
+    // };
 
-    setTimeout(() => {
-      if (editingAssignment) {
-        setHousingAssignments(
-          housingAssignments.map((a) =>
-            a.id === editingAssignment.id
-              ? { ...assignmentData, id: editingAssignment.id }
-              : a
-          )
-        );
-        toast.success("Housing assignment updated successfully");
-      } else {
-        setHousingAssignments([
-          ...housingAssignments,
-          { ...assignmentData, id: `ha-${Date.now()}` },
-        ]);
+    const assignmentData: Assignment = {
+      prisoner: prisoner?.id || '',
+      ward: ward?.id || "",
+      cell: cell?.id || "",
+      is_active: true,
+      created_by: null
+    }
+
+    try {
+        const response = await addHousingAssignment(assignmentData)
+        if (handleResponseError(response)) return
+
+        setHousingAssignments([response as AssignmentResponse, ...housingAssignments])
         toast.success("Housing assignment created successfully");
-      }
-      setIsAssignmentDialogOpen(false);
-      setSelectedWardForCells("");
-      resetAssignment();
-      setLoading(false);
-    }, 500);
+
+        setIsAssignmentDialogOpen(false);
+        setSelectedWardForCells("");
+        resetAssignment();
+
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoading(false)
+    }
+
+    // setTimeout(() => {
+    //   if (editingAssignment) {
+    //     setHousingAssignments(
+    //       housingAssignments.map((a) =>
+    //         a.id === editingAssignment.id
+    //           ? { ...assignmentData, id: editingAssignment.id }
+    //           : a
+    //       )
+    //     );
+    //     toast.success("Housing assignment updated successfully");
+    //   } else {
+    //     setHousingAssignments([
+    //       ...housingAssignments,
+    //       { ...assignmentData, id: `ha-${Date.now()}` },
+    //     ]);
+    //     toast.success("Housing assignment created successfully");
+    //   }
+
+    //   setLoading(false);
+    // }, 500);
   };
 
   // Ward CRUD
@@ -644,40 +677,84 @@ export default function HousingAllocationScreen() {
   //   }
   // }
 
-  function populateList(response: any, msg: string) {
+  function populateList(response: any, msg: string, setData: any) {
     if (handleServerError(response)) return
 
     if ("results" in response) {
       const data = response.results
-      console.log(data)
-      if(handleEmptyList(data, msg)) return
-      if (msg === "There are no prisoners in the selected station") {
-        const newData = data.filter(prisoner => prisoner.current_station === station)
-        console.log(newData)
-      }
       // console.log(data)
+      handleEmptyList(data, msg)
+      if (msg === "There are no prisoners for the selected station") {
+        const newData = data.filter(prisoner => prisoner.current_station === station)
+        // console.log(station)
+        // console.log(newData)
+        setData(newData)
+        setSelectedStation(station)
+      }
+      else if (msg === "There are no cells for the selected ward" && !data.length) {
+        setData(data)
+        // console.log(data)
+        setCellVisible(false)
+      }
+      else if (msg === "There are no cells for the selected ward" && data.length) {
+        setData(data)
+        // console.log(data)
+        setCellVisible(true)
+      }
+      else {
+        setData(data)
+        // console.log(data)
+      }
+
     }
   }
 
   async function fetchData () {
       try {
+
+        const resp = await getHousingAssignments()
+        populateList(resp, "There are no housing assignments for the selected station", setHousingAssignments)
+
         const response1 = await getPrisoners()
-        handleServerError(response1)
-        populateList(response1, "There are no prisoners in the selected station")
+        populateList(response1, "There are no prisoners for the selected station", setPrisoners)
 
         const response2 = await getStationWards(station)
-        handleServerError(response2)
-        populateList(response2, "There are no wards in the selected station")
+        populateList(response2, "There are no wards for the selected station", setWards)
 
         setHousingLoading(false)
 
       }
       catch (error) {
-        if (!error?.response) {
-          toast.error('Failed to connect to server. Please try again.');
-        }
+        handleCatchError(error)
       }
   }
+
+  useEffect(() => {
+      if (selectedWardForCells) {
+        setCellLoading(true)
+        fetchCells()
+      }
+  }, [selectedWardForCells]);
+
+  async function fetchCells() {
+      try {
+        const response = await getWardCells(selectedWardForCells)
+        populateList(response, "There are no cells for the selected ward", setCells)
+      }
+      catch (error) {
+        handleCatchError(error)
+      }
+      finally {
+        setCellLoading(false)
+      }
+  }
+
+  useEffect(() => {
+    if(!isAssignmentDialogOpen){
+      setCells([])
+      setCellVisible(false)
+    }
+  }, [isAssignmentDialogOpen]);
 
   return (
     <div className="p-6 space-y-6">
@@ -821,185 +898,185 @@ export default function HousingAllocationScreen() {
 
               { /* Tabs */}
               <Card>
-        <CardContent className="p-0">
-          {/* Custom Tabs Navigation */}
-          <div className="flex gap-2 p-4 bg-gray-100 border-b">
-            <button
-              onClick={() => setActiveTab("assignments")}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
-                activeTab === "assignments"
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor: activeTab === "assignments" ? '#650000' : undefined,
-              }}
-            >
-              <Users className="h-4 w-4" />
-              Housing Assignments ({filteredAssignments.length})
-            </button>
-            <button
-              onClick={() => setActiveTab("wards")}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
-                activeTab === "wards"
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor: activeTab === "wards" ? '#650000' : undefined,
-              }}
-            >
-              <Home className="h-4 w-4" />
-              Wards ({filteredWardsSearch.length})
-            </button>
-          </div>
+                <CardContent className="p-0">
+                  {/* Custom Tabs Navigation */}
+                  <div className="flex gap-2 p-4 bg-gray-100 border-b">
+                    <button
+                      onClick={() => setActiveTab("assignments")}
+                      className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                        activeTab === "assignments"
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor: activeTab === "assignments" ? '#650000' : undefined,
+                      }}
+                    >
+                      <Users className="h-4 w-4" />
+                      Housing Assignments ({filteredAssignments.length})
+                    </button>
+                    <button
+                      onClick={() => setActiveTab("wards")}
+                      className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm flex items-center justify-center gap-2 ${
+                        activeTab === "wards"
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor: activeTab === "wards" ? '#650000' : undefined,
+                      }}
+                    >
+                      <Home className="h-4 w-4" />
+                      Wards ({filteredWardsSearch.length})
+                    </button>
+                  </div>
 
-        {/* Housing Assignments Table */}
-        {activeTab === "assignments" && (
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Prisoner</TableHead>
-                    <TableHead>Ward</TableHead>
-                    <TableHead>Cell</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredAssignments.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={4}
-                        className="text-center py-8 text-gray-500"
-                      >
-                        {selectedStation
-                          ? "No housing assignments found"
-                          : "Please select a station to view housing assignments"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredAssignments.map((assignment) => (
-                      <TableRow key={assignment.id}>
-                        <TableCell>{assignment.prisoner_name}</TableCell>
-                        <TableCell>{assignment.ward_name}</TableCell>
-                        <TableCell>{assignment.cell_name}</TableCell>
-                        <TableCell>
-                          <div className="flex gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleEditAssignment(assignment)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                handleDeleteAssignment(assignment.id!)
-                              }
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
+                {/* Housing Assignments Table */}
+                {activeTab === "assignments" && (
+                  <Card>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Prisoner</TableHead>
+                            <TableHead>Ward</TableHead>
+                            <TableHead>Cell</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredAssignments.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={4}
+                                className="text-center py-8 text-gray-500"
+                              >
+                                {selectedStation
+                                  ? "No housing assignments found"
+                                  : "Please select a station to view housing assignments"}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredAssignments.map((assignment) => (
+                              <TableRow key={assignment.id}>
+                                <TableCell>{assignment.prisoner_name}</TableCell>
+                                <TableCell>{assignment.ward_name}</TableCell>
+                                <TableCell>{assignment.cell_name}</TableCell>
+                                <TableCell>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() => handleEditAssignment(assignment)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="destructive"
+                                      onClick={() =>
+                                        handleDeleteAssignment(assignment.id!)
+                                      }
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
 
-        {/* Wards Table */}
-        {activeTab === "wards" && (
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Ward Number</TableHead>
-                    <TableHead>Ward Name</TableHead>
-                    <TableHead>Block</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Security Level</TableHead>
-                    <TableHead>Capacity</TableHead>
-                    <TableHead>Occupancy</TableHead>
-                    <TableHead>Congestion</TableHead>
-                    <TableHead>Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredWardsSearch.length === 0 ? (
-                    <TableRow>
-                      <TableCell
-                        colSpan={9}
-                        className="text-center py-8 text-gray-500"
-                      >
-                        {selectedStation
-                          ? "No wards found"
-                          : "Please select a station to view wards"}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    filteredWardsSearch.map((ward) => {
-                      const congestion = parseInt(ward.congestion || "0");
-                      return (
-                        <TableRow key={ward.id}>
-                          <TableCell>
-                            <Badge className="bg-[#650000]">
-                              {ward.ward_number}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{ward.name}</TableCell>
-                          <TableCell>{ward.block_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{ward.ward_type_name}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {ward.security_classification_name}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>{ward.ward_capacity}</TableCell>
-                          <TableCell>{ward.occupancy}</TableCell>
-                          <TableCell>
-                            <Badge variant={getCongestionBadgeVariant(congestion)}>
-                              {congestion}%
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleEditWard(ward)}
+                {/* Wards Table */}
+                {activeTab === "wards" && (
+                  <Card>
+                    <CardContent className="p-0">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Ward Number</TableHead>
+                            <TableHead>Ward Name</TableHead>
+                            <TableHead>Block</TableHead>
+                            <TableHead>Type</TableHead>
+                            <TableHead>Security Level</TableHead>
+                            <TableHead>Capacity</TableHead>
+                            <TableHead>Occupancy</TableHead>
+                            <TableHead>Congestion</TableHead>
+                            <TableHead>Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {filteredWardsSearch.length === 0 ? (
+                            <TableRow>
+                              <TableCell
+                                colSpan={9}
+                                className="text-center py-8 text-gray-500"
                               >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={() => handleDeleteWard(ward.id)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })
-                  )}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        )}
-        </CardContent>
-      </Card>
+                                {selectedStation
+                                  ? "No wards found"
+                                  : "Please select a station to view wards"}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            filteredWardsSearch.map((ward) => {
+                              const congestion = parseInt(ward.congestion || "0");
+                              return (
+                                <TableRow key={ward.id}>
+                                  <TableCell>
+                                    <Badge className="bg-[#650000]">
+                                      {ward.ward_number}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{ward.name}</TableCell>
+                                  <TableCell>{ward.block_name}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">{ward.ward_type_name}</Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge variant="secondary">
+                                      {ward.security_classification_name}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>{ward.ward_capacity}</TableCell>
+                                  <TableCell>{ward.occupancy}</TableCell>
+                                  <TableCell>
+                                    <Badge variant={getCongestionBadgeVariant(congestion)}>
+                                      {congestion}%
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="flex gap-2">
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => handleEditWard(ward)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => handleDeleteWard(ward.id)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              );
+                            })
+                          )}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                )}
+                </CardContent>
+              </Card>
             </>
         )
       }
@@ -1009,7 +1086,7 @@ export default function HousingAllocationScreen() {
         open={isAssignmentDialogOpen}
         onOpenChange={setIsAssignmentDialogOpen}
       >
-        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
           <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
@@ -1040,9 +1117,9 @@ export default function HousingAllocationScreen() {
                         className="w-full justify-between"
                       >
                         {field.value
-                          ? prisoners.find((p) => p.id === field.value)?.prisoner_name +
+                          ? prisoners.find((p) => p.id === field.value)?.full_name +
                             " (" +
-                            prisoners.find((p) => p.id === field.value)?.prisoner_number +
+                            prisoners.find((p) => p.id === field.value)?.prisoner_number_value +
                             ")"
                           : "Search prisoner..."}
                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
@@ -1057,13 +1134,13 @@ export default function HousingAllocationScreen() {
                             {prisoners.map((prisoner) => (
                               <CommandItem
                                 key={prisoner.id}
-                                value={`${prisoner.prisoner_name} ${prisoner.prisoner_number}`}
+                                value={`${prisoner.full_name} ${prisoner.prisoner_number_value}`}
                                 onSelect={() => {
                                   field.onChange(prisoner.id);
                                   setPrisonerSearchOpen(false);
                                 }}
                               >
-                                {prisoner.prisoner_name} ({prisoner.prisoner_number})
+                                {prisoner.full_name} ({prisoner.prisoner_number_value})
                               </CommandItem>
                             ))}
                           </CommandGroup>
@@ -1142,94 +1219,101 @@ export default function HousingAllocationScreen() {
               )}
             </div>
 
-            {/* Cell Selection */}
-            <div>
-              <Label htmlFor="cell">
-                Cell <span className="text-red-500">*</span>
-              </Label>
-              <Controller
-                name="cell"
-                control={controlAssignment}
-                rules={{ required: "Cell is required" }}
-                render={({ field }) => {
-                  const availableCells = selectedWardForCells
-                    ? getFilteredCells(selectedWardForCells)
-                    : cells;
-                  return (
-                    <Popover open={cellSearchOpen} onOpenChange={setCellSearchOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          role="combobox"
-                          aria-expanded={cellSearchOpen}
-                          className="w-full justify-between"
-                          disabled={!selectedWardForCells}
-                        >
-                          {field.value
-                            ? availableCells.find((c) => c.id === field.value)?.name ||
-                              "Select cell..."
-                            : selectedWardForCells
-                            ? "Search cell..."
-                            : "Select ward first"}
-                          <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-full p-0">
-                        <Command>
-                          <CommandInput placeholder="Search cell..." />
-                          <CommandList>
-                            <CommandEmpty>No cell found.</CommandEmpty>
-                            <CommandGroup>
-                              {availableCells.map((cell) => (
-                                <CommandItem
-                                  key={cell.id}
-                                  value={cell.name}
-                                  onSelect={() => {
-                                    field.onChange(cell.id);
-                                    setCellSearchOpen(false);
-                                  }}
+            {
+              cellVisible && (
+                  <>
+                    {/* Cell Selection */}
+                    <div>
+                      <Label htmlFor="cell">
+                        Cell <span className="text-red-500">*</span>
+                      </Label>
+                      <Controller
+                        name="cell"
+                        control={controlAssignment}
+                        rules={{ required: "Cell is required" }}
+                        render={({ field }) => {
+                          const availableCells = selectedWardForCells
+                            ? getFilteredCells(selectedWardForCells)
+                            : cells;
+                          return (
+                            <Popover open={cellSearchOpen} onOpenChange={setCellSearchOpen}>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  variant="outline"
+                                  role="combobox"
+                                  aria-expanded={cellSearchOpen}
+                                  className="w-full justify-between"
+                                  disabled={!selectedWardForCells}
                                 >
-                                  {cell.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </CommandList>
-                        </Command>
-                      </PopoverContent>
-                    </Popover>
-                  );
-                }}
-              />
-              {assignmentErrors.cell && (
-                <p className="text-red-500 text-sm mt-1">
-                  {assignmentErrors.cell.message}
-                </p>
-              )}
-            </div>
+                                  {field.value
+                                    ? availableCells.find((c) => c.id === field.value)?.name ||
+                                      "Select cell..."
+                                    : selectedWardForCells
+                                    ? "Search cell..."
+                                    : "Select ward first"}
+                                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-full p-0">
+                                <Command>
+                                  <CommandInput placeholder="Search cell..." />
+                                  <CommandList>
+                                    <CommandEmpty>No cell found.</CommandEmpty>
+                                    <CommandGroup>
+                                      {availableCells.map((cell) => (
+                                        <CommandItem
+                                          key={cell.id}
+                                          value={cell.name}
+                                          onSelect={() => {
+                                            field.onChange(cell.id);
+                                            setCellSearchOpen(false);
+                                          }}
+                                        >
+                                          {cell.name}
+                                        </CommandItem>
+                                      ))}
+                                    </CommandGroup>
+                                  </CommandList>
+                                </Command>
+                              </PopoverContent>
+                            </Popover>
+                          );
+                        }}
+                      />
+                      {assignmentErrors.cell && (
+                        <p className="text-red-500 text-sm mt-1">
+                          {assignmentErrors.cell.message}
+                        </p>
+                      )}
+                    </div>
 
-            {/* Actions */}
-            <div className="flex justify-end gap-2 pt-4">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setIsAssignmentDialogOpen(false);
-                  setSelectedWardForCells("");
-                  resetAssignment();
-                }}
-              >
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="bg-[#650000] hover:bg-[#4a0000]"
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {loading ? "Saving..." : editingAssignment ? "Update" : "Save"}
-              </Button>
-            </div>
+                    {/* Actions */}
+                    <div className="flex justify-end gap-2 pt-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setIsAssignmentDialogOpen(false);
+                          setSelectedWardForCells("");
+                          resetAssignment();
+                        }}
+                      >
+                        <X className="h-4 w-4 mr-2" />
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={loading}
+                        className="bg-[#650000] hover:bg-[#4a0000]"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {loading ? "Saving..." : editingAssignment ? "Update" : "Save"}
+                      </Button>
+                    </div>
+                  </>
+              )
+            }
+
           </form>
           </div>
         </DialogContent>
@@ -1447,6 +1531,27 @@ export default function HousingAllocationScreen() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Cell Loading Dialog */}
+      <Dialog open={cellLoading} onOpenChange={setCellLoading}>
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle style={{ color: '#650000' }}></DialogTitle>
+              <DialogDescription></DialogDescription>
+            </DialogHeader>
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground text-sm">
+                    Fetching Cells' information, Please wait...
+                  </p>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
