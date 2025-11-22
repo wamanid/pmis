@@ -181,7 +181,7 @@ export const deleteVisitorItem = async (id: string) : Promise<{ message: string 
   try {
     await axiosInstance.delete(`/gate-management/visitor-items/${id}/`);
 
-    return { message: "Visitor tem deleted successfully" }
+    return { message: "Visitor team deleted successfully" }
 
   } catch (error: any) {
     return {

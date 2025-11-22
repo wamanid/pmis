@@ -60,12 +60,20 @@ import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitor
 import {
   addHousingAssignment,
   Assignment, AssignmentResponse,
-  Cell, getHousingAssignments,
+  Cell, deleteHousingAssignment, getHousingAssignments,
   getStationWards,
   getWardCells, HousingAssignment,
   Ward
 } from "../../services/stationServices/housingService";
 import {handleCatchError, handleEffectLoad, handleResponseError} from "../../services/stationServices/utils";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle
+} from "../ui/alert-dialog";
+import {VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 
 interface Region {
   id: string;
@@ -175,6 +183,7 @@ export default function HousingAllocationScreen() {
   const [housingAssignments, setHousingAssignments] = useState<
     HousingAssignment[]
   >([]);
+  const [deleteAssignment, setDeleteAssignment] = useState<HousingAssignment | null>(null);
   const [overviewData, setOverviewData] = useState<OverviewData>({
     capacity: 0,
     occupancy: 0,
@@ -756,6 +765,23 @@ export default function HousingAllocationScreen() {
     }
   }, [isAssignmentDialogOpen]);
 
+  async function handleDelete () {
+      if (!deleteAssignment) return;
+      setLoading(true);
+
+      try {
+          await deleteHousingAssignment(deleteAssignment.id)
+          setHousingAssignments(housingAssignments.filter((item) => item.id !== deleteAssignment.id));
+          toast.success("Housing assignment deleted successfully")
+          setDeleteAssignment(null);
+          setLoading(false);
+      }catch (error){
+        toast.error(error?.response?.data?.detail || "Failed to delete assignment")
+      }finally {
+        setLoading(false)
+      }
+  }
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -975,7 +1001,8 @@ export default function HousingAllocationScreen() {
                                       size="sm"
                                       variant="destructive"
                                       onClick={() =>
-                                        handleDeleteAssignment(assignment.id!)
+                                        // handleDeleteAssignment(assignment.id!)
+                                          setDeleteAssignment(assignment)
                                       }
                                     >
                                       <Trash2 className="h-4 w-4" />
@@ -1551,6 +1578,38 @@ export default function HousingAllocationScreen() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteAssignment} onOpenChange={() => setDeleteAssignment(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Housing Assignment</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this housing Assignment? <strong>This action cannot be undone.</strong>
+              {deleteAssignment && (
+                <div className="mt-2 p-3 bg-muted rounded">
+                  <p>
+                    <strong>Prisoner:</strong> {deleteAssignment.prisoner_name}
+                  </p>
+                  <p>
+                    <strong>Ward:</strong> {deleteAssignment.ward_name}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
     </div>
   );
