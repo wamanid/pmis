@@ -97,6 +97,11 @@ export const addHousingAssignment = async (assignment: Assignment) : Promise<Pri
   return response.data;
 }
 
+export const updateHousingAssignment = async (assignment: Assignment, id: string) : Promise<PrisonAssignmentResponse> => {
+  const response = await axiosInstance.put<PrisonAssignmentResponse>(`/admission/prisoner-housing-assignments/${id}/`, assignment);
+  return response.data;
+}
+
 export const deleteHousingAssignment = async (id: string) : Promise<void> => {
   await axiosInstance.delete<void>(`/admission/prisoner-housing-assignments/${id}`);
 }

@@ -62,7 +62,7 @@ import {
   Assignment, AssignmentResponse,
   Cell, deleteHousingAssignment, getHousingAssignments,
   getStationWards,
-  getWardCells, HousingAssignment,
+  getWardCells, HousingAssignment, updateHousingAssignment,
   Ward
 } from "../../services/stationServices/housingService";
 import {handleCatchError, handleEffectLoad, handleResponseError} from "../../services/stationServices/utils";
@@ -479,15 +479,16 @@ export default function HousingAllocationScreen() {
 
   const handleEditAssignment = (assignment: HousingAssignment) => {
     setEditingAssignment(assignment);
-    setSelectedWardForCells(assignment.ward);
-    Object.keys(assignment).forEach((key) => {
-      // Use type assertion for the form value setting
-      const value = assignment[key as keyof HousingAssignment];
-      if (value !== undefined) {
-        resetAssignment({ [key]: value } as any);
-      }
-    });
+    // setSelectedWardForCells(assignment.ward);
+    // Object.keys(assignment).forEach((key) => {
+    //   // Use type assertion for the form value setting
+    //   const value = assignment[key as keyof HousingAssignment];
+    //   if (value !== undefined) {
+    //     resetAssignment({ [key]: value } as any);
+    //   }
+    // });
     setIsAssignmentDialogOpen(true);
+    setSelectedWardForCells(assignment.ward)
   };
 
   const handleDeleteAssignment = (id: string) => {
@@ -520,14 +521,27 @@ export default function HousingAllocationScreen() {
     }
 
     try {
-        const response = await addHousingAssignment(assignmentData)
-        if (handleResponseError(response)) return
 
-        setHousingAssignments([response as AssignmentResponse, ...housingAssignments])
-        toast.success("Housing assignment created successfully");
+        if (editingAssignment) {
+           const response = await updateHousingAssignment(assignmentData, editingAssignment.id)
+           if (handleResponseError(response)) return
+
+            if ("id" in response) {
+               setHousingAssignments(prev => prev.map(v => (v.id === response.id ? response : v)))
+            }
+            toast.success("Housing assignment updated successfully");
+        }
+        else {
+          const response = await addHousingAssignment(assignmentData)
+          if (handleResponseError(response)) return
+
+          setHousingAssignments([response as AssignmentResponse, ...housingAssignments])
+          toast.success("Housing assignment created successfully")
+        }
 
         setIsAssignmentDialogOpen(false);
         setSelectedWardForCells("");
+        setEditingAssignment(null)
         resetAssignment();
 
     }catch (error) {
@@ -749,6 +763,7 @@ export default function HousingAllocationScreen() {
       try {
         const response = await getWardCells(selectedWardForCells)
         populateList(response, "There are no cells for the selected ward", setCells)
+        setSelectedWardForCells("")
       }
       catch (error) {
         handleCatchError(error)
@@ -1120,6 +1135,7 @@ export default function HousingAllocationScreen() {
               <Users className="h-5 w-5" />
               {editingAssignment ? "Edit Housing Assignment" : "Assign Prisoner"}
             </DialogTitle>
+            <DialogDescription></DialogDescription>
           </DialogHeader>
           <form
             onSubmit={handleSubmitAssignment(onSubmitAssignment)}
@@ -1143,12 +1159,17 @@ export default function HousingAllocationScreen() {
                         aria-expanded={prisonerSearchOpen}
                         className="w-full justify-between"
                       >
-                        {field.value
-                          ? prisoners.find((p) => p.id === field.value)?.full_name +
-                            " (" +
-                            prisoners.find((p) => p.id === field.value)?.prisoner_number_value +
-                            ")"
-                          : "Search prisoner..."}
+
+                        <>
+                           {field.value
+                            ? (() => {
+                                const prisoner = prisoners.find((p) => p.id === field.value);
+                                return prisoner
+                                  ? `${prisoner.full_name} (${prisoner.prisoner_number_value})`
+                                  : "Select prisoner...";
+                              })()
+                            : "Search prisoner..."}
+                         </>
                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -1202,14 +1223,17 @@ export default function HousingAllocationScreen() {
                         aria-expanded={wardSearchOpen}
                         className="w-full justify-between"
                       >
-                        {field.value
-                          ? (() => {
-                              const ward = filteredWards.find((w) => w.id === field.value);
-                              return ward
-                                ? `${ward.name} (${ward.ward_number}) - ${ward.block_name}`
-                                : "Select ward...";
-                            })()
-                          : "Search ward..."}
+                         <>
+                           {field.value
+                            ? (() => {
+                                const ward = filteredWards.find((w) => w.id === field.value);
+                                return ward
+                                  ? `${ward.name} (${ward.ward_number}) - ${ward.block_name}`
+                                  : "Select ward...";
+                              })()
+                            : "Search ward..."}
+                         </>
+
                         <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
                     </PopoverTrigger>
@@ -1270,14 +1294,14 @@ export default function HousingAllocationScreen() {
                                   role="combobox"
                                   aria-expanded={cellSearchOpen}
                                   className="w-full justify-between"
-                                  disabled={!selectedWardForCells}
                                 >
                                   {field.value
-                                    ? availableCells.find((c) => c.id === field.value)?.name ||
-                                      "Select cell..."
-                                    : selectedWardForCells
-                                    ? "Search cell..."
-                                    : "Select ward first"}
+                                      ? availableCells.find((c) => c.id === field.value)?.name ||
+                                        "Select cell..."
+                                      : selectedWardForCells
+                                      ? "Search cell..."
+                                      : "Select ward first"}
+
                                   <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                 </Button>
                               </PopoverTrigger>
@@ -1355,6 +1379,7 @@ export default function HousingAllocationScreen() {
               <Home className="h-5 w-5" />
               {editingWard ? "Edit Ward" : "Add Ward"}
             </DialogTitle>
+            <DialogDescription></DialogDescription>
           </DialogHeader>
           <form
             onSubmit={handleSubmitWard(onSubmitWard)}

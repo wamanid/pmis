@@ -157,21 +157,21 @@ export function handleEffectLoad(
 
   if (!region && !district && !station) {
     // console.log("code1")
-    toast.error("Please select the region, district and station to load this information");
+    // toast.error("Please select the region, district and station to load this information");
     setLoading(false);
     return false;
   }
 
   else if (region && !district && !station) {
     // console.log("code2")
-    toast.error("Please select the district and station too");
+    // toast.error("Please select the district and station too");
     setLoading(false);
     return false;
   }
 
   else if (region && district && !station) {
     // console.log("code3")
-    toast.error("Please select the station to load station information");
+    // toast.error("Please select the station to load station information");
     setLoading(false);
     return false;
   }
