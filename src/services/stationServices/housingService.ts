@@ -120,6 +120,10 @@ export const getStationWards = async (stationId: string) : Promise<WardsResponse
   return response.data;
 }
 
+export const deleteWardById = async (id: string) : Promise<void> => {
+  await axiosInstance.delete<void>(`/station-management/api/wards/${id}`);
+}
+
 export const getWardCells = async (wardId: string) : Promise<CellsResponse> => {
   const response = await axiosInstance.get<CellsResponse>('/station-management/api/cells/', {
       params: {

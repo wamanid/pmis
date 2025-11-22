@@ -60,7 +60,7 @@ import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitor
 import {
   addHousingAssignment,
   Assignment, AssignmentResponse,
-  Cell, deleteHousingAssignment, getHousingAssignments,
+  Cell, deleteHousingAssignment, deleteWardById, getHousingAssignments,
   getStationWards,
   getWardCells, HousingAssignment, updateHousingAssignment,
   Ward
@@ -183,7 +183,10 @@ export default function HousingAllocationScreen() {
   const [housingAssignments, setHousingAssignments] = useState<
     HousingAssignment[]
   >([]);
+
   const [deleteAssignment, setDeleteAssignment] = useState<HousingAssignment | null>(null);
+  const [deleteWard, setDeleteWard] = useState<Ward | null>(null);
+
   const [overviewData, setOverviewData] = useState<OverviewData>({
     capacity: 0,
     occupancy: 0,
@@ -211,7 +214,6 @@ export default function HousingAllocationScreen() {
   const { region, district, station } = useFilters();
   const [cellVisible, setCellVisible] = useState(false)
   const [cellLoading, setCellLoading] = useState(false)
-  // const [assignment, setAssignment] = useState<Assignment>(null)
 
   // Forms
   const {
@@ -592,11 +594,6 @@ export default function HousingAllocationScreen() {
     setIsWardDialogOpen(true);
   };
 
-  const handleDeleteWard = (id: string) => {
-    setWards(wards.filter((w) => w.id !== id));
-    toast.success("Ward deleted successfully");
-  };
-
   const onSubmitWard = (data: Ward) => {
     setLoading(true);
 
@@ -792,6 +789,23 @@ export default function HousingAllocationScreen() {
           setLoading(false);
       }catch (error){
         toast.error(error?.response?.data?.detail || "Failed to delete assignment")
+      }finally {
+        setLoading(false)
+      }
+  }
+
+  async function handleDeleteWard () {
+      if (!deleteWard) return;
+      setLoading(true);
+
+      try {
+          await deleteWardById(deleteWard.id)
+          setWards(wards.filter((item) => item.id !== deleteWard.id));
+          toast.success("Ward deleted successfully")
+          setDeleteWard(null);
+          setLoading(false);
+      }catch (error){
+        toast.error(error?.response?.data?.detail || "Failed to delete ward")
       }finally {
         setLoading(false)
       }
@@ -1102,7 +1116,7 @@ export default function HousingAllocationScreen() {
                                       <Button
                                         size="sm"
                                         variant="destructive"
-                                        onClick={() => handleDeleteWard(ward.id)}
+                                        onClick={() => setDeleteWard(ward)}
                                       >
                                         <Trash2 className="h-4 w-4" />
                                       </Button>
@@ -1627,6 +1641,37 @@ export default function HousingAllocationScreen() {
             <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
+              disabled={loading}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              {loading ? 'Deleting...' : 'Delete'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteWard} onOpenChange={() => setDeleteWard(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Ward</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this ward? <strong>This action cannot be undone.</strong>
+              {deleteWard && (
+                <div className="mt-2 p-3 bg-muted rounded">
+                  <p>
+                    <strong>Ward:</strong> {deleteWard.name}
+                  </p>
+                  <p>
+                    <strong>Block:</strong> {deleteWard.block_name}
+                  </p>
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteWard}
               disabled={loading}
               className="bg-red-600 hover:bg-red-700"
             >
