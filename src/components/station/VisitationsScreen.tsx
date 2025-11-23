@@ -50,17 +50,6 @@ import {
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-<<<<<<< HEAD
-=======
-import VisitorPassForm from "../gatePass/VisitorPassForm";
-import VisitorItemList from "./VisitorItemList";
-import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
-import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
-import axiosInstance from "../../services/axiosInstance"; // << ensure path matches your project
-import {handleResponseError} from "../../services/stationServices/utils";
-import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
-
->>>>>>> station
 
 
 interface Region {
@@ -417,78 +406,6 @@ export default function VisitationsScreen() {
     );
   };
 
-<<<<<<< HEAD
-=======
-  const handleGenerateVisitorPass = (visitor: Visitor) => {
-    setSelectedVisitorForPass(visitor);
-    setIsVisitorPassDialogOpen(true);
-  };
-
-  const handleVisitorPassSubmit = (data: any) => {
-    toast.success('Visitor pass generated successfully');
-    setIsVisitorPassDialogOpen(false);
-    setSelectedVisitorForPass(null);
-  };
-
-  // APIs integration
-  useEffect(() => {
-      if (visitorRecordsLoading) {
-        async function fetchData() {
-          // setVisitorRecordsLoading(true)
-            try {
-              const response = await getStationVisitors()
-              if (handleResponseError(response)) return
-
-              if ("results" in response) {
-                const data = response.results
-                if (!data.length){
-                    toast.error("There are no visitor records");
-                    return true
-                }
-                setVisitors(data)
-                // console.log(data)
-              }
-
-              const response2 = await getVisitorItems()
-              if (handleResponseError(response2)) return
-              if ("results" in response2) {
-                const data = response2.results
-                setItems(data)
-                console.log(data)
-              }
-
-            }catch (error) {
-              if (!error?.response) {
-                toast.error('Failed to connect to server. Please try again.');
-              }
-
-            }finally {
-              setVisitorRecordsLoading(false)
-            }
-        }
-
-        fetchData()
-      }
-  }, [setVisitorRecordsLoading]);
-
-  useEffect(() => {
-    if (!isDialogOpen){
-      setEditingVisitor(null)
-    }
-  }, [isDialogOpen]);
-
-  function extractTimeHHMM(isoString: string): string {
-    const d = new Date(isoString);
-
-    if (isNaN(d.getTime())) return ""; // invalid date
-
-    const hh = String(d.getHours()).padStart(2, "0");
-    const mm = String(d.getMinutes()).padStart(2, "0");
-
-    return `${hh}:${mm}`;
-  }
-
->>>>>>> station
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -513,7 +430,6 @@ export default function VisitationsScreen() {
           />
         </div>
 
-<<<<<<< HEAD
         <Dialog
           open={isDialogOpen}
           onOpenChange={(open) => {
@@ -540,45 +456,6 @@ export default function VisitationsScreen() {
                   : "Register a new visitor and manage check-in/check-out"}
               </DialogDescription>
             </DialogHeader>
-=======
-        {/* Visitor Records Tab */}
-        <TabsContent value="records" className="space-y-6 mt-6">
-          {/* Search and Actions */}
-          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Search by name, ID number, or contact..."
-                value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
-                className="pl-10"
-              />
-            </div>
-
-            <Button 
-              className="bg-primary hover:bg-primary/90"
-              onClick={() => setIsDialogOpen(true)}
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Register Visitor
-            </Button>
-          </div>
-
-          <VisitorRegistrationDialog
-            open={isDialogOpen}
-            onOpenChange={(open) => {
-              setIsDialogOpen(open);
-              if (!open) {
-                resetForm();
-              }
-            }}
-            setVisitors={setVisitors}
-            editingVisitor={editingVisitor}
-          />
-
-          {/* Placeholder for form - will be removed */}
-          <div style={{display: 'none'}}>
->>>>>>> station
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               <Tabs defaultValue="personal" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
@@ -1344,7 +1221,6 @@ export default function VisitationsScreen() {
       </div>
 
       {/* Visitors Table */}
-<<<<<<< HEAD
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -1442,106 +1318,6 @@ export default function VisitationsScreen() {
           </div>
         </CardContent>
       </Card>
-=======
-          <div>
-            {visitorRecordsLoading || tableLoading ? (
-              <div className="size-full flex items-center justify-center py-8">
-                <div className="text-center">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                  <p className="text-muted-foreground text-sm">Fetching visitor records, Please wait...</p>
-                </div>
-              </div>
-            ) : (
-              <DataTable
-                data={tableData}
-                loading={tableLoading}
-                total={total}
-                title="Visitor Records"
-                columns={[
-                  { key: 'full_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => (<div><p>{`${row.first_name ?? ''} ${row.middle_name ?? ''} ${row.last_name ?? ''}`.trim()}</p>{row.organisation && <p className="text-xs text-muted-foreground">{row.organisation}</p>}</div>) },
-                  { key: 'id_number', label: 'ID Number', sortable: true },
-                  { key: 'contact_no', label: 'Contact', sortable: true },
-                  { key: 'prisoner_name', label: 'Prisoner', sortable: true },
-                  { key: 'visitor_type_name', label: 'Visitor Type', sortable: true },
-                  { key: 'gate_name', label: 'Gate', sortable: true },
-                  { key: 'time_in', label: 'Time In', sortable: true, render: (_v: any, row: any) => row.time_in ? (<div className="flex items-center gap-1 text-green-600"><LogIn className="h-3 w-3" />{extractTimeHHMM(row.time_in)}</div>) : '-' },
-                  { key: 'time_out', label: 'Time Out', sortable: true, render: (_v: any, row: any) => row.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(row.time_out)}</div>) : '-' },
-                  { key: 'visitor_status_name', label: 'Status', sortable: true, render: (v: any) => getStatusBadge(v) },
-                  { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(row)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>)},
-                ]}
-                // externalSearch={searchQuery}
-                onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
-                onPageChange={(p: number) => setPage(p)}
-                onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
-                onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
-                page={page}
-                pageSize={pageSize}
-              />
-            )}
-          </div>
-        </TabsContent>
-
-        {/* Visitor Items Tab */}
-        <TabsContent value="items" className="mt-6">
-          <VisitorItemList visitors={visitors} items={items} setItems={setItems} />
-        </TabsContent>
-      </Tabs>
-
-      {/* Visitor Pass Generation Dialog */}
-      <Dialog 
-        open={isVisitorPassDialogOpen} 
-        onOpenChange={(open) => {
-          setIsVisitorPassDialogOpen(open);
-          if (!open) {
-            setSelectedVisitorForPass(null);
-          }
-        }}
-      >
-        <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle style={{ color: '#650000' }}>
-              Generate Visitor Pass
-            </DialogTitle>
-            <DialogDescription>
-              Create a visitor pass for {selectedVisitorForPass ? `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.last_name}` : 'selected visitor'}
-            </DialogDescription>
-          </DialogHeader>
-
-          {selectedVisitorForPass && (
-            <VisitorPassForm
-              pass={{
-                visitor_tag_number: '',
-                valid_from: '',
-                valid_until: '',
-                purpose: selectedVisitorForPass.reason_of_visitation || '',
-                issue_date: new Date().toISOString().slice(0, 16),
-                is_suspended: false,
-                suspended_date: '',
-                suspended_reason: '',
-                prisoner: selectedVisitorForPass.prisoner,
-                visitor: selectedVisitorForPass.id,
-                suspended_by: 0,
-                prisoner_name: selectedVisitorForPass.prisoner_name,
-                visitor_name: `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.middle_name} ${selectedVisitorForPass.last_name}`.trim()
-              }}
-              onSubmit={handleVisitorPassSubmit}
-              onCancel={() => {
-                setIsVisitorPassDialogOpen(false);
-                setSelectedVisitorForPass(null);
-              }}
-              disabledFields={{
-                prisoner: true,
-                visitor: false
-              }}
-              onAddNewVisitor={() => {
-                setIsDialogOpen(true);
-                setEditingVisitor(null);
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
->>>>>>> station
     </div>
   );
 }
