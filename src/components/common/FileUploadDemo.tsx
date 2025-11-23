@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import FileUpload from "./FileUpload";
+import { StaffSelect } from "../authentication/StaffSelect";
 import { Button } from "../ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card";
 import { Label } from "../ui/label";
@@ -12,6 +13,7 @@ import { User, FileText, CreditCard } from "lucide-react";
 interface DemoFormData {
   name: string;
   email: string;
+  staffId: string;
   profilePhoto: string | null;
   resume: string | null;
   idDocument: string | null;
@@ -22,6 +24,7 @@ const FileUploadDemo: React.FC = () => {
     defaultValues: {
       name: "",
       email: "",
+      staffId: "",
       profilePhoto: null,
       resume: null,
       idDocument: null,
@@ -31,6 +34,7 @@ const FileUploadDemo: React.FC = () => {
   const [profilePhotoFile, setProfilePhotoFile] = useState<File | null>(null);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [idDocumentFile, setIdDocumentFile] = useState<File | null>(null);
+  const [selectedStaffId, setSelectedStaffId] = useState<string>("");
 
   const profilePhoto = watch("profilePhoto");
   const resume = watch("resume");
@@ -40,6 +44,7 @@ const FileUploadDemo: React.FC = () => {
     console.log("Form submitted with data:", {
       name: data.name,
       email: data.email,
+      staffId: selectedStaffId,
       profilePhoto: data.profilePhoto ? `${data.profilePhoto.substring(0, 50)}...` : null,
       resume: data.resume ? `${data.resume.substring(0, 50)}...` : null,
       idDocument: data.idDocument ? `${data.idDocument.substring(0, 50)}...` : null,
@@ -81,6 +86,23 @@ const FileUploadDemo: React.FC = () => {
                 {...register("email", { required: true })}
                 placeholder="john.doe@example.com"
               />
+            </div>
+            <div>
+              <Label htmlFor="staffSelect">Assigned Staff</Label>
+              <StaffSelect
+                value={selectedStaffId}
+                onValueChange={(value) => {
+                  setSelectedStaffId(value);
+                  setValue("staffId", value);
+                }}
+                placeholder="Select a staff member..."
+                statusFilter="active"
+              />
+              {selectedStaffId && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Selected Staff ID: {selectedStaffId}
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -185,6 +207,7 @@ const FileUploadDemo: React.FC = () => {
                 {
                   name: watch("name"),
                   email: watch("email"),
+                  staffId: selectedStaffId,
                   profilePhoto: profilePhoto ? `${profilePhoto.substring(0, 100)}...` : null,
                   resume: resume ? `${resume.substring(0, 100)}...` : null,
                   idDocument: idDocument ? `${idDocument.substring(0, 100)}...` : null,

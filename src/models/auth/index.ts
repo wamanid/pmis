@@ -2,6 +2,13 @@
  * Authentication and User models
  */
 
+// Export staff profile types for accounts API
+export type {
+  StaffProfile as AccountStaffProfile,
+  StaffProfileListResponse,
+  StaffProfileFilters,
+} from './staffProfile';
+
 export interface StaffProfile {
   id: string;
   rank_name: string;
