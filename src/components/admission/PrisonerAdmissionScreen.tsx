@@ -851,7 +851,8 @@ const PrisonerAdmissionScreen: React.FC = () => {
             )}
 
             {/* Search Section - Available for all admission types */}
-            {admissionType && (
+            {/* Hide search if prisoner number is already generated */}
+            {admissionType && !generatedPrisonerNumber && (
               <div className="space-y-4">
                 <Separator />
                 <div>

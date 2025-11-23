@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import axiosInstance from '../../services/axiosInstance';
 import { 
   Search, 
   Download, 
@@ -56,8 +56,21 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
       setLoading(true);
       setError(null);
       try {
-        const response = await axios.get(url);
-        setData(Array.isArray(response.data) ? response.data : response.data.data || []);
+        const response = await axiosInstance.get(url);
+        // Handle different response formats:
+        // 1. Direct array: [...]
+        // 2. Paginated with results: { results: [...], count: N }
+        // 3. Object with data: { data: [...] }
+        const responseData = response.data;
+        if (Array.isArray(responseData)) {
+          setData(responseData);
+        } else if (responseData.results && Array.isArray(responseData.results)) {
+          setData(responseData.results);
+        } else if (responseData.data && Array.isArray(responseData.data)) {
+          setData(responseData.data);
+        } else {
+          setData([]);
+        }
       } catch (err: any) {
         setError(err.message || 'Failed to fetch data');
       } finally {
