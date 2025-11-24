@@ -37,6 +37,8 @@ import {
   RegionFilter,
   StationFilter
 } from "../../services/stationServices/utils"
+import { DataTable } from '../common/DataTable';
+import { useRef, useCallback } from 'react';
 
 export function StaffDeploymentScreen() {
   const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);
@@ -44,6 +46,12 @@ export function StaffDeploymentScreen() {
   const [stations, setStations] = useState<Station[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  // debounced search (avoid API calls on every keystroke)
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(searchQuery);
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
   const [deployOpen, setDeployOpen] = useState(false);
   
   // HRMIS Staff Search
@@ -70,32 +78,22 @@ export function StaffDeploymentScreen() {
   const [stationSummary, setStationSummary] = useState<StationFilter[]>([])
   const [regionSummary, setRegionSummary] = useState<RegionFilter[]>([])
   const [districtSummary, setDistrictSummary] = useState<DistrictFilter[]>([])
+  // DataTable states (server-side capable pattern)
+  const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const [tableData, setTableData] = useState<StaffDeploymentResponse[]>([]);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState<number>(1);
+  const [pageSize, setPageSize] = useState<number>(10);
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     // loadData();
     fetchData()
   }, []);
 
-  // useEffect(() => {
-  //   const searchHRMIS = async () => {
-  //     if (hrmisSearchQuery.length >= 2) {
-  //       setLoadingHRMIS(true);
-  //       try {
-  //         const results = await searchHRMISStaff(hrmisSearchQuery);
-  //         setHrmisResults(results);
-  //       } catch (error) {
-  //         console.error('Failed to search HRMIS:', error);
-  //       } finally {
-  //         setLoadingHRMIS(false);
-  //       }
-  //     } else {
-  //       setHrmisResults([]);
-  //     }
-  //   };
-  //
-  //   const debounce = setTimeout(searchHRMIS, 300);
-  //   return () => clearTimeout(debounce);
-  // }, [hrmisSearchQuery]);
   const fetchData = async () => {
     setLoading(true);
     try {
@@ -216,31 +214,7 @@ export function StaffDeploymentScreen() {
       setDeployOpen(false);
       resetForm();
       addDeployment(response as StaffDeploymentResponse)
-      // setDeployments((prev) => [...prev, response as StaffDeploymentResponse]);
-      // loadData()
 
-      // Split name into parts
-      // const nameParts = selectedStaff.name.trim().split(' ');
-      // const first_name = nameParts[0] || '';
-      // const last_name = nameParts[nameParts.length - 1] || '';
-      // const middle_name = nameParts.length > 2 ? nameParts.slice(1, -1).join(' ') : '';
-      //
-      // await createStaffDeployment({
-      //   first_name,
-      //   middle_name,
-      //   last_name,
-      //   force_number: selectedStaff.force_number,
-      //   date_of_birth: selectedStaff.dob,
-      //   rank: selectedStaff.rank,
-      //   station: selectedStation.id.toString(),
-      //   start_date: deployFormData.start_date,
-      //   end_date: deployFormData.end_date || undefined
-      // });
-      //
-      // toast.success('Staff member deployed successfully');
-      // setDeployOpen(false);
-      // resetForm();
-      // loadData();
     } catch (error) {
       if (!error?.response) {
         toast.error('Failed to connect to server. Please try again.');
@@ -278,6 +252,56 @@ export function StaffDeploymentScreen() {
       deployment.rank.toLowerCase().includes(query)
     );
   });
+
+  // DataTable: load function (client-side fallback when API doesn't support params)
+  // Note: use debounced search to avoid requests on every keypress
+  const loadTable = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
+     try { abortRef.current?.abort(); } catch {}
+     const controller = new AbortController();
+     abortRef.current = controller;
+     const reqId = ++requestIdRef.current;
+     setTableLoading(true);
+    try {
+      // fetch full list (service currently returns results array)
+      const res = await getStaffDeployment();
+      const items = (res as any)?.results ?? (res as any) ?? [];
+      // client-side search
+      const filtered = (items || []).filter((it: any) => {
+        if (!_search) return true;
+        const q = String(_search).toLowerCase();
+        return String(it.full_name ?? '').toLowerCase().includes(q) ||
+               String(it.force_number ?? '').toLowerCase().includes(q) ||
+               String(it.station_name ?? '').toLowerCase().includes(q) ||
+               String(it.profile_rank ?? it.rank ?? '').toLowerCase().includes(q);
+      });
+      // client-side sort
+      if (_sortField) {
+        filtered.sort((a: any, b: any) => {
+          const A = String(a[_sortField] ?? '').toLowerCase();
+          const B = String(b[_sortField] ?? '').toLowerCase();
+          if (A === B) return 0;
+          const res = A > B ? 1 : -1;
+          return _sortDir === 'desc' ? -res : res;
+        });
+      }
+      const totalCount = filtered.length;
+      const start = (_page - 1) * _pageSize;
+      const paged = filtered.slice(start, start + _pageSize);
+      if (requestIdRef.current === reqId) {
+        setTableData(paged);
+        setTotal(totalCount);
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') return;
+      console.error('load staff deployments error', err?.response ?? err);
+    } finally {
+      if (requestIdRef.current === reqId) setTableLoading(false);
+    }
+  }, [page, pageSize, sortField, sortDir, debouncedSearch]);
+
+  useEffect(() => {
+    loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
+  }, [page, pageSize, sortField, sortDir, debouncedSearch, loadTable]);
 
   useEffect(() => {
       const fetchData = async () => {
@@ -586,76 +610,42 @@ export function StaffDeploymentScreen() {
                 <Input
                   placeholder="Search by name, force number, station..."
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   className="pl-9"
                 />
               </div>
 
-              {/* Deployments Table */}
-              <div className="border rounded-lg">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Force Number</TableHead>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Rank</TableHead>
-                      <TableHead>Station</TableHead>
-                      <TableHead>Start Date</TableHead>
-                      <TableHead>End Date</TableHead>
-                      <TableHead>Age at Deployment</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredDeployments.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                          No staff deployments found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredDeployments.map(deployment => (
-                        <TableRow key={deployment.id}>
-                          <TableCell className="font-mono text-sm">{deployment.force_number}</TableCell>
-                          <TableCell>{deployment.full_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{deployment.rank}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Building2 className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{deployment.station_name}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm">{new Date(deployment.start_date).toLocaleDateString()}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            {deployment.end_date ? (
-                              <span className="text-sm">{new Date(deployment.end_date).toLocaleDateString()}</span>
-                            ) : (
-                              <span className="text-muted-foreground text-sm">-</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            <span className="text-sm">{deployment.age_at_deployment}</span>
-                          </TableCell>
-                          <TableCell>
-                            <Badge 
-                              variant={deployment.is_active ? 'default' : 'secondary'}
-                              style={deployment.is_active ? { backgroundColor: '#650000' } : {}}
-                            >
-                              {deployment.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
+              {/* Deployments DataTable */}
+              <div className="">
+                <DataTable
+                  data={tableData}
+                  loading={tableLoading}
+                  total={total}
+                  columns={[
+                    { key: 'force_number', label: 'Force Number', sortable: true },
+                    { key: 'full_name', label: 'Name', sortable: true },
+                    { key: 'profile_rank', label: 'Rank', sortable: true, render: (v: any, row: any) => <Badge variant="outline">{v ?? row.rank}</Badge> },
+                    { key: 'station_name', label: 'Station', sortable: true, render: (v: any) => <div className="flex items-center gap-1"><Building2 className="h-3 w-3 text-muted-foreground" /><span className="text-sm">{v}</span></div> },
+                    { key: 'start_date', label: 'Start Date', sortable: true },
+                    { key: 'end_date', label: 'End Date', sortable: true },
+                    // age should not be sortable per request
+                    { key: 'age_at_deployment', label: 'Age at Deployment', sortable: false },
+                    { key: 'is_active', label: 'Status', sortable: true, render: (v: any) => <Badge variant={v ? 'default' : 'secondary'} style={v ? { backgroundColor: '#650000' } : {}}>{v ? 'Active' : 'Inactive'}</Badge> },
+                    { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
+                        <div className="flex gap-2 justify-end">
+                          <Button variant="outline" size="sm" onClick={() => { /* view handler if needed */ }}><UserPlus className="h-4 w-4 mr-1" />View</Button>
+                        </div>
+                      )
+                    },
+                  ]}
+                  // keep onSearch so table can still react if DataTable emits it; we also provide external search input above
+                  onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
+                  onPageChange={(p: number) => setPage(p)}
+                  onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+                  onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
+                  page={page}
+                  pageSize={pageSize}
+                />
               </div>
             </CardContent>
           </Card>
