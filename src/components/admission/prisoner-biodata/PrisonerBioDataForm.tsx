@@ -39,12 +39,13 @@ import NextOfKinForm from "../NextOfKinForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { Separator } from "../../ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
-import type { PrisonerBiodata, ArmedPersonnel, ChildRecord, NextOfKin } from "../../../models/admission";
+import type { PrisonerBiodata, ArmedPersonnel, ChildRecord, NextOfKin, PrisonerRecord } from "../../../models/admission";
 import { CardContent } from "../../ui/card";
 import { Card } from "../../ui/card";
 import { CardHeader } from "../../ui/card";
 import { CardTitle } from "../../ui/card";
-import { createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
+import { createPrisonerBiodata, updatePrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
+import { getPrisonerRecordsByPrisonerId, createPrisonerRecord, updatePrisonerRecord } from "../../../services/admission/prisonerRecordService";
 import {
   Search,
   User,
@@ -83,6 +84,8 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
 }) => {
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [prisonerRecords, setPrisonerRecords] = useState<PrisonerRecord[]>([]);
+  const [loadingRecords, setLoadingRecords] = useState(false);
   
   const {
     register,
@@ -180,6 +183,11 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       // Populate record fields
       if (bioData.desired_district_of_release) setValue("desired_district_of_release", bioData.desired_district_of_release);
       if (bioData.prisoner_class) setValue("prisoner_class", bioData.prisoner_class);
+      
+      // Fetch prisoner records if prisoner ID is available
+      if (bioData.prisoner) {
+        fetchPrisonerRecords(bioData.prisoner);
+      }
     }
   }, [bioData, reset, setValue]);
 
@@ -194,6 +202,20 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
     });
     return () => subscription.unsubscribe();
   }, [watch]);
+
+  // Fetch prisoner records
+  const fetchPrisonerRecords = async (prisonerId: string) => {
+    try {
+      setLoadingRecords(true);
+      const response = await getPrisonerRecordsByPrisonerId(prisonerId);
+      setPrisonerRecords(response.results || []);
+    } catch (error) {
+      console.error("Error fetching prisoner records:", error);
+      toast.error("Failed to load prisoner records");
+    } finally {
+      setLoadingRecords(false);
+    }
+  };
 
   // Helper function to set value and clear error
   const setValueAndClearError = (field: keyof PrisonerBiodata, value: any) => {
@@ -217,28 +239,31 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       
       // Get prisoner IDs from localStorage
       const storedReservation = localStorage.getItem("pmis_prisoner_number_reservation");
-      let prisonerId = null;
+      let prisonerId=null
+      let prisonerNumberId = null;
       let prisonerPersonalNumberId = null;
       let reservationId = null;
       
       if (storedReservation) {
         const reservation = JSON.parse(storedReservation);
-        prisonerId = reservation.prisoner_id;  // Send prisoner_id
+        prisonerId=reservation.prisoner_id
+        prisonerNumberId = reservation.id;  // Send prisoner_id
         prisonerPersonalNumberId = reservation.prisoner_personal_number_details?.id;  // Send prisoner_personal_number_details.id
         reservationId = reservation.id;  // Send reservation id
       }
       
-      if (!prisonerId || !prisonerPersonalNumberId) {
+      if (!prisonerNumberId || !prisonerPersonalNumberId) {
         toast.error("Prisoner IDs not found. Please generate prisoner numbers first.");
         setIsSubmitting(false);
         return;
       }
       
-      // Prepare data for API submission
-      const submissionData: any = {
+      // Prepare biodata for API submission (exclude prisoner record fields)
+      const biodataSubmission: any = {
         ...data,
-        prisoner_number: prisonerId,  // Send prisoner_id
-        prisoner_personal_number: prisonerPersonalNumberId,  // Send prisoner_personal_number_details.id
+        prisoner: prisonerId,
+        prisoner_number: prisonerNumberId,
+        prisoner_personal_number: prisonerPersonalNumberId,
         // Duplicate education_level to highest_education
         highest_education: data.education_level,
         // Replicate nationality to country_of_origin
@@ -249,28 +274,67 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
         height: data.height ? parseFloat(parseFloat(data.height as any).toFixed(2)) : null,
       };
 
+      // Remove prisoner record fields from biodata submission
+      const formData = data as any;
+      delete biodataSubmission.escapee;
+      delete biodataSubmission.armed_personnel;
+      delete biodataSubmission.extremely_violent;
+      delete biodataSubmission.life_or_death_imprisonment;
+      delete biodataSubmission.commital;
+      delete biodataSubmission.previous_convictions_count;
+
       // Handle photo upload - convert to base64 if file is selected
       if (data.photo && data.photo instanceof FileList && data.photo.length > 0) {
         const photoFile = data.photo[0];
-        submissionData.photo = await fileToBase64(photoFile);
+        biodataSubmission.photo = await fileToBase64(photoFile);
       } else {
         // Remove photo field if no file is uploaded
-        delete submissionData.photo;
+        delete biodataSubmission.photo;
       }
 
       // Handle fingerprint upload - convert to base64 if file is selected
       if (data.finger_print && data.finger_print instanceof FileList && data.finger_print.length > 0) {
         const fingerprintFile = data.finger_print[0];
-        submissionData.finger_print = await fileToBase64(fingerprintFile);
+        biodataSubmission.finger_print = await fileToBase64(fingerprintFile);
       } else {
         // Remove finger_print field if no file is uploaded
-        delete submissionData.finger_print;
+        delete biodataSubmission.finger_print;
       }
       
-      // Submit to API
-      const response = await createPrisonerBiodata(submissionData);
+      // 1. Submit biodata to API
+      const biodataResponse = bioData?.id 
+        ? await updatePrisonerBiodata(bioData.id, biodataSubmission)
+        : await createPrisonerBiodata(biodataSubmission);
       
-      toast.success("Prisoner biodata submitted successfully!");
+      // 2. Prepare and submit prisoner record data separately
+      const prisonerRecordData: any = {
+        prisoner: prisonerId,
+        prisoner_class: data.prisoner_class,
+        escapee: formData.escapee || false,
+        armed_personnel: formData.armed_personnel || false,
+        extremely_violent: formData.extremely_violent || false,
+        life_or_death_imprisonment: formData.life_or_death_imprisonment || false,
+        commital: formData.commital || false,
+        previous_convictions_count: formData.previous_convictions_count || 0,
+        arrest_region: data.arrest_region,
+        arrest_district: data.arrest_district,
+        arrest_county: data.arrest_county,
+        arrest_sub_county: data.arrest_sub_county,
+        arrest_parish: data.arrest_parish,
+        arrest_village: data.arrest_village,
+        prison_station: JSON.parse(localStorage.getItem("pmis_user_filters") || "{}").station || "",
+      };
+
+      // Submit or update prisoner record
+      if (prisonerRecords.length > 0) {
+        // Update existing record
+        await updatePrisonerRecord(prisonerRecords[0].id, prisonerRecordData);
+      } else {
+        // Create new record
+        await createPrisonerRecord(prisonerRecordData);
+      }
+      
+      toast.success("Prisoner biodata and record submitted successfully!");
       
       // Clear form state and prisoner_id from localStorage on successful submission
       localStorage.removeItem("pmis_biodata_form_state");
@@ -278,10 +342,10 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       localStorage.removeItem("pmis_admission_form_state");
       
       // Call the parent onSubmit callback
-      onSubmit(response);
+      onSubmit(biodataResponse);
       
       // Navigate to prisoner detail screen
-      navigate(`/admissions-management/prisoner/${response.id}`);
+      navigate(`/admissions-management/prisoners/${prisonerId}`);
     } catch (error: any) {
       console.error("Error submitting biodata:", error);
       
@@ -1336,6 +1400,77 @@ const {
                   value="record"
                   className="space-y-4"
                 >
+                  {/* Existing Prisoner Records Display */}
+                  {bioData?.prisoner && (
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-medium">Prisoner Records History</h4>
+                        {loadingRecords && (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        )}
+                      </div>
+                      
+                      {prisonerRecords.length > 0 ? (
+                        <div className="border rounded-lg overflow-hidden">
+                          <Table>
+                            <TableHeader>
+                              <TableRow>
+                                <TableHead>Prisoner Class</TableHead>
+                                <TableHead>Prison Station</TableHead>
+                                <TableHead>Tags</TableHead>
+                                <TableHead>Security Rating</TableHead>
+                                <TableHead>Created</TableHead>
+                              </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                              {prisonerRecords.map((record) => (
+                                <TableRow key={record.id}>
+                                  <TableCell>{record.prisoner_class_name}</TableCell>
+                                  <TableCell>{record.prison_station_name}</TableCell>
+                                  <TableCell>
+                                    <div className="flex flex-wrap gap-1">
+                                      {record.escapee && (
+                                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded">
+                                          Escapee
+                                        </span>
+                                      )}
+                                      {record.armed_personnel && (
+                                        <span className="px-2 py-0.5 bg-orange-100 text-orange-800 text-xs rounded">
+                                          Armed
+                                        </span>
+                                      )}
+                                      {record.extremely_violent && (
+                                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs rounded">
+                                          Violent
+                                        </span>
+                                      )}
+                                      {record.life_or_death_imprisonment && (
+                                        <span className="px-2 py-0.5 bg-purple-100 text-purple-800 text-xs rounded">
+                                          Life/Death
+                                        </span>
+                                      )}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell>{record.avg_security_rating}/5</TableCell>
+                                  <TableCell>
+                                    {new Date(record.created_datetime).toLocaleDateString()}
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                            </TableBody>
+                          </Table>
+                        </div>
+                      ) : (
+                        !loadingRecords && (
+                          <p className="text-sm text-gray-500 italic">
+                            No prisoner records found. Fill out the form below to create one.
+                          </p>
+                        )
+                      )}
+                      <Separator className="mt-6" />
+                    </div>
+                  )}
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                       <Label htmlFor="prisoner_class">

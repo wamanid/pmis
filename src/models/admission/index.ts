@@ -3,6 +3,7 @@ export * from './dashboard';
 export * from './prisoner';
 export * from './prisonerNumber';
 export * from './prisonerBiodata';
+export * from './prisonerRecord';
 export * from './nextOfKin';
 export * from './debtorInformation';
 export * from './childRecord';
