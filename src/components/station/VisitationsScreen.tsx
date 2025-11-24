@@ -51,7 +51,7 @@ import {
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
-import VisitorPassForm from "../gatePass/VisitorPassForm";
+import VisitorPassForm from "../gate/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
 import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";

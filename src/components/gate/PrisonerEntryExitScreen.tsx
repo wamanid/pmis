@@ -1,4 +1,4 @@
-import React, { useState,useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -7,9 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { getprisonerMovements,getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass } from '../../services/gateService';
-import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
-
 import { 
   Search, 
   Eye, 
@@ -30,9 +27,8 @@ interface PrisonerGatePass {
   time_in: string | null;
   reason: string;
   prisoner: string;
-  gate_pass?: string;
+  gate_pass: string;
   working_party: string | null;
-  remark?: string | null;
 }
 
 interface GatePassDetail {
@@ -65,8 +61,8 @@ interface PrisonerDetail {
 }
 
 // Mock Data
-let mockPrisonerGatePasses: PrisonerGatePass[] = [
-  /*{
+const mockPrisonerGatePasses: PrisonerGatePass[] = [
+  {
     id: '1',
     prisoner_name: 'John Doe',
     working_party_name: '',
@@ -137,7 +133,7 @@ let mockPrisonerGatePasses: PrisonerGatePass[] = [
     prisoner: 'pr6',
     gate_pass: 'gp5',
     working_party: null
-  }*/
+  }
 ];
 
 const mockGatePassDetails: Record<string, GatePassDetail> = {
@@ -266,34 +262,15 @@ const mockPrisonerDetails: Record<string, PrisonerDetail> = {
   }
 };
 
-export  function PrisonerEntryExitScreen() {
+export default function PrisonerEntryExitScreen() {
   const [prisonerGatePasses, setPrisonerGatePasses] = useState<PrisonerGatePass[]>(mockPrisonerGatePasses);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerGatePass | null>(null);
+
   const itemsPerPage = 10;
-  const [isLoading, setIsLoading]=useState(true);
-
-  const loadData = async () => { 
-   // getvisitors
-  setIsLoading(true);
-    getprisonerMovements().then((data) => {
-    mockPrisonerGatePasses = data.results;
-    setPrisonerGatePasses(mockPrisonerGatePasses);
-   // alert(JSON.stringify(data.results));
-        setIsLoading(false);
-  }).catch((error) => {
-    alert(error);
-      setIsLoading(false);
-  });
-
-  }
-
-useEffect(() => {
-loadData();
-    }, []);
 
   // Get status based on time_out
   const getInOutStatus = (timeOut: string | null) => {
@@ -303,7 +280,7 @@ loadData();
   // Filter prisoner gate passes
   const filteredRecords = prisonerGatePasses.filter(record => {
     const matchesSearch = 
-      record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.reason.toLowerCase().includes(searchTerm.toLowerCase()) ||
       record.working_party_name.toLowerCase().includes(searchTerm.toLowerCase());
@@ -358,18 +335,6 @@ loadData();
   const prisonersOut = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'OUT').length;
   const prisonersIn = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'IN').length;
   const onWorkingParty = prisonerGatePasses.filter(p => p.working_party).length;
-
-
-    if (isLoading) {
-    return (
-      <div className="size-full flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading  data</p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -507,7 +472,7 @@ loadData();
                           <span className="text-gray-400">-</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-xs truncate">{record.remarks}</TableCell>
+                      <TableCell className="max-w-xs truncate">{record.reason}</TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {formatDateTime(record.time_out)}
                       </TableCell>
@@ -585,27 +550,27 @@ loadData();
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Prisoner Information</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {selectedRecord.prisoner ? (
+                    {mockPrisonerDetails[selectedRecord.prisoner] ? (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Full Name</p>
-                          <p>{selectedRecord.prisoner.first_name} &nbsp {selectedRecord.prisoner.lastname_name}</p>
+                          <p>{mockPrisonerDetails[selectedRecord.prisoner].full_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Prisoner Number</p>
-                          <p>{selectedRecord.prisoner.prisoner_number}</p>
+                          <p>{mockPrisonerDetails[selectedRecord.prisoner].prisoner_number}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Category</p>
-                          <Badge variant="outline">{selectedRecord.prisoner.prisoner_category}</Badge>
+                          <Badge variant="outline">{mockPrisonerDetails[selectedRecord.prisoner].category}</Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gender</p>
-                          <p>{selectedRecord.prisoner.sex}</p>
+                          <p>{mockPrisonerDetails[selectedRecord.prisoner].gender}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Date of Birth</p>
-                          <p>{new Date(selectedRecord.prisoner.date_of_birth).toLocaleDateString()}</p>
+                          <p>{new Date(mockPrisonerDetails[selectedRecord.prisoner].date_of_birth).toLocaleDateString()}</p>
                         </div>
                       </div>
                     ) : (
@@ -655,27 +620,42 @@ loadData();
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Gate Pass Details</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {selectedRecord.gate_pass? (
+                    {mockGatePassDetails[selectedRecord.gate_pass] ? (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Gate Pass Type</p>
-                          <p>{selectedRecord.gate_pass.gate_pass_type_name}</p>
+                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_pass_type_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gatekeeper</p>
-                          <p>{selectedRecord.gate_pass.gate_keeper_username}</p>
+                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_keeper_username}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Main Gate Required</p>
-                          <Badge className={selectedRecord.gate_pass.main_gate_required ? 'bg-green-600' : ''}>
-                            {selectedRecord.gate_pass.main_gate_required ? 'Yes' : 'No'}
+                          <Badge className={mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'bg-green-600' : ''}>
+                            {mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'Yes' : 'No'}
                           </Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Status</p>
-                          <Badge variant="outline">{selectedRecord.gate_pass.status_name}</Badge>
+                          <Badge variant="outline">{mockGatePassDetails[selectedRecord.gate_pass].status}</Badge>
                         </div>
-                      
+                        <div>
+                          <p className="text-sm text-gray-600">Created At</p>
+                          <p>{formatDateTime(mockGatePassDetails[selectedRecord.gate_pass].created_at)}</p>
+                        </div>
+                        {mockGatePassDetails[selectedRecord.gate_pass].exception_reason && (
+                          <div className="col-span-2">
+                            <p className="text-sm text-gray-600">Exception Reason</p>
+                            <p>{mockGatePassDetails[selectedRecord.gate_pass].exception_reason}</p>
+                          </div>
+                        )}
+                        {mockGatePassDetails[selectedRecord.gate_pass].remarks && (
+                          <div className="col-span-2">
+                            <p className="text-sm text-gray-600">Remarks</p>
+                            <p>{mockGatePassDetails[selectedRecord.gate_pass].remarks}</p>
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <p className="text-gray-500">Gate pass details not available</p>
@@ -683,23 +663,28 @@ loadData();
                   </CardContent>
                 </Card>
               </div>
+
               {/* Working Party Details */}
-              {selectedRecord.working_party_name && (
+              {selectedRecord.working_party && (
                 <>
                   <Separator />
                   <div>
                     <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Working Party Details</h3>
                     <Card>
                       <CardContent className="p-4">
-                        {selectedRecord.working_party ? (
+                        {mockWorkingPartyDetails[selectedRecord.working_party] ? (
                           <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-gray-600">Name</p>
-                              <p>{selectedRecord.working_party_name}</p>
+                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].name}</p>
+                            </div>
+                            <div>
+                              <p className="text-sm text-gray-600">Capacity</p>
+                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].current_members} / {mockWorkingPartyDetails[selectedRecord.working_party].capacity}</p>
                             </div>
                             <div className="col-span-2">
                               <p className="text-sm text-gray-600">Description</p>
-                              <p>{selectedRecord.remark}</p>
+                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].description}</p>
                             </div>
                           </div>
                         ) : (
@@ -718,5 +703,3 @@ loadData();
     </div>
   );
 }
-
-
