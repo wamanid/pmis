@@ -228,6 +228,17 @@ export const alphabeticValidation = {
 };
 
 /**
+ * Name validation rule (letters, apostrophes, hyphens)
+ * Allows proper names like O'Brien, Mary-Jane, etc.
+ */
+export const nameValidation = {
+  pattern: {
+    value: /^[a-zA-Z\s'-]+$/,
+    message: "Please enter only letters, spaces, apostrophes, and hyphens",
+  },
+};
+
+/**
  * Alphanumeric validation rule
  */
 export const alphanumericValidation = {

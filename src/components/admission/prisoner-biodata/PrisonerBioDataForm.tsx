@@ -66,7 +66,7 @@ import {
   Loader2,
   Baby,
 } from "lucide-react";
-import { phoneNumberValidationFlexible, alphabeticValidation } from "../../../utils";
+import { phoneNumberValidationFlexible, nameValidation } from "../../../utils";
 
 interface PrisonerBiodataFormProps {
   bioData: PrisonerBiodata | null;
@@ -600,7 +600,7 @@ const {
                       <Input
                         id="first_name"
                         {...register("first_name", {
-                          ...alphabeticValidation,
+                          ...nameValidation,
                           required: "First name is required",
                         })}
                         placeholder="Enter first name"
