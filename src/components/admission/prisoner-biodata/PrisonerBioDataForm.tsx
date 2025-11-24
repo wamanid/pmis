@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from "react";
-import { useForm, Controller } from "react-hook-form@7.55.0";
+import { useForm, Controller } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import { Button } from "../../ui/button";
 import { Input } from "../../ui/input";
 import { Label } from "../../ui/label";
@@ -39,13 +39,12 @@ import NextOfKinForm from "../NextOfKinForm";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
 import { Separator } from "../../ui/separator";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "../../ui/table";
-import { PrisonerBioData } from "./PrisonerBioDataList";
-import { ArmedPersonnel, ChildRecord, NextOfKin } from "../../../models/admission/";
+import type { PrisonerBiodata, ArmedPersonnel, ChildRecord, NextOfKin } from "../../../models/admission";
 import { CardContent } from "../../ui/card";
 import { Card } from "../../ui/card";
 import { CardHeader } from "../../ui/card";
 import { CardTitle } from "../../ui/card";
-import { createPrisonerBiodata } from "../../../services/prisonerBiodataService";
+import { createPrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 import {
   Search,
   User,
@@ -67,16 +66,16 @@ import {
   Loader2,
   Baby,
 } from "lucide-react";
+import { phoneNumberValidationFlexible, alphabeticValidation } from "../../../utils";
 
-interface PrisonerBioDataFormProps {
-  bioData: PrisonerBioData | null;
-  onSubmit: (data: PrisonerBioData) => void;
+interface PrisonerBiodataFormProps {
+  bioData: PrisonerBiodata | null;
+  onSubmit: (data: PrisonerBiodata) => void;
   onCancel: () => void;
   prisonerCategory?: string;
 }
 
-
-const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
+const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
   bioData,
   onSubmit,
   onCancel,
@@ -95,7 +94,7 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
     setError,
     clearErrors,
     formState: { errors },
-  } = useForm<PrisonerBioData>({
+  } = useForm<PrisonerBiodata>({
     defaultValues: bioData || {
       is_active: true,
       first_name: "",
@@ -118,7 +117,7 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
           // Populate all fields explicitly
           Object.keys(formData).forEach((key) => {
             if (formData[key] !== undefined && formData[key] !== null) {
-              setValue(key as keyof PrisonerBioData, formData[key]);
+              setValue(key as keyof PrisonerBiodata, formData[key]);
             }
           });
         }
@@ -197,7 +196,7 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
   }, [watch]);
 
   // Helper function to set value and clear error
-  const setValueAndClearError = (field: keyof PrisonerBioData, value: any) => {
+  const setValueAndClearError = (field: keyof PrisonerBiodata, value: any) => {
     setValue(field, value);
     clearErrors(field);
   };
@@ -212,7 +211,7 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
     });
   };
 
-  const handleFormSubmit = async (data: PrisonerBioData) => {
+  const handleFormSubmit = async (data: PrisonerBiodata) => {
     try {
       setIsSubmitting(true);
       
@@ -296,7 +295,7 @@ const PrisonerBioDataForm: React.FC<PrisonerBioDataFormProps> = ({
         // Set field-level errors on the form
         Object.entries(validationErrors).forEach(([field, messages]: [string, any]) => {
           const errorMessage = Array.isArray(messages) ? messages[0] : messages;
-          setError(field as keyof PrisonerBioData, {
+          setError(field as keyof PrisonerBiodata, {
             type: 'manual',
             message: errorMessage,
           });
@@ -601,6 +600,7 @@ const {
                       <Input
                         id="first_name"
                         {...register("first_name", {
+                          ...alphabeticValidation,
                           required: "First name is required",
                         })}
                         placeholder="Enter first name"
@@ -1821,4 +1821,4 @@ const {
   );
 };
 
-export default PrisonerBioDataForm;
+export default PrisonerBiodataForm;

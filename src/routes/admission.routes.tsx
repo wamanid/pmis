@@ -27,7 +27,7 @@ export const admissionRoutes: RouteObject[] = [
     element: <PendingApprovals />,
   },
   {
-    path: '/admissions-management/prisoner/:id',
+    path: '/admissions-management/prisoners/:id',
     element: <PrisonerDetailScreen />,
   },
   {

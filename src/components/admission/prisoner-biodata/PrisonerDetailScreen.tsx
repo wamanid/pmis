@@ -22,21 +22,23 @@ import {
 import { toast } from "sonner";
 import PrisonerBioDataView from "./PrisonerBioDataView";
 import PrisonerBioDataForm from "./PrisonerBioDataForm";
-import { PrisonerBioData } from "./PrisonerBioDataList";
-import { getPrisonerBiodataByPrisonerId, createPrisonerBiodata } from "../../../services/prisonerBiodataService";
+import { getPrisonerById } from "../../../services/admission/prisonerService";
+import { getPrisonerBiodataByPrisonerId, updatePrisonerBiodata, deletePrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
+import type { Prisoner, PrisonerBiodata } from "../../../models/admission";
 
 const PrisonerDetailScreen: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [bioData, setBioData] = useState<PrisonerBioData | null>(null);
+  const [prisoner, setPrisoner] = useState<Prisoner | null>(null);
+  const [bioData, setBioData] = useState<PrisonerBiodata | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch prisoner bio data on mount
+  // Fetch prisoner info and bio data on mount
   useEffect(() => {
-    const fetchBioData = async () => {
+    const fetchPrisonerData = async () => {
       if (!id) {
         setError("No prisoner ID provided");
         setIsLoading(false);
@@ -45,19 +47,30 @@ const PrisonerDetailScreen: React.FC = () => {
 
       setIsLoading(true);
       try {
-        const data = await getPrisonerBiodataByPrisonerId(id);
-        setBioData(data);
+        // First, fetch prisoner basic info
+        const prisonerData = await getPrisonerById(id);
+        setPrisoner(prisonerData);
+
+        // Then, fetch prisoner biodata using prisoner ID filter
+        const biodataResult = await getPrisonerBiodataByPrisonerId(id);
+        
+        if (biodataResult) {
+          setBioData(biodataResult);
+        } else {
+          setError("No biodata found for this prisoner");
+        }
+        
         setError(null);
       } catch (error: any) {
-        console.error("Error fetching bio data:", error);
-        setError(error.message || "Failed to load prisoner bio data");
-        toast.error("Failed to load prisoner bio data");
+        console.error("Error fetching prisoner data:", error);
+        setError(error.message || "Failed to load prisoner data");
+        toast.error("Failed to load prisoner data");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchBioData();
+    fetchPrisonerData();
   }, [id]);
 
   const handleEdit = () => {
@@ -69,18 +82,32 @@ const PrisonerDetailScreen: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!id) return;
+    if (!bioData?.id) return;
     
-    // TODO: Implement delete functionality when API endpoint is available
-    toast.info("Delete functionality not yet implemented");
-    setIsDeleteDialogOpen(false);
+    try {
+      await deletePrisonerBiodata(bioData.id);
+      toast.success("Prisoner biodata deleted successfully");
+      navigate("/admissions-management/prisoners");
+    } catch (error) {
+      console.error("Error deleting biodata:", error);
+      toast.error("Failed to delete prisoner biodata");
+    } finally {
+      setIsDeleteDialogOpen(false);
+    }
   };
 
-  const handleFormSubmit = async (data: PrisonerBioData) => {
-    // TODO: Implement update functionality when API endpoint is available
-    setBioData(data);
-    toast.success("Prisoner bio data updated successfully!");
-    setIsEditDialogOpen(false);
+  const handleFormSubmit = async (data: PrisonerBiodata) => {
+    if (!bioData?.id) return;
+    
+    try {
+      const updated = await updatePrisonerBiodata(bioData.id, data);
+      setBioData(updated);
+      toast.success("Prisoner biodata updated successfully!");
+      setIsEditDialogOpen(false);
+    } catch (error) {
+      console.error("Error updating biodata:", error);
+      toast.error("Failed to update prisoner biodata");
+    }
   };
 
   const handleBack = () => {
@@ -100,14 +127,14 @@ const PrisonerDetailScreen: React.FC = () => {
     );
   }
 
-  if (error || !bioData) {
+  if (error || !prisoner) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card>
           <CardContent className="pt-6">
             <div className="text-center space-y-4">
               <p className="text-muted-foreground">
-                {error || "Prisoner bio data not found"}
+                {error || "Prisoner not found"}
               </p>
               <Button onClick={handleBack} variant="outline">
                 <ArrowLeft className="h-4 w-4 mr-2" />
@@ -130,10 +157,9 @@ const PrisonerDetailScreen: React.FC = () => {
             Back to List
           </Button>
           <div>
-            <h1 className="text-2xl font-bold">Prisoner Bio Data Details</h1>
+            <h1 className="text-2xl font-bold">Prisoner Details</h1>
             <p className="text-muted-foreground">
-              {bioData.prisoner_number} -{" "}
-              {`${bioData.first_name} ${bioData.middle_name || ""} ${bioData.surname}`.trim()}
+              {prisoner.prisoner_number_value} - {prisoner.full_name}
             </p>
           </div>
         </div>
@@ -154,7 +180,17 @@ const PrisonerDetailScreen: React.FC = () => {
       </div>
 
       {/* Bio Data View */}
-      <PrisonerBioDataView bioData={bioData} />
+      {bioData ? (
+        <PrisonerBioDataView bioData={bioData} />
+      ) : (
+        <Card>
+          <CardContent className="pt-6">
+            <p className="text-center text-muted-foreground">
+              No biodata available for this prisoner
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Edit Dialog */}
       
@@ -162,7 +198,7 @@ const PrisonerDetailScreen: React.FC = () => {
         open={isEditDialogOpen}
         onOpenChange={setIsEditDialogOpen}
       >
-        <DialogContent className="max-w-[95vw] md:w-80 w-full max-h-[95vh] overflow-y-auto">
+        <DialogContent className="w-[80vw] max-w-[80vw] sm:max-w-[80vw] max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Prisoner Bio Data</DialogTitle>
           </DialogHeader>
@@ -183,9 +219,8 @@ const PrisonerDetailScreen: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the bio data for{" "}
-              {bioData.first_name} {bioData.surname}. This
-              action cannot be undone.
+              This will permanently delete the biodata for{" "}
+              {prisoner.full_name}. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
