@@ -46,6 +46,7 @@ import { CardHeader } from "../../ui/card";
 import { CardTitle } from "../../ui/card";
 import { createPrisonerBiodata, updatePrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 import { getPrisonerRecordsByPrisonerId, createPrisonerRecord, updatePrisonerRecord } from "../../../services/admission/prisonerRecordService";
+import { pastOrTodayDateValidation, minimumAgeValidation } from "../../../utils/validation";
 import {
   Search,
   User,
@@ -727,6 +728,7 @@ const {
                         type="date"
                         {...register("date_of_birth", {
                           required: "Date of birth is required",
+                          ...minimumAgeValidation(18),
                         })}
                       />
                       {errors.date_of_birth && (
@@ -1066,6 +1068,7 @@ const {
                         {...register("date_of_admission", {
                           required:
                             "Date of admission is required",
+                          ...pastOrTodayDateValidation,
                         })}
                       />
                       {errors.date_of_admission && (

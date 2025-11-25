@@ -200,6 +200,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     const isExpanded = expandedItems.has(item.id);
     const Icon = item.icon;
     const isActive = location.pathname === item.path;
+    const isTopLevel = level === 0;
 
     return (
       <div key={item.id}>
@@ -228,9 +229,14 @@ export function Sidebar({ isOpen }: SidebarProps) {
             ))}
         </button>
         {hasChildren && isExpanded && (
-          <div className="mt-1">
-            {item.children!.map((child) => renderMenuItem(child, level + 1))}
-          </div>
+          <>
+            <div className="mt-1">
+              {item.children!.map((child) => renderMenuItem(child, level + 1))}
+            </div>
+            {isTopLevel && (
+              <div className="my-2 mx-3 border-t border-border" />
+            )}
+          </>
         )}
       </div>
     );
