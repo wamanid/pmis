@@ -8,3 +8,4 @@ export * from './nextOfKin';
 export * from './debtorInformation';
 export * from './childRecord';
 export * from './armedPersonnel';
+export * from './bulkAdmission';
