@@ -9,6 +9,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, AlertCircle, Upload, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { cn } from '../ui/utils';
+import { phoneNumberValidation, emailValidation, requiredValidation } from "../../utils/validation";
 import {
   Item,
   ItemCategories,
