@@ -2,20 +2,27 @@ import axiosInstance from "../../axiosInstance";
 import {Item, VisitorItem, VisitorItemResponse, VisitorItemsResponse} from "./visitorItem";
 
 export interface Pass {
-  is_active: boolean;
-  deleted_datetime: string | null;
-  visitor_tag_number: string;
-  valid_from: string;
-  valid_until: string;
-  purpose: string;
-  is_suspended: boolean;
-  suspended_date: string | null;
-  suspended_reason: string;
-  is_valid: boolean;
-  deleted_by: number | null;
   prisoner: string;
   visitor: string;
-  suspended_by: string;
+  issue_date: string;
+  valid_from: string;
+  valid_until: string;
+  is_suspended: boolean;
+  // remarks: string;
+  // is_active: boolean;
+  // deleted_datetime: string | null;
+  // visitor_tag_number: string;
+  // valid_from: string;
+  // valid_until: string;
+  // purpose: string;
+  // is_suspended: boolean;
+  // suspended_date: string | null;
+  // suspended_reason: string;
+  // is_valid: boolean;
+  // deleted_by: number | null;
+  // prisoner: string;
+  // visitor: string;
+  // suspended_by: string;
 }
 
 export interface VisitorPass {

@@ -736,7 +736,6 @@ export function StaffEntryExitScreen() {
           <DataTable
             /* controlled mode: we already fetch server data in this component (loadTable) */
             data={tableData}
-            url="/station-management/api/attendance/"
             loading={tableLoading}
             total={total}
             title="Staff Entry & Exit Records"

@@ -32,16 +32,28 @@ import { format } from "date-fns";
 import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import {
-  addStationVisitor,
-  GateItem,
-  getGates,
-  getIdTypes,
-  getPrisoners, getRelationships, getVisitorStatus,
-  getVisitorTypes, IdType, Prisoner, PrisonerItem, RelationShipItem,
-  StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
-} from "../../services/stationServices/visitorsServices/VisitorsService";
-import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
-import {fileToBinaryString, handleResponseError} from "../../services/stationServices/utils";
+   addStationVisitor,
+   GateItem,
+   getGates,
+   getIdTypes,
+   getPrisoners, getRelationships, getVisitorStatus,
+   getVisitorTypes, IdType, Prisoner, PrisonerItem, RelationShipItem,
+   StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
+ } from "../../services/stationServices/visitorsServices/VisitorsService";
+// validation utils
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation,
+  pastDateValidation,
+  normalizePhoneNumber,
+} from "../../utils/validation";
+ import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
+ import {fileToBinaryString, handleResponseError} from "../../services/stationServices/utils";
+import axiosInstance from "../../services/axiosInstance";
 
 // Types
 interface Visitor {
@@ -76,61 +88,17 @@ interface VisitorRegistrationDialogProps {
   onOpenChange: (open: boolean) => void;
   onVisitorCreated?: (visitor: Visitor) => void;
   setVisitors?: React.Dispatch<React.SetStateAction<Visitor[]>>;
+  onSaved?: () => void;
   editingVisitor?: Visitor | null;
 }
 
-// Mock data
-// const mockGates = [
-//   { id: "1", name: "Main Gate" },
-//   { id: "2", name: "East Gate" },
-//   { id: "3", name: "West Gate" },
-// ];
-
-// const mockPrisoners = [
-//   { id: "1", name: "John Doe", prisoner_number: "P-2024-001" },
-//   { id: "2", name: "Jane Smith", prisoner_number: "P-2024-002" },
-//   { id: "3", name: "Michael Johnson", prisoner_number: "P-2024-003" },
-// ];
-
-// const mockVisitorTypes = [
-//   { id: "1", name: "Family Member" },
-//   { id: "2", name: "Legal Representative" },
-//   { id: "3", name: "Religious Leader" },
-//   { id: "4", name: "Official" },
-// ];
-
-// const mockRelationships = [
-//   { id: "1", name: "Spouse" },
-//   { id: "2", name: "Parent" },
-//   { id: "3", name: "Child" },
-//   { id: "4", name: "Sibling" },
-//   { id: "5", name: "Friend" },
-//   { id: "6", name: "Lawyer" },
-// ];
-
-// const mockIDTypes = [
-//   { id: "1", name: "National ID" },
-//   { id: "2", name: "Passport" },
-//   { id: "3", name: "Driver's License" },
-//   { id: "4", name: "Work Permit" },
-// ];
-
-// const mockVisitorStatuses = [
-//   { id: "1", name: "Checked In", color: "green" },
-//   { id: "2", name: "Checked Out", color: "gray" },
-//   { id: "3", name: "Blacklisted", color: "red" },
-// ];
-
-// const mockStaff = [
-//   { id: "1", force_number: "F-001", name: "Officer Smith", rank: "Sergeant" },
-//   { id: "2", force_number: "F-002", name: "Officer Jones", rank: "Corporal" },
-// ];
 
 export default function VisitorRegistrationDialog({
   open,
   onOpenChange,
   setVisitors,
   editingVisitor,
+  onSaved,
 }: VisitorRegistrationDialogProps) {
   const [form, setForm] = useState<StationVisitor>({
   is_active: true,
@@ -162,6 +130,9 @@ export default function VisitorRegistrationDialog({
   gate_keeper: "",
 });
 
+  // inline validation errors
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
   const [loading, setLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [useCamera, setUseCamera] = useState(false);
@@ -191,12 +162,27 @@ export default function VisitorRegistrationDialog({
 
   useEffect(() => {
     if (editingVisitor) {
+      // normalize visitation_datetime to yyyy-mm-dd for the date input
+      const rawDate = (editingVisitor as any).visitation_datetime;
+      let dateOnly = "";
+      if (rawDate) {
+        try {
+          dateOnly =
+            typeof rawDate === "string" && rawDate.includes("T")
+              ? rawDate.split("T")[0]
+              : new Date(rawDate).toISOString().split("T")[0];
+        } catch {
+          dateOnly = "";
+        }
+      }
+
       setForm({
         ...editingVisitor,
+        visitation_datetime: dateOnly || new Date().toISOString().split("T")[0],
         time_in: extractTimeHHMM(editingVisitor?.time_in),
         time_out: extractTimeHHMM(editingVisitor?.time_out ?? ""),
       });
-      setPhotoPreview(editingVisitor.photo)
+      setPhotoPreview((editingVisitor as any).photo ?? "");
     }
   }, [editingVisitor]);
 
@@ -270,23 +256,23 @@ export default function VisitorRegistrationDialog({
   };
 
   const capturePhoto = async () => {
-    if (videoRef.current && canvasRef.current) {
-      const video = videoRef.current;
-      const canvas = canvasRef.current;
-      canvas.width = video.videoWidth;
-      canvas.height = video.videoHeight;
-      const ctx = canvas.getContext("2d");
-      if (ctx) {
-        ctx.drawImage(video, 0, 0);
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob(resolve, "image/jpeg")
-        );
+     if (videoRef.current && canvasRef.current) {
+       const video = videoRef.current;
+       const canvas = canvasRef.current;
+       canvas.width = video.videoWidth;
+       canvas.height = video.videoHeight;
+       const ctx = canvas.getContext("2d");
+       if (ctx) {
+         ctx.drawImage(video, 0, 0);
+         const blob = await new Promise<Blob | null>((resolve) =>
+           canvas.toBlob(resolve, "image/jpeg")
+         );
 
         if (!blob) return;
 
-        const file = new File([blob], "visitor-photo.jpg", { type: "image/jpeg" });
-        const binaryString = await fileToBinaryString(file);
-        setForm({ ...form, photo: binaryString });
+        const file = new File([blob], `visitor-photo-${Date.now()}.jpg`, { type: "image/jpeg" });
+        // store File so we can append to FormData
+        setForm({ ...form, photo: file as any });
         setPhotoPreview(URL.createObjectURL(blob));
         stopCamera();
         toast.success("Photo captured successfully");
@@ -295,53 +281,154 @@ export default function VisitorRegistrationDialog({
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-
-      const binaryString = await fileToBinaryString(file);
-      setForm({ ...form, photo: binaryString });
-
+     const file = e.target.files?.[0];
+     if (file) {
+      // store File directly for upload
+      setForm({ ...form, photo: file as any });
       const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
+      reader.onloadend = () => setPhotoPreview(reader.result as string);
       reader.readAsDataURL(file);
-      toast.success("Photo uploaded successfully");
+       toast.success("Photo uploaded successfully");
     }
   };
 
+  function combineDateAndTimeToIso(dateStr?: string, timeStr?: string) {
+    if (!dateStr) return undefined;
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const [hh = 0, mm = 0] = (timeStr || "").split(":").map((v) => Number(v || 0));
+    const dt = new Date(y, (m || 1) - 1, d, Number.isFinite(hh) ? hh : 0, Number.isFinite(mm) ? mm : 0, 0, 0);
+    if (Number.isNaN(dt.getTime())) return undefined;
+    return dt.toISOString();
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // client-side validation (show inline messages)
+    const errs: Record<string,string> = {};
+
+    // required / name validations
+    if (!form.first_name || !form.first_name.trim()) errs.first_name = "First name is required";
+    else if (!nameValidation.pattern.value.test(form.first_name.trim())) errs.first_name = nameValidation.pattern.message;
+
+    if (!form.last_name || !form.last_name.trim()) errs.last_name = "Last name is required";
+    else if (!nameValidation.pattern.value.test(form.last_name.trim())) errs.last_name = nameValidation.pattern.message;
+
+    // contact number validation
+    if (!form.contact_no || !String(form.contact_no).trim()) errs.contact_no = "Contact number is required";
+    else if (!phoneNumberValidation.pattern.value.test(String(form.contact_no).trim())) errs.contact_no = phoneNumberValidation.pattern.message;
+
+    // id type dependent validation
+    const selectedIdType = mockIDTypes.find(t => t.id === form.id_type)?.name?.toLowerCase() ?? "";
+    if (!form.id_number || !String(form.id_number).trim()) {
+      errs.id_number = "ID / Passport number is required";
+    } else {
+      const idVal = String(form.id_number).trim();
+      if (selectedIdType.includes("passport")) {
+        if (!passportValidation.pattern.value.test(idVal)) errs.id_number = passportValidation.pattern.message;
+      } else if (selectedIdType.includes("national") || selectedIdType.includes("id")) {
+        if (!nationalIdValidation.pattern.value.test(idVal)) errs.id_number = nationalIdValidation.pattern.message;
+      }
+    }
+
+    // visitation date must not be in the future
+    if (!form.visitation_datetime) {
+      errs.visitation_datetime = "Visitation date is required";
+    } else {
+      const ok = pastDateValidation.validate(String(form.visitation_datetime));
+      if (ok !== true) errs.visitation_datetime = String(ok);
+    }
+
+    // required selects
+    if (!form.gate) errs.gate = "Gate is required";
+    if (!form.prisoner) errs.prisoner = "Prisoner is required";
+    if (!form.visitor_type) errs.visitor_type = "Visitor type is required";
+    if (!form.place_visited || !String(form.place_visited).trim()) errs.place_visited = "Place visited is required";
+    if (!form.reason_of_visitation || !String(form.reason_of_visitation).trim()) errs.reason_of_visitation = "Reason for visit is required";
+
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      toast.error("Please fix the highlighted fields");
+      return;
+    }
+
+    setErrors({});
     setLoading(true);
 
     try {
-      // Simulate API call
-      // await new Promise((resolve) => setTimeout(resolve, 1000));
+      // normalize phone for backend
+      const normalizedPhone = normalizePhoneNumber(String(form.contact_no || ""));
+      const payload = { ...form, contact_no: normalizedPhone };
 
-      const newVisitor = {
-        ...form,
-        time_in: timeToIso(form.time_in),
-        time_out: timeToIso(form.time_out),
-        id: editingVisitor?.id || `visitor-${Date.now()}`,
-      };
+      // Build FormData for multipart upload (works with or without photo)
+      const formData = new FormData();
+      // required/standard fields (append strings only)
+      formData.append("first_name", payload.first_name || "");
+      formData.append("middle_name", payload.middle_name || "");
+      formData.append("last_name", payload.last_name || "");
+      formData.append("organisation", payload.organisation || "");
+      formData.append("id_number", payload.id_number || "");
+      formData.append("contact_no", payload.contact_no || "");
+      formData.append("remarks", payload.remarks || "");
+      formData.append("vehicle_no", payload.vehicle_no || "");
+      formData.append("reason_of_visitation", payload.reason_of_visitation || "");
+      formData.append("address", payload.address || "");
+      formData.append("place_visited", payload.place_visited || "");
+      formData.append("blacklist_reason", payload.blacklist_reason || "");
+      formData.append("visit_location", payload.visit_location || "");
+      formData.append("prisoner", payload.prisoner || "");
+      formData.append("visitor_type", payload.visitor_type || "");
+      formData.append("relation", payload.relation || "");
+      formData.append("visitor_status", payload.visitor_status || "");
+      formData.append("id_type", payload.id_type || "");
+      formData.append("gate", payload.gate || "");
+      formData.append("gate_keeper", payload.gate_keeper || "");
 
-      if (newVisitor.photo?.startsWith("https://")) {
-        delete newVisitor.photo;
+      // datetime conversions: visitation_datetime should be date-time (combine date + time_in if present)
+      const visitationIso = combineDateAndTimeToIso(String(payload.visitation_datetime), payload.time_in);
+      if (visitationIso) formData.append("visitation_datetime", visitationIso);
+
+      // time_in is required (api expects date-time)
+      const timeInIso = combineDateAndTimeToIso(String(payload.visitation_datetime), payload.time_in) ?? timeToIso(payload.time_in || "");
+      if (timeInIso) formData.append("time_in", timeInIso);
+
+      // time_out is optional: append only if provided
+      if (payload.time_out) {
+        const timeOutIso = combineDateAndTimeToIso(String(payload.visitation_datetime), payload.time_out) ?? timeToIso(payload.time_out);
+        if (timeOutIso) formData.append("time_out", timeOutIso);
       }
 
-      // console.log(newVisitor)
-
-      if (!editingVisitor) {
-         const response = await addStationVisitor(newVisitor)
-         if (handleResponseError(response)) return
-         setVisitors(prev => ([response, ...prev]))
+      // Append photo file only if it's a File instance
+      if (payload.photo && payload.photo instanceof File) {
+        formData.append("photo", payload.photo as File);
       }
-      else {
-         const response = await updateStationVisitor(newVisitor, editingVisitor.id)
-         if (handleResponseError(response)) return
-         if ("id" in response) {
-           setVisitors(prev => prev.map(v => (v.id === response.id ? response : v)))
-         }
+
+      // decide endpoint and method (create vs update)
+      try {
+        let res;
+        if (!editingVisitor) {
+          res = await axiosInstance.post("/gate-management/station-visitors/", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        } else {
+          res = await axiosInstance.put(`/gate-management/station-visitors/${editingVisitor.id}/`, formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+          });
+        }
+        const responseData = res.data;
+        if (handleResponseError(responseData)) return;
+        if (!editingVisitor) {
+          if (typeof setVisitors === "function") setVisitors((prev = []) => [responseData, ...prev]);
+        } else {
+          if (typeof setVisitors === "function") setVisitors((prev = []) => prev.map((v: any) => (v.id === responseData.id ? responseData : v)));
+        }
+        if (typeof onVisitorCreated === "function") onVisitorCreated(responseData);
+        // notify parent to refresh server-backed DataTable
+        try { onSaved?.(); } catch (e) { /* ignore */ }
+      } catch (err: any) {
+        console.error("Submit error:", err);
+        const serverBody = err?.response?.data ?? err?.message ?? err;
+        toast.error(typeof serverBody === "string" ? serverBody : JSON.stringify(serverBody));
+        return;
       }
 
       toast.success(
@@ -499,7 +586,7 @@ export default function VisitorRegistrationDialog({
                     <TabsContent value="personal" className="space-y-4 mt-4">
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="first_name">First Name *</Label>
+                          <Label htmlFor="first_name">First Name <span className="text-red-500">*</span></Label>
                           <Input
                             id="first_name"
                             value={form.first_name}
@@ -524,7 +611,7 @@ export default function VisitorRegistrationDialog({
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="last_name">Last Name *</Label>
+                          <Label htmlFor="last_name">Last Name <span className="text-red-500">*</span></Label>
                           <Input
                             id="last_name"
                             value={form.last_name}
@@ -539,7 +626,7 @@ export default function VisitorRegistrationDialog({
 
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div className="space-y-2">
-                          <Label htmlFor="contact_no">Contact Number *</Label>
+                          <Label htmlFor="contact_no">Contact Number <span className="text-red-500">*</span></Label>
                           <Input
                             id="contact_no"
                             value={form.contact_no}
@@ -549,10 +636,11 @@ export default function VisitorRegistrationDialog({
                             placeholder="+256700123456"
                             required
                           />
+                         {errors.contact_no && <p className="text-red-500 text-sm mt-1">{errors.contact_no}</p>}
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="organisation">Organisation *</Label>
+                          <Label htmlFor="organisation">Organisation <span className="text-red-500">*</span></Label>
                           <Input
                             id="organisation"
                             value={form.organisation}
@@ -565,7 +653,7 @@ export default function VisitorRegistrationDialog({
                       </div>
 
                       <div className="space-y-2">
-                        <Label htmlFor="address">Address *</Label>
+                        <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                         <Textarea
                           id="address"
                           value={form.address}
@@ -581,7 +669,7 @@ export default function VisitorRegistrationDialog({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* ID Type */}
                         <div className="space-y-2">
-                          <Label>ID Type *</Label>
+                          <Label>ID Type <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openIDTypeCombo}
                             onOpenChange={setOpenIDTypeCombo}
@@ -632,7 +720,7 @@ export default function VisitorRegistrationDialog({
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="id_number">ID Number *</Label>
+                          <Label htmlFor="id_number">ID Number <span className="text-red-500">*</span></Label>
                           <Input
                             id="id_number"
                             value={form.id_number}
@@ -642,6 +730,7 @@ export default function VisitorRegistrationDialog({
                             placeholder="Enter ID number"
                             required
                           />
+                         {errors.id_number && <p className="text-red-500 text-sm mt-1">{errors.id_number}</p>}
                         </div>
                       </div>
                     </TabsContent>
@@ -651,7 +740,7 @@ export default function VisitorRegistrationDialog({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Gate */}
                         <div className="space-y-2">
-                          <Label>Gate *</Label>
+                          <Label>Gate <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openGateCombo}
                             onOpenChange={setOpenGateCombo}
@@ -702,7 +791,7 @@ export default function VisitorRegistrationDialog({
 
                         {/* Gate Keeper */}
                         <div className="space-y-2">
-                          <Label>Gate Keeper *</Label>
+                          <Label>Gate Keeper <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openGateKeeperCombo}
                             onOpenChange={setOpenGateKeeperCombo}
@@ -758,7 +847,7 @@ export default function VisitorRegistrationDialog({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Prisoner */}
                         <div className="space-y-2">
-                          <Label>Prisoner *</Label>
+                          <Label>Prisoner <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openPrisonerCombo}
                             onOpenChange={setOpenPrisonerCombo}
@@ -810,7 +899,7 @@ export default function VisitorRegistrationDialog({
 
                         {/* Visitor Type */}
                         <div className="space-y-2">
-                          <Label>Visitor Type *</Label>
+                          <Label>Visitor Type <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openVisitorTypeCombo}
                             onOpenChange={setOpenVisitorTypeCombo}
@@ -865,7 +954,7 @@ export default function VisitorRegistrationDialog({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {/* Relationship */}
                         <div className="space-y-2">
-                          <Label>Relationship *</Label>
+                          <Label>Relationship <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openRelationCombo}
                             onOpenChange={setOpenRelationCombo}
@@ -918,7 +1007,7 @@ export default function VisitorRegistrationDialog({
 
                         {/* Visitor Status */}
                         <div className="space-y-2">
-                          <Label>Visitor Status *</Label>
+                          <Label>Visitor Status <span className="text-red-500">*</span></Label>
                           <Popover
                             open={openVisitorStatusCombo}
                             onOpenChange={setOpenVisitorStatusCombo}
@@ -976,45 +1065,16 @@ export default function VisitorRegistrationDialog({
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {/* Visitation Date */}
                         <div className="space-y-2">
-                          <Label>Visitation Date *</Label>
+                          <Label>Visitation Date <span className="text-red-500">*</span></Label>
                           <Input
                             type="date"
                             value={form.visitation_datetime}
                             onChange={(e) => setForm({ ...form, visitation_datetime: e.target.value })}
                           />
-                          {/*<Popover open={calendarOpen} onOpenChange={setCalendarOpen}>*/}
-                          {/*  <PopoverTrigger asChild>*/}
-                          {/*    <Button*/}
-                          {/*      variant="outline"*/}
-                          {/*      className={cn(*/}
-                          {/*        "w-full justify-start text-left",*/}
-                          {/*        !form.visitation_datetime &&*/}
-                          {/*          "text-muted-foreground"*/}
-                          {/*      )}*/}
-                          {/*    >*/}
-                          {/*      <CalendarIcon className="mr-2 h-4 w-4" />*/}
-                          {/*      {form.visitation_datetime ? (*/}
-                          {/*        format(form.visitation_datetime, "PPP")*/}
-                          {/*      ) : (*/}
-                          {/*        <span>Pick a date</span>*/}
-                          {/*      )}*/}
-                          {/*    </Button>*/}
-                          {/*  </PopoverTrigger>*/}
-                          {/*  <PopoverContent className="w-auto p-0" align="start">*/}
-                          {/*    <Calendar*/}
-                          {/*      mode="single"*/}
-                          {/*      selected={form.visitation_datetime}*/}
-                          {/*      onSelect={(date: Date | undefined) => {*/}
-                          {/*        if (date) {*/}
-                          {/*          setForm({ ...form, visitation_datetime: date });*/}
-                          {/*          setCalendarOpen(false);*/}
-                          {/*        }*/}
-                          {/*      }}*/}
-                          {/*      initialFocus*/}
-                          {/*    />*/}
-                          {/*  </PopoverContent>*/}
-                          {/*</Popover>*/}
+                         {errors.visitation_datetime && <p className="text-red-500 text-sm mt-1">{errors.visitation_datetime}</p>}
                         </div>
+
+                        
 
                         {/* Time In */}
                         <div className="space-y-2">
@@ -1063,7 +1123,7 @@ export default function VisitorRegistrationDialog({
                         </div>
 
                         <div className="space-y-2">
-                          <Label htmlFor="place_visited">Place Visited *</Label>
+                          <Label htmlFor="place_visited">Place Visited <span className="text-red-500">*</span></Label>
                           <Input
                             id="place_visited"
                             value={form.place_visited}
@@ -1072,12 +1132,13 @@ export default function VisitorRegistrationDialog({
                             }
                             placeholder="e.g., Visitor's Hall"
                           />
+                         {errors.place_visited && <p className="text-red-500 text-sm mt-1">{errors.place_visited}</p>}
                         </div>
                       </div>
 
                       <div className="space-y-2">
                         <Label htmlFor="reason_of_visitation">
-                          Reason for Visitation *
+                          Reason for Visitation <span className="text-red-500">*</span>
                         </Label>
                         <Textarea
                           id="reason_of_visitation"
@@ -1088,6 +1149,7 @@ export default function VisitorRegistrationDialog({
                           placeholder="Enter reason for visit"
                           rows={2}
                         />
+                       {errors.reason_of_visitation && <p className="text-red-500 text-sm mt-1">{errors.reason_of_visitation}</p>}
                       </div>
 
                       <div className="space-y-2">

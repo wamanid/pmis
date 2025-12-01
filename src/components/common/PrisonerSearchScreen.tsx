@@ -21,7 +21,6 @@ import {
 import { cn } from '../ui/utils';
 import { getPrisoners } from '../../services/admission';
 import { Prisoner, PrisonerFilters } from '../../models/admission';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 interface PrisonerSearchScreenProps {
   value?: string; // Selected prisoner ID
@@ -51,7 +50,7 @@ export default function PrisonerSearchScreen({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Load prisoner data from API with debounce
-  useFilterRefresh(() => {
+  useEffect(() => {
     const loadPrisoners = async () => {
       setIsLoading(true);
       try {

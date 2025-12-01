@@ -122,15 +122,16 @@ export function DataTableDemo() {
 
   if (!mounted) return null;
 
-  // Demo 1: Users table with custom rendering
+  // Demo 1: Users table with custom rendering and column filters
   const userColumns: DataTableColumn[] = [
-    { key: 'id', label: 'ID', sortable: true},
-    { key: 'name', label: 'Name', sortable: true },
-    { key: 'email', label: 'Email', sortable: true },
+    { key: 'id', label: 'ID', sortable: true },
+    { key: 'name', label: 'Name', sortable: true, filterable: true },
+    { key: 'email', label: 'Email', sortable: true, filterable: true },
     { 
       key: 'status', 
       label: 'Status',
       sortable: true,
+      filterable: true,
       render: (value) => (
         <span className={`px-2 py-1 rounded text-xs font-medium ${
           value === 'active' 
@@ -141,15 +142,15 @@ export function DataTableDemo() {
         </span>
       )
     },
-    { key: 'role', label: 'Role', sortable: true },
+    { key: 'role', label: 'Role', sortable: true, filterable: true },
     { key: 'joinDate', label: 'Join Date', sortable: true },
   ];
 
-  // Demo 2: Products table with custom rendering
+  // Demo 2: Products table with custom rendering and column filters
   const productColumns: DataTableColumn[] = [
     { key: 'id', label: 'ID', sortable: true },
-    { key: 'product', label: 'Product', sortable: true },
-    { key: 'category', label: 'Category', sortable: true },
+    { key: 'product', label: 'Product', sortable: true, filterable: true },
+    { key: 'category', label: 'Category', sortable: true, filterable: true },
     { 
       key: 'price', 
       label: 'Price',
@@ -170,7 +171,7 @@ export function DataTableDemo() {
         </span>
       )
     },
-    { key: 'supplier', label: 'Supplier', sortable: true },
+    { key: 'supplier', label: 'Supplier', sortable: true, filterable: true },
   ];
 
   return (
@@ -185,9 +186,10 @@ export function DataTableDemo() {
 
       {/* Demo 1: Full-featured table */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Demo 1: Full-Featured Table</h2>
+        <h2 className="text-xl font-semibold mb-4">Demo 1: Full-Featured Table with Column Filters</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          All features enabled: search, sorting, pagination, export (CSV, PDF, print), and summary.
+          All features enabled: global search, <strong>column filters</strong>, sorting, pagination, export (CSV, PDF, print), and summary.
+          Try filtering by Name, Email, Status, or Role using the filter inputs below each column header.
         </p>
         <DataTable
           url="/api/demo/users"
@@ -198,9 +200,10 @@ export function DataTableDemo() {
 
       {/* Demo 2: Custom configuration */}
       <div>
-        <h2 className="text-xl font-semibold mb-4">Demo 2: Custom Configuration</h2>
+        <h2 className="text-xl font-semibold mb-4">Demo 2: Product Inventory with Column Filters</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Custom page sizes (5, 10, 25) and print disabled.
+          Custom page sizes (5, 10, 25) and print disabled. 
+          Filter by Product name, Category, or Supplier. Try typing "Electronics" in the Category filter or "TechCorp" in the Supplier filter.
         </p>
         <DataTable
           url="/api/demo/products"

@@ -20,31 +20,188 @@ import {
   Church
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import { getPrisoners, getPrisonerBiodata } from '../../services/admission';
-import {
-  Prisoner,
-  PrisonerFilters,
-  PrisonerBiodata,
-  PrisonerBiodataFilters,
-} from '../../models/admission';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+
+interface Prisoner {
+  id: string;
+  prisoner_number: string;
+  personal_number: string;
+  full_name: string;
+  first_name: string;
+  middle_name: string;
+  last_name: string;
+  date_of_birth: string;
+  id_number: string;
+  id_type: string;
+  gender: string;
+  tribe: string;
+  date_of_admission: string;
+  religion: string;
+  category?: string;
+  status?: string;
+}
 
 interface PrisonerSearchScreenProps {
   value?: string; // Selected prisoner ID
   onChange?: (prisonerId: string, prisoner: Prisoner | null) => void;
   onPrisonerSelect?: (prisoner: Prisoner) => void;
-  onPrisonerBiodataLoaded?: (biodata: PrisonerBiodata | null) => void;
   disabled?: boolean;
   showTitle?: boolean;
   label?: string;
   required?: boolean;
 }
 
+// Mock data for prisoners
+const mockPrisoners: Prisoner[] = [
+  {
+    id: 'pr1',
+    prisoner_number: 'PRS-2024-001',
+    personal_number: 'CM012345678',
+    full_name: 'John Doe Mukasa',
+    first_name: 'John',
+    middle_name: 'Doe',
+    last_name: 'Mukasa',
+    date_of_birth: '1990-05-15',
+    id_number: 'CM90012345678N',
+    id_type: 'National ID',
+    gender: 'Male',
+    tribe: 'Muganda',
+    date_of_admission: '2024-01-15',
+    religion: 'Christian',
+    category: 'Remand',
+    status: 'Active'
+  },
+  {
+    id: 'pr2',
+    prisoner_number: 'PRS-2024-002',
+    personal_number: 'CM023456789',
+    full_name: 'Sarah Jane Nakato',
+    first_name: 'Sarah',
+    middle_name: 'Jane',
+    last_name: 'Nakato',
+    date_of_birth: '1988-08-22',
+    id_number: 'CM88023456789N',
+    id_type: 'National ID',
+    gender: 'Female',
+    tribe: 'Muganda',
+    date_of_admission: '2024-02-10',
+    religion: 'Muslim',
+    category: 'Convict',
+    status: 'Active'
+  },
+  {
+    id: 'pr3',
+    prisoner_number: 'PRS-2024-003',
+    personal_number: 'CM034567890',
+    full_name: 'Michael Peter Okello',
+    first_name: 'Michael',
+    middle_name: 'Peter',
+    last_name: 'Okello',
+    date_of_birth: '1985-03-10',
+    id_number: 'CM85034567890N',
+    id_type: 'National ID',
+    gender: 'Male',
+    tribe: 'Acholi',
+    date_of_admission: '2024-01-20',
+    religion: 'Christian',
+    category: 'Awaiting Trial',
+    status: 'Active'
+  },
+  {
+    id: 'pr4',
+    prisoner_number: 'PRS-2024-004',
+    personal_number: 'PP987654321',
+    full_name: 'David Emmanuel Musoke',
+    first_name: 'David',
+    middle_name: 'Emmanuel',
+    last_name: 'Musoke',
+    date_of_birth: '1992-11-30',
+    id_number: 'PP45678912',
+    id_type: 'Passport',
+    gender: 'Male',
+    tribe: 'Muganda',
+    date_of_admission: '2024-03-05',
+    religion: 'Christian',
+    category: 'Convict',
+    status: 'Active'
+  },
+  {
+    id: 'pr5',
+    prisoner_number: 'PRS-2024-005',
+    personal_number: 'CM045678901',
+    full_name: 'Grace Mary Akello',
+    first_name: 'Grace',
+    middle_name: 'Mary',
+    last_name: 'Akello',
+    date_of_birth: '1995-07-18',
+    id_number: 'CM95045678901N',
+    id_type: 'National ID',
+    gender: 'Female',
+    tribe: 'Langi',
+    date_of_admission: '2024-02-28',
+    religion: 'Christian',
+    category: 'Remand',
+    status: 'Active'
+  },
+  {
+    id: 'pr6',
+    prisoner_number: 'PRS-2024-006',
+    personal_number: 'CM056789012',
+    full_name: 'Robert James Tumwine',
+    first_name: 'Robert',
+    middle_name: 'James',
+    last_name: 'Tumwine',
+    date_of_birth: '1987-12-05',
+    id_number: 'CM87056789012N',
+    id_type: 'National ID',
+    gender: 'Male',
+    tribe: 'Munyankole',
+    date_of_admission: '2024-01-10',
+    religion: 'Christian',
+    category: 'Civil Debtor',
+    status: 'Active'
+  },
+  {
+    id: 'pr7',
+    prisoner_number: 'PRS-2024-007',
+    personal_number: 'CM067890123',
+    full_name: 'Patricia Anne Nambi',
+    first_name: 'Patricia',
+    middle_name: 'Anne',
+    last_name: 'Nambi',
+    date_of_birth: '1993-04-25',
+    id_number: 'CM93067890123N',
+    id_type: 'National ID',
+    gender: 'Female',
+    tribe: 'Muganda',
+    date_of_admission: '2024-03-12',
+    religion: 'Muslim',
+    category: 'Remand',
+    status: 'Active'
+  },
+  {
+    id: 'pr8',
+    prisoner_number: 'PRS-2024-008',
+    personal_number: 'DL123456789',
+    full_name: 'Andrew Simon Kaweesi',
+    first_name: 'Andrew',
+    middle_name: 'Simon',
+    last_name: 'Kaweesi',
+    date_of_birth: '1989-09-14',
+    id_number: 'DL987654321',
+    id_type: 'Driving Permit',
+    gender: 'Male',
+    tribe: 'Muganda',
+    date_of_admission: '2024-02-18',
+    religion: 'Christian',
+    category: 'Awaiting Trial',
+    status: 'Active'
+  }
+];
+
 export default function PrisonerSearchScreenWider({ 
   value,
   onChange,
   onPrisonerSelect,
-  onPrisonerBiodataLoaded,
   disabled = false,
   showTitle = true,
   label = 'Search Prisoner',
@@ -52,28 +209,22 @@ export default function PrisonerSearchScreenWider({
 }: PrisonerSearchScreenProps) {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>(value || '');
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
-  const [selectedPrisonerBiodata, setSelectedPrisonerBiodata] = useState<PrisonerBiodata | null>(null);
   const [openDropdown, setOpenDropdown] = useState(false);
-  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
+  const [prisoners, setPrisoners] = useState<Prisoner[]>(mockPrisoners);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
 
-  // Load prisoner data from API with debounce
+  // Load prisoner data from API (currently using mock data)
   useEffect(() => {
-    const loadPrisoners = async () => {
+    const fetchPrisoners = async () => {
       setIsLoading(true);
       try {
-        const filters: PrisonerFilters = {
-          is_active: true,
-          ordering: 'full_name',
-        };
-
-        if (searchQuery) {
-          filters.search = searchQuery;
-        }
-
-        const response = await getPrisoners(filters);
-        setPrisoners(response.results);
+        // TODO: Replace with actual API call
+        // const response = await fetch('/api/prisoners/');
+        // const data = await response.json();
+        // setPrisoners(data.results || data);
+        
+        // Using mock data for now
+        setPrisoners(mockPrisoners);
       } catch (error) {
         console.error('Error fetching prisoners:', error);
         toast.error('Failed to load prisoners');
@@ -82,12 +233,8 @@ export default function PrisonerSearchScreenWider({
       }
     };
 
-    const timeoutId = setTimeout(() => {
-      loadPrisoners();
-    }, 300);
-
-    return () => clearTimeout(timeoutId);
-  }, [searchQuery]);
+    fetchPrisoners();
+  }, []);
 
   // Update selected prisoner when value changes
   useEffect(() => {
@@ -95,11 +242,9 @@ export default function PrisonerSearchScreenWider({
       const prisoner = prisoners.find(p => p.id === value);
       setSelectedPrisonerId(value);
       setSelectedPrisoner(prisoner || null);
-      setSelectedPrisonerBiodata(null);
     } else {
       setSelectedPrisonerId('');
       setSelectedPrisoner(null);
-      setSelectedPrisonerBiodata(null);
     }
   }, [value, prisoners]);
 
@@ -108,7 +253,6 @@ export default function PrisonerSearchScreenWider({
     setSelectedPrisonerId(prisoner.id);
     setSelectedPrisoner(prisoner);
     setOpenDropdown(false);
-    setSelectedPrisonerBiodata(null);
     
     if (onChange) {
       onChange(prisoner.id, prisoner);
@@ -117,32 +261,6 @@ export default function PrisonerSearchScreenWider({
     if (onPrisonerSelect) {
       onPrisonerSelect(prisoner);
     }
-
-    // Fetch prisoner biodata using list endpoint with prisoner filter
-    const loadBiodata = async () => {
-      try {
-        const filters: PrisonerBiodataFilters = {
-          prisoner: prisoner.id,
-          is_active: true,
-        };
-        const response = await getPrisonerBiodata(filters);
-        if (!response.results.length) {
-          setSelectedPrisonerBiodata(null);
-          onPrisonerBiodataLoaded?.(null);
-          toast.info('No biodata found for this prisoner');
-          return;
-        }
-
-        const biodata = response.results[0];
-        setSelectedPrisonerBiodata(biodata);
-        onPrisonerBiodataLoaded?.(biodata);
-      } catch (error) {
-        console.error('Error fetching prisoner biodata:', error);
-        toast.error('Failed to load prisoner biodata');
-      }
-    };
-
-    loadBiodata();
     
     toast.success(`Selected prisoner: ${prisoner.full_name}`);
   };
@@ -219,7 +337,7 @@ export default function PrisonerSearchScreenWider({
                       <div className="flex flex-col">
                         <span>{selectedPrisoner.full_name}</span>
                         <span className="text-xs text-gray-500">
-                          {selectedPrisoner.prisoner_number_value} | {selectedPrisoner.prisoner_personal_number_value}
+                          {selectedPrisoner.prisoner_number} | {selectedPrisoner.personal_number}
                         </span>
                       </div>
                     </div>
@@ -231,18 +349,14 @@ export default function PrisonerSearchScreenWider({
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" style={{ width: 'var(--radix-popover-trigger-width)' }}>
                 <Command>
-                  <CommandInput
-                    placeholder="Search prisoners..."
-                    value={searchQuery}
-                    onValueChange={setSearchQuery}
-                  />
+                  <CommandInput placeholder="Search prisoners..." />
                   <CommandList>
                     <CommandEmpty>No prisoner found.</CommandEmpty>
                     <CommandGroup>
                       {prisoners.map((prisoner) => (
                         <CommandItem
                           key={prisoner.id}
-                          value={`${prisoner.prisoner_number_value} ${prisoner.full_name} ${prisoner.prisoner_personal_number_value}`}
+                          value={`${prisoner.prisoner_number} ${prisoner.full_name} ${prisoner.personal_number} ${prisoner.id_number}`}
                           onSelect={() => handleSelectPrisoner(prisoner)}
                           className="cursor-pointer"
                         >
@@ -256,13 +370,21 @@ export default function PrisonerSearchScreenWider({
                           <div className="flex flex-col flex-1 text-sm">
                             <div className="flex items-center gap-2">
                               <span>{prisoner.full_name}</span>
+                              <Badge 
+                                variant="outline" 
+                                className="text-xs"
+                                style={{ 
+                                  borderColor: '#650000',
+                                  color: '#650000'
+                                }}
+                              >
+                                {prisoner.gender}
+                              </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-                              <span>Prisoner: {prisoner.prisoner_number_value}</span>
-                              <span>Personal: {prisoner.prisoner_personal_number_value}</span>
-                              {prisoner.current_station_name && (
-                                <span>Station: {prisoner.current_station_name}</span>
-                              )}
+                              <span>Prisoner: {prisoner.prisoner_number}</span>
+                              <span>Personal: {prisoner.personal_number}</span>
+                              <span>ID: {prisoner.id_number}</span>
                             </div>
                           </div>
                         </CommandItem>
@@ -307,7 +429,7 @@ export default function PrisonerSearchScreenWider({
                   <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Prisoner Number</span>
                 </div>
-                <p className="font-medium text-sm">{selectedPrisoner.prisoner_number_value}</p>
+                <p className="font-medium text-sm">{selectedPrisoner.prisoner_number}</p>
               </div>
 
               {/* Row 1 - Column 2: Personal Number */}
@@ -316,7 +438,7 @@ export default function PrisonerSearchScreenWider({
                   <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Personal Number</span>
                 </div>
-                <p className="font-medium text-sm">{selectedPrisoner.prisoner_personal_number_value}</p>
+                <p className="font-medium text-sm">{selectedPrisoner.personal_number}</p>
               </div>
 
               {/* Row 1 - Column 3: Prisoner Name */}
@@ -334,16 +456,8 @@ export default function PrisonerSearchScreenWider({
                   <Calendar className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Date of Birth</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata
-                    ? formatDate(selectedPrisonerBiodata.date_of_birth)
-                    : '-'}
-                </p>
-                {selectedPrisonerBiodata && (
-                  <p className="text-xs text-gray-500">
-                    Age: {calculateAge(selectedPrisonerBiodata.date_of_birth)}
-                  </p>
-                )}
+                <p className="font-medium text-sm">{formatDate(selectedPrisoner.date_of_birth)}</p>
+                <p className="text-xs text-gray-500">Age: {calculateAge(selectedPrisoner.date_of_birth)}</p>
               </div>
 
               {/* Row 1 - Column 5: ID Number */}
@@ -352,9 +466,7 @@ export default function PrisonerSearchScreenWider({
                   <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>ID Number</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata?.id_number || '-'}
-                </p>
+                <p className="font-medium text-sm">{selectedPrisoner.id_number}</p>
               </div>
 
               {/* Row 2 - Column 1: ID Type */}
@@ -364,7 +476,7 @@ export default function PrisonerSearchScreenWider({
                   <span>ID Type</span>
                 </div>
                 <Badge className="text-xs" style={{ backgroundColor: '#650000' }}>
-                  {selectedPrisonerBiodata?.id_type?.name || '-'}
+                  {selectedPrisoner.id_type}
                 </Badge>
               </div>
 
@@ -374,9 +486,7 @@ export default function PrisonerSearchScreenWider({
                   <Users className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Gender</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata?.sex_name || '-'}
-                </p>
+                <p className="font-medium text-sm">{selectedPrisoner.gender}</p>
               </div>
 
               {/* Row 2 - Column 3: Tribe */}
@@ -385,9 +495,7 @@ export default function PrisonerSearchScreenWider({
                   <MapPin className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Tribe</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata?.tribe?.name || '-'}
-                </p>
+                <p className="font-medium text-sm">{selectedPrisoner.tribe}</p>
               </div>
 
               {/* Row 2 - Column 4: Religion */}
@@ -396,9 +504,7 @@ export default function PrisonerSearchScreenWider({
                   <Church className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Religion</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata?.religion?.name || '-'}
-                </p>
+                <p className="font-medium text-sm">{selectedPrisoner.religion}</p>
               </div>
 
               {/* Row 2 - Column 5: Date of Admission */}
@@ -407,20 +513,16 @@ export default function PrisonerSearchScreenWider({
                   <Calendar className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Date of Admission</span>
                 </div>
-                <p className="font-medium text-sm">
-                  {selectedPrisonerBiodata
-                    ? formatDate(selectedPrisonerBiodata.date_of_admission)
-                    : '-'}
-                </p>
+                <p className="font-medium text-sm">{formatDate(selectedPrisoner.date_of_admission)}</p>
               </div>
             </div>
 
-            {/* Additional Info Row - Nationality and Status */}
-            {(selectedPrisonerBiodata?.nationality_name || selectedPrisoner.is_active) && (
+            {/* Additional Info Row - Category and Status */}
+            {(selectedPrisoner.category || selectedPrisoner.status) && (
               <div className="mt-6 flex items-center gap-4">
-                {selectedPrisonerBiodata?.nationality_name && (
+                {selectedPrisoner.category && (
                   <>
-                    <span className="text-sm text-gray-600">Nationality:</span>
+                    <span className="text-sm text-gray-600">Category:</span>
                     <Badge 
                       variant="outline"
                       className="text-xs"
@@ -429,16 +531,18 @@ export default function PrisonerSearchScreenWider({
                         color: '#650000'
                       }}
                     >
-                      {selectedPrisonerBiodata.nationality_name}
+                      {selectedPrisoner.category}
                     </Badge>
                   </>
                 )}
-                <>
-                  <span className="text-sm text-gray-600 ml-4">Status:</span>
-                  <Badge className={selectedPrisoner.is_active ? 'bg-green-600 text-xs' : 'bg-gray-600 text-xs'}>
-                    {selectedPrisoner.is_active ? 'Active' : 'Inactive'}
-                  </Badge>
-                </>
+                {selectedPrisoner.status && (
+                  <>
+                    <span className="text-sm text-gray-600 ml-4">Status:</span>
+                    <Badge className="bg-green-600 text-xs">
+                      {selectedPrisoner.status}
+                    </Badge>
+                  </>
+                )}
               </div>
             )}
           </CardContent>
