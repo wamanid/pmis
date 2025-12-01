@@ -50,6 +50,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
+import { phoneNumberValidation, emailValidation, requiredValidation } from "../../utils/validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import VisitorPassForm from "../gate/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
@@ -187,13 +188,14 @@ export default function VisitationsScreen() {
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
-  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(true)
+  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
   // DataTable states
   const [tableData, setTableData] = useState<Visitor[]>([]);
   const [tableLoading, setTableLoading] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
-  const [page, setPage] = useState<number>(1);
-  const [pageSize, setPageSize] = useState<number>(10);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [reloadCounter, setReloadCounter] = useState(0); // <-- added
   const [sortField, setSortField] = useState<string | undefined>(undefined);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
   const requestIdRef = useRef(0);
@@ -502,21 +504,38 @@ export default function VisitationsScreen() {
 
       {/* Main Tabs */}
       <Tabs defaultValue="records" className="w-full">
-        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+        {/* <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
           <TabsTrigger 
             value="records" 
-            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
           >
             <Users className="h-4 w-4 mr-2" />
             Visitor Records
           </TabsTrigger>
           <TabsTrigger 
             value="items" 
-            className="text-base data-[state=active]:bg-white data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
           >
             <FileText className="h-4 w-4 mr-2" />
             Visitor Items
           </TabsTrigger>
+        </TabsList> */}
+
+        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+          <TabsTrigger
+            value="records"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+             <Users className="h-4 w-4 mr-2" />
+             Visitor Records
+           </TabsTrigger>
+          <TabsTrigger
+            value="items"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+             <FileText className="h-4 w-4 mr-2" />
+             Visitor Items
+           </TabsTrigger>
         </TabsList>
 
         {/* Visitor Records Tab */}
@@ -547,11 +566,20 @@ export default function VisitationsScreen() {
             onOpenChange={(open) => {
               setIsDialogOpen(open);
               if (!open) {
-                resetForm();
+                setEditingVisitor(null);
               }
             }}
             setVisitors={setVisitors}
             editingVisitor={editingVisitor}
+            onSaved={() => {
+              // Reload table immediately using the existing loadTable() helper
+              setPage(1);
+              setVisitorRecordsLoading(true);
+              // ensure we use current sort/search params
+              loadTable(1, pageSize, sortField, sortDir, debouncedSearch)
+                .catch((e) => console.error("reload after save failed", e))
+                .finally(() => setVisitorRecordsLoading(false));
+            }}
           />
 
           {/* Placeholder for form - will be removed */}
@@ -569,7 +597,7 @@ export default function VisitationsScreen() {
                 <TabsContent value="personal" className="space-y-4 mt-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="first_name">First Name *</Label>
+                      <Label htmlFor="first_name">First Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="first_name"
                         value={form.first_name}
@@ -594,7 +622,7 @@ export default function VisitationsScreen() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="last_name">Last Name *</Label>
+                      <Label htmlFor="last_name">Last Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="last_name"
                         value={form.last_name}
@@ -609,7 +637,7 @@ export default function VisitationsScreen() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="contact_no">Contact Number *</Label>
+                      <Label htmlFor="contact_no">Contact Number <span className="text-red-500">*</span></Label>
                       <Input
                         id="contact_no"
                         value={form.contact_no}
@@ -619,6 +647,7 @@ export default function VisitationsScreen() {
                         placeholder="+256700123456"
                         required
                       />
+            
                     </div>
 
                     <div className="space-y-2">
@@ -635,7 +664,7 @@ export default function VisitationsScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
+                    <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                     <Textarea
                       id="address"
                       value={form.address}
@@ -651,7 +680,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* ID Type */}
                     <div className="space-y-2">
-                      <Label>ID Type *</Label>
+                      <Label>ID Type <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openIDTypeCombo}
                         onOpenChange={setOpenIDTypeCombo}
@@ -701,7 +730,7 @@ export default function VisitationsScreen() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="id_number">ID Number *</Label>
+                      <Label htmlFor="id_number">ID Number <span className="text-red-500">*</span></Label>
                       <Input
                         id="id_number"
                         value={form.id_number}
@@ -720,7 +749,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Gate */}
                     <div className="space-y-2">
-                      <Label>Gate *</Label>
+                      <Label>Gate <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openGateCombo}
                         onOpenChange={setOpenGateCombo}
@@ -771,7 +800,7 @@ export default function VisitationsScreen() {
 
                     {/* Gate Keeper */}
                     <div className="space-y-2">
-                      <Label>Gate Keeper *</Label>
+                      <Label>Gate Keeper <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openGateKeeperCombo}
                         onOpenChange={setOpenGateKeeperCombo}
@@ -825,7 +854,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Prisoner */}
                     <div className="space-y-2">
-                      <Label>Prisoner to Visit *</Label>
+                      <Label>Prisoner to Visit <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openPrisonerCombo}
                         onOpenChange={setOpenPrisonerCombo}
@@ -877,7 +906,7 @@ export default function VisitationsScreen() {
 
                     {/* Relationship */}
                     <div className="space-y-2">
-                      <Label>Relationship *</Label>
+                      <Label>Relationship <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openRelationCombo}
                         onOpenChange={setOpenRelationCombo}
@@ -931,7 +960,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Visitor Type */}
                     <div className="space-y-2">
-                      <Label>Visitor Type *</Label>
+                      <Label>Visitor Type <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openVisitorTypeCombo}
                         onOpenChange={setOpenVisitorTypeCombo}
@@ -984,7 +1013,7 @@ export default function VisitationsScreen() {
 
                     {/* Visitor Status */}
                     <div className="space-y-2">
-                      <Label>Visitor Status *</Label>
+                      <Label>Visitor Status <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openVisitorStatusCombo}
                         onOpenChange={setOpenVisitorStatusCombo}
@@ -1042,7 +1071,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Visitation Date */}
                     <div className="space-y-2">
-                      <Label>Visitation Date *</Label>
+                      <Label>Visitation Date <span className="text-red-500">*</span></Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger asChild>
                           <Button
@@ -1373,7 +1402,7 @@ export default function VisitationsScreen() {
           }
         }}
       >
-        <DialogContent className="max-w-[900px] max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>
               Generate Visitor Pass
