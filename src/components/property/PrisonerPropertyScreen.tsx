@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import BiometricCapture from '../common/BiometricCapture';
-import NextOfKinScreen from '../admission/NextOfKinScreen';
 import PropertyStatusChangeForm from './PropertyStatusChangeForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -40,14 +39,34 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import {handleCatchError, handleEmptyList, handleServerError} from "../../services/stationServices/utils";
+import {
+  fetchCounties,
+  fetchDistricts, fetchParishes, fetchSubCounties, fetchVillages,
+  handleCatchError,
+  handleEmptyList, handleResponseError,
+  handleServerError
+} from "../../services/stationServices/utils";
 import {getProperties, PrisonerProperty} from "../../services/stationServices/propertyService";
 import {
-  getPrisoners,
-  getStationVisitors2,
-  PrisonerItem, Visitor
+  getIdTypes,
+  getPrisoners, getRelationships,
+  getStationVisitors2, IdType,
+  PrisonerItem, Relationship, RelationShipItem, Visitor
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {getVisitorItems2, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {getSexes, Item} from "../../services/stationServices/manualLockupIntegration";
+import {
+  addNextOfKin,
+  County,
+  District, getNextOfKins,
+  getRegions, NextOfKin, NextOfKinResponse,
+  Parish,
+  Region,
+  SubCounty,
+  Village
+} from "../../services/admission/nextOfKinService";
+import {getCurrentUser} from "../../services";
+import NextOfKinScreen from "./NextOfKin";
 
 interface Property {
   id: string;
@@ -114,11 +133,11 @@ interface Prisoner {
   prisoner_number: string;
 }
 
-interface NextOfKin {
-  id: string;
-  full_name: string;
-  relationship: string;
-}
+// interface NextOfKin {
+//   id: string;
+//   full_name: string;
+//   relationship: string;
+// }
 
 // interface Visitor {
 //   id: string;
@@ -323,11 +342,11 @@ const mockPrisoners: Prisoner[] = [
   { id: 'pr5', full_name: 'Robert Martinez', prisoner_number: 'PN-2024-005' }
 ];
 
-const mockNextOfKin: NextOfKin[] = [
-  { id: 'nok1', full_name: 'Jane Doe', relationship: 'Spouse' },
-  { id: 'nok2', full_name: 'Mary Wilson', relationship: 'Mother' },
-  { id: 'nok3', full_name: 'Anna Martinez', relationship: 'Sister' }
-];
+// const mockNextOfKin: NextOfKin[] = [
+//   { id: 'nok1', full_name: 'Jane Doe', relationship: 'Spouse' },
+//   { id: 'nok2', full_name: 'Mary Wilson', relationship: 'Mother' },
+//   { id: 'nok3', full_name: 'Anna Martinez', relationship: 'Sister' }
+// ];
 
 const mockVisitors: Visitor[] = [
   { id: 'v1', first_name: 'Sarah', middle_name: 'Jane', last_name: 'Smith', id_number: 'CM123456789', phone_number: '0771234567', visitor_type_name: 'Family' },
@@ -412,6 +431,40 @@ const mockVisitorItems: VisitorItemData[] = [
   }
 ];
 
+const mockRelationships = [
+  { id: '1', name: 'Spouse' },
+  { id: '2', name: 'Parent' },
+  { id: '3', name: 'Sibling' },
+  { id: '4', name: 'Child' },
+  { id: '5', name: 'Other Relative' },
+  { id: '6', name: 'Friend' },
+];
+
+const mockSexTypes = [
+  { id: '1', name: 'Male' },
+  { id: '2', name: 'Female' },
+];
+
+const mockIdTypes = [
+  { id: '1', name: 'National ID' },
+  { id: '2', name: 'Passport' },
+  { id: '3', name: 'Driving License' },
+  { id: '4', name: 'Other' },
+];
+
+const mockRegions = [
+  { id: '1', name: 'Central' },
+  { id: '2', name: 'Eastern' },
+  { id: '3', name: 'Western' },
+  { id: '4', name: 'Northern' },
+];
+
+const mockDistricts = [
+  { id: '1', name: 'Kampala', region_id: '1' },
+  { id: '2', name: 'Wakiso', region_id: '1' },
+  { id: '3', name: 'Mbale', region_id: '2' },
+];
+
 export default function PrisonerPropertyScreen() {
   const [properties, setProperties] = useState<PrisonerProperty[]>([]);
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
@@ -421,6 +474,7 @@ export default function PrisonerPropertyScreen() {
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isNextCreateDialogOpen, setIsNextCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
@@ -437,6 +491,8 @@ export default function PrisonerPropertyScreen() {
   const [newDialogLoader, setNewDialogLoader] = useState(false)
   const [loaderText, setLoaderText] = useState("")
   const [visitorItems, setVisitorItems] = useState<VisitorItem[]>([])
+
+  const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
 
   // Separate state for prisoner and visitor info (for create mode)
   const [prisonerInfo, setPrisonerInfo] = useState({
@@ -460,7 +516,9 @@ export default function PrisonerPropertyScreen() {
     quantity: '',
     amount: '',
     note: '',
-    destination: ''
+    destination: '',
+    visitor_item: '',
+    visitor_item_name: '',
   }]);
 
   // State for biometric data (for create mode)
@@ -574,10 +632,18 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
-  const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
-    setPropertyItems(propertyItems.map(item => 
-      item.id === itemId ? { ...item, [field]: value } : item
-    ));
+  // const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
+  //   setPropertyItems(propertyItems.map(item =>
+  //     item.id === itemId ? { ...item, [field]: value } : item
+  //   ));
+  // };
+
+  const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
+    setPropertyItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId ? { ...item, ...updatedFields } : item
+      )
+    );
   };
 
   const handleEdit = (property: Property) => {
@@ -642,7 +708,7 @@ export default function PrisonerPropertyScreen() {
       const measurementUnit = mockMeasurementUnits.find(mu => mu.id === item.measurement_unit);
       const propertyBag = mockPropertyBags.find(pb => pb.id === item.property_bag);
       const propertyStatus = mockPropertyStatuses.find(ps => ps.id === item.property_status);
-      const nextOfKin = item.next_of_kin !== 'none' ? mockNextOfKin.find(nok => nok.id === item.next_of_kin) : undefined;
+      const nextOfKin = item.next_of_kin !== 'none' ? nextOfKins.find(nok => nok.id === item.next_of_kin) : undefined;
 
       return {
         id: (Date.now() + index).toString(),
@@ -689,7 +755,7 @@ export default function PrisonerPropertyScreen() {
       const measurementUnit = mockMeasurementUnits.find(mu => mu.id === formData.measurement_unit);
       const propertyBag = mockPropertyBags.find(pb => pb.id === formData.property_bag);
       const propertyStatus = mockPropertyStatuses.find(ps => ps.id === formData.property_status);
-      const nextOfKin = formData.next_of_kin !== 'none' ? mockNextOfKin.find(nok => nok.id === formData.next_of_kin) : undefined;
+      const nextOfKin = formData.next_of_kin !== 'none' ? nextOfKins.find(nok => nok.id === formData.next_of_kin) : undefined;
       const visitor = visitors.find(v => v.id === formData.visitor);
 
       const updatedProperty: Property = {
@@ -1028,7 +1094,7 @@ export default function PrisonerPropertyScreen() {
   const PropertyItemCard = ({ item, index, onUpdate, onRemove, canRemove }: {
     item: any;
     index: number;
-    onUpdate: (id: string, field: string, value: any) => void;
+    onUpdate: (id: string, updatedFields: Partial<typeof item>) => void;
     onRemove: (id: string) => void;
     canRemove: boolean;
   }) => {
@@ -1043,22 +1109,31 @@ export default function PrisonerPropertyScreen() {
     const [openVisitorItem, setOpenVisitorItem] = useState(false);
     const [visitorItemSearch, setVisitorItemSearch] = useState('');
 
+
     // Filter visitor items based on search
-    const filteredVisitorItems = mockVisitorItems.filter((visitorItem) => {
+    const filteredVisitorItems = visitorItems.filter((visitorItem) => {
       const searchLower = visitorItemSearch.toLowerCase();
       return (
         visitorItem.visitor_name.toLowerCase().includes(searchLower) ||
-        visitorItem.visitor_id_number.toLowerCase().includes(searchLower) ||
-        visitorItem.visitor_phone.toLowerCase().includes(searchLower) ||
+        // visitorItem.visitor_id_number.toLowerCase().includes(searchLower) ||
+        // visitorItem.visitor_phone.toLowerCase().includes(searchLower) ||
         visitorItem.item_name.toLowerCase().includes(searchLower)
       );
     });
 
-    const handleVisitorItemSelect = (visitorItem: VisitorItemData) => {
+    const handleVisitorItemSelect = (visitorItem: VisitorItem) => {
       // Populate fields from selected visitor item
-      onUpdate(item.id, 'quantity', visitorItem.quantity.toString());
-      onUpdate(item.id, 'amount', visitorItem.amount);
-      toast.success(`Loaded item from visitor: ${visitorItem.visitor_name}`);
+      const name= `${visitorItem.item_name} (${visitorItem.category_name})`
+      // onUpdate(item.id, 'quantity', visitorItem.quantity.toString());
+      // onUpdate(item.id, 'amount', visitorItem.amount);
+
+      onUpdate(item.id, {
+        quantity: visitorItem.quantity.toString(),
+        amount: visitorItem.amount,
+        visitor_item_name: name,
+        visitor_item: visitorItem.item,
+      });
+      toast.success(`Loaded item: ${name}`);
       setOpenVisitorItem(false);
     };
 
@@ -1121,18 +1196,26 @@ export default function PrisonerPropertyScreen() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Search Visitor Items */}
           <div className="space-y-2 md:col-span-2">
-            <Label>Search from Visitor Items (Optional)</Label>
+            <Label>Select Visitor Item *</Label>
             <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
               <PopoverTrigger asChild>
                 <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  <span className="text-gray-500">Search by visitor name, ID, or phone...</span>
+                  <span className="text-gray-500">
+                    {
+                      !item.visitor_item_name ? (
+                          "Search by item name..."
+                      ) : (
+                          item.visitor_item_name
+                      )
+                    }
+                  </span>
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-full p-0" style={{ width: '600px' }}>
                 <Command>
                   <CommandInput 
-                    placeholder="Search by visitor name, ID number, or phone..." 
+                    placeholder="Search by item name..."
                     value={visitorItemSearch}
                     onValueChange={setVisitorItemSearch}
                   />
@@ -1142,17 +1225,17 @@ export default function PrisonerPropertyScreen() {
                       {filteredVisitorItems.map((visitorItem) => (
                         <CommandItem
                           key={visitorItem.id}
-                          value={`${visitorItem.visitor_name} ${visitorItem.visitor_id_number} ${visitorItem.visitor_phone} ${visitorItem.item_name}`}
+                          value={`${visitorItem.item_name}`}
                           onSelect={() => handleVisitorItemSelect(visitorItem)}
                         >
-                          <div className="flex flex-col w-full">
+                          <div className="flex flex-col w-full mb-5">
                             <div className="flex items-center justify-between">
-                              <span className="font-medium">{visitorItem.visitor_name}</span>
-                              <Badge variant="secondary">{visitorItem.item_name}</Badge>
+                              <span className="font-medium">{visitorItem.item_name} ({visitorItem.category_name})</span>
+                              {/*<Badge variant="secondary">{visitorItem.item_name}</Badge>*/}
                             </div>
                             <div className="flex gap-4 text-sm text-gray-600 mt-1">
-                              <span>ID: {visitorItem.visitor_id_number}</span>
-                              <span>Phone: {visitorItem.visitor_phone}</span>
+                              {/*<span>ID: {visitorItem.visitor_id_number}</span>*/}
+                              {/*<span>Phone: {visitorItem.visitor_phone}</span>*/}
                               <span>Bag: {visitorItem.bag_no}</span>
                             </div>
                           </div>
@@ -1424,7 +1507,7 @@ export default function PrisonerPropertyScreen() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" role="combobox" className="flex-1 justify-between" type="button">
                     {item.next_of_kin && item.next_of_kin !== 'none'
-                      ? mockNextOfKin.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + mockNextOfKin.find((nok) => nok.id === item.next_of_kin)?.relationship + ')'
+                      ? nextOfKins.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + nextOfKins.find((nok) => nok.id === item.next_of_kin)?.relationship_name + ')'
                       : "Select next of kin..."}
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -1445,17 +1528,19 @@ export default function PrisonerPropertyScreen() {
                         <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === 'none' ? "opacity-100" : "opacity-0")} />
                         None
                       </CommandItem>
-                      {mockNextOfKin.map((nok) => (
+                      {nextOfKins.map((nok) => (
                         <CommandItem
                           key={nok.id}
                           value={nok.full_name + ' ' + nok.relationship}
                           onSelect={() => {
-                            onUpdate(item.id, 'next_of_kin', nok.id);
+                            onUpdate(item.id, {
+                              next_of_kin: nok.id,
+                            });
                             setOpenNextOfKin(false);
                           }}
                         >
                           <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === nok.id ? "opacity-100" : "opacity-0")} />
-                          {nok.full_name} ({nok.relationship})
+                          {nok.full_name} ({nok.relationship_name})
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -1463,12 +1548,21 @@ export default function PrisonerPropertyScreen() {
                 </Command>
               </PopoverContent>
             </Popover>
+            {/*<Button*/}
+            {/*  type="button"*/}
+            {/*  variant="outline"*/}
+            {/*  size="icon"*/}
+            {/*  className="shrink-0"*/}
+            {/*  onClick={() => setIsNextOfKinDialogOpen(true)}*/}
+            {/*  title="Add New Next of Kin"*/}
+            {/*  style={{ borderColor: '#650000' }}*/}
+            {/*>*/}
             <Button
               type="button"
               variant="outline"
               size="icon"
               className="shrink-0"
-              onClick={() => setIsNextOfKinDialogOpen(true)}
+              onClick={() => setIsNextCreateDialogOpen(true)}
               title="Add New Next of Kin"
               style={{ borderColor: '#650000' }}
             >
@@ -1916,8 +2010,8 @@ export default function PrisonerPropertyScreen() {
                   type="button"
                 >
                   {formData.next_of_kin && formData.next_of_kin !== 'none'
-                    ? mockNextOfKin.find((nok) => nok.id === formData.next_of_kin)?.full_name + 
-                      ' (' + mockNextOfKin.find((nok) => nok.id === formData.next_of_kin)?.relationship + ')'
+                    ? nextOfKins.find((nok) => nok.id === formData.next_of_kin)?.full_name +
+                      ' (' + nextOfKins.find((nok) => nok.id === formData.next_of_kin)?.relationship + ')'
                     : "Select next of kin..."}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -1943,7 +2037,7 @@ export default function PrisonerPropertyScreen() {
                         />
                         None
                       </CommandItem>
-                      {mockNextOfKin.map((nok) => (
+                      {nextOfKins.map((nok) => (
                         <CommandItem
                           key={nok.id}
                           value={nok.full_name + ' ' + nok.relationship}
@@ -2104,7 +2198,6 @@ export default function PrisonerPropertyScreen() {
 
     if ("results" in response) {
       const data = response.results
-      console.log(data)
       handleEmptyList(data, msg, setPropertyLoading)
       if (msg === "There are no visitors for the selected prisoner" && data.length) {
         setLoading(prev => ({...prev, visitor: true}))
@@ -2189,8 +2282,11 @@ export default function PrisonerPropertyScreen() {
     try {
         const response = await getVisitorItems2(visitorId)
         if(handleServerError(response, setNewDialogLoader)) return
-
         populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
+
+        const response2 = await getNextOfKins(prisonerInfo.prisoner)
+        if(handleServerError(response2, setNewDialogLoader)) return
+        populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
 
     }catch (error) {
       handleCatchError(error)
@@ -2664,6 +2760,10 @@ export default function PrisonerPropertyScreen() {
       <Dialog open={isNextOfKinDialogOpen} onOpenChange={setIsNextOfKinDialogOpen}>
         <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize" style={{ resize: 'both' }}>
           <div className="flex-1 overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle></DialogTitle>
+              <DialogDescription></DialogDescription>
+            </DialogHeader>
             <NextOfKinScreen />
             {/*Next of Kin chodrine*/}
           </div>
@@ -2694,6 +2794,20 @@ export default function PrisonerPropertyScreen() {
                   </p>
               </div>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+      
+      {/* Next of Kin create Dialog */}
+      <Dialog open={isNextCreateDialogOpen} onOpenChange={setIsNextCreateDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex-1 max-h-[90vh] p-6">
+            <DialogHeader>
+              <DialogTitle>Add Next of Kin</DialogTitle>
+              <DialogDescription>Add a new next of kin contact for a prisoner</DialogDescription>
+            </DialogHeader>
+            <NextOfKinScreen setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText} isNextCreateDialogOpen={isNextCreateDialogOpen}
+                             setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} prisoner={prisonerInfo.prisoner} setNextOfKins={setNextOfKins}/>
           </div>
         </DialogContent>
       </Dialog>

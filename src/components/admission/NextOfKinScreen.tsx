@@ -988,8 +988,8 @@ const NextOfKinScreen: React.FC = () => {
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex-1 max-h-[90vh] p-6">
             <DialogHeader>
               <DialogTitle>Add Next of Kin</DialogTitle>
               <DialogDescription>Add a new next of kin contact for a prisoner</DialogDescription>
