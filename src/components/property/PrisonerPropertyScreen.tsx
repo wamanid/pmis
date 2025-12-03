@@ -46,14 +46,19 @@ import {
   handleEmptyList, handleResponseError,
   handleServerError
 } from "../../services/stationServices/utils";
-import {getProperties, PrisonerProperty} from "../../services/stationServices/propertyService";
+import {
+  getProperties, getPropertyBags,
+  getPropertyItems, getPropertyStatuses,
+  getPropertyTypes,
+  PrisonerProperty, PropertyBag, PropertyItem
+} from "../../services/stationServices/propertyService";
 import {
   getIdTypes,
   getPrisoners, getRelationships,
   getStationVisitors2, IdType,
   PrisonerItem, Relationship, RelationShipItem, Visitor
 } from "../../services/stationServices/visitorsServices/VisitorsService";
-import {getVisitorItems2, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {getVisitorItems2, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 import {getSexes, Item} from "../../services/stationServices/manualLockupIntegration";
 import {
   addNextOfKin,
@@ -101,10 +106,10 @@ interface PropertyType {
   name: string;
 }
 
-interface PropertyItem {
-  id: string;
-  name: string;
-}
+// interface PropertyItem {
+//   id: string;
+//   name: string;
+// }
 
 interface PropertyCategory {
   id: string;
@@ -116,10 +121,10 @@ interface MeasurementUnit {
   name: string;
 }
 
-interface PropertyBag {
-  id: string;
-  bag_number: string;
-}
+// interface PropertyBag {
+//   id: string;
+//   bag_number: string;
+// }
 
 interface PropertyStatus {
   id: string;
@@ -301,14 +306,14 @@ const mockPropertyCategories: PropertyCategory[] = [
 ];
 
 const mockPropertyItems: PropertyItem[] = [
-  { id: 'pi1', name: 'Mobile Phone' },
-  { id: 'pi2', name: 'Leather Jacket' },
-  { id: 'pi3', name: 'Laptop' },
-  { id: 'pi4', name: 'Cash' },
-  { id: 'pi5', name: 'National ID' },
-  { id: 'pi6', name: 'Watch' },
-  { id: 'pi7', name: 'Wallet' },
-  { id: 'pi8', name: 'Jewelry' }
+  // { id: 'pi1', name: 'Mobile Phone' },
+  // { id: 'pi2', name: 'Leather Jacket' },
+  // { id: 'pi3', name: 'Laptop' },
+  // { id: 'pi4', name: 'Cash' },
+  // { id: 'pi5', name: 'National ID' },
+  // { id: 'pi6', name: 'Watch' },
+  // { id: 'pi7', name: 'Wallet' },
+  // { id: 'pi8', name: 'Jewelry' }
 ];
 
 const mockMeasurementUnits: MeasurementUnit[] = [
@@ -319,11 +324,11 @@ const mockMeasurementUnits: MeasurementUnit[] = [
 ];
 
 const mockPropertyBags: PropertyBag[] = [
-  { id: 'pb1', bag_number: 'BAG-001' },
-  { id: 'pb2', bag_number: 'BAG-002' },
-  { id: 'pb3', bag_number: 'BAG-003' },
-  { id: 'pb4', bag_number: 'BAG-004' },
-  { id: 'pb5', bag_number: 'BAG-005' }
+  // { id: 'pb1', bag_number: 'BAG-001' },
+  // { id: 'pb2', bag_number: 'BAG-002' },
+  // { id: 'pb3', bag_number: 'BAG-003' },
+  // { id: 'pb4', bag_number: 'BAG-004' },
+  // { id: 'pb5', bag_number: 'BAG-005' }
 ];
 
 const mockPropertyStatuses: PropertyStatus[] = [
@@ -348,12 +353,12 @@ const mockPrisoners: Prisoner[] = [
 //   { id: 'nok3', full_name: 'Anna Martinez', relationship: 'Sister' }
 // ];
 
-const mockVisitors: Visitor[] = [
-  { id: 'v1', first_name: 'Sarah', middle_name: 'Jane', last_name: 'Smith', id_number: 'CM123456789', phone_number: '0771234567', visitor_type_name: 'Family' },
-  { id: 'v2', first_name: 'John', middle_name: '', last_name: 'Brown', id_number: 'CM987654321', phone_number: '0752345678', visitor_type_name: 'Friend' },
-  { id: 'v3', first_name: 'Mary', middle_name: 'Ann', last_name: 'Johnson', id_number: 'CM456789123', phone_number: '0783456789', visitor_type_name: 'Family' },
-  { id: 'v4', first_name: 'David', middle_name: '', last_name: 'Williams', id_number: 'CM789123456', phone_number: '0704567890', visitor_type_name: 'Legal Representative' }
-];
+// const mockVisitors: Visitor[] = [
+//   { id: 'v1', first_name: 'Sarah', middle_name: 'Jane', last_name: 'Smith', id_number: 'CM123456789', phone_number: '0771234567', visitor_type_name: 'Family' },
+//   { id: 'v2', first_name: 'John', middle_name: '', last_name: 'Brown', id_number: 'CM987654321', phone_number: '0752345678', visitor_type_name: 'Friend' },
+//   { id: 'v3', first_name: 'Mary', middle_name: 'Ann', last_name: 'Johnson', id_number: 'CM456789123', phone_number: '0783456789', visitor_type_name: 'Family' },
+//   { id: 'v4', first_name: 'David', middle_name: '', last_name: 'Williams', id_number: 'CM789123456', phone_number: '0704567890', visitor_type_name: 'Legal Representative' }
+// ];
 
 interface VisitorItemData {
   id: string;
@@ -487,7 +492,7 @@ export default function PrisonerPropertyScreen() {
 
   // APIs integration
   const [propertyLoading, setPropertyLoading] = useState(true)
-  const [loading, setLoading] = useState({ visitor: false, property: false })
+  const [loading, setLoading] = useState({ visitor: false, property: false, type: false })
   const [newDialogLoader, setNewDialogLoader] = useState(false)
   const [loaderText, setLoaderText] = useState("")
   const [visitorItems, setVisitorItems] = useState<VisitorItem[]>([])
@@ -1014,28 +1019,29 @@ export default function PrisonerPropertyScreen() {
                                   <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
                                     <h3 className="flex items-center gap-2" style={{ color: '#650000' }}>
                                       <Package className="h-5 w-5" />
-                                      Property Items
-                                      <Badge variant="secondary">{propertyItems.length}</Badge>
+                                      {/*Property Items*/}
+                                      Property Item
+                                      {/*<Badge variant="secondary">{propertyItems.length}</Badge>*/}
                                     </h3>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          handleAddPropertyItem();
-                                        }}
-                                        size="sm"
-                                        style={{ backgroundColor: '#650000' }}
-                                      >
-                                        <Plus className="h-4 w-4 mr-2" />
-                                        Add Item
-                                      </Button>
-                                      {isPropertyItemsOpen ? (
-                                        <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />
-                                      ) : (
-                                        <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />
-                                      )}
-                                    </div>
+                                    {/*<div className="flex items-center gap-2">*/}
+                                    {/*  <Button*/}
+                                    {/*    type="button"*/}
+                                    {/*    onClick={(e) => {*/}
+                                    {/*      e.stopPropagation();*/}
+                                    {/*      handleAddPropertyItem();*/}
+                                    {/*    }}*/}
+                                    {/*    size="sm"*/}
+                                    {/*    style={{ backgroundColor: '#650000' }}*/}
+                                    {/*  >*/}
+                                    {/*    <Plus className="h-4 w-4 mr-2" />*/}
+                                    {/*    Add Item*/}
+                                    {/*  </Button>*/}
+                                    {/*  {isPropertyItemsOpen ? (*/}
+                                    {/*    <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />*/}
+                                    {/*  ) : (*/}
+                                    {/*    <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />*/}
+                                    {/*  )}*/}
+                                    {/*</div>*/}
                                   </div>
                                 </CollapsibleTrigger>
 
@@ -1057,7 +1063,10 @@ export default function PrisonerPropertyScreen() {
                             </Collapsible>
 
                              {/*Biometric Capture/Verification Section */}
-                            <Card className="border-2" style={{ borderColor: '#650000' }}>
+                            {
+                              loading.type && (
+                                  <>
+                                    <Card className="border-2" style={{ borderColor: '#650000' }}>
                               <div className="p-4">
                                 <h3 className="mb-4" style={{ color: '#650000' }}>Biometric Capture/Verification</h3>
                                 <BiometricCapture
@@ -1068,7 +1077,7 @@ export default function PrisonerPropertyScreen() {
                               </div>
                             </Card>
 
-                            <DialogFooter>
+                                    <DialogFooter>
                       <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
                         Cancel
                       </Button>
@@ -1076,6 +1085,10 @@ export default function PrisonerPropertyScreen() {
                         Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
                       </Button>
                     </DialogFooter>
+                                  </>
+                                )
+                            }
+
                           </>
                       )
                     }
@@ -1109,6 +1122,13 @@ export default function PrisonerPropertyScreen() {
     const [openVisitorItem, setOpenVisitorItem] = useState(false);
     const [visitorItemSearch, setVisitorItemSearch] = useState('');
 
+    const [typeLoader, setTypeLoader] = useState(false)
+
+    const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
+    const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
+    const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
+    const [propertyBags, setPropertyBags] = useState<PropertyBag>([])
+
 
     // Filter visitor items based on search
     const filteredVisitorItems = visitorItems.filter((visitorItem) => {
@@ -1121,11 +1141,13 @@ export default function PrisonerPropertyScreen() {
       );
     });
 
-    const handleVisitorItemSelect = (visitorItem: VisitorItem) => {
+    const handleVisitorItemSelect = async (visitorItem: VisitorItem) => {
       // Populate fields from selected visitor item
       const name= `${visitorItem.item_name} (${visitorItem.category_name})`
       // onUpdate(item.id, 'quantity', visitorItem.quantity.toString());
       // onUpdate(item.id, 'amount', visitorItem.amount);
+
+      // console.log(visitorItem)
 
       onUpdate(item.id, {
         quantity: visitorItem.quantity.toString(),
@@ -1133,16 +1155,57 @@ export default function PrisonerPropertyScreen() {
         visitor_item_name: name,
         visitor_item: visitorItem.item,
       });
-      toast.success(`Loaded item: ${name}`);
+      // toast.success(`Loaded item: ${name}`);
       setOpenVisitorItem(false);
+
+      await fetchPropertyData(visitorItem)
     };
 
+    async function fetchPropertyData(visitorItem: VisitorItem) {
+       setNewDialogLoader(true)
+       setLoaderText("Fetching Property information")
+        try {
+            const response1 = await getPropertyTypes()
+            const ok1 = populateListX(response1, "There are no property types", setPropertyTypes)
+            if(!ok1) return
+            const response2 = await getPropertyItems(visitorItem.item_category)
+            const ok2 = populateListX(response2, "There are no property items", setPropertyItems)
+            if(!ok2) return
+            const response3 = await getPropertyStatuses()
+            const ok3 = populateListX(response3, "There are no property statuses", setPropertyStatuses)
+            if(!ok3) return
+            const response4 = await getPropertyBags(prisonerInfo.prisoner)
+            const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
+            if(!ok4) return
+
+            setTypeLoader(true)
+
+        }catch (error) {
+          handleCatchError(error)
+        }finally {
+          setNewDialogLoader(false)
+        }
+    }
+
+    function populateListX(response: any, msg: string, setData: any) {
+      if(handleServerError(response, setNewDialogLoader)) return false
+
+      if ("results" in response) {
+        const data = response.results
+        if (handleEmptyList(data, msg, setNewDialogLoader)) return false
+        setData(data)
+        return true
+      }
+
+      return false
+    }
+
     // Get summary info for collapsed state
-    const propertyTypeName = item.property_type 
-      ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name 
+    const propertyTypeName = item.property_type
+      ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name
       : null;
-    const propertyItemName = item.property_item 
-      ? mockPropertyItems.find((i) => i.id === item.property_item)?.name 
+    const propertyItemName = item.property_item
+      ? mockPropertyItems.find((i) => i.id === item.property_item)?.name
       : null;
 
     return (
@@ -1153,7 +1216,8 @@ export default function PrisonerPropertyScreen() {
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2">
                   <Tag className="h-4 w-4" style={{ color: '#650000' }} />
-                  <h4 className="font-medium">Item #{index + 1}</h4>
+                  {/*<h4 className="font-medium">Item #{index + 1}</h4>*/}
+                  <h4 className="font-medium">Item Details</h4>
                 </div>
                 {!isItemOpen && (propertyTypeName || propertyItemName) && (
                   <div className="flex gap-2">
@@ -1193,406 +1257,412 @@ export default function PrisonerPropertyScreen() {
           <CollapsibleContent>
             <div className="px-4 pb-4">{/* Content wrapper */}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Search Visitor Items */}
-          <div className="space-y-2 md:col-span-2">
-            <Label>Select Visitor Item *</Label>
-            <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  <span className="text-gray-500">
-                    {
-                      !item.visitor_item_name ? (
-                          "Search by item name..."
-                      ) : (
-                          item.visitor_item_name
-                      )
-                    }
-                  </span>
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0" style={{ width: '600px' }}>
-                <Command>
-                  <CommandInput 
-                    placeholder="Search by item name..."
-                    value={visitorItemSearch}
-                    onValueChange={setVisitorItemSearch}
-                  />
-                  <CommandList>
-                    <CommandEmpty>No visitor items found.</CommandEmpty>
-                    <CommandGroup>
-                      {filteredVisitorItems.map((visitorItem) => (
-                        <CommandItem
-                          key={visitorItem.id}
-                          value={`${visitorItem.item_name}`}
-                          onSelect={() => handleVisitorItemSelect(visitorItem)}
-                        >
-                          <div className="flex flex-col w-full mb-5">
-                            <div className="flex items-center justify-between">
-                              <span className="font-medium">{visitorItem.item_name} ({visitorItem.category_name})</span>
-                              {/*<Badge variant="secondary">{visitorItem.item_name}</Badge>*/}
-                            </div>
-                            <div className="flex gap-4 text-sm text-gray-600 mt-1">
-                              {/*<span>ID: {visitorItem.visitor_id_number}</span>*/}
-                              {/*<span>Phone: {visitorItem.visitor_phone}</span>*/}
-                              <span>Bag: {visitorItem.bag_no}</span>
-                            </div>
-                          </div>
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Search Visitor Items */}
+              <div className="space-y-2 md:col-span-2">
+                <Label>Select Visitor Item *</Label>
+                <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                      <span className="text-gray-500">
+                        {
+                          !item.visitor_item_name ? (
+                              "Search by item name..."
+                          ) : (
+                              item.visitor_item_name
+                          )
+                        }
+                      </span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0" style={{ width: '600px' }}>
+                    <Command>
+                      <CommandInput
+                        placeholder="Search by item name..."
+                        value={visitorItemSearch}
+                        onValueChange={setVisitorItemSearch}
+                      />
+                      <CommandList>
+                        <CommandEmpty>No visitor items found.</CommandEmpty>
+                        <CommandGroup>
+                          {filteredVisitorItems.map((visitorItem) => (
+                            <CommandItem
+                              key={visitorItem.id}
+                              value={`${visitorItem.item_name}`}
+                              onSelect={() => handleVisitorItemSelect(visitorItem)}
+                            >
+                              <div className="flex flex-col w-full mb-5">
+                                <div className="flex items-center justify-between">
+                                  <span className="font-medium">{visitorItem.item_name} ({visitorItem.category_name})</span>
+                                  {/*<Badge variant="secondary">{visitorItem.item_name}</Badge>*/}
+                                </div>
+                                <div className="flex gap-4 text-sm text-gray-600 mt-1">
+                                  {/*<span>ID: {visitorItem.visitor_id_number}</span>*/}
+                                  {/*<span>Phone: {visitorItem.visitor_phone}</span>*/}
+                                  <span>Bag: {visitorItem.bag_no}</span>
+                                </div>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+              </div>
 
-          {/* Property Type */}
-          <div className="space-y-2">
-            <Label>Property Type *</Label>
-            <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.property_type
-                    ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name
-                    : "Select property type..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search property type..." />
-                  <CommandList>
-                    <CommandEmpty>No type found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPropertyTypes.map((type) => (
-                        <CommandItem
-                          key={type.id}
-                          value={type.name}
-                          onSelect={() => {
-                            onUpdate(item.id, 'property_type', type.id);
-                            setOpenPropertyType(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.property_type === type.id ? "opacity-100" : "opacity-0")} />
-                          {type.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+              {
+                typeLoader && (
+                    <>
+                       {/* Property Type */}
+                        <div className="space-y-2">
+                          <Label>Property Type *</Label>
+                          <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.property_type
+                                  ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name
+                                  : "Select property type..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search property type..." />
+                                <CommandList>
+                                  <CommandEmpty>No type found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockPropertyTypes.map((type) => (
+                                      <CommandItem
+                                        key={type.id}
+                                        value={type.name}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'property_type', type.id);
+                                          setOpenPropertyType(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.property_type === type.id ? "opacity-100" : "opacity-0")} />
+                                        {type.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Property Category */}
-          <div className="space-y-2">
-            <Label>Property Category *</Label>
-            <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.property_category
-                    ? mockPropertyCategories.find((c) => c.id === item.property_category)?.name
-                    : "Select category..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search category..." />
-                  <CommandList>
-                    <CommandEmpty>No category found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPropertyCategories.map((category) => (
-                        <CommandItem
-                          key={category.id}
-                          value={category.name}
-                          onSelect={() => {
-                            onUpdate(item.id, 'property_category', category.id);
-                            setOpenPropertyCategory(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
-                          {category.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        {/* Property Category */}
+                        <div className="space-y-2">
+                          <Label>Property Category *</Label>
+                          <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.property_category
+                                  ? mockPropertyCategories.find((c) => c.id === item.property_category)?.name
+                                  : "Select category..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search category..." />
+                                <CommandList>
+                                  <CommandEmpty>No category found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockPropertyCategories.map((category) => (
+                                      <CommandItem
+                                        key={category.id}
+                                        value={category.name}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'property_category', category.id);
+                                          setOpenPropertyCategory(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
+                                        {category.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Property Item */}
-          <div className="space-y-2">
-            <Label>Property Item *</Label>
-            <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.property_item
-                    ? mockPropertyItems.find((i) => i.id === item.property_item)?.name
-                    : "Select item..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search item..." />
-                  <CommandList>
-                    <CommandEmpty>No item found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPropertyItems.map((propertyItem) => (
-                        <CommandItem
-                          key={propertyItem.id}
-                          value={propertyItem.name}
-                          onSelect={() => {
-                            onUpdate(item.id, 'property_item', propertyItem.id);
-                            setOpenPropertyItem(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.property_item === propertyItem.id ? "opacity-100" : "opacity-0")} />
-                          {propertyItem.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        {/* Property Item */}
+                        <div className="space-y-2">
+                          <Label>Property Item *</Label>
+                          <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.property_item
+                                  ? mockPropertyItems.find((i) => i.id === item.property_item)?.name
+                                  : "Select item..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search item..." />
+                                <CommandList>
+                                  <CommandEmpty>No item found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockPropertyItems.map((propertyItem) => (
+                                      <CommandItem
+                                        key={propertyItem.id}
+                                        value={propertyItem.name}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'property_item', propertyItem.id);
+                                          setOpenPropertyItem(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.property_item === propertyItem.id ? "opacity-100" : "opacity-0")} />
+                                        {propertyItem.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Measurement Unit */}
-          <div className="space-y-2">
-            <Label>Measurement Unit</Label>
-            <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.measurement_unit
-                    ? mockMeasurementUnits.find((u) => u.id === item.measurement_unit)?.name
-                    : "Select unit..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search unit..." />
-                  <CommandList>
-                    <CommandEmpty>No unit found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockMeasurementUnits.map((unit) => (
-                        <CommandItem
-                          key={unit.id}
-                          value={unit.name}
-                          onSelect={() => {
-                            onUpdate(item.id, 'measurement_unit', unit.id);
-                            setOpenMeasurementUnit(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.measurement_unit === unit.id ? "opacity-100" : "opacity-0")} />
-                          {unit.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        {/* Measurement Unit */}
+                        <div className="space-y-2">
+                          <Label>Measurement Unit</Label>
+                          <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.measurement_unit
+                                  ? mockMeasurementUnits.find((u) => u.id === item.measurement_unit)?.name
+                                  : "Select unit..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search unit..." />
+                                <CommandList>
+                                  <CommandEmpty>No unit found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockMeasurementUnits.map((unit) => (
+                                      <CommandItem
+                                        key={unit.id}
+                                        value={unit.name}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'measurement_unit', unit.id);
+                                          setOpenMeasurementUnit(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.measurement_unit === unit.id ? "opacity-100" : "opacity-0")} />
+                                        {unit.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Quantity */}
-          <div className="space-y-2">
-            <Label>Quantity *</Label>
-            <Input
-              type="text"
-              value={item.quantity}
-              onChange={(e) => onUpdate(item.id, 'quantity', e.target.value)}
-              placeholder="Enter quantity"
-              required
-            />
-          </div>
+                        {/* Quantity */}
+                        <div className="space-y-2">
+                          <Label>Quantity *</Label>
+                          <Input
+                            type="text"
+                            value={item.quantity}
+                            onChange={(e) => onUpdate(item.id, 'quantity', e.target.value)}
+                            placeholder="Enter quantity"
+                            required
+                          />
+                        </div>
 
-          {/* Amount */}
-          <div className="space-y-2">
-            <Label>Amount (UGX)</Label>
-            <Input
-              type="number"
-              value={item.amount}
-              onChange={(e) => onUpdate(item.id, 'amount', e.target.value)}
-              placeholder="Enter amount"
-            />
-          </div>
+                        {/* Amount */}
+                        <div className="space-y-2">
+                          <Label>Amount (UGX)</Label>
+                          <Input
+                            type="number"
+                            value={item.amount}
+                            onChange={(e) => onUpdate(item.id, 'amount', e.target.value)}
+                            placeholder="Enter amount"
+                          />
+                        </div>
 
-          {/* Property Bag */}
-          <div className="space-y-2">
-            <Label>Property Bag *</Label>
-            <Popover open={openPropertyBag} onOpenChange={setOpenPropertyBag}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.property_bag
-                    ? mockPropertyBags.find((b) => b.id === item.property_bag)?.bag_number
-                    : "Select bag..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search bag..." />
-                  <CommandList>
-                    <CommandEmpty>No bag found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPropertyBags.map((bag) => (
-                        <CommandItem
-                          key={bag.id}
-                          value={bag.bag_number}
-                          onSelect={() => {
-                            onUpdate(item.id, 'property_bag', bag.id);
-                            setOpenPropertyBag(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.property_bag === bag.id ? "opacity-100" : "opacity-0")} />
-                          {bag.bag_number}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        {/* Property Bag */}
+                        <div className="space-y-2">
+                          <Label>Property Bag *</Label>
+                          <Popover open={openPropertyBag} onOpenChange={setOpenPropertyBag}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.property_bag
+                                  ? mockPropertyBags.find((b) => b.id === item.property_bag)?.bag_number
+                                  : "Select bag..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search bag..." />
+                                <CommandList>
+                                  <CommandEmpty>No bag found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockPropertyBags.map((bag) => (
+                                      <CommandItem
+                                        key={bag.id}
+                                        value={bag.bag_number}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'property_bag', bag.id);
+                                          setOpenPropertyBag(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.property_bag === bag.id ? "opacity-100" : "opacity-0")} />
+                                        {bag.bag_number}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Property Status */}
-          <div className="space-y-2">
-            <Label>Property Status *</Label>
-            <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                  {item.property_status
-                    ? mockPropertyStatuses.find((s) => s.id === item.property_status)?.name
-                    : "Select status..."}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search status..." />
-                  <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
-                    <CommandGroup>
-                      {mockPropertyStatuses.map((status) => (
-                        <CommandItem
-                          key={status.id}
-                          value={status.name}
-                          onSelect={() => {
-                            onUpdate(item.id, 'property_status', status.id);
-                            setOpenPropertyStatus(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.property_status === status.id ? "opacity-100" : "opacity-0")} />
-                          {status.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-          </div>
+                        {/* Property Status */}
+                        <div className="space-y-2">
+                          <Label>Property Status *</Label>
+                          <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
+                                {item.property_status
+                                  ? mockPropertyStatuses.find((s) => s.id === item.property_status)?.name
+                                  : "Select status..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search status..." />
+                                <CommandList>
+                                  <CommandEmpty>No status found.</CommandEmpty>
+                                  <CommandGroup>
+                                    {mockPropertyStatuses.map((status) => (
+                                      <CommandItem
+                                        key={status.id}
+                                        value={status.name}
+                                        onSelect={() => {
+                                          onUpdate(item.id, 'property_status', status.id);
+                                          setOpenPropertyStatus(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.property_status === status.id ? "opacity-100" : "opacity-0")} />
+                                        {status.name}
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
 
-          {/* Next of Kin */}
-          <div className="space-y-2">
-            <Label>Next of Kin</Label>
-            <div className="flex gap-2">
-              <Popover open={openNextOfKin} onOpenChange={setOpenNextOfKin}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className="flex-1 justify-between" type="button">
-                    {item.next_of_kin && item.next_of_kin !== 'none'
-                      ? nextOfKins.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + nextOfKins.find((nok) => nok.id === item.next_of_kin)?.relationship_name + ')'
-                      : "Select next of kin..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command>
-                  <CommandInput placeholder="Search next of kin..." />
-                  <CommandList>
-                    <CommandEmpty>No next of kin found.</CommandEmpty>
-                    <CommandGroup>
-                      <CommandItem
-                        value="none"
-                        onSelect={() => {
-                          onUpdate(item.id, 'next_of_kin', 'none');
-                          setOpenNextOfKin(false);
-                        }}
-                      >
-                        <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === 'none' ? "opacity-100" : "opacity-0")} />
-                        None
-                      </CommandItem>
-                      {nextOfKins.map((nok) => (
-                        <CommandItem
-                          key={nok.id}
-                          value={nok.full_name + ' ' + nok.relationship}
-                          onSelect={() => {
-                            onUpdate(item.id, {
-                              next_of_kin: nok.id,
-                            });
-                            setOpenNextOfKin(false);
-                          }}
-                        >
-                          <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === nok.id ? "opacity-100" : "opacity-0")} />
-                          {nok.full_name} ({nok.relationship_name})
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
-            {/*<Button*/}
-            {/*  type="button"*/}
-            {/*  variant="outline"*/}
-            {/*  size="icon"*/}
-            {/*  className="shrink-0"*/}
-            {/*  onClick={() => setIsNextOfKinDialogOpen(true)}*/}
-            {/*  title="Add New Next of Kin"*/}
-            {/*  style={{ borderColor: '#650000' }}*/}
-            {/*>*/}
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              className="shrink-0"
-              onClick={() => setIsNextCreateDialogOpen(true)}
-              title="Add New Next of Kin"
-              style={{ borderColor: '#650000' }}
-            >
-              <Plus className="h-5 w-5" style={{ color: '#650000' }} />
-            </Button>
-          </div>
-        </div>
+                        {/* Next of Kin */}
+                        <div className="space-y-2">
+                          <Label>Next of Kin</Label>
+                          <div className="flex gap-2">
+                            <Popover open={openNextOfKin} onOpenChange={setOpenNextOfKin}>
+                              <PopoverTrigger asChild>
+                                <Button variant="outline" role="combobox" className="flex-1 justify-between" type="button">
+                                  {item.next_of_kin && item.next_of_kin !== 'none'
+                                    ? nextOfKins.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + nextOfKins.find((nok) => nok.id === item.next_of_kin)?.relationship_name + ')'
+                                    : "Select next of kin..."}
+                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </PopoverTrigger>
+                            <PopoverContent className="w-full p-0">
+                              <Command>
+                                <CommandInput placeholder="Search next of kin..." />
+                                <CommandList>
+                                  <CommandEmpty>No next of kin found.</CommandEmpty>
+                                  <CommandGroup>
+                                    <CommandItem
+                                      value="none"
+                                      onSelect={() => {
+                                        onUpdate(item.id, 'next_of_kin', 'none');
+                                        setOpenNextOfKin(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === 'none' ? "opacity-100" : "opacity-0")} />
+                                      None
+                                    </CommandItem>
+                                    {nextOfKins.map((nok) => (
+                                      <CommandItem
+                                        key={nok.id}
+                                        value={nok.full_name + ' ' + nok.relationship}
+                                        onSelect={() => {
+                                          onUpdate(item.id, {
+                                            next_of_kin: nok.id,
+                                          });
+                                          setOpenNextOfKin(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === nok.id ? "opacity-100" : "opacity-0")} />
+                                        {nok.full_name} ({nok.relationship_name})
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </CommandList>
+                              </Command>
+                            </PopoverContent>
+                          </Popover>
+                          {/*<Button*/}
+                          {/*  type="button"*/}
+                          {/*  variant="outline"*/}
+                          {/*  size="icon"*/}
+                          {/*  className="shrink-0"*/}
+                          {/*  onClick={() => setIsNextOfKinDialogOpen(true)}*/}
+                          {/*  title="Add New Next of Kin"*/}
+                          {/*  style={{ borderColor: '#650000' }}*/}
+                          {/*>*/}
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon"
+                            className="shrink-0"
+                            onClick={() => setIsNextCreateDialogOpen(true)}
+                            title="Add New Next of Kin"
+                            style={{ borderColor: '#650000' }}
+                          >
+                            <Plus className="h-5 w-5" style={{ color: '#650000' }} />
+                          </Button>
+                        </div>
+                      </div>
 
-          {/* Destination */}
-          <div className="space-y-2">
-            <Label>Destination</Label>
-            <Input
-              type="text"
-              value={item.destination}
-              onChange={(e) => onUpdate(item.id, 'destination', e.target.value)}
-              placeholder="Enter destination"
-            />
-          </div>
+                        {/* Destination */}
+                        <div className="space-y-2">
+                          <Label>Destination</Label>
+                          <Input
+                            type="text"
+                            value={item.destination}
+                            onChange={(e) => onUpdate(item.id, 'destination', e.target.value)}
+                            placeholder="Enter destination"
+                          />
+                        </div>
 
-          {/* Note */}
-          <div className="space-y-2 md:col-span-2">
-            <Label>Notes</Label>
-            <Textarea
-              value={item.note}
-              onChange={(e) => onUpdate(item.id, 'note', e.target.value)}
-              placeholder="Enter any additional notes"
-              rows={2}
-            />
-          </div>
-        </div>
+                        {/* Note */}
+                        <div className="space-y-2 md:col-span-2">
+                <Label>Notes</Label>
+                <Textarea
+                  value={item.note}
+                  onChange={(e) => onUpdate(item.id, 'note', e.target.value)}
+                  placeholder="Enter any additional notes"
+                  rows={2}
+                />
+              </div>
+                    </>
+                )
+              }
+            </div>
             </div>{/* End content wrapper */}
           </CollapsibleContent>
         </Card>
@@ -2234,7 +2304,7 @@ export default function PrisonerPropertyScreen() {
 
   useEffect(() => {
     if (isCreateDialogOpen){
-      setLoading({visitor: false, property: false})
+      setLoading({visitor: false, property: false, type: false})
       if (!prisoners.length){
         setIsCreateDialogOpen(false)
         toast.error("There are no prisoners, You can't create a property without prisoners");
@@ -2248,7 +2318,7 @@ export default function PrisonerPropertyScreen() {
     if (prisonerInfo.prisoner) {
       setLoaderText("Fetching Visitor Information, Please wait...")
       setNewDialogLoader(true)
-      setLoading({visitor: false, property: false})
+      setLoading({visitor: false, property: false, type: false})
       setVisitors([])
       fetchVisitorData(prisonerInfo.prisoner)
     }

@@ -2,6 +2,7 @@ import {ErrorResponse} from "./visitorsServices/VisitorsService";
 import axiosInstance from "../axiosInstance";
 import {WardsResponse} from "./housingService";
 import {Paginated} from "./utils";
+import {Unit} from "./visitorsServices/visitorItem";
 
 export interface Property {
   is_active: boolean;
@@ -56,8 +57,53 @@ export interface PrisonerProperty {
   property_status: string;
 }
 
+export interface PropertyItem {
+  id: string;
+  property_category_name: string;
+  station_name: string;
+  status_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  name: string;
+  description: string;
+  price: string;
+  is_money: boolean;
+  remark: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  station: string;
+  property_category: string;
+  status: string;
+}
+
+export interface PropertyBag {
+  id: string;
+  prisoner_name: string;
+  property_category_name: string;
+  shelf_number: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  bag_number: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  prisoner: string;
+  station: string;
+  property_category: string;
+  shelf: string;
+}
+
 export type PropertyResponse = PrisonerProperty | ErrorResponse;
 export type PropertiesResponse<T> = Paginated<T> | ErrorResponse
+export type PropertyTypesResponse<T> = Paginated<T> | ErrorResponse
+export type PropertyItemsResponse<T> = Paginated<T> | ErrorResponse
+export type PropertyBagsResponse<T> = Paginated<T> | ErrorResponse
+export type PropertyStatusResponse<T> = Paginated<T> | ErrorResponse
 
 export const addProperty = async (property: Property) : Promise<PropertyResponse> => {
   const response = await axiosInstance.post<PropertyResponse>('/property-management/properties/', property);
@@ -66,5 +112,33 @@ export const addProperty = async (property: Property) : Promise<PropertyResponse
 
 export const getProperties = async <T = PrisonerProperty>() : Promise<PropertiesResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/property-management/properties/');
+  return response.data;
+}
+
+export const getPropertyTypes = async <T = Unit>() : Promise<PropertyTypesResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/property-management/types/');
+  return response.data;
+}
+
+export const getPropertyItems = async <T = PropertyItem>(property_category: string) : Promise<PropertyItemsResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/property-management/items/', {
+    params: {
+      property_category
+    }
+  });
+  return response.data;
+}
+
+export const getPropertyBags = async <T = PropertyBag>(prisoner: string) : Promise<PropertyBagsResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/property-management/bags/', {
+    params: {
+      prisoner
+    }
+  });
+  return response.data;
+}
+
+export const getPropertyStatuses = async <T = Unit>() : Promise<PropertyStatusResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/property-management/statuses/');
   return response.data;
 }
