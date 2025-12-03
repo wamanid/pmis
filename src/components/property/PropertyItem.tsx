@@ -35,6 +35,8 @@ interface ChildProps {
   // onUpdate: (itemId: string, field: string, value: any) => void;
   propertyTypes: Unit
   propertyStatuses: Unit
+  loading: any
+  setLoading: React.Dispatch<React.SetStateAction<any>>;
 }
 
 // export default function PropertyItem() {
@@ -42,7 +44,7 @@ interface ChildProps {
 const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, visitorItems,
                                                 setNewDialogLoader, setLoaderText, nextOfKins,
                                                 setIsNextCreateDialogOpen, propertyItems, onUpdate, propertyTypes,
-                                                propertyStatuses }) => {
+                                                propertyStatuses, loading, setLoading }) => {
 
     const [isItemOpen, setIsItemOpen] = useState(true);
     const [openPropertyType, setOpenPropertyType] = useState(false);
@@ -55,7 +57,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
     const [openVisitorItem, setOpenVisitorItem] = useState(false);
     const [visitorItemSearch, setVisitorItemSearch] = useState('');
 
-    const [typeLoader, setTypeLoader] = useState(true)
+    const [typeLoader, setTypeLoader] = useState(false)
     // const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
     const [propertyItemsX, setPropertyItemsX] = useState<PropertyItem[]>([])
     // const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
@@ -103,7 +105,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
     async function fetchPropertyData(visitorItem: VisitorItem) {
        setNewDialogLoader(true)
        setLoaderText("Fetching Property information")
-       setTypeLoader(false)
+       setLoading(prev => ({...prev, type: false}))
         try {
 
            if (!propertyTypes.length){
@@ -124,7 +126,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
             // const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
             // if(!ok4) return
 
-            setTypeLoader(true)
+            setLoading(prev => ({...prev, type: true}))
 
         }catch (error) {
           handleCatchError(error)
@@ -264,7 +266,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
               </div>
 
               {
-                typeLoader && (
+                loading.type && (
                     <>
                        {/* Property Type */}
                         <div className="space-y-2">

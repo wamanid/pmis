@@ -74,6 +74,7 @@ import {
 import {getCurrentUser} from "../../services";
 import NextOfKinScreen from "./NextOfKin";
 import PropertyItemX from "./PropertyItem"
+import CreatePropertyForm from "./CreatePropertyForm";
 
 interface Property {
   id: string;
@@ -638,23 +639,6 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
-  // const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
-  //   // console.log(`${field} ${value}`)
-  //   // console.log(itemId)
-  //   // console.log(propertyItems)
-  //   setPropertyItems(propertyItems.map(item =>
-  //     item.id === itemId ? { ...item, [field]: value } : item
-  //   ));
-  // };
-
-  const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
-    setPropertyItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, ...updatedFields } : item
-      )
-    );
-  };
-
   const handleEdit = (property: Property) => {
     setSelectedProperty(property);
     setPreviousPropertyStatus(property.property_status); // Store the original status
@@ -815,318 +799,6 @@ export default function PrisonerPropertyScreen() {
   const storedProperties = properties.filter(p => p.property_status_name === 'Stored').length;
   const releasedProperties = properties.filter(p => p.property_status_name === 'Released').length;
   const totalValue = properties.reduce((sum, p) => sum + parseInt(p.amount || '0'), 0);
-
-  // Component for creating multiple property items
-  const CreatePropertyForm = ({ onSubmit }: { onSubmit: (e: React.FormEvent) => void }) => {
-    const [openPrisoner, setOpenPrisoner] = useState(false);
-    const [openVisitor, setOpenVisitor] = useState(false);
-
-    return (
-        <div className="h-full" style={{ marginTop: '10px' }}>
-          <form onSubmit={onSubmit} className="space-y-6">
-            {/* Prisoner Information Section */}
-            <Card className="border-2" style={{ borderColor: '#650000' }}>
-              <div className="p-4">
-                <h3 className="mb-4" style={{ color: '#650000' }}>Prisoner Information</h3>
-                <div className="space-y-2">
-                  <Label htmlFor="prisoner">Prisoner *</Label>
-                  <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openPrisoner}
-                        className="w-full justify-between"
-                        type="button"
-                      >
-                        {prisonerInfo.prisoner ? (
-                          (() => {
-                            const prisoner = prisoners.find((p) => p.id === prisonerInfo.prisoner);
-                            return prisoner ? (
-                              <div className="flex items-center gap-2">
-                                <span>{prisoner.full_name}</span>
-                                <span className="text-gray-500">({prisoner.prisoner_number_value})</span>
-                              </div>
-                            ) : "Select prisoner...";
-                          })()
-                        ) : "Select prisoner..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search prisoner..." />
-                        <CommandList>
-                          <CommandEmpty>No prisoner found.</CommandEmpty>
-                          <CommandGroup>
-                            {prisoners.map((prisoner) => (
-                              <CommandItem
-                                key={prisoner.id}
-                                value={prisoner.full_name + ' ' + prisoner.prisoner_number_value}
-                                onSelect={() => {
-                                  setPrisonerInfo({prisoner: prisoner.id});
-                                  setOpenPrisoner(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    prisonerInfo.prisoner === prisoner.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{prisoner.full_name}</span>
-                                  <span className="text-xs text-gray-500">Prisoner Number: {prisoner.prisoner_number_value}</span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                  {prisonerInfo.prisoner && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-600">Prisoner Number:</span>
-                          <span className="ml-2">{prisoners.find((p) => p.id === prisonerInfo.prisoner)?.prisoner_number_value}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Full Name:</span>
-                          <span className="ml-2">{prisoners.find((p) => p.id === prisonerInfo.prisoner)?.full_name}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </Card>
-
-            {
-              loading.visitor && (
-                  <>
-                    {/* Visitor Information Section */}
-                    <Card className="border-2" style={{ borderColor: '#650000' }}>
-                      <div className="p-4">
-                        <h3 className="mb-4" style={{ color: '#650000' }}>Visitor Information</h3>
-                        <div className="space-y-2">
-                          <Label htmlFor="visitor">Visitor</Label>
-                          <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={openVisitor}
-                                className="w-full justify-between"
-                                type="button"
-                                disabled={isLoadingVisitors}
-                              >
-                                {visitorInfo.visitor ? (
-                                  (() => {
-                                    const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                                    return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : "Select visitor...";
-                                  })()
-                                ) : "Select visitor..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0">
-                              <Command>
-                                <CommandInput placeholder="Search by name, ID, or phone..." />
-                                <CommandList>
-                                  <CommandEmpty>
-                                    {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
-                                  </CommandEmpty>
-                                  <CommandGroup>
-                                    <CommandItem
-                                      value="none"
-                                      onSelect={() => {
-                                        setVisitorInfo({visitor: ''});
-                                        setOpenVisitor(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          visitorInfo.visitor === '' ? "opacity-100" : "opacity-0"
-                                        )}
-                                      />
-                                      None
-                                    </CommandItem>
-                                    {visitors.map((visitor) => {
-                                      const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
-                                      const searchValue = `${fullName} ${visitor.id_number} ${visitor.contact_no}`;
-                                      return (
-                                        <CommandItem
-                                          key={visitor.id}
-                                          value={searchValue}
-                                          onSelect={() => {
-                                            setVisitorInfo({visitor: visitor.id});
-                                            setOpenVisitor(false);
-                                          }}
-                                        >
-                                          <Check
-                                            className={cn(
-                                              "mr-2 h-4 w-4",
-                                              visitorInfo.visitor === visitor.id ? "opacity-100" : "opacity-0"
-                                            )}
-                                          />
-                                          <div className="flex flex-col">
-                                            <span>{fullName}</span>
-                                            <span className="text-xs text-gray-500">
-                                              ID: {visitor.id_number} | Phone: {visitor.contact_no}
-                                            </span>
-                                          </div>
-                                        </CommandItem>
-                                      );
-                                    })}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          {visitorInfo.visitor && (
-                            <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                              <div className="grid grid-cols-2 gap-2 text-sm">
-                                <div>
-                                  <span className="text-gray-600">Visitor Name:</span>
-                                  <span className="ml-2">
-                                    {(() => {
-                                      const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                                      return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '';
-                                    })()}
-                                  </span>
-                                </div>
-                                <div>
-                                  <span className="text-gray-600">Phone Number:</span>
-                                  <span className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.contact_no}</span>
-                                </div>
-                                <div className="col-span-2">
-                                  <span className="text-gray-600">ID Number:</span>
-                                  <span className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.id_number}</span>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </Card>
-
-                    {
-                      loading.property && (
-                          <>
-                            {/* Property Items Section */}
-                            <Collapsible open={isPropertyItemsOpen} onOpenChange={setIsPropertyItemsOpen}>
-                              <Card className="border-2" style={{ borderColor: isPropertyItemsOpen ? '#650000' : '#e5e7eb' }}>
-                                <CollapsibleTrigger asChild>
-                                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
-                                    <h3 className="flex items-center gap-2" style={{ color: '#650000' }}>
-                                      <Package className="h-5 w-5" />
-                                      {/*Property Items*/}
-                                      Property Item
-                                      {/*<Badge variant="secondary">{propertyItems.length}</Badge>*/}
-                                    </h3>
-                                    {/*<div className="flex items-center gap-2">*/}
-                                    {/*  <Button*/}
-                                    {/*    type="button"*/}
-                                    {/*    onClick={(e) => {*/}
-                                    {/*      e.stopPropagation();*/}
-                                    {/*      handleAddPropertyItem();*/}
-                                    {/*    }}*/}
-                                    {/*    size="sm"*/}
-                                    {/*    style={{ backgroundColor: '#650000' }}*/}
-                                    {/*  >*/}
-                                    {/*    <Plus className="h-4 w-4 mr-2" />*/}
-                                    {/*    Add Item*/}
-                                    {/*  </Button>*/}
-                                    {/*  {isPropertyItemsOpen ? (*/}
-                                    {/*    <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />*/}
-                                    {/*  ) : (*/}
-                                    {/*    <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />*/}
-                                    {/*  )}*/}
-                                    {/*</div>*/}
-                                  </div>
-                                </CollapsibleTrigger>
-
-                                <CollapsibleContent>
-                                  <div className="p-4 pt-0 space-y-4">
-                                    {propertyItems.map((item, index) => (
-                                        <PropertyItemX
-                                            key={item.id}
-                                            item={item}
-                                            propertyItems={propertyItems}
-                                            index={index}
-                                            setPropertyItems={setPropertyItems}
-                                            visitorItems={visitorItems}
-                                            setNewDialogLoader={setNewDialogLoader}
-                                            setLoaderText={setLoaderText}
-                                            nextOfKins={nextOfKins}
-                                            setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}
-                                            onUpdate={handleUpdatePropertyItem}
-                                            propertyTypes={propertyTypes}
-                                            propertyStatuses={propertyStatuses}
-                                        />
-                                      // <PropertyItemCard
-                                      //   key={item.id}
-                                      //   item={item}
-                                      //   index={index}
-                                      //   onUpdate={handleUpdatePropertyItem}
-                                      //   onRemove={handleRemovePropertyItem}
-                                      //   canRemove={propertyItems.length > 1}
-                                      // />
-                                    ))}
-                                  </div>
-                                </CollapsibleContent>
-                              </Card>
-                            </Collapsible>
-
-                             {/*Biometric Capture/Verification Section */}
-                            {
-                              loading.type && (
-                                  <>
-                                    <Card className="border-2" style={{ borderColor: '#650000' }}>
-                              <div className="p-4">
-                                <h3 className="mb-4" style={{ color: '#650000' }}>Biometric Capture/Verification</h3>
-                                <BiometricCapture
-                                  value={biometricData}
-                                  onChange={setBiometricData}
-                                  label="Prisoner Fingerprint Verification"
-                                />
-                              </div>
-                            </Card>
-
-                                    <DialogFooter>
-                      <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                        Cancel
-                      </Button>
-                      <Button type="submit" style={{ backgroundColor: '#650000' }}>
-                        Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
-                      </Button>
-                    </DialogFooter>
-                                  </>
-                                )
-                            }
-
-                          </>
-                      )
-                    }
-
-                  </>
-              )
-            }
-
-          </form>
-        </div>
-
-    );
-  };
-
-  const [typeLoader, setTypeLoader] = useState(false)
-  const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
-  // const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
-  const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
-  const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
 
   // Component for individual property item card
   const PropertyItemCard = ({ item, index, onUpdate, onRemove, canRemove }: {
@@ -2303,15 +1975,6 @@ export default function PrisonerPropertyScreen() {
     }
   }
 
-  function populateLists(response: any, msg: string, setData: any) {
-    if(handleServerError(response, setPropertyLoading)) return
-
-    if ("results" in response) {
-      const data = response.results
-      setData(data)
-    }
-  }
-
   function populateListX(response: any, msg: string, setData: any) {
       if(handleServerError(response, setPropertyLoading)) return false
 
@@ -2362,61 +2025,9 @@ export default function PrisonerPropertyScreen() {
   }, [isCreateDialogOpen]);
 
   useEffect(() => {
-    if (prisonerInfo.prisoner) {
-      setLoaderText("Fetching Visitor Information, Please wait...")
-      setNewDialogLoader(true)
-      setLoading({visitor: false, property: false, type: false})
-      setVisitors([])
-      fetchVisitorData(prisonerInfo.prisoner)
-    }
-  }, [prisonerInfo]);
+    console.log(isNextCreateDialogOpen)
+  }, [isNextCreateDialogOpen]);
 
-  useEffect(() => {
-    if (visitorInfo.visitor) {
-      setLoaderText("Fetching Visitor items, Please wait...")
-      setNewDialogLoader(true)
-      setLoading(prev =>({...prev, property: false}))
-      setVisitorItems([])
-      fetchVisitorItems(visitorInfo.visitor)
-    }
-  }, [visitorInfo]);
-
-  async function fetchVisitorData(prisonerId) {
-    try {
-        const response = await getStationVisitors2(prisonerId)
-        if(handleServerError(response, setNewDialogLoader)) return
-
-        populateList(response, "There are no visitors for the selected prisoner", setVisitors)
-
-    }catch (error) {
-      handleCatchError(error)
-    }finally {
-       setNewDialogLoader(false)
-    }
-  }
-
-  async function fetchVisitorItems(visitorId) {
-    try {
-        const response = await getVisitorItems2(visitorId)
-        if(handleServerError(response, setNewDialogLoader)) return
-        populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
-
-        const response2 = await getNextOfKins(prisonerInfo.prisoner)
-        if(handleServerError(response2, setNewDialogLoader)) return
-        populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
-
-         const response1 = await getPropertyTypes()
-         populateLists(response1, "There are no property types", setPropertyTypes)
-
-         const response3 = await getPropertyStatuses()
-         populateLists(response3, "There are no property statuses", setPropertyStatuses)
-
-    }catch (error) {
-      handleCatchError(error)
-    }finally {
-       setNewDialogLoader(false)
-    }
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -2680,7 +2291,10 @@ export default function PrisonerPropertyScreen() {
               Add property items for a prisoner and visitor
             </DialogDescription>
           </DialogHeader>
-          <CreatePropertyForm onSubmit={handleSubmitCreate} />
+          {/*<CreatePropertyForm onSubmit={handleSubmitCreate} />*/}
+            <CreatePropertyForm prisoners={prisoners} setIsCreateDialogOpen={setIsCreateDialogOpen}
+              setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText}
+              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}/>
           </div>
         </DialogContent>
       </Dialog>
