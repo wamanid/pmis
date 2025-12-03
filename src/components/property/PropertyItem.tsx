@@ -22,7 +22,9 @@ import {handleCatchError, handleEmptyList, handleServerError} from "../../servic
 import {toast} from "sonner";
 
 interface ChildProps {
+  setPropertyItems: React.Dispatch<React.SetStateAction<DefaultPropertyItem[]>>;
   item: DefaultPropertyItem
+  propertyItems: DefaultPropertyItem
   index: number
   visitorItems: VisitorItem
   setNewDialogLoader: React.Dispatch<React.SetStateAction<boolean>>;
@@ -37,9 +39,9 @@ interface ChildProps {
 
 // export default function PropertyItem() {
 // const PropertyItem React.FC<ChildProps> = ({ }) => {
-const PropertyItem: React.FC<ChildProps> = ({ index, item, visitorItems,
+const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, visitorItems,
                                                 setNewDialogLoader, setLoaderText, nextOfKins,
-                                                setIsNextCreateDialogOpen, onUpdate, propertyTypes,
+                                                setIsNextCreateDialogOpen, propertyItems, onUpdate, propertyTypes,
                                                 propertyStatuses }) => {
 
     const [isItemOpen, setIsItemOpen] = useState(true);

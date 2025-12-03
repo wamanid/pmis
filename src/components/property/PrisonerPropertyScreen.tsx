@@ -639,6 +639,9 @@ export default function PrisonerPropertyScreen() {
   };
 
   const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
+    // console.log(`${field} ${value}`)
+    // console.log(itemId)
+    // console.log(propertyItems)
     setPropertyItems(propertyItems.map(item =>
       item.id === itemId ? { ...item, [field]: value } : item
     ));
@@ -1052,7 +1055,9 @@ export default function PrisonerPropertyScreen() {
                                         <PropertyItemX
                                             key={item.id}
                                             item={item}
+                                            propertyItems={propertyItems}
                                             index={index}
+                                            setPropertyItems={setPropertyItems}
                                             visitorItems={visitorItems}
                                             setNewDialogLoader={setNewDialogLoader}
                                             setLoaderText={setLoaderText}
