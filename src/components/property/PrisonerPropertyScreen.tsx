@@ -638,22 +638,22 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
-  const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
-    // console.log(`${field} ${value}`)
-    // console.log(itemId)
-    // console.log(propertyItems)
-    setPropertyItems(propertyItems.map(item =>
-      item.id === itemId ? { ...item, [field]: value } : item
-    ));
-  };
-
-  // const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
-  //   setPropertyItems(prevItems =>
-  //     prevItems.map(item =>
-  //       item.id === itemId ? { ...item, ...updatedFields } : item
-  //     )
-  //   );
+  // const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
+  //   // console.log(`${field} ${value}`)
+  //   // console.log(itemId)
+  //   // console.log(propertyItems)
+  //   setPropertyItems(propertyItems.map(item =>
+  //     item.id === itemId ? { ...item, [field]: value } : item
+  //   ));
   // };
+
+  const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
+    setPropertyItems(prevItems =>
+      prevItems.map(item =>
+        item.id === itemId ? { ...item, ...updatedFields } : item
+      )
+    );
+  };
 
   const handleEdit = (property: Property) => {
     setSelectedProperty(property);

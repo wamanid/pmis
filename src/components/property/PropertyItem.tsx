@@ -31,8 +31,8 @@ interface ChildProps {
   setLoaderText: React.Dispatch<React.SetStateAction<string>>;
   nextOfKins: React.Dispatch<React.SetStateAction<NextOfKinResponse[]>>;
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
-  // onUpdate: (itemId: string, updatedFields: Partial<DefaultPropertyItem>) => void;
-  onUpdate: (itemId: string, field: string, value: any) => void;
+  onUpdate: (itemId: string, updatedFields: Partial<DefaultPropertyItem>) => void;
+  // onUpdate: (itemId: string, field: string, value: any) => void;
   propertyTypes: Unit
   propertyStatuses: Unit
 }
@@ -78,11 +78,22 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
     const handleVisitorItemSelect = async (visitorItem: VisitorItem) => {
       // Populate fields from selected visitor item
-        onUpdate(item.id, "quantity", visitorItem.quantity.toString());
-        onUpdate(item.id, "amount", visitorItem.amount);
-        onUpdate(item.id, "visitor_item", visitorItem.id);
-        onUpdate(item.id, "property_category", visitorItem.item_category);
-        onUpdate(item.id, "measurement_unit", visitorItem.measurement_unit);
+      //   onUpdate(item.id, "quantity", visitorItem.quantity.toString());
+      //   onUpdate(item.id, "amount", visitorItem.amount);
+      //   onUpdate(item.id, "visitor_item", visitorItem.id);
+      //   onUpdate(item.id, "property_category", visitorItem.item_category);
+      //   onUpdate(item.id, "measurement_unit", visitorItem.measurement_unit);
+
+        const updates = {
+            quantity: visitorItem.quantity.toString(),
+            amount: visitorItem.amount,
+            visitor_item: visitorItem.id,
+            property_category: visitorItem.item_category,
+            measurement_unit: visitorItem.measurement_unit,
+        };
+
+        // Now, call onUpdate ONCE with the combined updates object
+        onUpdate(item.id, updates);
 
       setOpenVisitorItem(false);
 
@@ -136,14 +147,14 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
     }
 
     function handleChange (name: string, value: string){
-        onUpdate(item.id, name, value);
+        const updates = { [name]: value }
+        onUpdate(item.id, updates);
     }
 
     const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
           const { name, value } = e.target;
-          onUpdate(item.id, name, value);
-          // Use the name from the input's 'name' attribute
-          // onUpdate(item.id, { [name]: value });
+          const updates = { [name]: value }
+          onUpdate(item.id, updates);
     };
 
     return (
