@@ -129,10 +129,11 @@ export const getPropertyItems = async <T = PropertyItem>(property_category: stri
   return response.data;
 }
 
-export const getPropertyBags = async <T = PropertyBag>(prisoner: string) : Promise<PropertyBagsResponse<T>> => {
+export const getPropertyBags = async <T = PropertyBag>(prisoner: string, property_category: string) : Promise<PropertyBagsResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/property-management/bags/', {
     params: {
-      prisoner
+      prisoner,
+      property_category
     }
   });
   return response.data;

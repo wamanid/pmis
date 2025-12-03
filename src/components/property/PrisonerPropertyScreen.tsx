@@ -509,22 +509,22 @@ export default function PrisonerPropertyScreen() {
   });
 
   // State for multiple property items (for create mode)
-  const [propertyItems, setPropertyItems] = useState([{
-    id: '1',
-    property_type: '',
-    property_category: '',
-    property_item: '',
-    measurement_unit: '',
-    property_bag: '',
-    next_of_kin: '',
-    property_status: '',
-    quantity: '',
-    amount: '',
-    note: '',
-    destination: '',
-    visitor_item: '',
-    visitor_item_name: '',
-  }]);
+  // const [propertyItems, setPropertyItems] = useState([{
+  //   id: '1',
+  //   property_type: '',
+  //   property_category: '',
+  //   property_item: '',
+  //   measurement_unit: '',
+  //   property_bag: '',
+  //   next_of_kin: '',
+  //   property_status: '',
+  //   quantity: '',
+  //   amount: '',
+  //   note: '',
+  //   destination: '',
+  //   visitor_item: '',
+  //   visitor_item_name: '',
+  // }]);
 
   // State for biometric data (for create mode)
   const [biometricData, setBiometricData] = useState('');
@@ -1103,6 +1103,12 @@ export default function PrisonerPropertyScreen() {
     );
   };
 
+  const [typeLoader, setTypeLoader] = useState(false)
+  const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
+  const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
+  const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
+  const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
+
   // Component for individual property item card
   const PropertyItemCard = ({ item, index, onUpdate, onRemove, canRemove }: {
     item: any;
@@ -1121,13 +1127,6 @@ export default function PrisonerPropertyScreen() {
     const [openNextOfKin, setOpenNextOfKin] = useState(false);
     const [openVisitorItem, setOpenVisitorItem] = useState(false);
     const [visitorItemSearch, setVisitorItemSearch] = useState('');
-
-    const [typeLoader, setTypeLoader] = useState(false)
-
-    const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
-    const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
-    const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
-    const [propertyBags, setPropertyBags] = useState<PropertyBag>([])
 
 
     // Filter visitor items based on search
@@ -1164,20 +1163,23 @@ export default function PrisonerPropertyScreen() {
     async function fetchPropertyData(visitorItem: VisitorItem) {
        setNewDialogLoader(true)
        setLoaderText("Fetching Property information")
+       setTypeLoader(false)
         try {
             const response1 = await getPropertyTypes()
             const ok1 = populateListX(response1, "There are no property types", setPropertyTypes)
             if(!ok1) return
-            const response2 = await getPropertyItems(visitorItem.item_category)
-            const ok2 = populateListX(response2, "There are no property items", setPropertyItems)
-            if(!ok2) return
+            // const response2 = await getPropertyItems(visitorItem.item_category)
+            // const ok2 = populateListX(response2, "There are no property items", setPropertyItems)
+            // if(!ok2) return
             const response3 = await getPropertyStatuses()
             const ok3 = populateListX(response3, "There are no property statuses", setPropertyStatuses)
             if(!ok3) return
-            const response4 = await getPropertyBags(prisonerInfo.prisoner)
-            const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
-            if(!ok4) return
+            // const response4 = await getPropertyBags(prisonerInfo.prisoner, visitorItem.item_category)
+            // const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
+            // if(!ok4) return
 
+            console.log("ok1", ok1)
+            console.log("ok2", ok3)
             setTypeLoader(true)
 
         }catch (error) {
@@ -1322,7 +1324,7 @@ export default function PrisonerPropertyScreen() {
                             <PopoverTrigger asChild>
                               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
                                 {item.property_type
-                                  ? mockPropertyTypes.find((t) => t.id === item.property_type)?.name
+                                  ? propertyTypes.find((t) => t.id === item.property_type)?.name
                                   : "Select property type..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -1333,12 +1335,14 @@ export default function PrisonerPropertyScreen() {
                                 <CommandList>
                                   <CommandEmpty>No type found.</CommandEmpty>
                                   <CommandGroup>
-                                    {mockPropertyTypes.map((type) => (
+                                    {propertyTypes.map((type) => (
                                       <CommandItem
                                         key={type.id}
                                         value={type.name}
                                         onSelect={() => {
-                                          onUpdate(item.id, 'property_type', type.id);
+                                          onUpdate(item.id, {
+                                            property_type: type.id
+                                          })
                                           setOpenPropertyType(false);
                                         }}
                                       >
@@ -1535,7 +1539,7 @@ export default function PrisonerPropertyScreen() {
                             <PopoverTrigger asChild>
                               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
                                 {item.property_status
-                                  ? mockPropertyStatuses.find((s) => s.id === item.property_status)?.name
+                                  ? propertyStatuses.find((s) => s.id === item.property_status)?.name
                                   : "Select status..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -1546,12 +1550,14 @@ export default function PrisonerPropertyScreen() {
                                 <CommandList>
                                   <CommandEmpty>No status found.</CommandEmpty>
                                   <CommandGroup>
-                                    {mockPropertyStatuses.map((status) => (
+                                    {propertyStatuses.map((status) => (
                                       <CommandItem
                                         key={status.id}
                                         value={status.name}
                                         onSelect={() => {
-                                          onUpdate(item.id, 'property_status', status.id);
+                                          onUpdate(item.id, {
+                                            property_status: status.id
+                                          });
                                           setOpenPropertyStatus(false);
                                         }}
                                       >
