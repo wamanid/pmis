@@ -131,24 +131,24 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
   }
 
     async function handleLocationChange (name: string, value: string) {
-    setFormData1({...formData1, [name]: value})
-    if (name === "address_region"){
-      await fetchDistricts(setDistricts, setNewDialogLoader, setLoaderText, value)
-    }
-    else if (name === "address_district") {
-      await fetchCounties(setCounties, setNewDialogLoader, setLoaderText, value)
-    }
-    else if (name === "address_county") {
-      await fetchSubCounties(setSubCounties, setNewDialogLoader, setLoaderText, value)
-    }
-    else if (name === "address_sub_county") {
-      await fetchParishes(setParishes, setNewDialogLoader, setLoaderText, value)
-    }
-    else if (name === "address_parish") {
-      await fetchVillages(setVillages, setNewDialogLoader, setLoaderText, value)
-    }
+      setFormData1({...formData1, [name]: value})
+      if (name === "address_region"){
+        await fetchDistricts(setDistricts, setNewDialogLoader, setLoaderText, value)
+      }
+      else if (name === "address_district") {
+        await fetchCounties(setCounties, setNewDialogLoader, setLoaderText, value)
+      }
+      else if (name === "address_county") {
+        await fetchSubCounties(setSubCounties, setNewDialogLoader, setLoaderText, value)
+      }
+      else if (name === "address_sub_county") {
+        await fetchParishes(setParishes, setNewDialogLoader, setLoaderText, value)
+      }
+      else if (name === "address_parish") {
+        await fetchVillages(setVillages, setNewDialogLoader, setLoaderText, value)
+      }
 
-  }
+    }
 
     const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

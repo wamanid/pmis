@@ -47,6 +47,7 @@ import {
   handleServerError
 } from "../../services/stationServices/utils";
 import {
+  DefaultPropertyItem,
   getProperties, getPropertyBags,
   getPropertyItems, getPropertyStatuses,
   getPropertyTypes,
@@ -72,6 +73,7 @@ import {
 } from "../../services/admission/nextOfKinService";
 import {getCurrentUser} from "../../services";
 import NextOfKinScreen from "./NextOfKin";
+import PropertyItemX from "./PropertyItem"
 
 interface Property {
   id: string;
@@ -509,22 +511,21 @@ export default function PrisonerPropertyScreen() {
   });
 
   // State for multiple property items (for create mode)
-  // const [propertyItems, setPropertyItems] = useState([{
-  //   id: '1',
-  //   property_type: '',
-  //   property_category: '',
-  //   property_item: '',
-  //   measurement_unit: '',
-  //   property_bag: '',
-  //   next_of_kin: '',
-  //   property_status: '',
-  //   quantity: '',
-  //   amount: '',
-  //   note: '',
-  //   destination: '',
-  //   visitor_item: '',
-  //   visitor_item_name: '',
-  // }]);
+  const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
+    id: '1',
+    property_type: '',
+    property_category: '',
+    property_item: '',
+    measurement_unit: '',
+    property_bag: '',
+    next_of_kin: '',
+    property_status: '',
+    quantity: '',
+    amount: '',
+    note: '',
+    destination: '',
+    visitor_item: '',
+  }]);
 
   // State for biometric data (for create mode)
   const [biometricData, setBiometricData] = useState('');
@@ -637,19 +638,19 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
-  // const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
-  //   setPropertyItems(propertyItems.map(item =>
-  //     item.id === itemId ? { ...item, [field]: value } : item
-  //   ));
-  // };
-
-  const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
-    setPropertyItems(prevItems =>
-      prevItems.map(item =>
-        item.id === itemId ? { ...item, ...updatedFields } : item
-      )
-    );
+  const handleUpdatePropertyItem = (itemId: string, field: string, value: any) => {
+    setPropertyItems(propertyItems.map(item =>
+      item.id === itemId ? { ...item, [field]: value } : item
+    ));
   };
+
+  // const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
+  //   setPropertyItems(prevItems =>
+  //     prevItems.map(item =>
+  //       item.id === itemId ? { ...item, ...updatedFields } : item
+  //     )
+  //   );
+  // };
 
   const handleEdit = (property: Property) => {
     setSelectedProperty(property);
@@ -1048,14 +1049,27 @@ export default function PrisonerPropertyScreen() {
                                 <CollapsibleContent>
                                   <div className="p-4 pt-0 space-y-4">
                                     {propertyItems.map((item, index) => (
-                                      <PropertyItemCard
-                                        key={item.id}
-                                        item={item}
-                                        index={index}
-                                        onUpdate={handleUpdatePropertyItem}
-                                        onRemove={handleRemovePropertyItem}
-                                        canRemove={propertyItems.length > 1}
-                                      />
+                                        <PropertyItemX
+                                            key={item.id}
+                                            item={item}
+                                            index={index}
+                                            visitorItems={visitorItems}
+                                            setNewDialogLoader={setNewDialogLoader}
+                                            setLoaderText={setLoaderText}
+                                            nextOfKins={nextOfKins}
+                                            setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}
+                                            onUpdate={handleUpdatePropertyItem}
+                                            propertyTypes={propertyTypes}
+                                            propertyStatuses={propertyStatuses}
+                                        />
+                                      // <PropertyItemCard
+                                      //   key={item.id}
+                                      //   item={item}
+                                      //   index={index}
+                                      //   onUpdate={handleUpdatePropertyItem}
+                                      //   onRemove={handleRemovePropertyItem}
+                                      //   canRemove={propertyItems.length > 1}
+                                      // />
                                     ))}
                                   </div>
                                 </CollapsibleContent>
@@ -1105,7 +1119,7 @@ export default function PrisonerPropertyScreen() {
 
   const [typeLoader, setTypeLoader] = useState(false)
   const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
-  const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
+  // const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
   const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
   const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
 
@@ -1134,8 +1148,6 @@ export default function PrisonerPropertyScreen() {
       const searchLower = visitorItemSearch.toLowerCase();
       return (
         visitorItem.visitor_name.toLowerCase().includes(searchLower) ||
-        // visitorItem.visitor_id_number.toLowerCase().includes(searchLower) ||
-        // visitorItem.visitor_phone.toLowerCase().includes(searchLower) ||
         visitorItem.item_name.toLowerCase().includes(searchLower)
       );
     });
@@ -1153,6 +1165,10 @@ export default function PrisonerPropertyScreen() {
         amount: visitorItem.amount,
         visitor_item_name: name,
         visitor_item: visitorItem.item,
+        property_category: visitorItem.item_category,
+        property_category_name: visitorItem.category_name,
+        measurement_unit: visitorItem.measurement_unit,
+        measurement_unit_name: visitorItem.measurement_unit_name,
       });
       // toast.success(`Loaded item: ${name}`);
       setOpenVisitorItem(false);
@@ -1178,8 +1194,6 @@ export default function PrisonerPropertyScreen() {
             // const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
             // if(!ok4) return
 
-            console.log("ok1", ok1)
-            console.log("ok2", ok3)
             setTypeLoader(true)
 
         }catch (error) {
@@ -1362,10 +1376,8 @@ export default function PrisonerPropertyScreen() {
                           <Label>Property Category *</Label>
                           <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
                             <PopoverTrigger asChild>
-                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                                {item.property_category
-                                  ? mockPropertyCategories.find((c) => c.id === item.property_category)?.name
-                                  : "Select category..."}
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button" disabled={true}>
+                                {item.property_category_name}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
@@ -1438,10 +1450,11 @@ export default function PrisonerPropertyScreen() {
                           <Label>Measurement Unit</Label>
                           <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
                             <PopoverTrigger asChild>
-                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                                {item.measurement_unit
-                                  ? mockMeasurementUnits.find((u) => u.id === item.measurement_unit)?.name
-                                  : "Select unit..."}
+                              <Button variant="outline" role="combobox" className="w-full justify-between" type="button" disabled={true}>
+                                {/*{item.measurement_unit*/}
+                                {/*  ? mockMeasurementUnits.find((u) => u.id === item.measurement_unit)?.name*/}
+                                {/*  : "Select unit..."}*/}
+                                {item.measurement_unit_name}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
@@ -1477,9 +1490,9 @@ export default function PrisonerPropertyScreen() {
                           <Input
                             type="text"
                             value={item.quantity}
-                            onChange={(e) => onUpdate(item.id, 'quantity', e.target.value)}
                             placeholder="Enter quantity"
                             required
+                            disabled={true}
                           />
                         </div>
 
@@ -1489,8 +1502,8 @@ export default function PrisonerPropertyScreen() {
                           <Input
                             type="number"
                             value={item.amount}
-                            onChange={(e) => onUpdate(item.id, 'amount', e.target.value)}
                             placeholder="Enter amount"
+                            disabled={true}
                           />
                         </div>
 
@@ -1650,21 +1663,21 @@ export default function PrisonerPropertyScreen() {
                           <Input
                             type="text"
                             value={item.destination}
-                            onChange={(e) => onUpdate(item.id, 'destination', e.target.value)}
+                            onChange={(e) => onUpdate(item.id, {destination: e.target.value})}
                             placeholder="Enter destination"
                           />
                         </div>
 
                         {/* Note */}
                         <div className="space-y-2 md:col-span-2">
-                <Label>Notes</Label>
-                <Textarea
-                  value={item.note}
-                  onChange={(e) => onUpdate(item.id, 'note', e.target.value)}
-                  placeholder="Enter any additional notes"
-                  rows={2}
-                />
-              </div>
+                          <Label>Notes</Label>
+                          <Textarea
+                            value={item.note}
+                            onChange={(e) => onUpdate(item.id, {note: e.target.value})}
+                            placeholder="Enter any additional notes"
+                            rows={2}
+                          />
+                        </div>
                     </>
                 )
               }
@@ -2285,21 +2298,44 @@ export default function PrisonerPropertyScreen() {
     }
   }
 
+  function populateLists(response: any, msg: string, setData: any) {
+    if(handleServerError(response, setPropertyLoading)) return
+
+    if ("results" in response) {
+      const data = response.results
+      setData(data)
+    }
+  }
+
+  function populateListX(response: any, msg: string, setData: any) {
+      if(handleServerError(response, setPropertyLoading)) return false
+
+      if ("results" in response) {
+        const data = response.results
+        if (handleEmptyList(data, msg, setPropertyLoading)) return false
+        setData(data)
+        return true
+      }
+
+      return false
+    }
+
   useEffect(() => {
     if (propertyLoading){
       async function fetchData () {
          try {
-           const response = await getProperties()
-           if(handleServerError(response, setPropertyLoading)) return
-           populateList(response, "There are no prisoner properties", setProperties)
 
            const response1 = await getPrisoners()
-           if(handleServerError(response1, setPropertyLoading)) return
-            populateList(response1, "There are no prisoners", setPrisoners)
+           const ok1 = populateListX(response1, "There are no prisoners", setPrisoners)
+           if (!ok1) return
+
+           const response = await getProperties()
+           populateList(response, "There are no prisoner properties", setProperties)
+
+           setPropertyLoading(false)
 
          }catch (error) {
            handleCatchError(error)
-         }finally {
            setPropertyLoading(false)
          }
       }
@@ -2363,6 +2399,12 @@ export default function PrisonerPropertyScreen() {
         const response2 = await getNextOfKins(prisonerInfo.prisoner)
         if(handleServerError(response2, setNewDialogLoader)) return
         populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
+
+         const response1 = await getPropertyTypes()
+         populateLists(response1, "There are no property types", setPropertyTypes)
+
+         const response3 = await getPropertyStatuses()
+         populateLists(response3, "There are no property statuses", setPropertyStatuses)
 
     }catch (error) {
       handleCatchError(error)

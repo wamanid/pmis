@@ -4,6 +4,22 @@ import {WardsResponse} from "./housingService";
 import {Paginated} from "./utils";
 import {Unit} from "./visitorsServices/visitorItem";
 
+export interface DefaultPropertyItem {
+  id: string;
+  property_type: string;
+  property_category: string;
+  property_item: string;
+  measurement_unit: string;
+  property_bag: string;
+  next_of_kin: string;
+  property_status: string;
+  quantity: string;
+  amount: string;
+  note: string;
+  destination: string;
+  visitor_item: string;
+}
+
 export interface Property {
   is_active: boolean;
   deleted_datetime: string | null;
