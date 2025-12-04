@@ -1,4 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -38,9 +40,9 @@ import {
   StationFilter
 } from "../../services/stationServices/utils"
 import { DataTable } from '../common/DataTable';
-import { useRef, useCallback } from 'react';
 
 export function StaffDeploymentScreen() {
+  const { region, district, station } = useFilters();
   const [deployments, setDeployments] = useState<StaffDeploymentResponse[]>([]);
   const [summary, setSummary] = useState<StaffDeploymentSummary | null>(null);
   const [stations, setStations] = useState<Station[]>([]);
@@ -88,6 +90,9 @@ export function StaffDeploymentScreen() {
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
+  // View modal state
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selectedDeployment, setSelectedDeployment] = useState<StaffDeploymentResponse | null>(null);
 
   useEffect(() => {
     // loadData();
@@ -230,6 +235,11 @@ export function StaffDeploymentScreen() {
       setRegionSummary(getRegionSummary(updatedDeployments));
       return updatedDeployments
     })
+    // refresh table (server authoritative) so paging/total are correct
+    // loadTable is defined later but stable via useCallback; queue microtask to avoid race
+    setTimeout(() => {
+      try { loadTable(1, pageSize, sortField, sortDir, debouncedSearch); } catch { /* ignore */ }
+    }, 0);
   }
 
   const resetForm = () => {
@@ -323,6 +333,26 @@ export function StaffDeploymentScreen() {
       }
       fetchData()
   }, [deployOpen]);
+
+  // Reload when global location filters change (TopBar)
+  // useFilterRefresh(() => {
+  //   setPage(1);
+  //   return loadTable(1, pageSize, sortField, sortDir, debouncedSearch);
+  // }, [region, district, station]);
+
+
+  useFilterRefresh(() => {
+    setPage(1);
+    // refresh summaries and related datasets (fetchData updates deployments, stationSummary, districtSummary, regionSummary)
+    // and also refresh the table page. Run fetchData first so summaries reflect the new filters quickly.
+    try {
+      // fire and forget fetchData (it updates state), then return the table loader promise
+      fetchData();
+    } catch (e) {
+      /* ignore */
+    }
+    return loadTable(1, pageSize, sortField, sortDir, debouncedSearch);
+  }, [region, district, station]);
 
   if (loading) {
     return (
@@ -618,6 +648,7 @@ export function StaffDeploymentScreen() {
               {/* Deployments DataTable */}
               <div className="">
                 <DataTable
+                url="/station-management/api/staff-deployments/"
                   data={tableData}
                   loading={tableLoading}
                   total={total}
@@ -633,11 +664,11 @@ export function StaffDeploymentScreen() {
                     { key: 'is_active', label: 'Status', sortable: true, render: (v: any) => <Badge variant={v ? 'default' : 'secondary'} style={v ? { backgroundColor: '#650000' } : {}}>{v ? 'Active' : 'Inactive'}</Badge> },
                     { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
                         <div className="flex gap-2 justify-end">
-                          <Button variant="outline" size="sm" onClick={() => { /* view handler if needed */ }}><UserPlus className="h-4 w-4 mr-1" />View</Button>
+                          <Button variant="outline" size="sm" onClick={() => { setSelectedDeployment(row); setViewOpen(true); }}><UserPlus className="h-4 w-4 mr-1" />View</Button>
                         </div>
                       )
                     },
-                  ]}
+                   ]}
                   // keep onSearch so table can still react if DataTable emits it; we also provide external search input above
                   onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
                   onPageChange={(p: number) => setPage(p)}
@@ -768,6 +799,34 @@ export function StaffDeploymentScreen() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      {/* View Modal (read-only) */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Deployment Details</DialogTitle>
+              <DialogDescription>Read-only details for the selected deployment</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 p-2">
+              {selectedDeployment ? (
+                <>
+                  <div><strong>Force Number:</strong> {selectedDeployment.force_number}</div>
+                  <div><strong>Name:</strong> {selectedDeployment.full_name}</div>
+                  <div><strong>Rank:</strong> {selectedDeployment.profile_rank ?? selectedDeployment.rank}</div>
+                  <div><strong>Station:</strong> {selectedDeployment.station_name}</div>
+                  <div><strong>Start Date:</strong> {selectedDeployment.start_date}</div>
+                  <div><strong>End Date:</strong> {selectedDeployment.end_date ?? '—'}</div>
+                  <div><strong>Status:</strong> {selectedDeployment.is_active ? 'Active' : 'Inactive'}</div>
+                </>
+              ) : (
+                <div>No deployment selected</div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setViewOpen(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
     </div>
   );
 }
