@@ -39,6 +39,9 @@ import { format} from 'date-fns';
 import { toast } from 'sonner';
 import { PrisonerRecord } from '../../models/gate/Index';
 import { getprisoners } from '../../services/gateService';
+import { getStages, submitStageData } from '../../services/stageService';
+import { Prisoner } from '../../models/gate/Prisoner';
+import { Stage, StageAssignmentPost } from '../../models/StageClassification';
 
 export interface StageAssignment {
   id: string;
@@ -59,17 +62,6 @@ interface StageAssignFormProps {
   onSuccess: () => void;
 }
 
-interface Prisoner {
-  id: string;
-  prisoner_number: string;
-  full_name: string;
-}
-
-interface Stage {
-  id: string;
-  name: string;
-  description: string;
-}
 
 export function StageAssignForm({
   open,
@@ -106,7 +98,7 @@ export function StageAssignForm({
       setSelectedPrisoners([{
         id: stageAssignment.prisoner,
         prisoner_number: stageAssignment.prisoner_number,
-        full_name: stageAssignment.prisoner_name,
+        prisoner_name: stageAssignment.prisoner_name,
       }]);
       setSelectedStage(stageAssignment.stage);
      // setStartDate(new Date(stageAssignment.start_date));
@@ -125,28 +117,20 @@ export function StageAssignForm({
       // setStages(data.results);
 
       // Mock data
-      setStages([
-        {
-          id: '1',
-          name: 'Orientation Stage',
-          description: 'Initial orientation for new prisoners',
-        },
-        {
-          id: '2',
-          name: 'Ordinary Stage',
-          description: 'Standard classification stage',
-        },
-        {
-          id: '3',
-          name: 'Star Stage',
-          description: 'Advanced stage for model prisoners',
-        },
-        {
-          id: '4',
-          name: 'Special Stage',
-          description: 'Special classification stage',
-        },
-      ]);
+        let stages: Stage[] = [
+      ];
+
+      //get stages
+       getStages().then((data) => {
+       // alert(JSON.stringify(data));
+         stages = data.results;
+         setStages(stages);
+      }).catch((error) => {
+        alert(error);
+
+      });
+
+      setStages(stages);
     } catch (error) {
       console.error('Failed to load stages:', error);
       toast.error('Failed to load stages');
@@ -194,7 +178,7 @@ export function StageAssignForm({
     setPrisonerSearch('');
     setPrisoners([]);
     setShowPrisonerDropdown(false);
-    toast.success(`Added ${prisoner.full_name}`);
+    toast.success(`Added ${prisoner.prisoner_name}`);
   };
 
   const handleRemovePrisoner = (prisonerId: string) => {
@@ -251,40 +235,39 @@ export function StageAssignForm({
           end_date: endDate ,
           remark: remark,
         };
-        // TODO: Replace with actual API call
-        // const response = await fetch(`/api/stage-management/prisoner-stages/${stageAssignment.id}/`, {
-        //   method: 'PUT',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(payload),
-        // });
-        // if (!response.ok) throw new Error('Failed to update stage assignment');
-
-        await new Promise((resolve) => setTimeout(resolve, 500));
+   // await new Promise((resolve) => setTimeout(resolve, 500));
         toast.success('Stage assignment updated successfully');
       } else {
         // Create new stage assignments (multiple prisoners)
         const assignments = selectedPrisoners.map((prisoner) => ({
-          prisoner: prisoner.id,
+          id: prisoner.id,
+         
+        }));
+
+        let dataToPost:StageAssignmentPost={
+            id:"",
           stage: selectedStage,
           start_date: startDate,
           end_date: endDate ,
           remark: remark,
-        }));
+          prisoners:assignments,
+          prisoner:assignments[0].id,
+          status:"0996439c-24cc-453e-87e4-1936a3e52820"
+        };
+        alert(JSON.stringify(dataToPost));
+      submitStageData(dataToPost).then((data) => {
+       alert(JSON.stringify(data));
+      toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
+     onOpenChange(false);
+      }).catch((error) => {
+        alert(error);
 
-        // TODO: Replace with actual API call for batch creation
-        // const response = await fetch('/api/stage-management/prisoner-stages/bulk/', {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify({ assignments }),
-        // });
-        // if (!response.ok) throw new Error('Failed to create stage assignments');
+      });
 
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
+       // await new Promise((resolve) => setTimeout(resolve, 500));
       }
-
-      onSuccess();
-      onOpenChange(false);
+     //onSuccess();
+     
       resetForm();
     } catch (error) {
       console.error('Error saving stage assignment:', error);
@@ -467,7 +450,7 @@ export function StageAssignForm({
               <SelectContent>
                 {stages.map((stage) => (
                   <SelectItem key={stage.id} value={stage.id}>
-                    {stage.name}
+                    {stage.stage}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -476,68 +459,34 @@ export function StageAssignForm({
 
           {/* Date Fields */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {startDate} <span>Pick a date</span>
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={startDate}
-                    onSelect={setStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-
-                   <div className="space-y-2">
+              <div className="space-y-2">
           <Label>
-            Issue Date <span className="text-red-500">*</span>
+            Start Date <span className="text-red-500">*</span>
           </Label>
           <Input
-            type="datetime-local"
+            type="date"
             value={startDate}
             onChange={(e) => {
-            
+            setStartDate(e.target.value);
+            }}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label>
+            End Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={endDate}
+            onChange={(e) => {
+             setEndDate(e.target.value);
             }}
          
           />
       
         </div>
 
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {endDate ? endDate: <span>Pick a date</span>}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={endDate}
-                    onSelect={setEndDate}
-                    initialFocus
-                    disabled={(date) => startDate ? date < startDate : false}
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+          
           </div>
 
           {/* Remark */}

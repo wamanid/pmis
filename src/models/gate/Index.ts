@@ -88,7 +88,7 @@ export interface VisitorPass {
   valid_from: string;
   valid_until: string;
   purpose: string;
-  issue_date: string;
+  issue_date?: string;
   is_suspended: boolean;
   is_valid?: boolean;
   prisoner: string;
