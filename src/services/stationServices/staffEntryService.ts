@@ -86,4 +86,13 @@ export const fetchStations = async () => {
     console.error('fetchStations error:', err);
     return [];
   }
+}
+
+// Ensure updateEntry exists — fallback implementation using fetch so the component can call it.
+// PATCH /station-management/api/attendance/{id}/
+export const updateEntry = async (id: string, payload: Partial<StaffEntryPayload>) => {
+  if (!id) throw new Error('updateEntry: id is required');
+  // use axiosInstance + ENTRIES_BASE so baseURL from axiosInstance is honored
+  const res = await axiosInstance.patch(`${ENTRIES_BASE}${id}/`, payload);
+  return res.data;
 };

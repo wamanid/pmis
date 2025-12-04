@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription } from '../ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogDescription, DialogFooter } from '../ui/dialog';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
-import { Plus, Search, Scan, CheckCircle2, XCircle, Clock, User, Loader2, Trash2 } from 'lucide-react';
+import { Plus, Search, Scan, CheckCircle2, XCircle, Clock, User, Loader2, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { Textarea } from '../ui/textarea';
@@ -70,6 +70,14 @@ export function StaffEntryExitScreen() {
   const [remark, setRemark] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  // Edit modal state (required by Edit button / dialog)
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingRecord, setEditingRecord] = useState<StaffEntryRow | null>(null);
+  const [editSelectedStation, setEditSelectedStation] = useState<string>('');
+  const [editAttendanceType, setEditAttendanceType] = useState<'PRESENT' | 'ABSENT'>('PRESENT');
+  const [editTimeOut, setEditTimeOut] = useState<string>('');
+  const [editRemark, setEditRemark] = useState<string>('');
+  const [editSubmitLoading, setEditSubmitLoading] = useState<boolean>(false);
   // whether we've fetched staff details successfully (freeze inputs)
   const [hasFetched, setHasFetched] = useState(false);
   const [fetchFailed, setFetchFailed] = useState(false);
@@ -246,7 +254,15 @@ export function StaffEntryExitScreen() {
     setFetchFailed(false);
     try {
       // try server search by force_number param
-      const profiles = await StaffEntryService.fetchStaffProfiles({ force_number: forceNumber });
+      // const profiles = await StaffEntryService.fetchStaffProfiles({ force_number: forceNumber });
+
+        // normalize to uppercase so search is case-insensitive (backend expects uppercase codes)
+      const normalized = (forceNumber || '').trim().toUpperCase();
+      // keep input visual consistent
+      setForceInput(normalized);
+      // try server search by force_number param
+      const profiles = await StaffEntryService.fetchStaffProfiles({ force_number: normalized });
+
       // server may return multiple or none; our service now returns exact-match array if provided
       const staff = profiles[0] ?? null;
       if (!staff) {
@@ -465,6 +481,27 @@ export function StaffEntryExitScreen() {
             variant="ghost"
             size="sm"
             onClick={() => {
+              // only allow edit when there is no time_out
+              if (row.time_out) {
+                toast.error('Cannot edit a record that already has a Time Out.');
+                return;
+              }
+              // open edit modal with row values
+              setEditingRecord(row);
+              setEditSelectedStation(row.station_name ? stationOptions.find(s => s.name === row.station_name)?.id ?? '' : '');
+              setEditAttendanceType((row.attendance_type as any) ?? 'PRESENT');
+              setEditTimeOut(row.time_out ?? '');
+              setEditRemark(row.remark ?? '');
+              setEditDialogOpen(true);
+            }}
+          >
+            <Edit className="h-4 w-4 text-amber-600" />
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
               setRecordToDelete(row.id);
               setDeleteDialogOpen(true);
             }}
@@ -475,6 +512,50 @@ export function StaffEntryExitScreen() {
       ),
     },
   ];
+
+  // submit edit
+  const handleEditSave = async () => {
+    if (!editingRecord) return;
+    if (!editSelectedStation) {
+      toast.error('Station is required');
+      setFormErrors({ station: 'Station is required' });
+      return;
+    }
+    setEditSubmitLoading(true);
+    try {
+      const payload = {
+        station: editSelectedStation,
+        attendance_type: editAttendanceType,
+        time_out: editTimeOut || null,
+        remark: editRemark || null,
+      };
+
+      // call service - updateEntry expected to exist
+      await StaffEntryService.updateEntry(editingRecord.id, payload);
+      toast.success('Record updated');
+      setEditDialogOpen(false);
+      setEditingRecord(null);
+      // refresh table
+      loadTable(1, pageSize, sortField, sortDir, search);
+    } catch (err: any) {
+      console.error('updateEntry error', err?.response ?? err);
+      toast.error('Failed to update record');
+    } finally {
+      setEditSubmitLoading(false);
+    }
+  };
+
+  // make sure modal resets when closed
+  useEffect(() => {
+    if (!editDialogOpen) {
+      setEditingRecord(null);
+      setEditSelectedStation('');
+      setEditAttendanceType('PRESENT');
+      setEditTimeOut('');
+      setEditRemark('');
+      setEditSubmitLoading(false);
+    }
+  }, [editDialogOpen]);
 
   return (
     <div className="space-y-6">
@@ -655,37 +736,37 @@ export function StaffEntryExitScreen() {
                       <Label>Remark (Optional)</Label>
                       <Textarea
                         placeholder="Enter any remarks here..."
+                        value={remark}
+                        onChange={(e) => setRemark(e.target.value)}
                         rows={3}
-                        value={remark} onChange={(e) => setRemark(e.target.value)}
                       />
                     </div>
-
-                  </div>
-
-                  <div className="flex gap-2 justify-end mt-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={fetchLoading || submitLoading}
-                      onClick={() => { setDialogOpen(false); resetForm(); }}
-                    >
-                      Cancel
-                    </Button>
-                    <Button variant="outline" onClick={() => { resetForm(); }}>
-                      Scan Another
-                    </Button>
-                    <Button onClick={handleConfirmEntry} className="bg-primary hover:bg-primary/90" disabled={submitLoading}>
-                      {submitLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Recording...</> : <> <CheckCircle2 className="mr-2 h-4 w-4" /> Confirm Entry</>}
-                    </Button>
                   </div>
                 </div>
               )}
             </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitLoading}>
+                Cancel
+              </Button>
+              <Button onClick={handleConfirmEntry} className="bg-primary hover:bg-primary/90" disabled={submitLoading}>
+                {submitLoading ? 'Saving...' : 'Save'}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Stats Cards */}
+      {/* Error loading table data */}
+      {loadError && (
+        <div className="p-4 text-sm rounded-md bg-red-50 text-red-900 border border-red-300">
+          <p className="font-medium">Error loading records</p>
+          <p>{loadError}</p>
+        </div>
+      )}
+
+      {/* Stats summary cards */}
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Total Records</CardTitle></CardHeader>
@@ -735,31 +816,14 @@ export function StaffEntryExitScreen() {
 
           <DataTable
             /* controlled mode: we already fetch server data in this component (loadTable) */
+            url="/station-management/api/attendance/"
             data={tableData}
             loading={tableLoading}
             total={total}
             title="Staff Entry & Exit Records"
             columns={userColumns}
             externalSearch={search}
-            // onSearch={(q) => {
-            //   setSearch(q);
-            //   setPage(1);
-            //   loadTable(1, pageSize, sortField, sortDir, q);
-            // }}
-            // onPageChange={(p) => {
-            //   setPage(p);
-            //   loadTable(p, pageSize, sortField, sortDir, search);
-            // }}
-            // onPageSizeChange={(size) => {
-            //   setPageSize(size);
-            //   setPage(1);
-            //   loadTable(1, size, sortField, sortDir, search);
-            // }}
-            // onSort={(field, dir) => {
-            //   setSortField(field ?? undefined);
-            //   setSortDir(dir ?? undefined);
-            //   loadTable(1, pageSize, field ?? undefined, dir ?? undefined, search);
-            // }}
+
 
             
           />
@@ -767,23 +831,75 @@ export function StaffEntryExitScreen() {
         </CardContent>
       </Card>
 
-      {/* Delete Confirmation */}
+      {/* Delete confirmation dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Record</AlertDialogTitle>
+            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this staff entry/exit record? This action cannot be undone.
+              Are you sure you want to delete this record? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setRecordToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
+            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
+              Delete
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Edit Record Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit Staff Entry</DialogTitle>
+            <DialogDescription>
+              Only records without a Time Out can be edited.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label>Station <span className="text-red-500">*</span></Label>
+              <Select value={editSelectedStation} onValueChange={(v) => { setEditSelectedStation(v || ''); setFormErrors(null); }}>
+                <SelectTrigger><SelectValue placeholder="Select a station" /></SelectTrigger>
+                <SelectContent>
+                  {stationOptions.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Attendance Type <span className="text-red-500">*</span></Label>
+              <Select value={editAttendanceType} onValueChange={(v) => setEditAttendanceType(v as any)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="PRESENT">Present</SelectItem>
+                  <SelectItem value="ABSENT">Absent</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Time Out (Optional)</Label>
+              <Input type="time" value={editTimeOut} onChange={(e) => setEditTimeOut(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Remark (Optional)</Label>
+              <Textarea value={editRemark} onChange={(e) => setEditRemark(e.target.value)} rows={3} />
+            </div>
+
+            <div className="flex gap-2 justify-end mt-4">
+              <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={editSubmitLoading}>Cancel</Button>
+              <Button onClick={handleEditSave} className="bg-primary hover:bg-primary/90" disabled={editSubmitLoading}>
+                {editSubmitLoading ? 'Saving...' : 'Save'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
-
-export default StaffEntryExitScreen;

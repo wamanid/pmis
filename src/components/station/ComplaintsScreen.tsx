@@ -4,6 +4,7 @@ import {
   Plus,
   Eye,
   Edit,
+  Trash,
   Filter,
   Calendar,
   User,
@@ -34,6 +35,7 @@ import { Badge } from "../ui/badge";
 import { DataTable } from "../common/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
+import ConfirmDialog from "../common/ConfirmDialog";
 
 interface ComplaintAction {
   id: string;
@@ -114,6 +116,10 @@ export function ComplaintsScreen() {
   const [editingComplaint, setEditingComplaint] = useState<Complaint | null>(
     null,
   );
+  // delete confirm state
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Complaint | null>(null);
+  const [confirmDescription, setConfirmDescription] = useState<string>('');
   const [complaintStatuses, setComplaintStatuses] = useState<any[]>([]);
   const [priorityOptions, setPriorityOptions] = useState<any[]>([]);
 
@@ -273,6 +279,34 @@ export function ComplaintsScreen() {
     setIsFormOpen(true);
   };
 
+  // Prepare delete confirmation
+  const handleDeleteClick = (complaint: Complaint) => {
+    setDeleteTarget(complaint);
+    const detail = `${complaint.prisoner_name ?? ''} — ${complaint.station_name ?? ''} — ${complaint.complaint_date ?? ''}`;
+    setConfirmDescription(`Are you sure you want to delete this complaint: ${detail}\n\n"${(complaint.complaint ?? '').slice(0,120)}"${(complaint.complaint?.length ?? 0) > 120 ? '…' : ''}`);
+    setConfirmOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return;
+    try {
+      await ComplaintsService.deleteComplaint(deleteTarget.id);
+      // remove from local list and adjust server total count
+      setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+      setTotal((t) => Math.max(0, (t || 0) - 1));
+      if (selectedComplaint?.id === deleteTarget.id) {
+        setIsDetailsOpen(false);
+        setSelectedComplaint(null);
+      }
+    } catch (err) {
+      console.error('delete complaint error', err);
+    } finally {
+      setConfirmOpen(false);
+      setDeleteTarget(null);
+      setConfirmDescription('');
+    }
+  };
+
   // Save complaint (add or edit) — persists via API
   const handleSaveComplaint = async (complaint: any) => {
     try {
@@ -292,15 +326,6 @@ export function ComplaintsScreen() {
       console.error('Save complaint error:', err?.response?.data ?? err);
       throw err;
     }
-  };
-
-  const handleDeleteComplaint = async (id: string) => {
-    if (!confirm('Delete this complaint?')) return;
-    try {
-      await ComplaintsService.deleteComplaint(id);
-      setComplaints((prev) => prev.filter((c) => c.id !== id));
-      setIsDetailsOpen(false);
-    } catch (err) { /* axios will show error */ }
   };
 
   // Load data on mount
@@ -487,6 +512,7 @@ export function ComplaintsScreen() {
       <Card className="pt-6">
         <CardContent>
           <DataTable
+            url="/station-management/api/complaints/"
             data={resolvedComplaints}
             loading={tableLoading}
             total={total}
@@ -501,8 +527,10 @@ export function ComplaintsScreen() {
               { key: 'complaint_date', label: 'Date' },
               { key: 'actions', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
                   <div className="flex gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4 mr-1" />View</Button>
-                    <Button variant="outline" size="sm" onClick={() => handleEditComplaint(row)} className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"><Edit className="h-4 w-4 mr-1" />Edit</Button>
+                    <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" onClick={() => handleEditComplaint(row)} className="text-[#0000FF] border-[#0000FF]"><Edit className="h-4 w-4" /></Button>
+                    <Button variant="outline" size="sm" onClick={() => handleDeleteClick(row)} className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"><Trash className="h-4 w-4" /></Button>
+                    {/* <Button variant="outline" size="sm" onClick={() => handleDeleteClick(row)} className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"><Trash className="h-4 w-4" /></Button> */}
                   </div>
                 )},
             ]}
@@ -518,6 +546,17 @@ export function ComplaintsScreen() {
         </CardContent>
       </Card>
 
+      {/* Confirm delete dialog */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete complaint"
+        description={confirmDescription || "Are you sure you want to delete this complaint? This action cannot be undone."}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleConfirmDelete}
+      />
+
       {/* Complaint Details Dialog */}
       <Dialog open={isDetailsOpen} onOpenChange={setIsDetailsOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -529,6 +568,15 @@ export function ComplaintsScreen() {
               Complete information about this complaint and its actions
             </DialogDescription>
           </DialogHeader>
+
+          {/* optional delete inside details */}
+          <div className="flex justify-end px-6 -mt-6">
+            {selectedComplaint && (
+              <Button variant="ghost" className="text-red-600" onClick={() => handleDeleteClick(selectedComplaint)}>
+                <Trash className="h-4 w-4 mr-2" /> Delete
+              </Button>
+            )}
+          </div>
 
           {selectedComplaint && (
             <div className="space-y-6">

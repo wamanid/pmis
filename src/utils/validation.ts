@@ -262,6 +262,19 @@ export const pastDateValidation = {
 };
 
 /**
+ * Date validation - must be in the past or today
+ */
+export const pastOrTodayDateValidation = {
+  validate: (value: string) => {
+    if (!value) return true;
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate <= today || "Date cannot be in the future";
+  },
+};
+
+/**
  * Date validation - must be in the future
  */
 export const futureDateValidation = {
@@ -273,6 +286,94 @@ export const futureDateValidation = {
     return selectedDate >= today || "Date must be in the future";
   },
 };
+
+/**
+ * Date validation - must be in the future or today
+ */
+export const futureOrTodayDateValidation = {
+  validate: (value: string) => {
+    if (!value) return true;
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return selectedDate >= today || "Date cannot be in the past";
+  },
+};
+
+/**
+ * Date range validation - start date must be before end date
+ * @param startDate - The start date to compare against
+ * @param fieldName - Optional custom field name for error message
+ */
+export const dateRangeValidation = (startDate: string, fieldName?: string) => ({
+  validate: (endDate: string) => {
+    if (!endDate || !startDate) return true;
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return end >= start || `${fieldName || "End date"} must be after start date`;
+  },
+});
+
+/**
+ * Date validation - must be within a specific range
+ * @param minDate - Minimum allowed date (ISO string or Date)
+ * @param maxDate - Maximum allowed date (ISO string or Date)
+ * @param fieldName - Optional custom field name for error message
+ */
+export const dateWithinRangeValidation = (
+  minDate: string | Date,
+  maxDate: string | Date,
+  fieldName?: string
+) => ({
+  validate: (value: string) => {
+    if (!value) return true;
+    const selectedDate = new Date(value);
+    const min = new Date(minDate);
+    const max = new Date(maxDate);
+    
+    if (selectedDate < min) {
+      return `${fieldName || "Date"} must be after ${min.toLocaleDateString()}`;
+    }
+    if (selectedDate > max) {
+      return `${fieldName || "Date"} must be before ${max.toLocaleDateString()}`;
+    }
+    return true;
+  },
+});
+
+/**
+ * Date validation - must be at least X days/months/years from today
+ * @param amount - Number of time units
+ * @param unit - Time unit ('days', 'months', 'years')
+ * @param direction - 'past' or 'future'
+ */
+export const dateOffsetValidation = (
+  amount: number,
+  unit: 'days' | 'months' | 'years',
+  direction: 'past' | 'future'
+) => ({
+  validate: (value: string) => {
+    if (!value) return true;
+    const selectedDate = new Date(value);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const compareDate = new Date(today);
+    if (unit === 'days') {
+      compareDate.setDate(compareDate.getDate() + (direction === 'future' ? amount : -amount));
+    } else if (unit === 'months') {
+      compareDate.setMonth(compareDate.getMonth() + (direction === 'future' ? amount : -amount));
+    } else if (unit === 'years') {
+      compareDate.setFullYear(compareDate.getFullYear() + (direction === 'future' ? amount : -amount));
+    }
+    
+    if (direction === 'future') {
+      return selectedDate >= compareDate || `Date must be at least ${amount} ${unit} in the future`;
+    } else {
+      return selectedDate <= compareDate || `Date must be at least ${amount} ${unit} in the past`;
+    }
+  },
+});
 
 /**
  * Age validation - must be at least minimum age

@@ -45,7 +45,28 @@ import {
 import { format } from "date-fns";
 import * as svc from '../../services/stationServices/shiftDeploymentsService';
 import { DataTable } from '../common/DataTable';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
+import { phoneNumberValidation, emailValidation, requiredValidation, nameValidation } from "../../utils/validation";
 
+import axiosInstance from '../../services/axiosInstance';
+import { uploadFile } from '../../services/fileUploadService';
+// API endpoints (centralised for easy management)
+const API_ENDPOINTS = {
+  SHIFT_DETAILS: '/station-management/api/shift-details/',
+};
+// Allowed file types for handover report (multipart uploads only)
+const SHIFT_REPORT_ALLOWED_EXTS = ['pdf','png','jpg','jpeg','doc','docx'];
+const SHIFT_REPORT_ALLOWED_MIMES = [
+  'application/pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+];
+const SHIFT_REPORT_MAX_BYTES = 10 * 1024 * 1024; // 10 MB
+ 
 // Types based on API
 interface ShiftDetail {
   id: string;
@@ -129,35 +150,40 @@ interface Staff {
 const cn = (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(' ');
 
 export default function ShiftDeploymentsScreen() {
-  // Normalize different API shapes into the fields the UI expects
-  const normalizeShiftDetail = (raw: any): ShiftDetail => {
-    const shiftLeaderFull =
-      raw.shift_leader_full_name ??
-      raw.shift_leader_name ??
-      raw.shift_leader?.full_name ??
-      raw.shift_leader?.name ??
-      raw.shift_leader?.username ?? // last-resort fallback
-      "";
+  // global location filters (TopBar)
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
+   // Normalize different API shapes into the fields the UI expects.
+   // Resolve leader name/username from in-memory staff lookup if API returns only id.
+   const normalizeShiftDetail = (raw: any): ShiftDetail => {
+     const leaderId = raw?.shift_leader;
+     const leaderObj = leaderId ? staff.find((s) => String(s.id) === String(leaderId)) : undefined;
 
-    const shiftLeaderUsername =
-      raw.shift_leader_username ??
-      raw.shift_leader?.username ??
-      raw.shift_leader?.user_name ??
-      "";
+     const shiftLeaderFull =
+       (raw.shift_leader_full_name && String(raw.shift_leader_full_name).trim()) ||
+       (raw.shift_leader_name && String(raw.shift_leader_name).trim()) ||
+       leaderObj?.name ||
+       leaderObj?.full_name ||
+       "";
 
-    const createdByName =
-      raw.created_by_name ??
-      raw.created_by?.name ??
-      raw.created_by?.full_name ??
-      "";
+     const shiftLeaderUsername =
+       (raw.shift_leader_username && String(raw.shift_leader_username).trim()) ||
+       leaderObj?.username ||
+       leaderObj?.user_name ||
+       "";
 
-    return {
-      ...raw,
-      shift_leader_full_name: shiftLeaderFull,
-      shift_leader_username: shiftLeaderUsername,
-      created_by_name: createdByName,
-    };
-  };
+     const createdByName =
+       raw.created_by_name ??
+       raw.created_by?.name ??
+       raw.created_by?.full_name ??
+       "";
+
+     return {
+       ...raw,
+       shift_leader_full_name: shiftLeaderFull,
+       shift_leader_username: shiftLeaderUsername,
+       created_by_name: createdByName,
+     } as ShiftDetail;
+   };
 
   // normalize a deployment row (fill missing staff fields from staff list)
   const normalizeDeployment = (raw: any): ShiftDeployment => {
@@ -175,9 +201,10 @@ export default function ShiftDeploymentsScreen() {
   };
 
   // Filter states
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
-  const [selectedStation, setSelectedStation] = useState<string>("");
+  // local UI selection (we'll default to global filters; local selects removed from page)
+  const [selectedRegion, setSelectedRegion] = useState<string>(globalRegion || "");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(globalDistrict || "");
+  const [selectedStation, setSelectedStation] = useState<string>(globalStation || "");
 
   // Data states
   const [regions, setRegions] = useState<Region[]>([]);
@@ -198,6 +225,9 @@ export default function ShiftDeploymentsScreen() {
   const [searchQuery, setSearchQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [deployLoading, setDeployLoading] = useState(false);
+  // form validation errors
+  const [shiftFormErrors, setShiftFormErrors] = useState<Record<string,string>>({});
+  const [staffFormErrors, setStaffFormErrors] = useState<Record<string,string>>({});
 
   // Pagination / sorting for shift-details
   const [page, setPage] = useState<number>(1);
@@ -250,12 +280,13 @@ export default function ShiftDeploymentsScreen() {
 
     (async () => {
       try {
+        // include global filters when fetching stations/details so lookups reflect TopBar selection
         const [regs, stns, stf, areas, details] = await Promise.all([
           svc.fetchRegions(undefined, c.signal),
-          svc.fetchStations(undefined, c.signal),
-          svc.fetchStaffProfiles(undefined, c.signal),
+          svc.fetchStations({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
+          svc.fetchStaffProfiles({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
           svc.fetchDeploymentAreas(undefined, c.signal),
-          svc.fetchShiftDetails({ page_size: -1 }, c.signal),
+          svc.fetchShiftDetails({ page_size: -1, region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
         ]);
         if (!mounted) return;
  
@@ -263,8 +294,19 @@ export default function ShiftDeploymentsScreen() {
         setStations(stns ?? []);
         setStaff(stf ?? []);
         setDeploymentAreas(areas ?? []);
+
+        // Normalize using the staff list returned above (stf) so we can resolve shift_leader name/username
         const allDetails = details?.results ?? [];
-        const normalized = (allDetails || []).map(normalizeShiftDetail);
+        const normalized = (allDetails || []).map((raw: any) => {
+          const leaderId = raw?.shift_leader;
+          const leaderObj = Array.isArray(stf) ? stf.find((s: any) => String(s.id) === String(leaderId)) : undefined;
+          return {
+            ...raw,
+            shift_leader_full_name: raw.shift_leader_full_name ?? raw.shift_leader_name ?? leaderObj?.name ?? leaderObj?.full_name ?? '',
+            shift_leader_username: raw.shift_leader_username ?? leaderObj?.username ?? leaderObj?.user_name ?? '',
+            created_by_name: raw.created_by_name ?? raw.created_by?.name ?? '',
+          } as ShiftDetail;
+        });
         setShiftDetails(normalized);
  
          // derive unique shifts from shift-details
@@ -274,6 +316,8 @@ export default function ShiftDeploymentsScreen() {
         });
         setShifts(Object.entries(uniq).map(([id, name]) => ({ id, name })));
       } catch (err) {
+        // ignore cancellations, show other errors
+        if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
         console.error('initial lookups error', err);
         toast.error('Failed to load initial lookup data');
       }
@@ -288,26 +332,30 @@ export default function ShiftDeploymentsScreen() {
     const c = new AbortController();
 
     (async () => {
-      if (!selectedRegion) {
+      // If global region exists prefer it; otherwise use local selection
+      const regionToUse = globalRegion || selectedRegion;
+      if (!regionToUse) {
         setDistricts([]);
-        setSelectedDistrict("");
-        setSelectedStation("");
+        setSelectedDistrict(globalDistrict || "");
+        setSelectedStation(globalStation || "");
         return;
       }
       try {
-        const ds = await svc.fetchDistricts({ region: selectedRegion }, c.signal);
+        const ds = await svc.fetchDistricts({ region: regionToUse }, c.signal);
         if (!mounted) return;
         setDistricts(ds ?? []);
-        setSelectedDistrict("");
-        setSelectedStation("");
+        // if global district is present, set it
+        setSelectedDistrict(globalDistrict || "");
+        setSelectedStation(globalStation || "");
       } catch (err) {
+        if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
         console.error('fetchDistricts error', err);
         toast.error('Failed to load districts');
       }
     })();
 
     return () => { mounted = false; c.abort(); };
-  }, [selectedRegion]);
+  }, [selectedRegion, globalRegion, globalDistrict, globalStation]);
 
   // Load stations when district changes
   useEffect(() => {
@@ -316,34 +364,36 @@ export default function ShiftDeploymentsScreen() {
 
     (async () => {
       try {
-        if (!selectedDistrict) {
-          // keep existing stations loaded on startup; only clear selected station
-          setSelectedStation("");
+        const districtToUse = globalDistrict || selectedDistrict;
+        if (!districtToUse) {
+          setSelectedStation(globalStation || "");
           return;
         }
-        const stns = await svc.fetchStations({ district: selectedDistrict }, c.signal);
+        const stns = await svc.fetchStations({ district: districtToUse, region: globalRegion }, c.signal);
         if (!mounted) return;
         setStations(stns ?? []);
-        setSelectedStation("");
+        setSelectedStation(globalStation || "");
       } catch (err) {
+        if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
         console.error('fetchStations error', err);
         toast.error('Failed to load stations');
       }
     })();
 
     return () => { mounted = false; c.abort(); };
-  }, [selectedDistrict]);
+  }, [selectedDistrict, globalRegion, globalDistrict, globalStation]);
 
   // loadShiftDetails: cancellable, request-id guarded to avoid stale responses
   const loadShiftDetails = useCallback(async (p = 1, ps = 10, sf?: string, sd?: 'asc'|'desc', q?: string) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setLoading(true);
+     try { abortRef.current?.abort(); } catch {}
+     const controller = new AbortController();
+     abortRef.current = controller;
+     const reqId = ++requestIdRef.current;
+     setLoading(true);
 
-    try {
-      const params: Record<string, any> = { page: Math.max(1, Number(p) || 1), page_size: Number(ps) || 10 };
+     try {
+      // include global filters in query so server-side results are filtered
+      const params: Record<string, any> = { page: Math.max(1, Number(p) || 1), page_size: Number(ps) || 10, region: globalRegion || undefined, district: globalDistrict || undefined, station: globalStation || undefined };
       if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
       if (q) params.search = q;
       params._t = Date.now();
@@ -366,16 +416,37 @@ export default function ShiftDeploymentsScreen() {
     } finally {
       if (requestIdRef.current === reqId) setLoading(false);
     }
-  }, []);
+  }, [staff, globalRegion, globalDistrict, globalStation]);
 
   // initial/load on page/search/sort change
   useEffect(() => {
     loadShiftDetails(page, pageSize, sortField, sortDir, searchQuery);
   }, [page, pageSize, sortField, sortDir, searchQuery, loadShiftDetails]);
 
+  // reload when TopBar global location filters change
+  useFilterRefresh(() => {
+    // reset page and reload shift details + lookups
+    setPage(1);
+    // refresh lookups and table
+    (async () => {
+      try {
+        const c = new AbortController();
+        const [stns, stf] = await Promise.all([
+          svc.fetchStations({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
+          svc.fetchStaffProfiles({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
+        ]);
+        setStations(stns ?? []);
+        setStaff(stf ?? []);
+      } catch (e) { /* ignore */ }
+    })();
+    return loadShiftDetails(1, pageSize, sortField, sortDir, searchQuery);
+  }, [globalRegion, globalDistrict, globalStation]);
+ 
   // client-side filtered list (keeps UI filters)
   const filteredShiftDetails = shiftDetails.filter(shift => {
-    if (selectedStation && shift.station !== selectedStation) return false;
+    // prefer globalStation filter when provided
+    const stationFilter = globalStation || selectedStation;
+    if (stationFilter && shift.station !== stationFilter) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
@@ -392,13 +463,82 @@ export default function ShiftDeploymentsScreen() {
     e.preventDefault();
     setLoading(true);
     try {
-      const fd = new FormData();
-      fd.append('station', shiftForm.station);
-      fd.append('shift', shiftForm.shift);
-      fd.append('shift_leader', shiftForm.shift_leader);
-      fd.append('handover_report', shiftForm.handover_report || '');
-      if (shiftForm.handover_report_doc) fd.append('handover_report_doc', shiftForm.handover_report_doc);
-      await svc.createShiftDetail(fd as any);
+      // validation
+      const errors: Record<string,string> = {};
+      if (!requiredValidation(shiftForm.station || globalStation)) errors.station = 'Station is required';
+      if (!requiredValidation(shiftForm.shift)) errors.shift = 'Shift is required';
+      if (!requiredValidation(shiftForm.shift_leader)) errors.shift_leader = 'Shift leader is required';
+      setShiftFormErrors(errors);
+      if (Object.keys(errors).length) {
+        setLoading(false);
+        return;
+      }
+ 
+      // If there's a document, upload multipart locally (no base64). Otherwise JSON create.
+      let createdItem: any = null;
+      if (shiftForm.handover_report_doc) {
+        const file = shiftForm.handover_report_doc;
+        // Basic validation
+        const name = file.name || '';
+        const ext = name.split('.').pop()?.toLowerCase() ?? '';
+        if (!SHIFT_REPORT_ALLOWED_EXTS.includes(ext)) {
+          throw new Error(`Invalid file type. Allowed: ${SHIFT_REPORT_ALLOWED_EXTS.join(', ')}`);
+        }
+        if (!SHIFT_REPORT_ALLOWED_MIMES.includes(file.type)) {
+          throw new Error('Invalid file mime type.');
+        }
+        if (file.size > SHIFT_REPORT_MAX_BYTES) {
+          throw new Error('File exceeds maximum size of 10MB.');
+        }
+
+        // Use the app's uploadFile helper (same pattern uploadStrategyService uses).
+        // This ensures the same auth/headers/interceptor behavior used elsewhere.
+        const baseUrl = (axiosInstance as any)?.defaults?.baseURL ?? (import.meta.env.VITE_API_BASE_URL ?? '');
+        const base = String(baseUrl || '').replace(/\/$/, '');
+        const url = base ? `${base}${API_ENDPOINTS.SHIFT_DETAILS}` : API_ENDPOINTS.SHIFT_DETAILS;
+
+        const extraData: Record<string,string> = {
+          station: shiftForm.station || globalStation || '',
+          shift: shiftForm.shift,
+          shift_leader: shiftForm.shift_leader,
+          handover_report: shiftForm.handover_report || '',
+        };
+ 
+        try {
+          const uploadResp = await uploadFile(file, {
+            url,
+            fieldName: 'handover_report_doc',
+            extraData,
+            signal: undefined,
+          });
+          // uploadFile should return parsed server response on success
+          // If it returned the created resource, use it
+          createdItem = uploadResp ?? null;
+        } catch (err: any) {
+          // uploadFile may throw an object with response/data — normalize and rethrow for existing error handling
+          const respErr = err?.response ?? err;
+          throw respErr;
+        }
+      } else {
+        // no file: fallback to service JSON create
+        createdItem = await svc.createShiftDetail({
+          station: shiftForm.station || globalStation || '',
+          shift: shiftForm.shift,
+          shift_leader: shiftForm.shift_leader,
+          handover_report: shiftForm.handover_report || '',
+        } as any);
+      }
+
+      // If backend returned created item, insert to UI immediately; else reload
+      if (createdItem && createdItem.id) {
+        const normalized = normalizeShiftDetail(createdItem);
+        setShiftDetails(prev => [normalized, ...prev]);
+        setShiftTotal(t => Number(t || 0) + 1);
+      } else {
+        // fallback reload
+        setPage(1);
+        await loadShiftDetails(1, pageSize, sortField, sortDir, searchQuery);
+      }
       toast.success("Shift created successfully");
       setIsShiftDialogOpen(false);
       setShiftForm({
@@ -409,32 +549,50 @@ export default function ShiftDeploymentsScreen() {
         handover_report_doc: null,
       });
       // refresh list (first page)
-      setPage(1);
-      await loadShiftDetails(1, pageSize, sortField, sortDir, searchQuery);
-    } catch (error: any) {
-      console.error('createShift error', error?.response ?? error);
-      const msg = error?.response?.data ? JSON.stringify(error.response.data) : 'Failed to create shift';
-      toast.error(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+      //        setPage(1);
+      //        await loadShiftDetails(1, pageSize, sortField, sortDir, searchQuery);
+     } catch (error: any) {
+       console.error('createShift error', error?.response ?? error);
+       const msg = error?.response?.data ? JSON.stringify(error.response.data) : (error?.message ?? 'Failed to create shift');
+       toast.error(msg);
+     } finally {
+       setLoading(false);
+     }
+   };
 
-  const handleAddStaffToShift = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    try {
-      // find staff details (must exist; staff list loaded at startup)
-      const staffObj = staff.find(s => String(s.id) === String(staffForm.staff));
-      const payload: Record<string, any> = {
-        station: staffForm.station || selectedStation,
-        shift: staffForm.shift,
-        staff: staffForm.staff,
-        deployment_area: staffForm.deployment_area,
-        shift_date: format(staffForm.shift_date, 'yyyy-MM-dd'),
-        end_date: format(staffForm.end_date, 'yyyy-MM-dd'),
-        report: staffForm.report || '',
-      };
+   const handleAddStaffToShift = async (e: React.FormEvent) => {
+     e.preventDefault();
+     setLoading(true);
+     try {
+      // validation
+      const errors: Record<string,string> = {};
+      if (!requiredValidation(staffForm.station || selectedStation || globalStation)) errors.station = 'Station is required';
+      if (!requiredValidation(staffForm.shift)) errors.shift = 'Shift is required';
+      if (!requiredValidation(staffForm.staff)) errors.staff = 'Staff member is required';
+      if (!requiredValidation(staffForm.deployment_area)) errors.deployment_area = 'Deployment area is required';
+      // date validation
+      if (!staffForm.shift_date || !staffForm.end_date) {
+        errors.shift_date = 'Shift dates are required';
+      } else if (new Date(staffForm.shift_date) > new Date(staffForm.end_date)) {
+        errors.end_date = 'End date must be after start date';
+      }
+      setStaffFormErrors(errors);
+      if (Object.keys(errors).length) {
+        setLoading(false);
+        return;
+      }
+
+       // find staff details (must exist; staff list loaded at startup)
+       const staffObj = staff.find(s => String(s.id) === String(staffForm.staff));
+       const payload: Record<string, any> = {
+        station: staffForm.station || selectedStation || globalStation || '',
+         shift: staffForm.shift,
+         staff: staffForm.staff,
+         deployment_area: staffForm.deployment_area,
+         shift_date: format(staffForm.shift_date, 'yyyy-MM-dd'),
+         end_date: format(staffForm.end_date, 'yyyy-MM-dd'),
+         report: staffForm.report || '',
+       };
  
       // Backend requires these fields according to validation error: include them from staff profile
       if (staffObj) {
@@ -478,53 +636,51 @@ export default function ShiftDeploymentsScreen() {
     } finally {
       setLoading(false);
     }
-  };
+   };
 
-  const loadDeployments = useCallback(async (shiftId: string) => {
-    try { deployAbortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    deployAbortRef.current = controller;
-    const reqId = ++deployRequestIdRef.current;
-    setDeployLoading(true);
+   const loadDeployments = useCallback(async (shiftId: string) => {
+     try { deployAbortRef.current?.abort(); } catch {}
+     const controller = new AbortController();
+     deployAbortRef.current = controller;
+     const reqId = ++deployRequestIdRef.current;
+     setDeployLoading(true);
 
-    try {
-      // Try nested endpoint first (shift-details/{id}/deployments/)
-      let res: any = null;
-      try {
-        res = await svc.fetchShiftDetailDeployments(shiftId, undefined, controller.signal);
-      } catch (err) {
-        // ignore and fallback
-        res = null;
-      }
+     try {
+       // Try nested endpoint first (shift-details/{id}/deployments/)
+       let res: any = null;
+       try {
+         res = await svc.fetchShiftDetailDeployments(shiftId, undefined, controller.signal);
+       } catch (err) {
+         // ignore and fallback
+         res = null;
+       }
 
-      // if nested returned nothing or is not expected, fallback to shift-deployments?shift=<id>
-      if (!res || (!res.results && !Array.isArray(res))) {
-        const fallback = await svc.fetchShiftDeployments({ shift: shiftId }, controller.signal);
-        // some APIs return results, some return array directly
-        res = fallback;
-      }
+       // if nested returned nothing or is not expected, fallback to shift-deployments?shift=<id>
+       if (!res || (!res.results && !Array.isArray(res))) {
+         const fallback = await svc.fetchShiftDeployments({ shift: shiftId }, controller.signal);
+         // some APIs return results, some return array directly
+         res = fallback;
+       }
 
-      const rawItems = res?.results ?? (Array.isArray(res) ? res : []);
-      // normalize each deployment using staff lookup
-      const items = (rawItems || []).map(normalizeDeployment);
-      if (deployRequestIdRef.current === reqId) {
-        setShiftDeployments(items);
-      }
-    } catch (err) {
-      if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
-      console.error('deployments load error', err);
-      toast.error('Failed to load deployments');
-    } finally {
-      if (deployRequestIdRef.current === reqId) setDeployLoading(false);
-    }
-  }, [staff]);
+       const rawItems = res?.results ?? (Array.isArray(res) ? res : []);
+       // normalize each deployment using staff lookup
+       const items = (rawItems || []).map(normalizeDeployment);
+       if (deployRequestIdRef.current === reqId) {
+         setShiftDeployments(items);
+       }
+     } catch (err) {
+       if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
+       console.error('deployments load error', err);
+       toast.error('Failed to load deployments');
+     } finally {
+       if (deployRequestIdRef.current === reqId) setDeployLoading(false);
+     }
+   }, [staff]);
 
-  const handleViewDeployments = (shift: ShiftDetail) => {
-    setSelectedShiftDetail(shift);
-    loadDeployments(shift.id);
-  };
-
-  // staff list is loaded from backend into `staff`
+   const handleViewDeployments = (shift: ShiftDetail) => {
+     setSelectedShiftDetail(shift);
+     loadDeployments(shift.id);
+   };
 
   return (
     <div className="space-y-6">
@@ -535,75 +691,6 @@ export default function ShiftDeploymentsScreen() {
           Manage shift schedules and staff deployments
         </p>
       </div>
-
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                <SelectTrigger id="region">
-                  <SelectValue placeholder="Select Region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="district">District</Label>
-              <Select
-                value={selectedDistrict}
-                onValueChange={setSelectedDistrict}
-                disabled={!selectedRegion}
-              >
-                <SelectTrigger id="district">
-                  <SelectValue placeholder="Select District" />
-                </SelectTrigger>
-                <SelectContent>
-                  {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="station">Station</Label>
-              <Select
-                value={selectedStation}
-                onValueChange={setSelectedStation}
-                disabled={!selectedDistrict}
-              >
-                <SelectTrigger id="station">
-                  <SelectValue placeholder="Select Station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Search and Actions */}
       <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -801,7 +888,7 @@ export default function ShiftDeploymentsScreen() {
                         ...shiftForm,
                         handover_report_doc: e.target.files?.[0] || null
                       })}
-                      accept=".pdf,.doc,.docx"
+                      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
                     />
                     <Upload className="h-4 w-4 text-muted-foreground" />
                   </div>
@@ -1158,6 +1245,7 @@ export default function ShiftDeploymentsScreen() {
           <div className="">
             {/* DataTable for Shift Details (server-side paging/sort) */}
             <DataTable
+              url={`${API_ENDPOINTS.SHIFT_DETAILS}?region=${encodeURIComponent(globalRegion || '')}&district=${encodeURIComponent(globalDistrict || '')}&station=${encodeURIComponent(globalStation || '')}`}
               title="Shift Details"
               data={shiftDetails}
               loading={loading}
@@ -1171,8 +1259,10 @@ export default function ShiftDeploymentsScreen() {
                   sortable: true,
                   render: (_v: any, r: ShiftDetail) => (
                     <div>
-                      <div>{r.shift_leader_full_name}</div>
-                      <div className="text-xs text-muted-foreground font-mono">@{r.shift_leader_username}</div>
+                      <div>{r.shift_leader_full_name || '—'}</div>
+                      {r.shift_leader_username ? (
+                        <div className="text-xs text-muted-foreground font-mono">@{r.shift_leader_username}</div>
+                      ) : null}
                     </div>
                   )
                 },
@@ -1207,6 +1297,7 @@ export default function ShiftDeploymentsScreen() {
           <CardContent>
             <div className="">
               <DataTable
+              url={`${API_ENDPOINTS.SHIFT_DETAILS}?region=${encodeURIComponent(globalRegion || '')}&district=${encodeURIComponent(globalDistrict || '')}&station=${encodeURIComponent(globalStation || '')}`}
                 title="Deployments"
                 data={shiftDeployments}
                 loading={deployLoading}
