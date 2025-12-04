@@ -1358,6 +1358,7 @@ export default function VisitationsScreen() {
               </div>
             ) : (
               <DataTable
+                url="/gate-management/station-visitors/"
                 data={tableData}
                 loading={tableLoading}
                 total={total}

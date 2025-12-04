@@ -48,7 +48,7 @@ import {
   nationalIdValidation,
   passportValidation,
   nameValidation,
-  pastDateValidation,
+  pastOrTodayDateValidation,
   normalizePhoneNumber,
 } from "../../utils/validation";
  import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
@@ -334,7 +334,7 @@ export default function VisitorRegistrationDialog({
     if (!form.visitation_datetime) {
       errs.visitation_datetime = "Visitation date is required";
     } else {
-      const ok = pastDateValidation.validate(String(form.visitation_datetime));
+      const ok = pastOrTodayDateValidation.validate(String(form.visitation_datetime));
       if (ok !== true) errs.visitation_datetime = String(ok);
     }
 

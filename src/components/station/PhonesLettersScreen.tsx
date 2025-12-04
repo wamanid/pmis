@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -599,6 +600,7 @@ export default function PhonesLettersScreen() {
           <CardContent>
             {activeTab === "calls" ? (
               <DataTable
+              url="/rehabilitation/call-records/"
                 data={callsData}
                 loading={callsLoading}
                 total={callsTotal}
@@ -614,6 +616,7 @@ export default function PhonesLettersScreen() {
               />
             ) : (
               <DataTable
+              url="/rehabilitation/eletters/"
                 data={lettersData}
                 loading={lettersLoading}
                 total={lettersTotal}

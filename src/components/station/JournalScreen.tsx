@@ -649,6 +649,7 @@ export function JournalScreen() {
         <CardContent>
           <div className="">
             <DataTable
+            url="/station-management/api/journals/"
               data={tableData}
               loading={tableLoading}
               total={total}
