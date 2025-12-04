@@ -39,7 +39,7 @@ import { format} from 'date-fns';
 import { toast } from 'sonner';
 import { PrisonerRecord } from '../../models/gate/Index';
 import { getprisoners } from '../../services/gateService';
-import { getStages } from '../../services/stageService';
+import { getStages, submitStageData } from '../../services/stageService';
 import { Prisoner } from '../../models/gate/Prisoner';
 import { Stage, StageAssignmentPost } from '../../models/StageClassification';
 
@@ -244,24 +244,30 @@ export function StageAssignForm({
          
         }));
 
-       
         let dataToPost:StageAssignmentPost={
             id:"",
-            stage: selectedStage,
+          stage: selectedStage,
           start_date: startDate,
           end_date: endDate ,
           remark: remark,
           prisoners:assignments,
+          prisoner:assignments[0].id,
           status:"0996439c-24cc-453e-87e4-1936a3e52820"
-
         };
-        // alert(JSON.stringify(dataToPost));
-        await new Promise((resolve) => setTimeout(resolve, 500));
-        toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
-      }
+        alert(JSON.stringify(dataToPost));
+      submitStageData(dataToPost).then((data) => {
+       alert(JSON.stringify(data));
+      toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
+     onOpenChange(false);
+      }).catch((error) => {
+        alert(error);
 
-      onSuccess();
-      onOpenChange(false);
+      });
+
+       // await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+     //onSuccess();
+     
       resetForm();
     } catch (error) {
       console.error('Error saving stage assignment:', error);
@@ -458,22 +464,19 @@ export function StageAssignForm({
             Start Date <span className="text-red-500">*</span>
           </Label>
           <Input
-            type="datetime-local"
+            type="date"
             value={startDate}
             onChange={(e) => {
             setStartDate(e.target.value);
             }}
-         
           />
-      
         </div>
-
         <div className="space-y-2">
           <Label>
             End Date <span className="text-red-500">*</span>
           </Label>
           <Input
-            type="datetime-local"
+            type="date"
             value={endDate}
             onChange={(e) => {
              setEndDate(e.target.value);

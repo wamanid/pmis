@@ -72,6 +72,8 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { StageAssignForm, StageAssignment } from './StageAssignForm';
+import { getStageList, getStages } from '../../services/stageService';
+import { Stage } from '../../models/StageClassification';
 
 export function StageAssignList() {
   const [loading, setLoading] = useState(false);
@@ -122,31 +124,45 @@ export function StageAssignList() {
   const [autoDemoteEndDate, setAutoDemoteEndDate] = useState<Date | undefined>(undefined);
   const [autoDemoteRemark, setAutoDemoteRemark] = useState('');
 
+    const [stages, setStages] = useState<Stage[]>([]);
+    const loadStages = async () => {
+        try {
+          // TODO: Replace with actual API call
+          // const response = await fetch('/api/system-administration/stages/');
+          // const data = await response.json();
+          // setStages(data.results);
+    
+          // Mock data
+            let stages: Stage[] = [
+          ];
+    
+          //get stages
+           getStages().then((data) => {
+           // alert(JSON.stringify(data));
+             stages = data.results;
+             setStages(stages);
+          }).catch((error) => {
+            alert(error);
+    
+          });
+    
+          setStages(stages);
+        } catch (error) {
+          console.error('Failed to load stages:', error);
+          toast.error('Failed to load stages');
+        }
+      };
   // Load data on mount and when filters change
   useEffect(() => {
     loadStageAssignments();
+    loadStages();
   }, [currentPage, searchQuery, selectedStage, startDateFrom, startDateTo]);
 
   const loadStageAssignments = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const params = new URLSearchParams({
-      //   page: currentPage.toString(),
-      //   ...(searchQuery && { search: searchQuery }),
-      //   ...(selectedStage !== 'all' && { stage: selectedStage }),
-      //   ...(startDateFrom && { start_date_from: format(startDateFrom, 'yyyy-MM-dd') }),
-      //   ...(startDateTo && { start_date_to: format(startDateTo, 'yyyy-MM-dd') }),
-      // });
-      // const response = await fetch(`/api/stage-management/prisoner-stages/?${params}`);
-      // const data = await response.json();
-      // setStageAssignments(data.results);
-      // setTotalCount(data.count);
-      // setTotalPages(Math.ceil(data.count / 10));
-
-      // Mock data
       await new Promise((resolve) => setTimeout(resolve, 500));
-      const mockData: StageAssignment[] = [
+      let mockData: StageAssignment[] = [
         {
           id: '1',
           prisoner_name: 'John Doe',
@@ -159,6 +175,19 @@ export function StageAssignList() {
           stage: '1',
         }
       ];
+
+
+
+
+
+              getStageList().then((data) => {
+              // mockData = data.results;
+         // alert(JSON.stringify(data.results));
+             
+            }).catch((error) => {
+              alert(error);
+      
+            });
 
       setStageAssignments(mockData);
       setFilteredAssignments(mockData);
@@ -467,18 +496,22 @@ export function StageAssignList() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
               <div className="space-y-2">
                 <Label>Stage</Label>
-                <Select value={selectedStage} onValueChange={setSelectedStage}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="All Stages" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Stages</SelectItem>
-                    <SelectItem value="1">Orientation Stage</SelectItem>
-                    <SelectItem value="2">Ordinary Stage</SelectItem>
-                    <SelectItem value="3">Star Stage</SelectItem>
-                    <SelectItem value="4">Special Stage</SelectItem>
-                  </SelectContent>
-                </Select>
+                
+                 <Select value={selectedStage} onValueChange={setSelectedStage}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select a stage" />
+              </SelectTrigger>
+              <SelectContent>
+                 <SelectItem  value="all">
+                    All Stages
+                  </SelectItem>
+                {stages.map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id}>
+                    {stage.stage}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
               </div>
 
               <div className="space-y-2">
@@ -490,11 +523,10 @@ export function StageAssignList() {
                       className="w-full justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                     
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">
-                    <Calendar
+                    <Calendar 
                       mode="single"
                       selected={startDateFrom}
                       onSelect={setStartDateFrom}

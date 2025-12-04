@@ -11,10 +11,11 @@ export interface Stage {
 
 export interface StageAssignmentPost {
   id: string;
-  prisoners: Prisoner[];
+  prisoners?: Prisoner[];
   stage: string;
   start_date: String;
   end_date: String;
   remark: String;
   status: String;
+  prisoner: String;
 }

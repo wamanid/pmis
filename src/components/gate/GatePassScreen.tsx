@@ -31,7 +31,7 @@ import { toast } from 'sonner@2.0.3';
 import { Prisoner } from '../../models/gate/Prisoner';
 import { Escort } from '../../models/gate/Escort';
 import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
-import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass, editVisitorPass } from '../../services/gateService';
+import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass, editVisitorPass, editgatePass } from '../../services/gateService';
 import VisitorPassForm from './VisitorPassForm';
 // Mock Data
 
@@ -369,25 +369,38 @@ getworkingparty().then((data) => {
     setDialogMode('edit');
     setSelectedGatePass(gatePass);
     setFormData({
+      gate_pass_keeper:gatePass.gate_keeper,
       gate_pass_type: gatePass.gate_pass_type,
       destination: gatePass.destination,
       main_gate_required: gatePass.main_gate_required,
       exception_reason: gatePass.exception_reason,
       remarks: gatePass.remarks
     });
+
+
+
     setSelectedPrisoners(gatePass.prisoners.map(p => ({
-      prisoner_id: p.prisoner,
+      prisoner_number: p.prisoner.prisoner_number,
+      prisoner_id: p.prisoner.id,
+      id: p.prisoner.id,
       working_party_id: p.working_party,
       destination: p.destination,
       reason: p.reason,
       time_out: p.time_out,
       time_in: p.time_in || ''
     })));
+
+
+ // alert(JSON.stringify(selectedPrisoners));
+
     setSelectedEscorts(gatePass.escorts.map(e => e.force_number));
     setIsDialogOpen(true);
   };
 
   const handleViewGatePass = (gatePass: GatePass) => {
+
+
+    alert()
     setSelectedGatePass(gatePass);
     setIsViewDialogOpen(true);
   };
@@ -418,7 +431,7 @@ getworkingparty().then((data) => {
     const gatePassType = mockGatePassTypes.find(t => t.id === formData.gate_pass_type);
     const currentUser = mockUsers[0];
 
-    const newGatePass: GatePass = {
+    let newGatePass: GatePass = {
       id: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
       gate_keeper_username: currentUser.username,
       gate_pass_type_name: gatePassType?.name || '',
@@ -482,8 +495,41 @@ getworkingparty().then((data) => {
     setIsLoading(false);
 });
     } else {
+
+      //remove those details
+      let newGatePass2: GatePass = {
+      id: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
+      gate_keeper_username: currentUser.username,
+      gate_pass_type_name: gatePassType?.name || '',
+    
+      destination: formData.destination,
+      main_gate_required: formData.main_gate_required,
+      exception_reason: formData.exception_reason,
+      remarks: formData.remarks,
+      gate_keeper: formData.gate_pass_keeper,
+      gate_pass_type: formData.gate_pass_type,
+      created_at: dialogMode === 'create' ? new Date().toISOString() : selectedGatePass!.created_at,
+      status: '0996439c-24cc-453e-87e4-1936a3e52820'
+    };
+
+
+
+
+alert(JSON.stringify(newGatePass2));
+editgatePass(newGatePass2).then((data) => {
+  toast.success('Gate pass updated successfully');
+  setIsLoading(false);
+ // loadData();
+
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+
+
+      //updating gatepass is here
       setGatePasses(gatePasses.map(gp => gp.id === selectedGatePass!.id ? newGatePass : gp));
-      toast.success('Gate pass updated successfully');
+
     }
   setIsDialogOpen(false);
   };
@@ -546,11 +592,10 @@ getworkingparty().then((data) => {
     const handleEditVisitorPassDelete = (pass: VisitorPass) => {
       if (confirm('Are you sure you want to delete this visitor pass?')) {
       setIsLoading(true);
-      deletevisitorpass(pass.id).then((data) => {
+      deletevisitorpass(pass.id).then((pass) => {
       toast.success('Visitor pass created successfully');
       setIsLoading(false);
-       //alert(JSON.stringify(data));
-      })
+       })
       .catch((error) => {
         toast.error(error.message);
         setIsLoading(false);
@@ -564,6 +609,7 @@ getworkingparty().then((data) => {
   const handleVisitorPassSubmit = (data: VisitorPass) => {
     //create visitor pass here
    // alert(JSON.stringify(data));
+   setIsLoading(true);
     if (visitorPassDialogMode === 'create') {
       submitVisitorPass(data).then((data) => {
       toast.success('Visitor pass created successfully');
@@ -572,8 +618,22 @@ getworkingparty().then((data) => {
         toast.error(error.message);
       });
     } else {
-      alert(JSON.stringify(data));
-      editVisitorPass(data).then((data) => {
+            //pass to update
+  let passtosend:VisitorPass={
+        id: data.id,
+  visitor_tag_number: data.visitor_tag_number,
+  valid_from: data.valid_from,
+  valid_until:data.valid_until,
+  purpose: data.purpose,
+  issue_date: data.issue_date,
+  is_suspended:data.is_suspended,
+  is_valid:data.is_valid,
+  prisoner:data.prisoner,
+  visitor: data.visitor,
+  is_active:data.is_active
+      };
+      alert(JSON.stringify(passtosend));
+      editVisitorPass(passtosend).then((data) => {
       toast.success('Visitor pass updated successfully');
       setIsVisitorPassDialogOpen(false);
       })
@@ -582,7 +642,9 @@ getworkingparty().then((data) => {
       });
       
     }
- 
+    setIsLoading(false);
+    loadData();
+
   };
   // Visitor management handlers
   const handleAddNewVisitor = () => {
@@ -822,9 +884,7 @@ getworkingparty().then((data) => {
                         ) : (
                              <>Not Required</>
                            
-                        )}
-                           
-                        
+                        )}                     
                       </TableCell>
                       <TableCell>{getStatusBadge(gatePass.status_name)}</TableCell>
                       <TableCell className="text-sm text-gray-600">

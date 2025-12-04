@@ -93,7 +93,15 @@ export const deletevisitorpass = async (id:String): Promise<Visitor[]> => {
 //start the edits
 //create visitto pass
 export const editVisitorPass = async (visitorPassData: VisitorPass): Promise<VisitorPass> => {
-  const response = await axiosInstance.patch<VisitorPass>('/gate-management/visitor-passes/'+visitorPassData.id+'/', visitorPassData.id);
+  const response = await axiosInstance.patch<VisitorPass>('/gate-management/visitor-passes/'+visitorPassData.id+'/', visitorPassData);
+  //console.log(visitorPassData.id);
+  return response.data;
+};
+
+
+//edit gate pass
+export const editgatePass = async (pass: GatePass): Promise<VisitorPass> => {
+  const response = await axiosInstance.patch<VisitorPass>('/gate-management/gate-passes/'+pass.id+'/', pass);
   //console.log(visitorPassData.id);
   return response.data;
 };
