@@ -648,8 +648,6 @@ export function StaffDeploymentScreen() {
               {/* Deployments DataTable */}
               <div className="">
                 <DataTable
-                url="/station-management/api/staff-deployments/"
-                  data={tableData}
                   url="/station-management/api/staff-deployments/"
                   loading={tableLoading}
                   total={total}
