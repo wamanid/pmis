@@ -33,6 +33,9 @@ export function LocationFilter({ className }: LocationFilterProps) {
         if (region) {
           const regionData = await fetchRegionById(region);
           setRegionName(regionData.name);
+          // localStorage.setItem('region_name', regionData.name);
+          // localStorage.removeItem('district_name');
+          // localStorage.removeItem('station_name')
         } else {
           setRegionName('');
         }
@@ -40,13 +43,17 @@ export function LocationFilter({ className }: LocationFilterProps) {
         if (district) {
           const districtData = await fetchDistrictById(district);
           setDistrictName(districtData.name);
+          // localStorage.setItem('district_name', districtData.name);
+          // localStorage.removeItem('station_name')
         } else {
           setDistrictName('');
         }
 
         if (station) {
           const stationData = await fetchStationById(station);
-          setStationName(stationData.name);
+          const name = stationData?.name
+          // localStorage.setItem('station_name', name);
+          setStationName(name);
         } else {
           setStationName('');
         }

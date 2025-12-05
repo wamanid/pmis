@@ -237,8 +237,25 @@ export const addStationVisitor = async (visitor: StationVisitor) : Promise<Visit
   return response.data;
 }
 
-export const getStationVisitors = async () : Promise<VisitorGetResponse> => {
+// export const getStationVisitors = async (stationId: string) : Promise<VisitorGetResponse> => {
+//   const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/', {
+//     params: {
+//       visit_location: stationId
+//     }
+//   });
+//   return response.data;
+// }
+export const getStationVisitors = async (stationId: string) : Promise<VisitorGetResponse> => {
   const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/');
+  return response.data;
+}
+
+export const getStationVisitors2 = async (prisonerId: string) : Promise<VisitorGetResponse> => {
+  const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/', {
+    params: {
+      prisoner: prisonerId
+    }
+  });
   return response.data;
 }
 
