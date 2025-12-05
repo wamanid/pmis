@@ -5,9 +5,10 @@ import {
   Visitor
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
+  addProperty,
   DefaultPropertyItem,
   getPropertyStatuses,
-  getPropertyTypes,
+  getPropertyTypes, PrisonerProperty, Property,
   PropertyBag
 } from "../../services/stationServices/propertyService";
 import PropertyItem from "./PropertyItem";
@@ -54,11 +55,12 @@ interface ChildProps {
   setNewDialogLoader: React.Dispatch<React.SetStateAction<boolean>>;
   setLoaderText: React.Dispatch<React.SetStateAction<string>>;
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
+  setProperties: React.Dispatch<React.SetStateAction<PrisonerProperty[]>>;
 }
 
 
 const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialogOpen, setNewDialogLoader,
-                                                    setLoaderText, setIsNextCreateDialogOpen}) => {
+                                                    setLoaderText, setIsNextCreateDialogOpen, setProperties}) => {
     const [openPrisoner, setOpenPrisoner] = useState(false);
     const [openVisitor, setOpenVisitor] = useState(false);
     const [prisonerInfo, setPrisonerInfo] = useState({
@@ -104,8 +106,38 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
       );
     };
 
-    const onSubmit = () => {
+    const onSubmit = async (event: React.FormEvent) => {
+        event.preventDefault()
+        const item = propertyItems[0]
 
+        const property: Property = {
+          prisoner: prisonerInfo.prisoner,
+          visitor: visitorInfo.visitor,
+          biometric_consent: biometricData !== "",
+          is_active: true,
+          deleted_datetime: null,
+          deleted_by: null,
+          property_type: item.property_type,
+          property_item: item.property_item,
+          measurement_unit: item.measurement_unit,
+          property_bag: item.property_bag,
+          next_of_kin: item.next_of_kin,
+          property_status: item.property_status,
+          quantity: item.quantity,
+          amount: item.amount,
+          note: item.note,
+          destination: item.destination,
+          visitor_item: item.visitor_item,
+        }
+
+        try {
+          const response = await addProperty(property)
+          setProperties(prev => ([response, ...prev]))
+          setIsCreateDialogOpen(false)
+          toast.success("Property created successfully");
+        }catch (error) {
+          handleCatchError(error)
+        }
     }
 
     useEffect(() => {
@@ -442,6 +474,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
                                               propertyStatuses={propertyStatuses}
                                               loading={loading}
                                               setLoading={setLoading}
+                                              prisonerInfo={prisonerInfo}
                                           />
                                       ))}
                                     </div>

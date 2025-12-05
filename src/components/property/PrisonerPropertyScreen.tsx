@@ -2294,7 +2294,7 @@ export default function PrisonerPropertyScreen() {
           {/*<CreatePropertyForm onSubmit={handleSubmitCreate} />*/}
             <CreatePropertyForm prisoners={prisoners} setIsCreateDialogOpen={setIsCreateDialogOpen}
               setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText}
-              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}/>
+              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} setProperties={setProperties}/>
           </div>
         </DialogContent>
       </Dialog>

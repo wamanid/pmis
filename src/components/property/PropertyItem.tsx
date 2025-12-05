@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {NextOfKinResponse} from "../../services/admission/nextOfKinService";
 import {
-    DefaultPropertyItem, getPropertyStatuses,
+    DefaultPropertyItem, getPropertyBags, getPropertyItems, getPropertyStatuses,
     getPropertyTypes,
     PropertyBag,
     PropertyItem
@@ -37,6 +37,7 @@ interface ChildProps {
   propertyStatuses: Unit
   loading: any
   setLoading: React.Dispatch<React.SetStateAction<any>>;
+  prisonerInfo: any
 }
 
 // export default function PropertyItem() {
@@ -44,7 +45,7 @@ interface ChildProps {
 const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, visitorItems,
                                                 setNewDialogLoader, setLoaderText, nextOfKins,
                                                 setIsNextCreateDialogOpen, propertyItems, onUpdate, propertyTypes,
-                                                propertyStatuses, loading, setLoading }) => {
+                                                propertyStatuses, loading, setLoading, prisonerInfo }) => {
 
     const [isItemOpen, setIsItemOpen] = useState(true);
     const [openPropertyType, setOpenPropertyType] = useState(false);
@@ -118,13 +119,13 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                return
            }
 
-            // const response2 = await getPropertyItems(visitorItem.item_category)
-            // const ok2 = populateListX(response2, "There are no property items", setPropertyItems)
-            // if(!ok2) return
+            const response2 = await getPropertyItems(visitorItem.item_category)
+            const ok2 = populateListX(response2, "There are no property items", setPropertyItemsX)
+            if(!ok2) return
 
-            // const response4 = await getPropertyBags(prisonerInfo.prisoner, visitorItem.item_category)
-            // const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
-            // if(!ok4) return
+            const response4 = await getPropertyBags(prisonerInfo.prisoner, visitorItem.item_category)
+            const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
+            if(!ok4) return
 
             setLoading(prev => ({...prev, type: true}))
 

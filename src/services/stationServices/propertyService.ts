@@ -28,7 +28,7 @@ export interface Property {
   biometric_consent: boolean;
   note: string;
   destination: string;
-  deleted_by: number;
+  deleted_by: number | null;
   prisoner: string;
   property_type: string;
   property_item: string;
