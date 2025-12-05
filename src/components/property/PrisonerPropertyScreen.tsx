@@ -47,7 +47,7 @@ import {
   handleServerError
 } from "../../services/stationServices/utils";
 import {
-  DefaultPropertyItem,
+  DefaultPropertyItem, deleteProperty,
   getProperties, getPropertyBags,
   getPropertyItems, getPropertyStatuses,
   getPropertyTypes,
@@ -59,7 +59,12 @@ import {
   getStationVisitors2, IdType,
   PrisonerItem, Relationship, RelationShipItem, Visitor
 } from "../../services/stationServices/visitorsServices/VisitorsService";
-import {getVisitorItems2, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {
+  deleteVisitorItem,
+  getVisitorItems2,
+  Unit,
+  VisitorItem
+} from "../../services/stationServices/visitorsServices/visitorItem";
 import {getSexes, Item} from "../../services/stationServices/manualLockupIntegration";
 import {
   addNextOfKin,
@@ -672,13 +677,17 @@ export default function PrisonerPropertyScreen() {
     setIsDeleteDialogOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (selectedProperty) {
-      setProperties(properties.filter(p => p.id !== selectedProperty.id));
-      toast.success('Property deleted successfully');
-      setIsDeleteDialogOpen(false);
-      setSelectedProperty(null);
+  const confirmDelete = async () => {
+    if (!selectedProperty) {
+      return
     }
+
+    const response = await deleteProperty(selectedProperty.id)
+    if (handleResponseError(response)) return;
+    setProperties(properties.filter(p => p.id !== selectedProperty.id));
+    toast.success('Property deleted successfully');
+    setIsDeleteDialogOpen(false);
+    setSelectedProperty(null);
   };
 
   const handleStatusChangeSubmit = (data: any) => {
@@ -2383,6 +2392,10 @@ export default function PrisonerPropertyScreen() {
                         <p className="text-sm text-gray-600">Status:</p>
                         {getStatusBadge(selectedProperty.property_status_name)}
                       </div>
+                      {/*<div>*/}
+                      {/*  <p className="text-sm text-gray-600">Description</p>*/}
+                      {/*  <p>{status.description}</p>*/}
+                      {/*</div>*/}
                       <div>
                         <p className="text-sm text-gray-600">Destination</p>
                         <p>{selectedProperty.destination || '-'}</p>

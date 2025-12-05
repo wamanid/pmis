@@ -126,6 +126,19 @@ export const addProperty = async (property: Property) : Promise<PropertyResponse
   return response.data;
 }
 
+export const deleteProperty = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/property-management/properties/${id}/`);
+
+    return { message: "Property deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to delete property."
+    };
+  }
+}
+
 export const getProperties = async <T = PrisonerProperty>() : Promise<PropertiesResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/property-management/properties/');
   return response.data;
