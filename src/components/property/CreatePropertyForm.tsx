@@ -13,7 +13,13 @@ import {
 } from "../../services/stationServices/propertyService";
 import PropertyItem from "./PropertyItem";
 import {getNextOfKins, NextOfKinResponse} from "../../services/admission/nextOfKinService";
-import {getVisitorItems2, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {
+  getItemCategories, getUnits,
+  getVisitorItems2,
+  ItemCategory, ItemStatus,
+  Unit,
+  VisitorItem
+} from "../../services/stationServices/visitorsServices/visitorItem";
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import BiometricCapture from '../common/BiometricCapture';
 import PropertyStatusChangeForm from './PropertyStatusChangeForm';
@@ -96,6 +102,8 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
     const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
     const [biometricData, setBiometricData] = useState('');
+    const [itemCategories, setItemCategories] = useState<ItemCategory[]>([])
+    const [units, setUnits] = useState<Unit[]>([])
 
 
     const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
@@ -129,22 +137,44 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
           destination: item.destination,
           visitor_item: item.visitor_item,
         }
-
+        // console.log(property)
         try {
           const response = await addProperty(property)
           setProperties(prev => ([response, ...prev]))
-          setIsCreateDialogOpen(false)
+          resetFields()
           toast.success("Property created successfully");
+          setIsCreateDialogOpen(false)
         }catch (error) {
           handleCatchError(error)
         }
+    }
+
+    function resetFields () {
+      setPrisonerInfo({prisoner: ""})
+      setVisitorInfo({visitor: ""})
+      setPropertyItems([{
+        id: '1',
+        property_type: '',
+        property_category: '',
+        property_item: '',
+        measurement_unit: '',
+        property_bag: '',
+        next_of_kin: '',
+        property_status: '',
+        quantity: '',
+        amount: '',
+        note: '',
+        destination: '',
+        visitor_item: '',
+      }])
+      setBiometricData("")
     }
 
     useEffect(() => {
       if (prisonerInfo.prisoner) {
         setLoaderText("Fetching Visitor Information, Please wait...")
         setNewDialogLoader(true)
-        setLoading({visitor: false, property: false, type: false})
+        // setLoading({visitor: false, property: false, type: false})
         setVisitors([])
         fetchVisitorData(prisonerInfo.prisoner)
       }
@@ -154,7 +184,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
       if (visitorInfo.visitor) {
         setLoaderText("Fetching Visitor items, Please wait...")
         setNewDialogLoader(true)
-        setLoading(prev =>({...prev, property: false}))
+        // setLoading(prev =>({...prev, property: false}))
         setVisitorItems([])
         fetchVisitorItems(visitorInfo.visitor)
       }
@@ -162,10 +192,23 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
 
     async function fetchVisitorData(prisonerId) {
       try {
-          const response = await getStationVisitors2(prisonerId)
-          if(handleServerError(response, setNewDialogLoader)) return
+          const response2 = await getNextOfKins(prisonerInfo.prisoner)
+          populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
 
+          const response = await getStationVisitors2(prisonerId)
           populateList(response, "There are no visitors for the selected prisoner", setVisitors)
+
+         const response1 = await getPropertyTypes()
+         populateLists(response1, "There are no property types", setPropertyTypes)
+
+         const response3 = await getPropertyStatuses()
+         populateLists(response3, "There are no property statuses", setPropertyStatuses)
+
+         const response11 = await getItemCategories()
+         populateLists(response11, "There are no item categories", setItemCategories)
+
+         const response41 = await getUnits()
+         populateLists(response41, "There are no item categories", setUnits)
 
       }catch (error) {
         handleCatchError(error)
@@ -180,16 +223,6 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         if(handleServerError(response, setNewDialogLoader)) return
         populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
 
-        const response2 = await getNextOfKins(prisonerInfo.prisoner)
-        if(handleServerError(response2, setNewDialogLoader)) return
-        populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
-
-         const response1 = await getPropertyTypes()
-         populateLists(response1, "There are no property types", setPropertyTypes)
-
-         const response3 = await getPropertyStatuses()
-         populateLists(response3, "There are no property statuses", setPropertyStatuses)
-
     }catch (error) {
       handleCatchError(error)
     }finally {
@@ -203,12 +236,12 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     if ("results" in response) {
       const data = response.results
       handleEmptyList(data, msg, setNewDialogLoader)
-      if (msg === "There are no visitors for the selected prisoner" && data.length) {
-        setLoading(prev => ({...prev, visitor: true}))
-      }
-      if (msg === "There are no visitor items for the selected visitor" && data.length) {
-        setLoading(prev => ({...prev, property: true}))
-      }
+      // if (msg === "There are no visitors for the selected prisoner" && data.length) {
+      //   // setLoading(prev => ({...prev, visitor: true}))
+      // }
+      // if (msg === "There are no visitor items for the selected visitor" && data.length) {
+      //   // setLoading(prev => ({...prev, property: true}))
+      // }
       setData(data)
     }
   }
@@ -307,214 +340,194 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
             </div>
           </Card>
 
-          {
-              loading.visitor && (
-                  <>
-                    {/* Visitor Information Section */}
-                    <Card className="border-2" style={{borderColor: '#650000'}}>
-                      <div className="p-4">
-                        <h3 className="mb-4" style={{color: '#650000'}}>Visitor Information</h3>
-                        <div className="space-y-2">
-                          <Label htmlFor="visitor">Visitor</Label>
-                          <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
-                            <PopoverTrigger asChild>
-                              <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  aria-expanded={openVisitor}
-                                  className="w-full justify-between"
-                                  type="button"
-                                  disabled={isLoadingVisitors}
-                              >
-                                {visitorInfo.visitor ? (
-                                    (() => {
-                                      const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                                      return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : "Select visitor...";
-                                    })()
-                                ) : "Select visitor..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0">
-                              <Command>
-                                <CommandInput placeholder="Search by name, ID, or phone..."/>
-                                <CommandList>
-                                  <CommandEmpty>
-                                    {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
-                                  </CommandEmpty>
-                                  <CommandGroup>
-                                    <CommandItem
-                                        value="none"
-                                        onSelect={() => {
-                                          setVisitorInfo({visitor: ''});
-                                          setOpenVisitor(false);
-                                        }}
-                                    >
-                                      <Check
-                                          className={cn(
-                                              "mr-2 h-4 w-4",
-                                              visitorInfo.visitor === '' ? "opacity-100" : "opacity-0"
-                                          )}
-                                      />
-                                      None
-                                    </CommandItem>
-                                    {visitors.map((visitor) => {
-                                      const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
-                                      const searchValue = `${fullName} ${visitor.id_number} ${visitor.contact_no}`;
-                                      return (
-                                          <CommandItem
-                                              key={visitor.id}
-                                              value={searchValue}
-                                              onSelect={() => {
-                                                setVisitorInfo({visitor: visitor.id});
-                                                setOpenVisitor(false);
-                                              }}
-                                          >
-                                            <Check
-                                                className={cn(
-                                                    "mr-2 h-4 w-4",
-                                                    visitorInfo.visitor === visitor.id ? "opacity-100" : "opacity-0"
-                                                )}
-                                            />
-                                            <div className="flex flex-col">
-                                              <span>{fullName}</span>
-                                              <span className="text-xs text-gray-500">
-                                              ID: {visitor.id_number} | Phone: {visitor.contact_no}
-                                            </span>
-                                            </div>
-                                          </CommandItem>
-                                      );
-                                    })}
-                                  </CommandGroup>
-                                </CommandList>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
-                          {visitorInfo.visitor && (
-                              <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                                <div className="grid grid-cols-2 gap-2 text-sm">
-                                  <div>
-                                    <span className="text-gray-600">Visitor Name:</span>
-                                    <span className="ml-2">
-                                    {(() => {
-                                      const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                                      return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '';
-                                    })()}
+          {/* Visitor Information Section */}
+          <Card className="border-2" style={{borderColor: '#650000'}}>
+            <div className="p-4">
+              <h3 className="mb-4" style={{color: '#650000'}}>Visitor Information</h3>
+              <div className="space-y-2">
+                <Label htmlFor="visitor">Visitor</Label>
+                <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
+                  <PopoverTrigger asChild>
+                    <Button
+                        variant="outline"
+                        role="combobox"
+                        aria-expanded={openVisitor}
+                        className="w-full justify-between"
+                        type="button"
+                        disabled={isLoadingVisitors}
+                    >
+                      {visitorInfo.visitor ? (
+                          (() => {
+                            const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
+                            return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : "Select visitor...";
+                          })()
+                      ) : "Select visitor..."}
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-full p-0">
+                    <Command>
+                      <CommandInput placeholder="Search by name, ID, or phone..."/>
+                      <CommandList>
+                        <CommandEmpty>
+                          {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
+                        </CommandEmpty>
+                        <CommandGroup>
+                          <CommandItem
+                              value="none"
+                              onSelect={() => {
+                                setVisitorInfo({visitor: ''});
+                                setOpenVisitor(false);
+                              }}
+                          >
+                            <Check
+                                className={cn(
+                                    "mr-2 h-4 w-4",
+                                    visitorInfo.visitor === '' ? "opacity-100" : "opacity-0"
+                                )}
+                            />
+                            None
+                          </CommandItem>
+                          {visitors.map((visitor) => {
+                            const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
+                            const searchValue = `${fullName} ${visitor.id_number} ${visitor.contact_no}`;
+                            return (
+                                <CommandItem
+                                    key={visitor.id}
+                                    value={searchValue}
+                                    onSelect={() => {
+                                      setVisitorInfo({visitor: visitor.id});
+                                      setOpenVisitor(false);
+                                    }}
+                                >
+                                  <Check
+                                      className={cn(
+                                          "mr-2 h-4 w-4",
+                                          visitorInfo.visitor === visitor.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{fullName}</span>
+                                    <span className="text-xs text-gray-500">
+                                    ID: {visitor.id_number} | Phone: {visitor.contact_no}
                                   </span>
                                   </div>
-                                  <div>
-                                    <span className="text-gray-600">Phone Number:</span>
-                                    <span
-                                        className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.contact_no}</span>
-                                  </div>
-                                  <div className="col-span-2">
-                                    <span className="text-gray-600">ID Number:</span>
-                                    <span
-                                        className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.id_number}</span>
-                                  </div>
-                                </div>
-                              </div>
-                          )}
+                                </CommandItem>
+                            );
+                          })}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
+                {visitorInfo.visitor && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded-md">
+                      <div className="grid grid-cols-2 gap-2 text-sm">
+                        <div>
+                          <span className="text-gray-600">Visitor Name:</span>
+                          <span className="ml-2">
+                          {(() => {
+                            const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
+                            return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '';
+                          })()}
+                        </span>
+                        </div>
+                        <div>
+                          <span className="text-gray-600">Phone Number:</span>
+                          <span
+                              className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.contact_no}</span>
+                        </div>
+                        <div className="col-span-2">
+                          <span className="text-gray-600">ID Number:</span>
+                          <span
+                              className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.id_number}</span>
                         </div>
                       </div>
-                    </Card>
+                    </div>
+                )}
+              </div>
+            </div>
+          </Card>
+            <Collapsible open={isPropertyItemsOpen} onOpenChange={setIsPropertyItemsOpen}>
+              <Card className="border-2" style={{borderColor: isPropertyItemsOpen ? '#650000' : '#e5e7eb'}}>
+                <CollapsibleTrigger asChild>
+                  <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
+                    <h3 className="flex items-center gap-2" style={{color: '#650000'}}>
+                      <Package className="h-5 w-5"/>
+                      {/*Property Items*/}
+                      Property Item
+                      {/*<Badge variant="secondary">{propertyItems.length}</Badge>*/}
+                    </h3>
+                    {/*<div className="flex items-center gap-2">*/}
+                    {/*  <Button*/}
+                    {/*    type="button"*/}
+                    {/*    onClick={(e) => {*/}
+                    {/*      e.stopPropagation();*/}
+                    {/*      handleAddPropertyItem();*/}
+                    {/*    }}*/}
+                    {/*    size="sm"*/}
+                    {/*    style={{ backgroundColor: '#650000' }}*/}
+                    {/*  >*/}
+                    {/*    <Plus className="h-4 w-4 mr-2" />*/}
+                    {/*    Add Item*/}
+                    {/*  </Button>*/}
+                    {/*  {isPropertyItemsOpen ? (*/}
+                    {/*    <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />*/}
+                    {/*  ) : (*/}
+                    {/*    <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />*/}
+                    {/*  )}*/}
+                    {/*</div>*/}
+                  </div>
+                </CollapsibleTrigger>
 
-                    {
-                        loading.property && (
-                            <>
-                              {/* Property Items Section */}
-                              <Collapsible open={isPropertyItemsOpen} onOpenChange={setIsPropertyItemsOpen}>
-                                <Card className="border-2" style={{borderColor: isPropertyItemsOpen ? '#650000' : '#e5e7eb'}}>
-                                  <CollapsibleTrigger asChild>
-                                    <div className="flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50">
-                                      <h3 className="flex items-center gap-2" style={{color: '#650000'}}>
-                                        <Package className="h-5 w-5"/>
-                                        {/*Property Items*/}
-                                        Property Item
-                                        {/*<Badge variant="secondary">{propertyItems.length}</Badge>*/}
-                                      </h3>
-                                      {/*<div className="flex items-center gap-2">*/}
-                                      {/*  <Button*/}
-                                      {/*    type="button"*/}
-                                      {/*    onClick={(e) => {*/}
-                                      {/*      e.stopPropagation();*/}
-                                      {/*      handleAddPropertyItem();*/}
-                                      {/*    }}*/}
-                                      {/*    size="sm"*/}
-                                      {/*    style={{ backgroundColor: '#650000' }}*/}
-                                      {/*  >*/}
-                                      {/*    <Plus className="h-4 w-4 mr-2" />*/}
-                                      {/*    Add Item*/}
-                                      {/*  </Button>*/}
-                                      {/*  {isPropertyItemsOpen ? (*/}
-                                      {/*    <ChevronUp className="h-5 w-5" style={{ color: '#650000' }} />*/}
-                                      {/*  ) : (*/}
-                                      {/*    <ChevronDown className="h-5 w-5" style={{ color: '#650000' }} />*/}
-                                      {/*  )}*/}
-                                      {/*</div>*/}
-                                    </div>
-                                  </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <div className="p-4 pt-0 space-y-4">
+                    {propertyItems.map((item, index) => (
+                        <PropertyItem
+                            key={item.id}
+                            item={item}
+                            propertyItems={propertyItems}
+                            index={index}
+                            setPropertyItems={setPropertyItems}
+                            visitorItems={visitorItems}
+                            setNewDialogLoader={setNewDialogLoader}
+                            setLoaderText={setLoaderText}
+                            nextOfKins={nextOfKins}
+                            setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}
+                            onUpdate={handleUpdatePropertyItem}
+                            propertyTypes={propertyTypes}
+                            propertyStatuses={propertyStatuses}
+                            loading={loading}
+                            setLoading={setLoading}
+                            prisonerInfo={prisonerInfo}
+                            visitorInfo={visitorInfo}
+                            itemCategories={itemCategories}
+                            units={units}
+                        />
+                    ))}
+                  </div>
+                </CollapsibleContent>
+              </Card>
+            </Collapsible>
+             <Card className="border-2" style={{borderColor: '#650000'}}>
+                <div className="p-4">
+                  <h3 className="mb-4" style={{color: '#650000'}}>Biometric Capture/Verification</h3>
+                  <BiometricCapture
+                      value={biometricData}
+                      onChange={setBiometricData}
+                      label="Prisoner Fingerprint Verification"
+                  />
+                </div>
+              </Card>
 
-                                  <CollapsibleContent>
-                                    <div className="p-4 pt-0 space-y-4">
-                                      {propertyItems.map((item, index) => (
-                                          <PropertyItem
-                                              key={item.id}
-                                              item={item}
-                                              propertyItems={propertyItems}
-                                              index={index}
-                                              setPropertyItems={setPropertyItems}
-                                              visitorItems={visitorItems}
-                                              setNewDialogLoader={setNewDialogLoader}
-                                              setLoaderText={setLoaderText}
-                                              nextOfKins={nextOfKins}
-                                              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen}
-                                              onUpdate={handleUpdatePropertyItem}
-                                              propertyTypes={propertyTypes}
-                                              propertyStatuses={propertyStatuses}
-                                              loading={loading}
-                                              setLoading={setLoading}
-                                              prisonerInfo={prisonerInfo}
-                                          />
-                                      ))}
-                                    </div>
-                                  </CollapsibleContent>
-                                </Card>
-                              </Collapsible>
-
-                              {/*Biometric Capture/Verification Section */}
-                              {
-                                  loading.type && (
-                                      <>
-                                        <Card className="border-2" style={{borderColor: '#650000'}}>
-                                          <div className="p-4">
-                                            <h3 className="mb-4" style={{color: '#650000'}}>Biometric Capture/Verification</h3>
-                                            <BiometricCapture
-                                                value={biometricData}
-                                                onChange={setBiometricData}
-                                                label="Prisoner Fingerprint Verification"
-                                            />
-                                          </div>
-                                        </Card>
-
-                                        <DialogFooter>
-                                          <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                                            Cancel
-                                          </Button>
-                                          <Button type="submit" style={{backgroundColor: '#650000'}}>
-                                            Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
-                                          </Button>
-                                        </DialogFooter>
-                                      </>
-                                  )
-                              }
-                            </>
-                        )
-                    }
-
-                  </>
-              )
-          }
+            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                                <Button type="submit" style={{backgroundColor: '#650000'}}>
+                                  Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
+                                </Button>
+                              </DialogFooter>
 
         </form>
       </div>
