@@ -488,7 +488,7 @@ export default function PrisonerPropertyScreen() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isNextOfKinDialogOpen, setIsNextOfKinDialogOpen] = useState(false);
   const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedProperty, setSelectedProperty] = useState<PrisonerProperty | null>(null);
   const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
   const [previousPropertyStatus, setPreviousPropertyStatus] = useState('');
   const [statusChangeData, setStatusChangeData] = useState<any>(null);
@@ -663,6 +663,7 @@ export default function PrisonerPropertyScreen() {
 
   const handleView = (property: Property) => {
     setSelectedProperty(property);
+    console.log(property)
     setIsViewDialogOpen(true);
   };
 
@@ -788,7 +789,8 @@ export default function PrisonerPropertyScreen() {
       'Destroyed': 'bg-gray-600'
     };
     return (
-      <Badge className={colorMap[statusName] || 'bg-gray-600'}>
+      // <Badge className={colorMap[statusName] || 'bg-gray-600'}>
+        <Badge>
         {statusName}
       </Badge>
     );
@@ -2316,8 +2318,8 @@ export default function PrisonerPropertyScreen() {
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex-1 max-h-[90vh] p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Property Details</DialogTitle>
             <DialogDescription>
@@ -2359,7 +2361,8 @@ export default function PrisonerPropertyScreen() {
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Biometric Consent</p>
-                        <Badge className={selectedProperty.biometric_consent ? 'bg-green-600' : 'bg-gray-600'}>
+                        {/*<Badge className={!selectedProperty.biometric_consent ? 'bg-green-600' : 'bg-gray-600'}>*/}
+                       <Badge>
                           {selectedProperty.biometric_consent ? 'Yes' : 'No'}
                         </Badge>
                       </div>
@@ -2375,27 +2378,37 @@ export default function PrisonerPropertyScreen() {
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Property Status</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {(() => {
-                      const status = mockPropertyStatuses.find(s => s.id === selectedProperty.property_status);
-                      return status ? (
-                        <div className="space-y-3">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm text-gray-600">Status:</p>
-                            {getStatusBadge(status.name)}
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Description</p>
-                            <p>{status.description}</p>
-                          </div>
-                          <div>
-                            <p className="text-sm text-gray-600">Destination</p>
-                            <p>{selectedProperty.destination || '-'}</p>
-                          </div>
-                        </div>
-                      ) : (
-                        <p className="text-gray-500">Status information not available</p>
-                      );
-                    })()}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-600">Status:</p>
+                        {getStatusBadge(selectedProperty.property_status_name)}
+                      </div>
+                      <div>
+                        <p className="text-sm text-gray-600">Destination</p>
+                        <p>{selectedProperty.destination || '-'}</p>
+                      </div>
+                    </div>
+                    {/*{(() => {*/}
+                    {/*  const status = mockPropertyStatuses.find(s => s.id === selectedProperty.property_status);*/}
+                    {/*  return status ? (*/}
+                    {/*    <div className="space-y-3">*/}
+                    {/*      <div className="flex items-center gap-2">*/}
+                    {/*        <p className="text-sm text-gray-600">Status:</p>*/}
+                    {/*        {getStatusBadge(status.name)}*/}
+                    {/*      </div>*/}
+                    {/*      <div>*/}
+                    {/*        <p className="text-sm text-gray-600">Description</p>*/}
+                    {/*        <p>{status.description}</p>*/}
+                    {/*      </div>*/}
+                    {/*      <div>*/}
+                    {/*        <p className="text-sm text-gray-600">Destination</p>*/}
+                    {/*        <p>{selectedProperty.destination || '-'}</p>*/}
+                    {/*      </div>*/}
+                    {/*    </div>*/}
+                    {/*  ) : (*/}
+                    {/*    <p className="text-gray-500">Status information not available</p>*/}
+                    {/*  );*/}
+                    {/*})()}*/}
                   </CardContent>
                 </Card>
               </div>
