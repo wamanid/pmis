@@ -143,6 +143,7 @@ function fileToBase64(file: File): Promise<string> {
 
 export function handleCatchError(error: any) {
   if (!error?.response) {
+    console.log(error)
     toast.error('Failed to connect to server. Please try again.');
   }
 }

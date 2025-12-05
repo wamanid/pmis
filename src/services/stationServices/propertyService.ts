@@ -126,6 +126,11 @@ export const addProperty = async (property: Property) : Promise<PropertyResponse
   return response.data;
 }
 
+export const updateProperty = async (property: Property, id: string) : Promise<PropertyResponse> => {
+  const response = await axiosInstance.put<PropertyResponse>(`/property-management/properties/${id}/`, property);
+  return response.data;
+}
+
 export const deleteProperty = async (id: string) : Promise<{ message: string } | { error: string }> => {
   try {
     await axiosInstance.delete(`/property-management/properties/${id}/`);

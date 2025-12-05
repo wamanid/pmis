@@ -2,7 +2,7 @@ import React, {useState} from "react";
 import {NextOfKinResponse} from "../../services/admission/nextOfKinService";
 import {
     DefaultPropertyItem, getPropertyBags, getPropertyItems, getPropertyStatuses,
-    getPropertyTypes,
+    getPropertyTypes, PrisonerProperty,
     PropertyBag,
     PropertyItem
 } from "../../services/stationServices/propertyService";
@@ -41,6 +41,8 @@ interface ChildProps {
   visitorInfo: any
   itemCategories: ItemCategory
   units: Unit
+  selectedProperty: PrisonerProperty
+  propertyBags: PropertyBag
 }
 
 // export default function PropertyItem() {
@@ -49,7 +51,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                                                 setNewDialogLoader, setLoaderText, nextOfKins,
                                                 setIsNextCreateDialogOpen, propertyItems, onUpdate, propertyTypes,
                                                 propertyStatuses, loading, setLoading, prisonerInfo, visitorInfo,
-                                                itemCategories, units }) => {
+                                                itemCategories, units, selectedProperty, propertyBags }) => {
 
     const [isItemOpen, setIsItemOpen] = useState(true);
     const [openPropertyType, setOpenPropertyType] = useState(false);
@@ -66,7 +68,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
     // const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
     const [propertyItemsX, setPropertyItemsX] = useState<PropertyItem[]>([])
     // const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
-    const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
+    // const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
 
     const filteredVisitorItems = visitorItems.filter((visitorItem) => {
       const searchLower = visitorItemSearch.toLowerCase();
@@ -151,10 +153,6 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
          const response2 = await getPropertyItems(categoryId)
          const ok2 = populateListX(response2, "There are no property items", setPropertyItemsX)
          if(!ok2) return
-
-         const response4 = await getPropertyBags(prisonerInfo.prisoner, categoryId)
-         const ok4 = populateListX(response4, "There are no property bags for this prisoner", setPropertyBags)
-         if(!ok4) return
     }
 
     function populateListX(response: any, msg: string, setData: any) {
@@ -331,55 +329,64 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                     </div>
 
                     {/* Property Category */}
-                    <div className="space-y-2">
-                      <Label>Property Category *</Label>
-                      <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={ item.visitor_item }
-                          >
-                            {item.property_category
-                              ? itemCategories.find((i) => i.id === item.property_category)?.name
-                              : ""}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search category..." />
-                            <CommandList>
-                              <CommandEmpty>No category found.</CommandEmpty>
-                              <CommandGroup>
-                                {itemCategories.map((category) => (
-                                  <CommandItem
-                                    key={category.id}
-                                    value={category.name}
-                                    onSelect={async () => {
-                                      handleChange("property_category", category.id)
-                                      await getPropertyItemsInfo(category.id)
-                                      setOpenPropertyCategory(false);
-                                    }}
+                   {
+                       selectedProperty === null && (
+                           <div className="space-y-2">
+                              <Label>Property Category *</Label>
+                              <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
+                                <PopoverTrigger asChild>
+                                  <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
+                                          disabled={ item.visitor_item }
                                   >
-                                    <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
-                                    {category.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                    </div>
+                                    {item.property_category
+                                      ? itemCategories.find((i) => i.id === item.property_category)?.name
+                                      : ""}
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                  </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-full p-0">
+                                  <Command>
+                                    <CommandInput placeholder="Search category..." />
+                                    <CommandList>
+                                      <CommandEmpty>No category found.</CommandEmpty>
+                                      <CommandGroup>
+                                        {itemCategories.map((category) => (
+                                          <CommandItem
+                                            key={category.id}
+                                            value={category.name}
+                                            onSelect={async () => {
+                                              handleChange("property_category", category.id)
+                                              await getPropertyItemsInfo(category.id)
+                                              setOpenPropertyCategory(false);
+                                            }}
+                                          >
+                                            <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
+                                            {category.name}
+                                          </CommandItem>
+                                        ))}
+                                      </CommandGroup>
+                                    </CommandList>
+                                  </Command>
+                                </PopoverContent>
+                              </Popover>
+                            </div>
+                       )
+                   }
+
 
                     {/* Property Item */}
                     <div className="space-y-2">
                       <Label>Property Item *</Label>
                       <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                            {item.property_item
-                              ? propertyItemsX.find((i) => i.id === item.property_item)?.name
-                              : "Select item..."}
+                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
+                                  disabled={selectedProperty !== null}
+                          >
+                            {selectedProperty && selectedProperty.property_item_name
+                              ? selectedProperty.property_item_name
+                              : item.property_item
+                                  ? propertyItemsX.find((i) => i.id === item.property_item)?.name
+                                  : "Select item..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>

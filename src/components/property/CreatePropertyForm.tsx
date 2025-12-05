@@ -6,10 +6,10 @@ import {
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
   addProperty,
-  DefaultPropertyItem,
+  DefaultPropertyItem, getPropertyBags,
   getPropertyStatuses,
   getPropertyTypes, PrisonerProperty, Property,
-  PropertyBag
+  PropertyBag, updateProperty
 } from "../../services/stationServices/propertyService";
 import PropertyItem from "./PropertyItem";
 import {getNextOfKins, NextOfKinResponse} from "../../services/admission/nextOfKinService";
@@ -62,11 +62,13 @@ interface ChildProps {
   setLoaderText: React.Dispatch<React.SetStateAction<string>>;
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setProperties: React.Dispatch<React.SetStateAction<PrisonerProperty[]>>;
+  selectedProperty: PrisonerProperty
 }
 
 
 const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialogOpen, setNewDialogLoader,
-                                                    setLoaderText, setIsNextCreateDialogOpen, setProperties}) => {
+                                                    setLoaderText, setIsNextCreateDialogOpen,
+                                                    setProperties, selectedProperty}) => {
     const [openPrisoner, setOpenPrisoner] = useState(false);
     const [openVisitor, setOpenVisitor] = useState(false);
     const [prisonerInfo, setPrisonerInfo] = useState({
@@ -139,10 +141,22 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         }
         // console.log(property)
         try {
-          const response = await addProperty(property)
-          setProperties(prev => ([response, ...prev]))
+          if (selectedProperty === null) {
+             const response = await addProperty(property)
+             setProperties(prev => ([response, ...prev]))
+             toast.success("Property created successfully");
+          }
+          else {
+             const response = await updateProperty(property, selectedProperty.id)
+             setProperties(prev =>
+                prev.map(item =>
+                  item.id === selectedProperty.id ? response : item
+                )
+             );
+             toast.success("Property updated successfully");
+          }
+
           resetFields()
-          toast.success("Property created successfully");
           setIsCreateDialogOpen(false)
         }catch (error) {
           handleCatchError(error)
@@ -210,6 +224,9 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
          const response41 = await getUnits()
          populateLists(response41, "There are no item categories", setUnits)
 
+         const response42 = await getPropertyBags(prisonerInfo.prisoner)
+         populateLists(response42, "There are no property bags for this prisoner", setPropertyBags)
+
       }catch (error) {
         handleCatchError(error)
       }finally {
@@ -218,21 +235,24 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     }
 
     async function fetchVisitorItems(visitorId) {
-      setPropertyItems([{
-        id: '1',
-        property_type: '',
-        property_category: '',
-        property_item: '',
-        measurement_unit: '',
-        property_bag: '',
-        next_of_kin: '',
-        property_status: '',
-        quantity: '',
-        amount: '',
-        note: '',
-        destination: '',
-        visitor_item: '',
-      }])
+      if (selectedProperty === null){
+          setPropertyItems([{
+            id: '1',
+            property_type: '',
+            property_category: '',
+            property_item: '',
+            measurement_unit: '',
+            property_bag: '',
+            next_of_kin: '',
+            property_status: '',
+            quantity: '',
+            amount: '',
+            note: '',
+            destination: '',
+            visitor_item: '',
+          }])
+      }
+
       try {
           const response = await getVisitorItems2(visitorId)
           if(handleServerError(response, setNewDialogLoader)) return
@@ -270,6 +290,34 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     }
   }
 
+  useEffect(() => {
+    if (selectedProperty !== null){
+        setPrisonerInfo({ prisoner: selectedProperty.prisoner })
+        setVisitorInfo({ visitor: selectedProperty.visitor })
+        setPropertyItems(prevItems => {
+          if (prevItems.length === 0) return prevItems; // nothing to update
+
+          return [
+            {
+              ...prevItems[0],
+              property_type: selectedProperty.property_type,
+              property_item: selectedProperty.property_item,
+              measurement_unit: selectedProperty.measurement_unit,
+              property_bag: selectedProperty.property_bag,
+              next_of_kin: selectedProperty.next_of_kin,
+              property_status: selectedProperty.property_status,
+              quantity: selectedProperty.quantity,
+              amount: selectedProperty.amount,
+              note: selectedProperty.note,
+              destination: selectedProperty.destination,
+            },
+            ...prevItems.slice(1), // keep the rest unchanged
+          ];
+        });
+        
+    }
+  }, [selectedProperty]);
+
   return (
       <div className="h-full" style={{marginTop: '10px'}}>
         <form onSubmit={onSubmit} className="space-y-6">
@@ -287,6 +335,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
                         aria-expanded={openPrisoner}
                         className="w-full justify-between"
                         type="button"
+                        disabled={selectedProperty}
                     >
                       {prisonerInfo.prisoner ? (
                           (() => {
@@ -518,6 +567,8 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
                             visitorInfo={visitorInfo}
                             itemCategories={itemCategories}
                             units={units}
+                            selectedProperty={selectedProperty}
+                            propertyBags={propertyBags}
                         />
                     ))}
                   </div>
@@ -536,13 +587,16 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
               </Card>
 
             <DialogFooter>
-                                <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                                  Cancel
-                                </Button>
-                                <Button type="submit" style={{backgroundColor: '#650000'}}>
-                                  Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}
-                                </Button>
-                              </DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" style={{backgroundColor: '#650000'}}>
+                {
+                  selectedProperty === null ? "Create Property" : "Update Property"
+                }
+                {/*Create {propertyItems.length} {propertyItems.length > 1 ? 'Properties' : 'Property'}*/}
+              </Button>
+            </DialogFooter>
 
         </form>
       </div>

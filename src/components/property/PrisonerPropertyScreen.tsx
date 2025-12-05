@@ -644,35 +644,42 @@ export default function PrisonerPropertyScreen() {
     }
   };
 
-  const handleEdit = (property: Property) => {
+  const handleEdit = (property: PrisonerProperty) => {
     setSelectedProperty(property);
-    setPreviousPropertyStatus(property.property_status); // Store the original status
-    setFormData({
-      prisoner: property.prisoner,
-      property_type: property.property_type,
-      property_category: property.property_category,
-      property_item: property.property_item,
-      measurement_unit: property.measurement_unit,
-      property_bag: property.property_bag,
-      next_of_kin: property.next_of_kin || 'none',
-      visitor: property.visitor,
-      property_status: property.property_status,
-      quantity: property.quantity,
-      amount: property.amount,
-      biometric_consent: property.biometric_consent,
-      note: property.note,
-      destination: property.destination
-    });
-    setIsEditDialogOpen(true);
+    setIsCreateDialogOpen(true)
+
+    // setPreviousPropertyStatus(property.property_status); // Store the original status
+    // setFormData({
+    //   prisoner: property.prisoner,
+    //   property_type: property.property_type,
+    //   property_category: property.property_category,
+    //   property_item: property.property_item,
+    //   measurement_unit: property.measurement_unit,
+    //   property_bag: property.property_bag,
+    //   next_of_kin: property.next_of_kin || 'none',
+    //   visitor: property.visitor,
+    //   property_status: property.property_status,
+    //   quantity: property.quantity,
+    //   amount: property.amount,
+    //   biometric_consent: property.biometric_consent,
+    //   note: property.note,
+    //   destination: property.destination
+    // });
+    // setIsEditDialogOpen(true);
+
   };
 
-  const handleView = (property: Property) => {
+  const handleView = (property: PrisonerProperty) => {
     setSelectedProperty(property);
-    console.log(property)
     setIsViewDialogOpen(true);
   };
 
-  const handleDelete = (property: Property) => {
+  useEffect(() => {
+    const anyOpen = isViewDialogOpen || isDeleteDialogOpen || isCreateDialogOpen;
+    if (!anyOpen) setSelectedProperty(null);
+  }, [isViewDialogOpen, isDeleteDialogOpen, isCreateDialogOpen]);
+
+  const handleDelete = (property: PrisonerProperty) => {
     setSelectedProperty(property);
     setIsDeleteDialogOpen(true);
   };
@@ -2305,7 +2312,7 @@ export default function PrisonerPropertyScreen() {
           {/*<CreatePropertyForm onSubmit={handleSubmitCreate} />*/}
             <CreatePropertyForm prisoners={prisoners} setIsCreateDialogOpen={setIsCreateDialogOpen}
               setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText}
-              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} setProperties={setProperties}/>
+              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} setProperties={setProperties} selectedProperty={selectedProperty}/>
           </div>
         </DialogContent>
       </Dialog>
