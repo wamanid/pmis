@@ -137,7 +137,6 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
     async function getPropertyItemsInfo(categoryId: string) {
          setNewDialogLoader(true)
          setLoaderText("Fetching Property information")
-         console.log(categoryId)
         try {
              await getPropertyData(categoryId)
         }catch (error) {
@@ -234,7 +233,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Search Visitor Items */}
               {
-                  visitorInfo.visitor && (
+                  !!visitorItems.length && (
                        <div className="space-y-2 md:col-span-2">
                         <Label>Select Visitor Item (Optional) *</Label>
                         <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
@@ -337,7 +336,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                       <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={ !itemCategories.length }
+                                  disabled={ item.visitor_item }
                           >
                             {item.property_category
                               ? itemCategories.find((i) => i.id === item.property_category)?.name
@@ -416,7 +415,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                       <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={ !units.length }
+                                  disabled={ item.visitor_item }
                           >
                            {item.measurement_unit
                               ? units.find((i) => i.id === item.measurement_unit)?.name

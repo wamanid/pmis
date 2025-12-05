@@ -218,17 +218,32 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     }
 
     async function fetchVisitorItems(visitorId) {
-    try {
-        const response = await getVisitorItems2(visitorId)
-        if(handleServerError(response, setNewDialogLoader)) return
-        populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
+      setPropertyItems([{
+        id: '1',
+        property_type: '',
+        property_category: '',
+        property_item: '',
+        measurement_unit: '',
+        property_bag: '',
+        next_of_kin: '',
+        property_status: '',
+        quantity: '',
+        amount: '',
+        note: '',
+        destination: '',
+        visitor_item: '',
+      }])
+      try {
+          const response = await getVisitorItems2(visitorId)
+          if(handleServerError(response, setNewDialogLoader)) return
+          populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
 
-    }catch (error) {
-      handleCatchError(error)
-    }finally {
-       setNewDialogLoader(false)
+      }catch (error) {
+        handleCatchError(error)
+      }finally {
+         setNewDialogLoader(false)
+      }
     }
-  }
 
   function populateList(response: any, msg: string, setData: any) {
     if(handleServerError(response, setNewDialogLoader)) return
