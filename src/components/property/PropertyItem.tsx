@@ -95,6 +95,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
         const updates = {
             quantity: visitorItem.quantity.toString(),
+            property_type: "",
             amount: visitorItem.amount,
             visitor_item: visitorItem.id,
             property_category: visitorItem.item_category,
@@ -295,10 +296,14 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                       <Label>Property Type *</Label>
                       <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
                         <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                            {item.property_type
-                              ? propertyTypes.find((t) => t.id === item.property_type)?.name
-                              : "Select property type..."}
+                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
+                                  disabled={!item.visitor_item}
+                          >
+                            {!item.visitor_item && !!propertyTypes.length && propertyTypes.find(type => type.name === "Incoming Supplementary")
+                                ? "Incoming Supplementary"
+                                : item.property_type
+                                  ? propertyTypes.find((t) => t.id === item.property_type)?.name
+                                  : "Select property type..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>

@@ -53,7 +53,12 @@ import {
   ChevronUp
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import {handleCatchError, handleEmptyList, handleServerError} from "../../services/stationServices/utils";
+import {
+  getPropertyTypeUtil,
+  handleCatchError,
+  handleEmptyList,
+  handleServerError
+} from "../../services/stationServices/utils";
 
 interface ChildProps {
   prisoners: PrisonerItem;
@@ -63,12 +68,14 @@ interface ChildProps {
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setProperties: React.Dispatch<React.SetStateAction<PrisonerProperty[]>>;
   selectedProperty: PrisonerProperty
+  propertyStatuses: Unit
+  propertyTypes: Unit
 }
 
 
 const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialogOpen, setNewDialogLoader,
                                                     setLoaderText, setIsNextCreateDialogOpen,
-                                                    setProperties, selectedProperty}) => {
+                                                    setProperties, selectedProperty, propertyStatuses, propertyTypes}) => {
     const [openPrisoner, setOpenPrisoner] = useState(false);
     const [openVisitor, setOpenVisitor] = useState(false);
     const [prisonerInfo, setPrisonerInfo] = useState({
@@ -83,25 +90,25 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
     const [isPropertyItemsOpen, setIsPropertyItemsOpen] = useState(true);
     const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
-    id: '1',
-    property_type: '',
-    property_category: '',
-    property_item: '',
-    measurement_unit: '',
-    property_bag: '',
-    next_of_kin: '',
-    property_status: '',
-    quantity: '',
-    amount: '',
-    note: '',
-    destination: '',
-    visitor_item: '',
-  }]);
+      id: '1',
+      property_type: getPropertyTypeUtil(propertyTypes),
+      property_category: '',
+      property_item: '',
+      measurement_unit: '',
+      property_bag: '',
+      next_of_kin: '',
+      property_status: '',
+      quantity: '',
+      amount: '',
+      note: '',
+      destination: '',
+      visitor_item: '',
+    }]);
     const [visitorItems, setVisitorItems] = useState<VisitorItem[]>([])
     const [typeLoader, setTypeLoader] = useState(false)
-    const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
+    // const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
     // const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
-    const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
+    // const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
     const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
     const [biometricData, setBiometricData] = useState('');
     const [itemCategories, setItemCategories] = useState<ItemCategory[]>([])
@@ -211,12 +218,6 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
 
           const response = await getStationVisitors2(prisonerId)
           populateList(response, "There are no visitors for the selected prisoner", setVisitors)
-
-         const response1 = await getPropertyTypes()
-         populateLists(response1, "There are no property types", setPropertyTypes)
-
-         const response3 = await getPropertyStatuses()
-         populateLists(response3, "There are no property statuses", setPropertyStatuses)
 
          const response11 = await getItemCategories()
          populateLists(response11, "There are no item categories", setItemCategories)

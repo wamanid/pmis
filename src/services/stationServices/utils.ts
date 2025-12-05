@@ -2,6 +2,7 @@ import {ManualLockUpItem} from "./manualLockupIntegration";
 import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
 import {toast} from "sonner";
 import {getCounties, getDistricts, getParishes, getSubCounties, getVillages} from "../admission/nextOfKinService";
+import {Unit} from "./visitorsServices/visitorItem";
 
 export interface Paginated<T> {
   count: number;
@@ -288,4 +289,14 @@ export async function fetchVillages(setData: any, setLoader: any, setLoderText: 
   finally {
     setLoader(false)
   }
+}
+
+export function getPropertyTypeUtil(propertyTypes: Unit){
+  if (!!propertyTypes.length) {
+    const type = propertyTypes.find(type => type.name === "Incoming Supplementary")
+    if (type) {
+      return type.id
+    }
+  }
+  return ""
 }
