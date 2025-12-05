@@ -301,6 +301,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
           return [
             {
               ...prevItems[0],
+              visitor_item: selectedProperty.visitor_item,
               property_type: selectedProperty.property_type,
               property_item: selectedProperty.property_item,
               measurement_unit: selectedProperty.measurement_unit,
