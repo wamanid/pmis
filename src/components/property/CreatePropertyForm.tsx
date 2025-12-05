@@ -237,21 +237,21 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
 
     async function fetchVisitorItems(visitorId) {
       if (selectedProperty === null){
-          setPropertyItems([{
-            id: '1',
-            property_type: '',
-            property_category: '',
-            property_item: '',
-            measurement_unit: '',
-            property_bag: '',
-            next_of_kin: '',
-            property_status: '',
-            quantity: '',
-            amount: '',
-            note: '',
-            destination: '',
-            visitor_item: '',
-          }])
+        setPropertyItems([{
+          id: '1',
+          property_type: '',
+          property_category: '',
+          property_item: '',
+          measurement_unit: '',
+          property_bag: '',
+          next_of_kin: '',
+          property_status: '',
+          quantity: '',
+          amount: '',
+          note: '',
+          destination: '',
+          visitor_item: '',
+        }])
       }
 
       try {
