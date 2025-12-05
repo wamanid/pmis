@@ -1,6 +1,7 @@
 import {ManualLockUpItem} from "./manualLockupIntegration";
 import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
 import {toast} from "sonner";
+import {getCounties, getDistricts, getParishes, getSubCounties, getVillages} from "../admission/nextOfKinService";
 
 export interface Paginated<T> {
   count: number;
@@ -206,4 +207,84 @@ export function handleEmptyList (data: any, msg: string, setLoading: any) {
         return true
   }
   return false
+}
+
+function populateList2(response: any, msg: string, setData: any, setLoader: any) {
+    if(handleServerError(response, setLoader)) return
+
+    if ("results" in response) {
+      const data = response.results
+      if (handleEmptyList(data, msg, setLoader)) return
+      setData(data)
+    }
+  }
+
+export async function fetchDistricts(setData: any, setLoader: any, setLoderText: any, region: string) {
+  setLoader(true)
+  setLoderText("Fetching district, please wait...")
+  try {
+    const response = await getDistricts(region)
+    populateList2(response, "There are no districts for the selected region", setData, setLoader)
+  }catch (error) {
+    handleCatchError(error)
+  }
+  finally {
+    setLoader(false)
+  }
+}
+
+export async function fetchCounties(setData: any, setLoader: any, setLoderText: any, district: string) {
+  setLoader(true)
+  setLoderText("Fetching counties, please wait...")
+  try {
+    const response = await getCounties(district)
+    populateList2(response, "There are no counties for the selected district", setData, setLoader)
+  }catch (error) {
+    handleCatchError(error)
+  }
+  finally {
+    setLoader(false)
+  }
+}
+
+export async function fetchSubCounties(setData: any, setLoader: any, setLoderText: any, county: string) {
+  setLoader(true)
+  setLoderText("Fetching sub counties, please wait...")
+  try {
+    const response = await getSubCounties(county)
+    populateList2(response, "There are no sub counties for the selected county", setData, setLoader)
+  }catch (error) {
+    handleCatchError(error)
+  }
+  finally {
+    setLoader(false)
+  }
+}
+
+export async function fetchParishes(setData: any, setLoader: any, setLoderText: any, sub_county: string) {
+  setLoader(true)
+  setLoderText("Fetching parishes, please wait...")
+  try {
+    const response = await getParishes(sub_county)
+    populateList2(response, "There are no parishes for the selected sub county", setData, setLoader)
+  }catch (error) {
+    handleCatchError(error)
+  }
+  finally {
+    setLoader(false)
+  }
+}
+
+export async function fetchVillages(setData: any, setLoader: any, setLoderText: any, parish: string) {
+  setLoader(true)
+  setLoderText("Fetching villages, please wait...")
+  try {
+    const response = await getVillages(parish)
+    populateList2(response, "There are no villages for the selected parish", setData, setLoader)
+  }catch (error) {
+    handleCatchError(error)
+  }
+  finally {
+    setLoader(false)
+  }
 }
