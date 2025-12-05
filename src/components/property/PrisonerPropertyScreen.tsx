@@ -2312,8 +2312,8 @@ export default function PrisonerPropertyScreen() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="flex-1 max-h-[90vh] p-6">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Edit Property</DialogTitle>
             <DialogDescription>
