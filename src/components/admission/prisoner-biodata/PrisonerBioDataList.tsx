@@ -111,6 +111,12 @@ export interface PrisonerBioData {
   permanent_sub_county?: string;
   permanent_parish?: string;
   permanent_village?: string;
+  arrest_region?: string;
+  arrest_district?: string;
+  arrest_county?: string;
+  arrest_sub_county?: string;
+  arrest_parish?: string;
+  arrest_village?: string;
   continent?: string;
   district_of_origin?: string;
   country_of_origin?: string;

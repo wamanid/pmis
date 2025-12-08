@@ -28,6 +28,7 @@ import {
   Settings,
   LucideIcon,
   Table,
+  Search,
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
@@ -35,6 +36,7 @@ import { Skeleton } from '../ui/skeleton';
 import ugandaPrisonsLogo from 'figma:asset/a1a2171c301702e7d1411052b77e2080575d2c9e.png';
 import { fetchMenus, ApiMenuItem } from '../../services/menuService';
 import { useAuth } from '../../contexts/AuthContext';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 type MenuItem = {
   id: string;
@@ -131,20 +133,22 @@ export function Sidebar({ isOpen }: SidebarProps) {
   const [menusLoading, setMenusLoading] = useState(true);
 
   // Load menus from API
-  useEffect(() => {
-    const loadMenus = async () => {
-      try {
-        setMenusLoading(true);
-        const response = await fetchMenus();
-        const menus = buildMenuTree(response.results);
-        setMenuItems(menus);
-      } catch (error) {
-        console.error('Failed to load menus:', error);
-      } finally {
-        setMenusLoading(false);
-      }
-    };
+  const loadMenus = async () => {
+    try {
+      setMenusLoading(true);
+      const response = await fetchMenus();
+      const menus = buildMenuTree(response.results);
+      setMenuItems(menus);
+    } catch (error) {
+      console.error('Failed to load menus:', error);
+    } finally {
+      setMenusLoading(false);
+    }
+  };
 
+  // Load menus on mount and when location filters change
+  // useFilterRefresh(loadMenus);
+  useEffect(() => {
     loadMenus();
   }, []);
 
@@ -196,6 +200,7 @@ export function Sidebar({ isOpen }: SidebarProps) {
     const isExpanded = expandedItems.has(item.id);
     const Icon = item.icon;
     const isActive = location.pathname === item.path;
+    const isTopLevel = level === 0;
 
     return (
       <div key={item.id}>
@@ -224,9 +229,14 @@ export function Sidebar({ isOpen }: SidebarProps) {
             ))}
         </button>
         {hasChildren && isExpanded && (
-          <div className="mt-1">
-            {item.children!.map((child) => renderMenuItem(child, level + 1))}
-          </div>
+          <>
+            <div className="mt-1">
+              {item.children!.map((child) => renderMenuItem(child, level + 1))}
+            </div>
+            {isTopLevel && (
+              <div className="my-2 mx-3 border-t border-border" />
+            )}
+          </>
         )}
       </div>
     );
@@ -270,21 +280,6 @@ export function Sidebar({ isOpen }: SidebarProps) {
             ) : (
               <>
                 {menuItems.map((item) => renderMenuItem(item))}
-                
-                {/* Static Demo Menu Item */}
-                <div className="pt-2 mt-2 border-t border-border">
-                  <button
-                    onClick={() => navigate('/demo/datatable')}
-                    className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-                      location.pathname === '/demo/datatable'
-                        ? 'bg-primary text-white'
-                        : 'hover:bg-muted text-foreground'
-                    }`}
-                  >
-                    <Table className="h-4 w-4 shrink-0" />
-                    <span className="flex-1 text-left text-sm">DataTable Demo</span>
-                  </button>
-                </div>
               </>
             )}
           </div>

@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { DataTable } from "../common/DataTable";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -21,13 +22,6 @@ import {
   DialogTrigger,
 } from "../ui/dialog";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../ui/select";
-import {
   Command,
   CommandEmpty,
   CommandGroup,
@@ -41,7 +35,6 @@ import { toast } from "sonner@2.0.3";
 import {
   Plus,
   Search,
-  Filter,
   Users,
   Calendar as CalendarIcon,
   Upload,
@@ -53,42 +46,21 @@ import {
   LogOut,
   Edit,
   Eye,
+  FileText,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
+import { phoneNumberValidation, emailValidation, requiredValidation } from "../../utils/validation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import VisitorPassForm from "../gate/VisitorPassForm";
+import VisitorItemList from "./VisitorItemList";
+import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
+import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+import axiosInstance from "../../services/axiosInstance"; // << ensure path matches your project
+import {handleResponseError} from "../../services/stationServices/utils";
+import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 
-// Types based on API
-interface Visitor {
-  id: string;
-  prisoner_name: string;
-  gate_name: string;
-  visitor_type_name: string;
-  visitor_status_name: string;
-  visitation_datetime: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  organisation: string;
-  vehicle_no: string;
-  time_in: string;
-  time_out: string;
-  reason_of_visitation: string;
-  id_number: string;
-  address: string;
-  contact_no: string;
-  place_visited: string;
-  remarks: string;
-  blacklist_reason: string;
-  photo: string;
-  gate: string;
-  prisoner: string;
-  visitor_type: string;
-  gate_keeper: string;
-  relation: string;
-  id_type: string;
-  visitor_status: string;
-}
+
 
 interface Region {
   id: string;
@@ -147,15 +119,8 @@ interface Staff {
 }
 
 export default function VisitationsScreen() {
-  // Filter states
-  const [selectedRegion, setSelectedRegion] = useState<string>("");
-  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
-  const [selectedStation, setSelectedStation] = useState<string>("");
-
-  // Data states
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [districts, setDistricts] = useState<District[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
+  // Filter & data states
+  const [items, setItems] = useState<VisitorItem[]>([]);
   const [gates, setGates] = useState<Gate[]>([]);
   const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
   const [visitorTypes, setVisitorTypes] = useState<VisitorType[]>([]);
@@ -168,13 +133,24 @@ export default function VisitationsScreen() {
   // UI states
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingVisitor, setEditingVisitor] = useState<Visitor | null>(null);
+  // external search (shown in header). Debounced before triggering API.
   const [searchQuery, setSearchQuery] = useState("");
+  // Debounced search so we don't call API on every keystroke
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
   const [loading, setLoading] = useState(false);
   const [photoPreview, setPhotoPreview] = useState<string>("");
   const [useCamera, setUseCamera] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
+  
+  // Visitor Pass Dialog states
+  const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
+  const [selectedVisitorForPass, setSelectedVisitorForPass] = useState<Visitor | null>(null);
 
   // Form states
   const [form, setForm] = useState({
@@ -212,186 +188,84 @@ export default function VisitationsScreen() {
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
+  const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
+  // DataTable states
+  const [tableData, setTableData] = useState<Visitor[]>([]);
+  const [tableLoading, setTableLoading] = useState<boolean>(true);
+  const [total, setTotal] = useState<number>(0);
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [reloadCounter, setReloadCounter] = useState(0); // <-- added
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  const requestIdRef = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
   // Calendar state
   const [calendarOpen, setCalendarOpen] = useState(false);
 
-  // Mock data
+
+  // TODO: fetch gates/prisoners/visitorTypes/relationships/idTypes/visitorStatuses/staffList from API services here.
   useEffect(() => {
-    // Load regions
-    setRegions([
-      { id: "1", name: "Central Region" },
-      { id: "2", name: "Western Region" },
-      { id: "3", name: "Eastern Region" },
-    ]);
-
-    // Load gates
-    setGates([
-      { id: "1", name: "Main Gate" },
-      { id: "2", name: "Service Gate" },
-      { id: "3", name: "Emergency Gate" },
-    ]);
-
-    // Load prisoners
-    setPrisoners([
-      { id: "1", prisoner_number: "P-2024-001", full_name: "John Doe" },
-      { id: "2", prisoner_number: "P-2024-002", full_name: "Jane Smith" },
-      { id: "3", prisoner_number: "P-2024-003", full_name: "Robert Johnson" },
-    ]);
-
-    // Load visitor types
-    setVisitorTypes([
-      { id: "1", name: "Family Member" },
-      { id: "2", name: "Legal Representative" },
-      { id: "3", name: "Religious Leader" },
-      { id: "4", name: "Official Visitor" },
-      { id: "5", name: "Medical Personnel" },
-    ]);
-
-    // Load relationships
-    setRelationships([
-      { id: "1", name: "Spouse" },
-      { id: "2", name: "Parent" },
-      { id: "3", name: "Child" },
-      { id: "4", name: "Sibling" },
-      { id: "5", name: "Friend" },
-      { id: "6", name: "Lawyer" },
-      { id: "7", name: "Other" },
-    ]);
-
-    // Load ID types
-    setIDTypes([
-      { id: "1", name: "National ID" },
-      { id: "2", name: "Passport" },
-      { id: "3", name: "Driver's License" },
-      { id: "4", name: "Student ID" },
-      { id: "5", name: "Work ID" },
-    ]);
-
-    // Load visitor statuses
-    setVisitorStatuses([
-      { id: "1", name: "Checked In", color: "blue" },
-      { id: "2", name: "Checked Out", color: "green" },
-      { id: "3", name: "Blacklisted", color: "red" },
-      { id: "4", name: "Pending Approval", color: "yellow" },
-    ]);
-
-    // Load staff
-    setStaffList([
-      { id: "1", force_number: "UPS001", name: "Officer James", rank: "Corporal" },
-      { id: "2", force_number: "UPS002", name: "Officer Mary", rank: "Sergeant" },
-      { id: "3", force_number: "UPS003", name: "Officer John", rank: "Inspector" },
-    ]);
-
-    // Load mock visitors
-    setVisitors([
-      {
-        id: "1",
-        prisoner_name: "John Doe",
-        gate_name: "Main Gate",
-        visitor_type_name: "Family Member",
-        visitor_status_name: "Checked In",
-        visitation_datetime: "2025-10-25T10:00:00Z",
-        first_name: "Sarah",
-        middle_name: "Anne",
-        last_name: "Doe",
-        organisation: "",
-        vehicle_no: "UAH 123X",
-        time_in: "10:00:00",
-        time_out: "",
-        reason_of_visitation: "Family visit",
-        id_number: "CM123456789",
-        address: "Kampala, Uganda",
-        contact_no: "+256700123456",
-        place_visited: "Visitor's Hall",
-        remarks: "First time visitor",
-        blacklist_reason: "",
-        photo: "",
-        gate: "1",
-        prisoner: "1",
-        visitor_type: "1",
-        gate_keeper: "1",
-        relation: "1",
-        id_type: "1",
-        visitor_status: "1",
-      },
-      {
-        id: "2",
-        prisoner_name: "Jane Smith",
-        gate_name: "Main Gate",
-        visitor_type_name: "Legal Representative",
-        visitor_status_name: "Checked Out",
-        visitation_datetime: "2025-10-25T09:00:00Z",
-        first_name: "Michael",
-        middle_name: "",
-        last_name: "Johnson",
-        organisation: "Johnson & Associates Law Firm",
-        vehicle_no: "UBB 456Y",
-        time_in: "09:00:00",
-        time_out: "11:30:00",
-        reason_of_visitation: "Legal consultation",
-        id_number: "CM987654321",
-        address: "Kampala, Uganda",
-        contact_no: "+256701234567",
-        place_visited: "Legal Consultation Room",
-        remarks: "Regular visitor",
-        blacklist_reason: "",
-        photo: "",
-        gate: "1",
-        prisoner: "2",
-        visitor_type: "2",
-        gate_keeper: "2",
-        relation: "6",
-        id_type: "1",
-        visitor_status: "2",
-      },
-    ]);
+    // intentionally left blank: lookups should be loaded from services instead of hardcoded data
   }, []);
 
-  // Load districts when region changes
+  // debounced search (avoid API calls on every keystroke)
   useEffect(() => {
-    if (selectedRegion) {
-      const mockDistricts: District[] = [
-        { id: "1", name: "Kampala", region: "1" },
-        { id: "2", name: "Wakiso", region: "1" },
-        { id: "3", name: "Masaka", region: "2" },
-      ];
-      setDistricts(mockDistricts.filter((d) => d.region === selectedRegion));
-      setSelectedDistrict("");
-      setSelectedStation("");
-    } else {
-      setDistricts([]);
-    }
-  }, [selectedRegion]);
+    const id = window.setTimeout(() => setDebouncedSearch(searchQuery), 350);
+    return () => window.clearTimeout(id);
+  }, [searchQuery]);
 
-  // Load stations when district changes
+  // Map / normalize server item -> table row (we keep original fields, renderers read them)
+  const mapVisitor = useCallback((it: any): Visitor => ({
+    ...it,
+  }), []);
+
+  // loadTable: server-side load with abort + request id guard
+  const loadTable = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
+    try { abortRef.current?.abort(); } catch {}
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const reqId = ++requestIdRef.current;
+    setTableLoading(true);
+    try {
+      const params: Record<string, any> = {};
+      params.page = Math.max(1, Number(_page) || 1);
+      params.page_size = Number(_pageSize) || 10;
+      if (_sortField) params.ordering = _sortDir === 'desc' ? `-${_sortField}` : _sortField;
+      if (_search) params.search = _search;
+
+      // const res = await getStationVisitors(params, controller.signal);
+      // const itemsRes = res?.results ?? res ?? [];
+
+      // DEBUG: log params so we can inspect what the UI is sending
+      // call axios directly so query params are forwarded exactly
+      console.debug("calling API with params:", params);
+      const apiRes = await axiosInstance.get("/gate-management/station-visitors/", { params });
+      const res = apiRes.data;
+      console.debug("loadTable response:", res);
+      const itemsRes = res?.results ?? res ?? [];
+      const count = Number(res?.count ?? itemsRes.length ?? 0);
+
+      if (requestIdRef.current === reqId) {
+        setTableData((itemsRes || []).map(mapVisitor));
+        setVisitors(itemsRes || []); // keep visitors state for VisitorItemList
+        setTotal(count);
+      }
+    } catch (err: any) {
+      if (err?.name === 'AbortError' || err?.code === 'ERR_CANCELED') return;
+      console.error('load visitors error', err?.response ?? err);
+      toast.error('Failed to load visitor records');
+    } finally {
+      if (requestIdRef.current === reqId) setTableLoading(false);
+      setVisitorRecordsLoading(false);
+    }
+  }, [page, pageSize, sortField, sortDir, debouncedSearch, mapVisitor]);
+
+  // trigger load when paging/sorting/search change
   useEffect(() => {
-    if (selectedDistrict) {
-      const mockStations: Station[] = [
-        { id: "1", name: "Luzira Prison", district: "1" },
-        { id: "2", name: "Kitalya Prison", district: "2" },
-        { id: "3", name: "Masaka Prison", district: "3" },
-      ];
-      setStations(mockStations.filter((s) => s.district === selectedDistrict));
-      setSelectedStation("");
-    } else {
-      setStations([]);
-    }
-  }, [selectedDistrict]);
-
-  // Filter visitors
-  const filteredVisitors = visitors.filter((visitor) => {
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      return (
-        visitor.first_name.toLowerCase().includes(query) ||
-        visitor.last_name.toLowerCase().includes(query) ||
-        visitor.prisoner_name.toLowerCase().includes(query) ||
-        visitor.id_number.toLowerCase().includes(query) ||
-        visitor.contact_no.toLowerCase().includes(query)
-      );
-    }
-    return true;
-  });
+    loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
+  }, [page, pageSize, sortField, sortDir, debouncedSearch, loadTable]);
 
   // Camera functions
   const startCamera = async () => {
@@ -524,33 +398,9 @@ export default function VisitationsScreen() {
   };
 
   const handleEdit = (visitor: Visitor) => {
+    // console.log(visitor)
     setEditingVisitor(visitor);
-    setForm({
-      first_name: visitor.first_name,
-      middle_name: visitor.middle_name,
-      last_name: visitor.last_name,
-      organisation: visitor.organisation,
-      vehicle_no: visitor.vehicle_no,
-      reason_of_visitation: visitor.reason_of_visitation,
-      id_number: visitor.id_number,
-      address: visitor.address,
-      contact_no: visitor.contact_no,
-      place_visited: visitor.place_visited,
-      remarks: visitor.remarks,
-      blacklist_reason: visitor.blacklist_reason,
-      photo: null,
-      gate: visitor.gate,
-      prisoner: visitor.prisoner,
-      visitor_type: visitor.visitor_type,
-      gate_keeper: visitor.gate_keeper,
-      relation: visitor.relation,
-      id_type: visitor.id_type,
-      visitor_status: visitor.visitor_status,
-      visitation_datetime: new Date(visitor.visitation_datetime),
-      time_in: visitor.time_in,
-      time_out: visitor.time_out,
-    });
-    setPhotoPreview(visitor.photo);
+
     setIsDialogOpen(true);
   };
 
@@ -571,6 +421,75 @@ export default function VisitationsScreen() {
     );
   };
 
+  const handleGenerateVisitorPass = (visitor: Visitor) => {
+    setSelectedVisitorForPass(visitor);
+    setIsVisitorPassDialogOpen(true);
+  };
+
+  const handleVisitorPassSubmit = (data: any) => {
+    toast.success('Visitor pass generated successfully');
+    setIsVisitorPassDialogOpen(false);
+    setSelectedVisitorForPass(null);
+  };
+
+  // APIs integration
+  useEffect(() => {
+      if (visitorRecordsLoading) {
+        async function fetchData() {
+          // setVisitorRecordsLoading(true)
+            try {
+              const response = await getStationVisitors()
+              if (handleResponseError(response)) return
+
+              if ("results" in response) {
+                const data = response.results
+                if (!data.length){
+                    toast.error("There are no visitor records");
+                    return true
+                }
+                setVisitors(data)
+                // console.log(data)
+              }
+
+              const response2 = await getVisitorItems()
+              if (handleResponseError(response2)) return
+              if ("results" in response2) {
+                const data = response2.results
+                setItems(data)
+                console.log(data)
+              }
+
+            }catch (error) {
+              if (!error?.response) {
+                toast.error('Failed to connect to server. Please try again.');
+              }
+
+            }finally {
+              setVisitorRecordsLoading(false)
+            }
+        }
+
+        fetchData()
+      }
+  }, [setVisitorRecordsLoading]);
+
+  useEffect(() => {
+    if (!isDialogOpen){
+      setEditingVisitor(null)
+    }
+  }, [isDialogOpen]);
+
+  function extractTimeHHMM(isoString: string): string {
+    const d = new Date(isoString);
+
+    if (isNaN(d.getTime())) return ""; // invalid date
+
+    const hh = String(d.getHours()).padStart(2, "0");
+    const mm = String(d.getMinutes()).padStart(2, "0");
+
+    return `${hh}:${mm}`;
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -581,113 +500,90 @@ export default function VisitationsScreen() {
         </p>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="region">Region</Label>
-              <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                <SelectTrigger id="region">
-                  <SelectValue placeholder="Select Region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+      {/* Filters removed — global filtering is provided by top nav via useFilterRefresh */}
+
+      {/* Main Tabs */}
+      <Tabs defaultValue="records" className="w-full">
+        {/* <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+          <TabsTrigger 
+            value="records" 
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+          >
+            <Users className="h-4 w-4 mr-2" />
+            Visitor Records
+          </TabsTrigger>
+          <TabsTrigger 
+            value="items" 
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:shadow-sm data-[state=active]:text-[#650000] data-[state=active]:border-b-2 data-[state=active]:border-[#650000]"
+          >
+            <FileText className="h-4 w-4 mr-2" />
+            Visitor Items
+          </TabsTrigger>
+        </TabsList> */}
+
+        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+          <TabsTrigger
+            value="records"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+             <Users className="h-4 w-4 mr-2" />
+             Visitor Records
+           </TabsTrigger>
+          <TabsTrigger
+            value="items"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+             <FileText className="h-4 w-4 mr-2" />
+             Visitor Items
+           </TabsTrigger>
+        </TabsList>
+
+        {/* Visitor Records Tab */}
+        <TabsContent value="records" className="space-y-6 mt-6">
+          {/* Search and Actions */}
+          <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search by name, ID number, or contact..."
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
+                className="pl-10"
+              />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="district">District</Label>
-              <Select
-                value={selectedDistrict}
-                onValueChange={setSelectedDistrict}
-                disabled={!selectedRegion}
-              >
-                <SelectTrigger id="district">
-                  <SelectValue placeholder="Select District" />
-                </SelectTrigger>
-                <SelectContent>
-                  {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="station">Station</Label>
-              <Select
-                value={selectedStation}
-                onValueChange={setSelectedStation}
-                disabled={!selectedDistrict}
-              >
-                <SelectTrigger id="station">
-                  <SelectValue placeholder="Select Station" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Search and Actions */}
-      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            placeholder="Search by name, ID number, or contact..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
-        </div>
-
-        <Dialog
-          open={isDialogOpen}
-          onOpenChange={(open) => {
-            setIsDialogOpen(open);
-            if (!open) {
-              resetForm();
-            }
-          }}
-        >
-          <DialogTrigger asChild>
-            <Button className="bg-primary hover:bg-primary/90">
+            <Button 
+              className="bg-primary hover:bg-primary/90"
+              onClick={() => setIsDialogOpen(true)}
+            >
               <Plus className="h-4 w-4 mr-2" />
               Register Visitor
             </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>
-                {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
-              </DialogTitle>
-              <DialogDescription>
-                {editingVisitor
-                  ? "Update visitor information"
-                  : "Register a new visitor and manage check-in/check-out"}
-              </DialogDescription>
-            </DialogHeader>
+          </div>
+
+          <VisitorRegistrationDialog
+            open={isDialogOpen}
+            onOpenChange={(open) => {
+              setIsDialogOpen(open);
+              if (!open) {
+                setEditingVisitor(null);
+              }
+            }}
+            setVisitors={setVisitors}
+            editingVisitor={editingVisitor}
+            onSaved={() => {
+              // Reload table immediately using the existing loadTable() helper
+              setPage(1);
+              setVisitorRecordsLoading(true);
+              // ensure we use current sort/search params
+              loadTable(1, pageSize, sortField, sortDir, debouncedSearch)
+                .catch((e) => console.error("reload after save failed", e))
+                .finally(() => setVisitorRecordsLoading(false));
+            }}
+          />
+
+          {/* Placeholder for form - will be removed */}
+          <div style={{display: 'none'}}>
             <form onSubmit={handleSubmit} className="space-y-6 mt-4">
               <Tabs defaultValue="personal" className="w-full">
                 <TabsList className="grid w-full grid-cols-4">
@@ -701,7 +597,7 @@ export default function VisitationsScreen() {
                 <TabsContent value="personal" className="space-y-4 mt-4">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="first_name">First Name *</Label>
+                      <Label htmlFor="first_name">First Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="first_name"
                         value={form.first_name}
@@ -726,7 +622,7 @@ export default function VisitationsScreen() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="last_name">Last Name *</Label>
+                      <Label htmlFor="last_name">Last Name <span className="text-red-500">*</span></Label>
                       <Input
                         id="last_name"
                         value={form.last_name}
@@ -741,7 +637,7 @@ export default function VisitationsScreen() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
-                      <Label htmlFor="contact_no">Contact Number *</Label>
+                      <Label htmlFor="contact_no">Contact Number <span className="text-red-500">*</span></Label>
                       <Input
                         id="contact_no"
                         value={form.contact_no}
@@ -751,6 +647,7 @@ export default function VisitationsScreen() {
                         placeholder="+256700123456"
                         required
                       />
+            
                     </div>
 
                     <div className="space-y-2">
@@ -767,7 +664,7 @@ export default function VisitationsScreen() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label htmlFor="address">Address *</Label>
+                    <Label htmlFor="address">Address <span className="text-red-500">*</span></Label>
                     <Textarea
                       id="address"
                       value={form.address}
@@ -783,7 +680,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* ID Type */}
                     <div className="space-y-2">
-                      <Label>ID Type *</Label>
+                      <Label>ID Type <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openIDTypeCombo}
                         onOpenChange={setOpenIDTypeCombo}
@@ -833,7 +730,7 @@ export default function VisitationsScreen() {
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="id_number">ID Number *</Label>
+                      <Label htmlFor="id_number">ID Number <span className="text-red-500">*</span></Label>
                       <Input
                         id="id_number"
                         value={form.id_number}
@@ -852,7 +749,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Gate */}
                     <div className="space-y-2">
-                      <Label>Gate *</Label>
+                      <Label>Gate <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openGateCombo}
                         onOpenChange={setOpenGateCombo}
@@ -903,7 +800,7 @@ export default function VisitationsScreen() {
 
                     {/* Gate Keeper */}
                     <div className="space-y-2">
-                      <Label>Gate Keeper *</Label>
+                      <Label>Gate Keeper <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openGateKeeperCombo}
                         onOpenChange={setOpenGateKeeperCombo}
@@ -957,7 +854,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Prisoner */}
                     <div className="space-y-2">
-                      <Label>Prisoner to Visit *</Label>
+                      <Label>Prisoner to Visit <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openPrisonerCombo}
                         onOpenChange={setOpenPrisonerCombo}
@@ -1009,7 +906,7 @@ export default function VisitationsScreen() {
 
                     {/* Relationship */}
                     <div className="space-y-2">
-                      <Label>Relationship *</Label>
+                      <Label>Relationship <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openRelationCombo}
                         onOpenChange={setOpenRelationCombo}
@@ -1063,7 +960,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Visitor Type */}
                     <div className="space-y-2">
-                      <Label>Visitor Type *</Label>
+                      <Label>Visitor Type <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openVisitorTypeCombo}
                         onOpenChange={setOpenVisitorTypeCombo}
@@ -1116,7 +1013,7 @@ export default function VisitationsScreen() {
 
                     {/* Visitor Status */}
                     <div className="space-y-2">
-                      <Label>Visitor Status *</Label>
+                      <Label>Visitor Status <span className="text-red-500">*</span></Label>
                       <Popover
                         open={openVisitorStatusCombo}
                         onOpenChange={setOpenVisitorStatusCombo}
@@ -1174,7 +1071,7 @@ export default function VisitationsScreen() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     {/* Visitation Date */}
                     <div className="space-y-2">
-                      <Label>Visitation Date *</Label>
+                      <Label>Visitation Date <span className="text-red-500">*</span></Label>
                       <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
                         <PopoverTrigger asChild>
                           <Button
@@ -1448,108 +1345,108 @@ export default function VisitationsScreen() {
                 </Button>
               </div>
             </form>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
 
       {/* Visitors Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Visitor Records
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Visitor Name</TableHead>
-                  <TableHead>ID Number</TableHead>
-                  <TableHead>Contact</TableHead>
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Visitor Type</TableHead>
-                  <TableHead>Gate</TableHead>
-                  <TableHead>Time In</TableHead>
-                  <TableHead>Time Out</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredVisitors.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={10}
-                      className="text-center py-8 text-muted-foreground"
-                    >
-                      No visitor records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredVisitors.map((visitor) => (
-                    <TableRow key={visitor.id}>
-                      <TableCell>
-                        <div>
-                          <p>
-                            {visitor.first_name} {visitor.middle_name}{" "}
-                            {visitor.last_name}
-                          </p>
-                          {visitor.organisation && (
-                            <p className="text-xs text-muted-foreground">
-                              {visitor.organisation}
-                            </p>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{visitor.id_number}</TableCell>
-                      <TableCell>{visitor.contact_no}</TableCell>
-                      <TableCell>{visitor.prisoner_name}</TableCell>
-                      <TableCell>{visitor.visitor_type_name}</TableCell>
-                      <TableCell>{visitor.gate_name}</TableCell>
-                      <TableCell>
-                        {visitor.time_in ? (
-                          <div className="flex items-center gap-1 text-green-600">
-                            <LogIn className="h-3 w-3" />
-                            {visitor.time_in}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {visitor.time_out ? (
-                          <div className="flex items-center gap-1 text-red-600">
-                            <LogOut className="h-3 w-3" />
-                            {visitor.time_out}
-                          </div>
-                        ) : (
-                          "-"
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {getStatusBadge(visitor.visitor_status_name)}
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(visitor)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+          <div>
+            {visitorRecordsLoading || tableLoading ? (
+              <div className="size-full flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground text-sm">Fetching visitor records, Please wait...</p>
+                </div>
+              </div>
+            ) : (
+              <DataTable
+                url="/gate-management/station-visitors/"
+                data={tableData}
+                loading={tableLoading}
+                total={total}
+                title="Visitor Records"
+                columns={[
+                  { key: 'full_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => (<div><p>{`${row.first_name ?? ''} ${row.middle_name ?? ''} ${row.last_name ?? ''}`.trim()}</p>{row.organisation && <p className="text-xs text-muted-foreground">{row.organisation}</p>}</div>) },
+                  { key: 'id_number', label: 'ID Number', sortable: true },
+                  { key: 'contact_no', label: 'Contact', sortable: true },
+                  { key: 'prisoner_name', label: 'Prisoner', sortable: true },
+                  { key: 'visitor_type_name', label: 'Visitor Type', sortable: true },
+                  { key: 'gate_name', label: 'Gate', sortable: true },
+                  { key: 'time_in', label: 'Time In', sortable: true, render: (_v: any, row: any) => row.time_in ? (<div className="flex items-center gap-1 text-green-600"><LogIn className="h-3 w-3" />{extractTimeHHMM(row.time_in)}</div>) : '-' },
+                  { key: 'time_out', label: 'Time Out', sortable: true, render: (_v: any, row: any) => row.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(row.time_out)}</div>) : '-' },
+                  { key: 'visitor_status_name', label: 'Status', sortable: true, render: (v: any) => getStatusBadge(v) },
+                  { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(row)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>)},
+                ]}
+                // externalSearch={searchQuery}
+                onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
+                onPageChange={(p: number) => setPage(p)}
+                onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
+                onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
+                page={page}
+                pageSize={pageSize}
+              />
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        {/* Visitor Items Tab */}
+        <TabsContent value="items" className="mt-6">
+          <VisitorItemList visitors={visitors} items={items} setItems={setItems} />
+        </TabsContent>
+      </Tabs>
+
+      {/* Visitor Pass Generation Dialog */}
+      <Dialog 
+        open={isVisitorPassDialogOpen} 
+        onOpenChange={(open) => {
+          setIsVisitorPassDialogOpen(open);
+          if (!open) {
+            setSelectedVisitorForPass(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>
+              Generate Visitor Pass
+            </DialogTitle>
+            <DialogDescription>
+              Create a visitor pass for {selectedVisitorForPass ? `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.last_name}` : 'selected visitor'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedVisitorForPass && (
+            <VisitorPassForm
+              pass={{
+                visitor_tag_number: '',
+                valid_from: '',
+                valid_until: '',
+                purpose: selectedVisitorForPass.reason_of_visitation || '',
+                issue_date: new Date().toISOString().slice(0, 16),
+                is_suspended: false,
+                suspended_date: '',
+                suspended_reason: '',
+                prisoner: selectedVisitorForPass.prisoner,
+                visitor: selectedVisitorForPass.id,
+                suspended_by: 0,
+                prisoner_name: selectedVisitorForPass.prisoner_name,
+                visitor_name: `${selectedVisitorForPass.first_name} ${selectedVisitorForPass.middle_name} ${selectedVisitorForPass.last_name}`.trim()
+              }}
+              onSubmit={handleVisitorPassSubmit}
+              onCancel={() => {
+                setIsVisitorPassDialogOpen(false);
+                setSelectedVisitorForPass(null);
+              }}
+              disabledFields={{
+                prisoner: true,
+                visitor: false
+              }}
+              onAddNewVisitor={() => {
+                setIsDialogOpen(true);
+                setEditingVisitor(null);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

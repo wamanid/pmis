@@ -39,21 +39,71 @@ interface VisitorPass {
 interface VisitorPassListProps {
   onEdit: (pass: VisitorPass) => void;
   onView: (pass: VisitorPass) => void;
-  passes?: VisitorPass[];
-  onDelete: (pass: VisitorPass) => void;
-  
 }
-let visitorList: VisitorPass[] = [];
 
-export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: VisitorPassListProps) {
+export default function VisitorPassList({ onEdit, onView }: VisitorPassListProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-    visitorList=passes || [];
-    
   // Mock data
-  const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(visitorList);
+  const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>([
+    {
+      id: '1',
+      prisoner_name: 'John Doe',
+      visitor_name: 'Jane Smith',
+      suspended_by_username: '',
+      visitor_tag_number: 'VT-2024-001',
+      valid_from: '2024-01-01T08:00:00Z',
+      valid_until: '2024-12-31T17:00:00Z',
+      purpose: 'Family visit',
+      issue_date: '2024-01-01T08:00:00Z',
+      is_suspended: false,
+      suspended_date: '',
+      suspended_reason: '',
+      is_valid: true,
+      prisoner: 'prisoner-uuid-1',
+      visitor: 'visitor-uuid-1',
+      suspended_by: 0
+    },
+    {
+      id: '2',
+      prisoner_name: 'Michael Brown',
+      visitor_name: 'Sarah Johnson',
+      suspended_by_username: 'admin_user',
+      visitor_tag_number: 'VT-2024-002',
+      valid_from: '2024-02-15T08:00:00Z',
+      valid_until: '2024-08-15T17:00:00Z',
+      purpose: 'Legal consultation',
+      issue_date: '2024-02-15T08:00:00Z',
+      is_suspended: true,
+      suspended_date: '2024-06-01T10:00:00Z',
+      suspended_reason: 'Security concerns',
+      is_valid: false,
+      prisoner: 'prisoner-uuid-2',
+      visitor: 'visitor-uuid-2',
+      suspended_by: 101
+    },
+    {
+      id: '3',
+      prisoner_name: 'Robert Wilson',
+      visitor_name: 'Emily Davis',
+      suspended_by_username: '',
+      visitor_tag_number: 'VT-2024-003',
+      valid_from: '2024-03-10T08:00:00Z',
+      valid_until: '2024-09-10T17:00:00Z',
+      purpose: 'Religious counseling',
+      issue_date: '2024-03-10T08:00:00Z',
+      is_suspended: false,
+      suspended_date: '',
+      suspended_reason: '',
+      is_valid: true,
+      prisoner: 'prisoner-uuid-3',
+      visitor: 'visitor-uuid-3',
+      suspended_by: 0
+    }
+  ]);
+
   // Filter data
   const filteredData = visitorPasses.filter(pass => 
     pass.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -69,12 +119,7 @@ export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: Visi
 
   const handleDelete = (id: string) => {
     if (confirm('Are you sure you want to delete this visitor pass?')) {
-
-      //hit the api here
-
-
-
-     setVisitorPasses(visitorPasses.filter(pass => pass.id !== id));
+      setVisitorPasses(visitorPasses.filter(pass => pass.id !== id));
       toast.success('Visitor pass deleted successfully');
     }
   };
@@ -155,6 +200,7 @@ export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: Visi
             <TableHeader>
               <TableRow>
                 <TableHead>Tag Number</TableHead>
+                <TableHead>Prisoner</TableHead>
                 <TableHead>Visitor</TableHead>
                 <TableHead>Valid From</TableHead>
                 <TableHead>Valid Until</TableHead>
@@ -174,6 +220,7 @@ export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: Visi
                 paginatedData.map((pass) => (
                   <TableRow key={pass.id}>
                     <TableCell>{pass.visitor_tag_number}</TableCell>
+                    <TableCell>{pass.prisoner_name}</TableCell>
                     <TableCell>{pass.visitor_name}</TableCell>
                     <TableCell>{formatDate(pass.valid_from)}</TableCell>
                     <TableCell>{formatDate(pass.valid_until)}</TableCell>
@@ -198,7 +245,7 @@ export default function VisitorPassList({ onEdit, onView ,passes,onDelete}: Visi
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => onDelete(pass)}
+                          onClick={() => handleDelete(pass.id)}
                         >
                           <Trash2 className="h-4 w-4 text-red-600" />
                         </Button>

@@ -9,13 +9,28 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Check, ChevronsUpDown, AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { Prisoner } from '../../models/gate/Prisoner';
-import { PrisonerRecord, Visitor ,VisitorPass} from '../../models/gate/Index';
+import {Pass} from "../../services/stationServices/visitorsServices/visitorPass";
 
-
+interface VisitorPass {
+  id?: string;
+  prisoner_name?: string;
+  visitor_name?: string;
+  suspended_by_username?: string;
+  visitor_tag_number: string;
+  valid_from: string;
+  valid_until: string;
+  purpose: string;
+  issue_date: string;
+  is_suspended: boolean;
+  suspended_date: string;
+  suspended_reason: string;
+  is_valid?: boolean;
+  prisoner: string;
+  visitor: string;
+  suspended_by: number;
+}
 
 interface VisitorPassFormProps {
- prisoners?: PrisonerRecord[] | null;
   pass?: VisitorPass | null;
   onSubmit: (data: VisitorPass) => void;
   onCancel: () => void;
@@ -24,17 +39,31 @@ interface VisitorPassFormProps {
     visitor?: boolean;
   };
   onAddNewVisitor?: () => void;
-  visitors?: Visitor[]| null
+  visitors?: Array<{ id: string; name: string; id_number: string }>;
 }
 
 // Mock data for dropdowns
-let mockPrisoners: PrisonerRecord[] = [];
+const mockPrisoners = [
+  { id: 'prisoner-uuid-1', name: 'John Doe', prisoner_number: 'P-2024-001' },
+  { id: 'prisoner-uuid-2', name: 'Michael Brown', prisoner_number: 'P-2024-002' },
+  { id: 'prisoner-uuid-3', name: 'Robert Wilson', prisoner_number: 'P-2024-003' },
+  { id: 'prisoner-uuid-4', name: 'David Martinez', prisoner_number: 'P-2024-004' },
+  { id: 'prisoner-uuid-5', name: 'James Anderson', prisoner_number: 'P-2024-005' }
+];
 
+const mockVisitors = [
+  { id: 'visitor-uuid-1', name: 'Jane Smith', id_number: 'ID-001' },
+  { id: 'visitor-uuid-2', name: 'Sarah Johnson', id_number: 'ID-002' },
+  { id: 'visitor-uuid-3', name: 'Emily Davis', id_number: 'ID-003' },
+  { id: 'visitor-uuid-4', name: 'Lisa Thompson', id_number: 'ID-004' },
+  { id: 'visitor-uuid-5', name: 'Maria Garcia', id_number: 'ID-005' }
+];
 
-export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, disabledFields,
-     onAddNewVisitor, visitors }: VisitorPassFormProps) {
-  const [formData, setFormData] = useState<VisitorPass>({
-   /* visitor_tag_number: '',
+export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFields, onAddNewVisitor, visitors }: VisitorPassFormProps) {
+  const [formData, setFormData] = useState<Pass>({
+    is_active: true,
+    is_valid: true,
+    visitor_tag_number: '',
     valid_from: '',
     valid_until: '',
     purpose: '',
@@ -44,28 +73,16 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
     suspended_reason: '',
     prisoner: '',
     visitor: '',
-    suspended_by: "0",
-    is_active: true,*/
-  id: '',
-  suspended_reason:'',
-  visitor_tag_number: '',
-  valid_from: '',
-  valid_until: '',
-  purpose: '',
-  issue_date: '',
-  is_suspended: false,
-  is_valid: true,
-  prisoner: '',
-  visitor: '',
-  is_active: true,
+    suspended_by: '',
+    deleted_by: null,
+    deleted_datetime: null
   });
 
-  mockPrisoners=prisoners || [];
   const [prisonerOpen, setPrisonerOpen] = useState(false);
   const [visitorOpen, setVisitorOpen] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const visitorList = visitors || [];
+  const visitorList = visitors || mockVisitors;
 
   useEffect(() => {
     if (pass) {
@@ -112,6 +129,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
       toast.error('Please fix the errors in the form');
       return;
     }
+
     onSubmit(formData);
   };
 
@@ -139,8 +157,8 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
               >
                 {selectedPrisoner
                   ? selectedPrisoner.prisoner_number 
-                    ? `${selectedPrisoner.full_name} (${selectedPrisoner.prisoner_number_value})`
-                    : selectedPrisoner.full_name
+                    ? `${selectedPrisoner.name} (${selectedPrisoner.prisoner_number})`
+                    : selectedPrisoner.name
                   : 'Select prisoner...'}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
@@ -154,7 +172,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                     {mockPrisoners.map((prisoner) => (
                       <CommandItem
                         key={prisoner.id}
-                        value={`${prisoner.full_name} ${prisoner.prisoner_number_value}`}
+                        value={`${prisoner.name} ${prisoner.prisoner_number}`}
                         onSelect={() => {
                           setFormData({ ...formData, prisoner: prisoner.id });
                           setPrisonerOpen(false);
@@ -166,8 +184,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                             formData.prisoner === prisoner.id ? 'opacity-100' : 'opacity-0'
                           }`}
                         />
-                    
-                        {prisoner.full_name} ({prisoner.prisoner_number_value})
+                        {prisoner.name} ({prisoner.prisoner_number})
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -200,8 +217,8 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                 >
                   {selectedVisitor
                     ? selectedVisitor.id_number 
-                      ? `${selectedVisitor.first_name}  (${selectedVisitor.id_number})`
-                      : selectedVisitor.first_name
+                      ? `${selectedVisitor.name} (${selectedVisitor.id_number})`
+                      : selectedVisitor.name
                     : 'Select visitor...'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -215,7 +232,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                       {visitorList.map((visitor) => (
                         <CommandItem
                           key={visitor.id}
-                          value={`${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}     ${visitor.id_number}`}
+                          value={`${visitor.name} ${visitor.id_number}`}
                           onSelect={() => {
                             setFormData({ ...formData, visitor: visitor.id });
                             setVisitorOpen(false);
@@ -227,7 +244,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                               formData.visitor === visitor.id ? 'opacity-100' : 'opacity-0'
                             }`}
                           />
-                          {visitor.first_name}  {visitor.middle_name}  {visitor.last_name} ({visitor.id_number})
+                          {visitor.name} ({visitor.id_number})
                         </CommandItem>
                       ))}
                     </CommandGroup>
@@ -236,8 +253,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
               </PopoverContent>
             </Popover>
             {onAddNewVisitor && (
-             
-             {/*<Button
+              <Button
                 type="button"
                 onClick={onAddNewVisitor}
                 className="shrink-0 h-10 w-10 p-0 flex items-center justify-center border border-[#650000] hover:opacity-80 transition-opacity"
@@ -250,8 +266,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                 title="Register New Visitor"
               >
                 <Plus className="h-6 w-6" style={{ color: 'white', strokeWidth: 2.5 }} />
-              </Button>*/ }
-
+              </Button>
             )}
           </div>
           {errors.visitor && (
@@ -416,6 +431,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
                     </p>
                   )}
                 </div>
+
                 <div className="space-y-2">
                   <Label>
                     Suspension Date <span className="text-red-500">*</span>
@@ -447,7 +463,7 @@ export default function VisitorPassForm({prisoners, pass, onSubmit, onCancel, di
         <Button type="button" variant="outline" onClick={onCancel}>
           Cancel
         </Button>
-        <Button type="submit" style={{ backgroundColor: '#650000' }} onSubmit={handleSubmit}>
+        <Button type="submit" style={{ backgroundColor: '#650000' }}>
           {pass ? 'Update Visitor Pass' : 'Create Visitor Pass'}
         </Button>
       </div>

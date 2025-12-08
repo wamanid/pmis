@@ -1,5 +1,7 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import axios from 'axios';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import axiosInstance from '../../services/axiosInstance';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
 import { 
   Search, 
   Download, 
@@ -41,6 +43,7 @@ const defaultConfig: DataTableConfig = {
 
 export function DataTable({ url, title, columns, config }: DataTableProps) {
   const mergedConfig = { ...defaultConfig, ...config };
+  const { region, district, station } = useFilters();
   
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -51,22 +54,34 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
 
   // Fetch data from URL
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await axios.get(url);
-        setData(Array.isArray(response.data) ? response.data : response.data.data || []);
-      } catch (err: any) {
-        setError(err.message || 'Failed to fetch data');
-      } finally {
-        setLoading(false);
+  const fetchData = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await axiosInstance.get(url);
+      // Handle different response formats:
+      // 1. Direct array: [...]
+      // 2. Paginated with results: { results: [...], count: N }
+      // 3. Object with data: { data: [...] }
+      const responseData = response.data;
+      if (Array.isArray(responseData)) {
+        setData(responseData);
+      } else if (responseData.results && Array.isArray(responseData.results)) {
+        setData(responseData.results);
+      } else if (responseData.data && Array.isArray(responseData.data)) {
+        setData(responseData.data);
+      } else {
+        setData([]);
       }
-    };
-
-    fetchData();
+    } catch (err: any) {
+      setError(err.message || 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
   }, [url]);
+
+  // Use filter refresh hook to reload data when filters change (including global filters)
+  useFilterRefresh(fetchData, [url, region, district, station]);
 
   // Filter data based on search term
   const filteredData = useMemo(() => {
@@ -271,7 +286,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
             {/* Search */}
             {mergedConfig.search && (
               <div className="relative">
-                <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
                   placeholder="Search..."
