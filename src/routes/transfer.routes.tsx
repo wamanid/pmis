@@ -6,15 +6,15 @@ import TransferRequestScreen from '../components/transfer/TransferRequestScreen'
 
 export const transferRoutes: RouteObject[] = [
   {
-    path: '/transfer-management/TransferScreen',
+    path: '/transfer/TransferScreen',
     element: <TransferScreen />,
   },
   {
-    path: '/transfer-management/TransferRequestScreen',
+    path: '/transfer/TransferRequestScreen',
     element: <TransferRequestScreen />,
   },
   {
-    path: '/transfer-management/TransferInOutBulk',
+    path: '/transfer/TransferInOutBulk',
     element: <TransferInOutBulkScreen />,
   },
 ];
