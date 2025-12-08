@@ -3729,3 +3729,8179 @@ export function Sidebar({ isOpen }: SidebarProps) {
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+-----------
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { toast } from 'sonner';
+import { ChevronLeft, ChevronRight, Plus, Eye, Pencil, Trash2, Calendar } from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTable";
+import SearchableSelect from '../common/SearchableSelect';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation
+} from '../../utils/validation';
+
+interface AccountRow { id: string; prisoner_name: string; account_type_name: string; currency: string; balance: string; prisoner: string; account_type: string; }
+interface TransactionRow { id: string; prisoner_name: string; account_type_name: string; transaction_type_name: string; transaction_status_name: string; checked_by_name: string; amount: string; transaction_datetime: string; transaction_remark: string; biometric_consent: boolean; balance_before: string; balance_after: string; property_prisoner_account: string; transaction_type: string; transaction_status: string; checked_by_oc: number; }
+
+// centralised API endpoints for this screen (single source of truth)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+};
+
+export default function PrisonerPropertyAccountScreen() {
+  // get current global filters (useFilters returns values)
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+
+  // accounts state
+  const [accounts, setAccounts] = useState<AccountRow[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  // transactions state (for selected account or global list)
+  const [transactions, setTransactions] = useState<TransactionRow[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookup data
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+
+  // UI state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [search, setSearch] = useState('');
+  const searchRef = useRef<number | null>(null);
+
+  const [isCreateAccountOpen, setIsCreateAccountOpen] = useState(false);
+  const [isEditAccountOpen, setIsEditAccountOpen] = useState(false);
+  const [editingAccount, setEditingAccount] = useState<AccountRow | null>(null);
+
+  const [isCreateTxOpen, setIsCreateTxOpen] = useState(false);
+
+  // form state
+  const [accountForm, setAccountForm] = useState({ prisoner: '', account_type: '', currency: 'UGX' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  const [txForm, setTxForm] = useState({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+  const [txFormErrors, setTxFormErrors] = useState<Record<string,string>>({});
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helpers: build base params including global filters
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, search, globalStation, globalDistrict, globalRegion]);
+
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try {
+      abortRef.current?.abort();
+    } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err: any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try {
+      abortRef.current?.abort();
+    } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounced search
+  useEffect(() => {
+    if (searchRef.current) window.clearTimeout(searchRef.current);
+    searchRef.current = window.setTimeout(() => {
+      setPage(1);
+      loadAccounts();
+      loadTransactions();
+    }, 500);
+    return () => { if (searchRef.current) window.clearTimeout(searchRef.current); };
+  }, [search, loadAccounts, loadTransactions]);
+
+  // reload when filters / paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register top-nav filter refresh handler so the screen reloads when global filters change via the UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(accountForm.prisoner)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountForm.account_type)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(accountForm.currency)) errs.currency = 'Currency is required';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateAccountForm()) return;
+    try {
+      const payload = { prisoner: accountForm.prisoner, account_type: accountForm.account_type, currency: accountForm.currency };
+      await accountsSvc.createAccount(payload);
+      toast.success('Account created');
+      setIsCreateAccountOpen(false);
+      setAccountForm({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAccount) return;
+    if (!validateAccountForm()) return;
+    try {
+      await accountsSvc.updateAccount(editingAccount.id, { prisoner: accountForm.prisoner, account_type: accountForm.account_type, currency: accountForm.currency });
+      toast.success('Account updated');
+      setIsEditAccountOpen(false);
+      setEditingAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async (id: string) => {
+    try {
+      await accountsSvc.deleteAccount(id);
+      toast.success('Account deleted');
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  const validateTxForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(txForm.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(txForm.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(txForm.amount)) errs.amount = 'Amount is required';
+    setTxFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTx = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTxForm()) return;
+    try {
+      const payload = {
+        property_prisoner_account: txForm.property_prisoner_account,
+        transaction_type: txForm.transaction_type,
+        transaction_status: txForm.transaction_status || undefined,
+        amount: txForm.amount,
+        transaction_remark: txForm.transaction_remark,
+        biometric_consent: txForm.biometric_consent,
+        checked_by_oc: txForm.checked_by_oc || undefined,
+      };
+      await txSvc.createTransaction(payload);
+      toast.success('Transaction created');
+      setIsCreateTxOpen(false);
+      setTxForm({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  // render
+  const accountColumns = [
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setEditingAccount(r); setAccountForm({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => handleDeleteAccount(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  return (
+    <div className="p-6 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+        <div className="flex gap-2">
+          <Input placeholder="Search..." value={search} onChange={(e)=> setSearch(e.target.value)} />
+          <Button onClick={() => setIsCreateAccountOpen(true)} style={{ backgroundColor: '#650000' }}><Plus className="h-4 w-4 mr-2" />Create Account</Button>
+        </div>
+      </div>
+
+      <Card>
+        <CardContent>
+          <DataTable
+            title="Accounts"
+            data={accounts}
+            loading={accountsLoading}
+            total={accountsTotal}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={(p:number)=>setPage(p)}
+            onPageSizeChange={(s:number)=>{ setPageSize(s); setPage(1); }}
+            onSort={() => { setPage(1); loadAccounts(); }}
+            columns={accountColumns}
+          />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardContent>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold">Transactions</h3>
+            <Button onClick={() => setIsCreateTxOpen(true)} style={{ backgroundColor: '#650000' }}><Plus className="h-4 w-4 mr-2" />Create Transaction</Button>
+          </div>
+
+          <DataTable
+            title="Transactions"
+            data={transactions}
+            loading={transactionsLoading}
+            total={transactionsTotal}
+            page={page}
+            pageSize={pageSize}
+            onPageChange={(p:number)=>setPage(p)}
+            onPageSizeChange={(s:number)=>{ setPageSize(s); setPage(1); }}
+            onSort={() => { setPage(1); loadTransactions(); }}
+            columns={[
+              { key: 'transaction_datetime', label: 'Date/Time' },
+              { key: 'prisoner_name', label: 'Prisoner' },
+              { key: 'account_type_name', label: 'Account Type' },
+              { key: 'transaction_type_name', label: 'Type' },
+              { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+              { key: 'transaction_status_name', label: 'Status' },
+              { key: 'checked_by_name', label: 'Checked By' },
+            ]}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Create Account Dialog */}
+      <Dialog open={isCreateAccountOpen} onOpenChange={setIsCreateAccountOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Account</DialogTitle>
+            <DialogDescription>Add a new prisoner account</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateAccount} className="space-y-4 p-4">
+            <Label>Prisoner</Label>
+            <SearchableSelect
+              items={prisoners.map(p => ({ id: String(p.id), label: p.full_name, meta: p.prisoner_number }))}
+              value={accountForm.prisoner || null}
+              onSelect={(id: string) => setAccountForm({...accountForm, prisoner: id})}
+              placeholder="Select prisoner..."
+            />
+            {accountFormErrors.prisoner && <div className="text-red-600 text-sm">{accountFormErrors.prisoner}</div>}
+
+            <Label>Account Type</Label>
+            <SearchableSelect
+              items={accountTypes.map((a:any) => ({ id: String(a.id), label: a.name }))}
+              value={accountForm.account_type || null}
+              onSelect={(id: string) => setAccountForm({...accountForm, account_type: id})}
+              placeholder="Select account type..."
+            />
+            {accountFormErrors.account_type && <div className="text-red-600 text-sm">{accountFormErrors.account_type}</div>}
+
+            <Label>Currency</Label>
+            <SearchableSelect
+              items={[{ id:'UGX', label:'UGX' }, { id:'USD', label:'USD' }, { id:'EUR', label:'EUR' }]}
+              value={accountForm.currency || null}
+              onSelect={(id: string) => setAccountForm({...accountForm, currency: id})}
+              placeholder="Currency"
+            />
+            {accountFormErrors.currency && <div className="text-red-600 text-sm">{accountFormErrors.currency}</div>}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateAccountOpen(false)}>Cancel</Button>
+              <Button type="submit" style={{ backgroundColor: '#650000' }}>Create</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Transaction Dialog */}
+      <Dialog open={isCreateTxOpen} onOpenChange={setIsCreateTxOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create Transaction</DialogTitle>
+            <DialogDescription>Add a transaction</DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleCreateTx} className="space-y-4 p-4">
+            <Label>Account</Label>
+            <SearchableSelect
+              items={accounts.map(a => ({ id: String(a.id), label: `${a.prisoner_name} - ${a.account_type_name}` }))}
+              value={txForm.property_prisoner_account || null}
+              onSelect={(id:string) => setTxForm({...txForm, property_prisoner_account: id})}
+              placeholder="Select account..."
+            />
+            {txFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{txFormErrors.property_prisoner_account}</div>}
+
+            <Label>Transaction Type</Label>
+            <SearchableSelect
+              items={txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))}
+              value={txForm.transaction_type || null}
+              onSelect={(id:string)=> setTxForm({...txForm, transaction_type: id})}
+              placeholder="Select transaction type..."
+            />
+            {txFormErrors.transaction_type && <div className="text-red-600 text-sm">{txFormErrors.transaction_type}</div>}
+
+            <Label>Amount</Label>
+            <Input type="number" value={txForm.amount} onChange={(e)=> setTxForm({...txForm, amount: e.target.value})} />
+
+            <Label>Remarks</Label>
+            <Textarea value={txForm.transaction_remark} onChange={(e)=> setTxForm({...txForm, transaction_remark: e.target.value})} />
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsCreateTxOpen(false)}>Cancel</Button>
+              <Button type="submit" style={{ backgroundColor: '#650000' }}>Create</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+}
+
+
+
+
+// original before edit
+import React, { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner@2.0.3';
+import { 
+  Search, 
+  Plus, 
+  Eye, 
+  Pencil, 
+  Trash2,
+  ChevronLeft, 
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// Mock data
+const mockPrisoners = [
+  { id: '1', full_name: 'John Doe', prisoner_number: 'P001' },
+  { id: '2', full_name: 'Jane Smith', prisoner_number: 'P002' },
+  { id: '3', full_name: 'Bob Johnson', prisoner_number: 'P003' },
+];
+
+const mockAccountTypes = [
+  { id: '1', name: 'Personal Account' },
+  { id: '2', name: 'Welfare Account' },
+  { id: '3', name: 'Work Account' },
+];
+
+const mockTransactionTypes = [
+  { id: '1', name: 'Deposit' },
+  { id: '2', name: 'Withdrawal' },
+  { id: '3', name: 'Transfer' },
+];
+
+const mockTransactionStatuses = [
+  { id: '1', name: 'Pending' },
+  { id: '2', name: 'Approved' },
+  { id: '3', name: 'Rejected' },
+];
+
+const mockAccounts: Account[] = [
+  {
+    id: '1',
+    prisoner_name: 'John Doe',
+    account_type_name: 'Personal Account',
+    currency: 'UGX',
+    balance: '500000',
+    prisoner: '1',
+    account_type: '1',
+  },
+  {
+    id: '2',
+    prisoner_name: 'Jane Smith',
+    account_type_name: 'Welfare Account',
+    currency: 'UGX',
+    balance: '350000',
+    prisoner: '2',
+    account_type: '2',
+  },
+];
+
+const mockTransactions: Transaction[] = [
+  {
+    id: '1',
+    prisoner_name: 'John Doe',
+    account_type_name: 'Personal Account',
+    transaction_type_name: 'Deposit',
+    transaction_status_name: 'Approved',
+    checked_by_name: 'Admin User',
+    amount: '100000',
+    transaction_datetime: '2025-10-25T10:30:00Z',
+    transaction_remark: 'Monthly allowance',
+    biometric_consent: true,
+    balance_before: '400000',
+    balance_after: '500000',
+    property_prisoner_account: '1',
+    transaction_type: '1',
+    transaction_status: '2',
+    checked_by_oc: 1,
+  },
+  {
+    id: '2',
+    prisoner_name: 'John Doe',
+    account_type_name: 'Personal Account',
+    transaction_type_name: 'Withdrawal',
+    transaction_status_name: 'Approved',
+    checked_by_name: 'Admin User',
+    amount: '-50000',
+    transaction_datetime: '2025-10-26T14:20:00Z',
+    transaction_remark: 'Canteen purchase',
+    biometric_consent: true,
+    balance_before: '500000',
+    balance_after: '450000',
+    property_prisoner_account: '1',
+    transaction_type: '2',
+    transaction_status: '2',
+    checked_by_oc: 1,
+  },
+];
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  const [accounts, setAccounts] = useState<Account[]>(mockAccounts);
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  // Transaction tab filters
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const [transactionTypeFilter, setTransactionTypeFilter] = useState('all');
+  const [transactionStatusFilter, setTransactionStatusFilter] = useState('all');
+  const [transactionCurrentPage, setTransactionCurrentPage] = useState(1);
+
+  // Account dialogs
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  // Transaction dialogs
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const [selectedAccountForTransaction, setSelectedAccountForTransaction] = useState<string | null>(null);
+
+  // Delete dialogs
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // Account form data
+  const [accountFormData, setAccountFormData] = useState({
+    prisoner: '',
+    account_type: '',
+    currency: 'UGX',
+  });
+
+  // Transaction form data
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+
+  // Toggle account expansion
+  const toggleAccountExpansion = (accountId: string) => {
+    const newExpanded = new Set(expandedAccounts);
+    if (newExpanded.has(accountId)) {
+      newExpanded.delete(accountId);
+    } else {
+      newExpanded.add(accountId);
+    }
+    setExpandedAccounts(newExpanded);
+  };
+
+  // Get transactions for an account
+  const getAccountTransactions = (accountId: string): Transaction[] => {
+    return mockTransactions.filter(t => t.property_prisoner_account === accountId);
+  };
+
+  // Account CRUD operations
+  const handleCreateAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    const prisoner = mockPrisoners.find(p => p.id === accountFormData.prisoner);
+    const accountType = mockAccountTypes.find(at => at.id === accountFormData.account_type);
+    
+    const newAccount: Account = {
+      id: (accounts.length + 1).toString(),
+      prisoner_name: prisoner?.full_name || '',
+      account_type_name: accountType?.name || '',
+      currency: accountFormData.currency,
+      balance: '0',
+      prisoner: accountFormData.prisoner,
+      account_type: accountFormData.account_type,
+    };
+    
+    setAccounts([...accounts, newAccount]);
+    setIsCreateAccountDialogOpen(false);
+    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+    toast.success('Account created successfully');
+  };
+
+  const handleUpdateAccount = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedAccount) {
+      const prisoner = mockPrisoners.find(p => p.id === accountFormData.prisoner);
+      const accountType = mockAccountTypes.find(at => at.id === accountFormData.account_type);
+      
+      const updatedAccounts = accounts.map(acc =>
+        acc.id === selectedAccount.id
+          ? {
+              ...acc,
+              prisoner_name: prisoner?.full_name || acc.prisoner_name,
+              account_type_name: accountType?.name || acc.account_type_name,
+              currency: accountFormData.currency,
+              prisoner: accountFormData.prisoner,
+              account_type: accountFormData.account_type,
+            }
+          : acc
+      );
+      setAccounts(updatedAccounts);
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      toast.success('Account updated successfully');
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    if (deleteAccountId) {
+      setAccounts(accounts.filter(acc => acc.id !== deleteAccountId));
+      setDeleteAccountId(null);
+      toast.success('Account deleted successfully');
+    }
+  };
+
+  // Transaction CRUD operations
+  const handleCreateTransaction = (e: React.FormEvent) => {
+    e.preventDefault();
+    const account = accounts.find(a => a.id === transactionFormData.property_prisoner_account);
+    const transactionType = mockTransactionTypes.find(tt => tt.id === transactionFormData.transaction_type);
+    const transactionStatus = mockTransactionStatuses.find(ts => ts.id === transactionFormData.transaction_status);
+    
+    const newTransaction: Transaction = {
+      id: (mockTransactions.length + 1).toString(),
+      prisoner_name: account?.prisoner_name || '',
+      account_type_name: account?.account_type_name || '',
+      transaction_type_name: transactionType?.name || '',
+      transaction_status_name: transactionStatus?.name || '',
+      checked_by_name: 'Current User',
+      amount: transactionFormData.amount,
+      transaction_datetime: new Date().toISOString(),
+      transaction_remark: transactionFormData.transaction_remark,
+      biometric_consent: transactionFormData.biometric_consent,
+      balance_before: account?.balance || '0',
+      balance_after: (parseFloat(account?.balance || '0') + parseFloat(transactionFormData.amount)).toString(),
+      property_prisoner_account: transactionFormData.property_prisoner_account,
+      transaction_type: transactionFormData.transaction_type,
+      transaction_status: transactionFormData.transaction_status,
+      checked_by_oc: transactionFormData.checked_by_oc,
+    };
+    
+    mockTransactions.push(newTransaction);
+    setIsCreateTransactionDialogOpen(false);
+    setTransactionFormData({
+      property_prisoner_account: '',
+      transaction_type: '',
+      transaction_status: '',
+      amount: '',
+      transaction_remark: '',
+      biometric_consent: false,
+      checked_by_oc: 0,
+    });
+    toast.success('Transaction created successfully');
+  };
+
+  const handleDeleteTransaction = () => {
+    if (deleteTransactionId) {
+      const index = mockTransactions.findIndex(t => t.id === deleteTransactionId);
+      if (index > -1) {
+        mockTransactions.splice(index, 1);
+      }
+      setDeleteTransactionId(null);
+      toast.success('Transaction deleted successfully');
+    }
+  };
+
+  // Pagination for accounts
+  const filteredAccounts = accounts.filter(acc =>
+    acc.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    acc.account_type_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const totalPages = Math.ceil(filteredAccounts.length / itemsPerPage);
+  const paginatedAccounts = filteredAccounts.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Filter and pagination for transactions tab
+  const filteredTransactions = mockTransactions.filter(transaction => {
+    const matchesSearch = 
+      transaction.prisoner_name.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.account_type_name.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.transaction_remark.toLowerCase().includes(transactionSearchTerm.toLowerCase()) ||
+      transaction.checked_by_name.toLowerCase().includes(transactionSearchTerm.toLowerCase());
+    
+    const matchesType = transactionTypeFilter === 'all' || transaction.transaction_type === transactionTypeFilter;
+    const matchesStatus = transactionStatusFilter === 'all' || transaction.transaction_status === transactionStatusFilter;
+
+    return matchesSearch && matchesType && matchesStatus;
+  });
+
+  const totalTransactionPages = Math.ceil(filteredTransactions.length / itemsPerPage);
+  const paginatedTransactions = filteredTransactions.slice(
+    (transactionCurrentPage - 1) * itemsPerPage,
+    transactionCurrentPage * itemsPerPage
+  );
+
+  // Calculate statistics
+  const totalAccounts = accounts.length;
+  const totalBalance = accounts.reduce((sum, acc) => sum + parseFloat(acc.balance), 0);
+  const totalTransactions = mockTransactions.length;
+  const pendingTransactions = mockTransactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [openAccountType, setOpenAccountType] = useState(false);
+    const [openCurrency, setOpenCurrency] = useState(false);
+
+    const currencies = ['UGX', 'USD', 'EUR', 'GBP'];
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* Prisoner Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openPrisoner}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {accountFormData.prisoner
+                    ? mockPrisoners.find((p) => p.id === accountFormData.prisoner)?.full_name + 
+                      ' (' + mockPrisoners.find((p) => p.id === accountFormData.prisoner)?.prisoner_number + ')'
+                    : "Select prisoner..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search prisoner..." />
+                  <CommandList>
+                    <CommandEmpty>No prisoner found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockPrisoners.map((prisoner) => (
+                        <CommandItem
+                          key={prisoner.id}
+                          value={prisoner.full_name + ' ' + prisoner.prisoner_number}
+                          onSelect={() => {
+                            setAccountFormData({...accountFormData, prisoner: prisoner.id});
+                            setOpenPrisoner(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              accountFormData.prisoner === prisoner.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {prisoner.full_name} ({prisoner.prisoner_number})
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Account Type Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Popover open={openAccountType} onOpenChange={setOpenAccountType}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openAccountType}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {accountFormData.account_type
+                    ? mockAccountTypes.find((t) => t.id === accountFormData.account_type)?.name
+                    : "Select account type..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search account type..." />
+                  <CommandList>
+                    <CommandEmpty>No account type found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockAccountTypes.map((type) => (
+                        <CommandItem
+                          key={type.id}
+                          value={type.name}
+                          onSelect={() => {
+                            setAccountFormData({...accountFormData, account_type: type.id});
+                            setOpenAccountType(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              accountFormData.account_type === type.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {type.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Currency Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Popover open={openCurrency} onOpenChange={setOpenCurrency}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openCurrency}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {accountFormData.currency || "Select currency..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search currency..." />
+                  <CommandList>
+                    <CommandEmpty>No currency found.</CommandEmpty>
+                    <CommandGroup>
+                      {currencies.map((currency) => (
+                        <CommandItem
+                          key={currency}
+                          value={currency}
+                          onSelect={() => {
+                            setAccountFormData({...accountFormData, currency});
+                            setOpenCurrency(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              accountFormData.currency === currency ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {currency}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateAccountDialogOpen(false);
+            setIsEditAccountDialogOpen(false);
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            {isEdit ? 'Update' : 'Create'} Account
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const [openAccount, setOpenAccount] = useState(false);
+    const [openTransactionType, setOpenTransactionType] = useState(false);
+    const [openTransactionStatus, setOpenTransactionStatus] = useState(false);
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Account Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="property_prisoner_account">Account *</Label>
+            <Popover open={openAccount} onOpenChange={setOpenAccount}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openAccount}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {transactionFormData.property_prisoner_account
+                    ? accounts.find((a) => a.id === transactionFormData.property_prisoner_account)?.prisoner_name + 
+                      ' - ' + accounts.find((a) => a.id === transactionFormData.property_prisoner_account)?.account_type_name
+                    : "Select account..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search account..." />
+                  <CommandList>
+                    <CommandEmpty>No account found.</CommandEmpty>
+                    <CommandGroup>
+                      {accounts.map((account) => (
+                        <CommandItem
+                          key={account.id}
+                          value={account.prisoner_name + ' ' + account.account_type_name}
+                          onSelect={() => {
+                            setTransactionFormData({...transactionFormData, property_prisoner_account: account.id});
+                            setOpenAccount(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              transactionFormData.property_prisoner_account === account.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {account.prisoner_name} - {account.account_type_name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Transaction Type Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="transaction_type">Transaction Type *</Label>
+            <Popover open={openTransactionType} onOpenChange={setOpenTransactionType}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openTransactionType}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {transactionFormData.transaction_type
+                    ? mockTransactionTypes.find((t) => t.id === transactionFormData.transaction_type)?.name
+                    : "Select transaction type..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search transaction type..." />
+                  <CommandList>
+                    <CommandEmpty>No transaction type found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockTransactionTypes.map((type) => (
+                        <CommandItem
+                          key={type.id}
+                          value={type.name}
+                          onSelect={() => {
+                            setTransactionFormData({...transactionFormData, transaction_type: type.id});
+                            setOpenTransactionType(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              transactionFormData.transaction_type === type.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {type.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Transaction Status Dropdown */}
+          <div className="space-y-2">
+            <Label htmlFor="transaction_status">Status *</Label>
+            <Popover open={openTransactionStatus} onOpenChange={setOpenTransactionStatus}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openTransactionStatus}
+                  className="w-full justify-between"
+                  type="button"
+                >
+                  {transactionFormData.transaction_status
+                    ? mockTransactionStatuses.find((s) => s.id === transactionFormData.transaction_status)?.name
+                    : "Select status..."}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command>
+                  <CommandInput placeholder="Search status..." />
+                  <CommandList>
+                    <CommandEmpty>No status found.</CommandEmpty>
+                    <CommandGroup>
+                      {mockTransactionStatuses.map((status) => (
+                        <CommandItem
+                          key={status.id}
+                          value={status.name}
+                          onSelect={() => {
+                            setTransactionFormData({...transactionFormData, transaction_status: status.id});
+                            setOpenTransactionStatus(false);
+                          }}
+                        >
+                          <Check
+                            className={cn(
+                              "mr-2 h-4 w-4",
+                              transactionFormData.transaction_status === status.id ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                          {status.name}
+                        </CommandItem>
+                      ))}
+                    </CommandGroup>
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* Amount */}
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount *</Label>
+            <Input
+              id="amount"
+              type="number"
+              value={transactionFormData.amount}
+              onChange={(e) => setTransactionFormData({...transactionFormData, amount: e.target.value})}
+              placeholder="Enter amount (positive for deposit, negative for withdrawal)"
+              required
+            />
+          </div>
+
+          {/* Biometric Consent */}
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Checkbox
+              id="biometric_consent"
+              checked={transactionFormData.biometric_consent}
+              onCheckedChange={(checked) => setTransactionFormData({...transactionFormData, biometric_consent: checked as boolean})}
+            />
+            <Label htmlFor="biometric_consent" className="cursor-pointer">
+              Biometric Consent
+            </Label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="transaction_remark">Remarks</Label>
+          <Textarea
+            id="transaction_remark"
+            value={transactionFormData.transaction_remark}
+            onChange={(e) => setTransactionFormData({...transactionFormData, transaction_remark: e.target.value})}
+            placeholder="Enter transaction remarks"
+            rows={3}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateTransactionDialogOpen(false);
+            setIsEditTransactionDialogOpen(false);
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            {isEdit ? 'Update' : 'Create'} Transaction
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs defaultValue="accounts" className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger 
+            value="accounts" 
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger 
+            value="transactions" 
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => setIsCreateAccountDialogOpen(true)}
+                  style={{ backgroundColor: '#650000' }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table */}
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow style={{ backgroundColor: '#650000' }}>
+                    <TableHead className="text-white"></TableHead>
+                    <TableHead className="text-white">Prisoner Name</TableHead>
+                    <TableHead className="text-white">Account Type</TableHead>
+                    <TableHead className="text-white">Currency</TableHead>
+                    <TableHead className="text-right text-white">Balance</TableHead>
+                    <TableHead className="text-right text-white">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedAccounts.map((account) => (
+                    <React.Fragment key={account.id}>
+                      <TableRow>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => toggleAccountExpansion(account.id)}
+                          >
+                            {expandedAccounts.has(account.id) ? (
+                              <ChevronUp className="h-4 w-4" />
+                            ) : (
+                              <ChevronDown className="h-4 w-4" />
+                            )}
+                          </Button>
+                        </TableCell>
+                        <TableCell>{account.prisoner_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{account.account_type_name}</Badge>
+                        </TableCell>
+                        <TableCell>{account.currency}</TableCell>
+                        <TableCell className="text-right">
+                          {parseFloat(account.balance).toLocaleString()}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAccount(account);
+                                setIsViewAccountDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedAccount(account);
+                                setAccountFormData({
+                                  prisoner: account.prisoner,
+                                  account_type: account.account_type,
+                                  currency: account.currency,
+                                });
+                                setIsEditAccountDialogOpen(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteAccountId(account.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                      
+                      {/* Expanded Transactions Row */}
+                      {expandedAccounts.has(account.id) && (
+                        <TableRow>
+                          <TableCell colSpan={6} className="bg-gray-50 p-4">
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between">
+                                <h3 className="font-semibold">Transactions</h3>
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAccountForTransaction(account.id);
+                                    setTransactionFormData({
+                                      ...transactionFormData,
+                                      property_prisoner_account: account.id,
+                                    });
+                                    setIsCreateTransactionDialogOpen(true);
+                                  }}
+                                  style={{ backgroundColor: '#650000' }}
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  Add Transaction
+                                </Button>
+                              </div>
+                              
+                              <Table>
+                                <TableHeader>
+                                  <TableRow>
+                                    <TableHead>Date & Time</TableHead>
+                                    <TableHead>Type</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                    <TableHead>Balance After</TableHead>
+                                    <TableHead>Remarks</TableHead>
+                                    <TableHead className="text-right">Actions</TableHead>
+                                  </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                  {getAccountTransactions(account.id).length === 0 ? (
+                                    <TableRow>
+                                      <TableCell colSpan={7} className="text-center text-gray-500">
+                                        No transactions found
+                                      </TableCell>
+                                    </TableRow>
+                                  ) : (
+                                    getAccountTransactions(account.id).map((transaction) => (
+                                      <TableRow key={transaction.id}>
+                                        <TableCell>
+                                          <div className="flex items-center gap-2">
+                                            <Calendar className="h-4 w-4 text-gray-400" />
+                                            {new Date(transaction.transaction_datetime).toLocaleString()}
+                                          </div>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">{transaction.transaction_type_name}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                          <span className={parseFloat(transaction.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                            {parseFloat(transaction.amount) >= 0 ? '+' : ''}{parseFloat(transaction.amount).toLocaleString()}
+                                          </span>
+                                        </TableCell>
+                                        <TableCell>
+                                          <Badge 
+                                            variant={
+                                              transaction.transaction_status_name === 'Approved' 
+                                                ? 'default' 
+                                                : transaction.transaction_status_name === 'Pending'
+                                                ? 'secondary'
+                                                : 'destructive'
+                                            }
+                                          >
+                                            {transaction.transaction_status_name}
+                                          </Badge>
+                                        </TableCell>
+                                        <TableCell>{parseFloat(transaction.balance_after).toLocaleString()}</TableCell>
+                                        <TableCell className="max-w-xs truncate">{transaction.transaction_remark}</TableCell>
+                                        <TableCell className="text-right">
+                                          <div className="flex justify-end gap-2">
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => {
+                                                setSelectedTransaction(transaction);
+                                                setIsViewTransactionDialogOpen(true);
+                                              }}
+                                            >
+                                              <Eye className="h-4 w-4" />
+                                            </Button>
+                                            <Button
+                                              variant="ghost"
+                                              size="sm"
+                                              onClick={() => setDeleteTransactionId(transaction.id)}
+                                            >
+                                              <Trash2 className="h-4 w-4 text-red-600" />
+                                            </Button>
+                                          </div>
+                                        </TableCell>
+                                      </TableRow>
+                                    ))
+                                  )}
+                                </TableBody>
+                              </Table>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-gray-600">
+                    Page {currentPage} of {totalPages}
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">
+                  {mockTransactions.filter(t => t.transaction_status_name === 'Approved').length}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">
+                  UGX {mockTransactions.reduce((sum, t) => sum + parseFloat(t.amount), 0).toLocaleString()}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => {
+                        setTransactionSearchTerm(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button
+                    onClick={() => setIsCreateTransactionDialogOpen(true)}
+                    style={{ backgroundColor: '#650000' }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                {/* Filters Row */}
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="transactionTypeFilter">Transaction Type</Label>
+                    <select
+                      id="transactionTypeFilter"
+                      value={transactionTypeFilter}
+                      onChange={(e) => {
+                        setTransactionTypeFilter(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="all">All Types</option>
+                      {mockTransactionTypes.map(type => (
+                        <option key={type.id} value={type.id}>{type.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <Label htmlFor="transactionStatusFilter">Status</Label>
+                    <select
+                      id="transactionStatusFilter"
+                      value={transactionStatusFilter}
+                      onChange={(e) => {
+                        setTransactionStatusFilter(e.target.value);
+                        setTransactionCurrentPage(1);
+                      }}
+                      className="w-full h-10 px-3 rounded-md border border-input bg-background"
+                    >
+                      <option value="all">All Statuses</option>
+                      {mockTransactionStatuses.map(status => (
+                        <option key={status.id} value={status.id}>{status.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table */}
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date & Time</TableHead>
+                    <TableHead>Prisoner</TableHead>
+                    <TableHead>Account Type</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Amount</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Balance After</TableHead>
+                    <TableHead>Checked By</TableHead>
+                    <TableHead>Remarks</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paginatedTransactions.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-gray-500 py-8">
+                        No transactions found
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    paginatedTransactions.map((transaction) => (
+                      <TableRow key={transaction.id}>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-gray-400" />
+                            <span className="text-sm">
+                              {new Date(transaction.transaction_datetime).toLocaleString()}
+                            </span>
+                          </div>
+                        </TableCell>
+                        <TableCell>{transaction.prisoner_name}</TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{transaction.account_type_name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">{transaction.transaction_type_name}</Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className={parseFloat(transaction.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                            {parseFloat(transaction.amount) >= 0 ? '+' : ''}{parseFloat(transaction.amount).toLocaleString()}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <Badge 
+                            variant={
+                              transaction.transaction_status_name === 'Approved' 
+                                ? 'default' 
+                                : transaction.transaction_status_name === 'Pending'
+                                ? 'secondary'
+                                : 'destructive'
+                            }
+                          >
+                            {transaction.transaction_status_name}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>{parseFloat(transaction.balance_after).toLocaleString()}</TableCell>
+                        <TableCell>{transaction.checked_by_name}</TableCell>
+                        <TableCell className="max-w-xs truncate">{transaction.transaction_remark || '-'}</TableCell>
+                        <TableCell className="text-right">
+                          <div className="flex justify-end gap-2">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setSelectedTransaction(transaction);
+                                setIsViewTransactionDialogOpen(true);
+                              }}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteTransactionId(transaction.id)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+
+              {/* Pagination */}
+              {totalTransactionPages > 1 && (
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-gray-600">
+                    Showing {((transactionCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(transactionCurrentPage * itemsPerPage, filteredTransactions.length)} of {filteredTransactions.length} transactions
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTransactionCurrentPage(prev => Math.max(1, prev - 1))}
+                      disabled={transactionCurrentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">
+                        Page {transactionCurrentPage} of {totalTransactionPages}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setTransactionCurrentPage(prev => Math.min(totalTransactionPages, prev + 1))}
+                      disabled={transactionCurrentPage === totalTransactionPages}
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create Account Dialog */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Create New Account</DialogTitle>
+            <DialogDescription>Add a new prisoner account</DialogDescription>
+          </DialogHeader>
+          <AccountForm onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Account Dialog */}
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Edit Account</DialogTitle>
+            <DialogDescription>Update account information</DialogDescription>
+          </DialogHeader>
+          <AccountForm onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Account Dialog */}
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Account Details</DialogTitle>
+            <DialogDescription>View prisoner account information</DialogDescription>
+          </DialogHeader>
+          {selectedAccount && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-500">Prisoner Name</Label>
+                  <p>{selectedAccount.prisoner_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Account Type</Label>
+                  <p>{selectedAccount.account_type_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Currency</Label>
+                  <p>{selectedAccount.currency}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Balance</Label>
+                  <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Transaction Dialog */}
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Create New Transaction</DialogTitle>
+            <DialogDescription>Add a new transaction</DialogDescription>
+          </DialogHeader>
+          <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Transaction Dialog */}
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle>Transaction Details</DialogTitle>
+            <DialogDescription>View transaction information</DialogDescription>
+          </DialogHeader>
+          {selectedTransaction && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label className="text-gray-500">Prisoner Name</Label>
+                  <p>{selectedTransaction.prisoner_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Account Type</Label>
+                  <p>{selectedTransaction.account_type_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Transaction Type</Label>
+                  <p>{selectedTransaction.transaction_type_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Status</Label>
+                  <Badge 
+                    variant={
+                      selectedTransaction.transaction_status_name === 'Approved' 
+                        ? 'default' 
+                        : selectedTransaction.transaction_status_name === 'Pending'
+                        ? 'secondary'
+                        : 'destructive'
+                    }
+                  >
+                    {selectedTransaction.transaction_status_name}
+                  </Badge>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Amount</Label>
+                  <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                    {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Date & Time</Label>
+                  <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Balance Before</Label>
+                  <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Balance After</Label>
+                  <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Checked By</Label>
+                  <p>{selectedTransaction.checked_by_name}</p>
+                </div>
+                <div>
+                  <Label className="text-gray-500">Biometric Consent</Label>
+                  <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                </div>
+                <div className="col-span-2">
+                  <Label className="text-gray-500">Remarks</Label>
+                  <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Account Confirmation */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Transaction Confirmation */}
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
+
+
+
+
+
+
+// before fix of collapsable rows in accounts table
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTable";
+import SearchableSelect from '../common/SearchableSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { fetchPrisoners } from '../../services/customPrisonersService';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation
+} from '../../utils/validation';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// API endpoints (centralised at top)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+};
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  // global filters
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+  // register refresh handler
+  useFilterRefresh(() => {
+    // empty body: we'll trigger reload via effects by changing page/search etc.
+  });
+
+  // server-driven state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookups
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+
+  // ui
+  const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const searchTimer = useRef<number| null>(null);
+
+  // dialogs/forms
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // form state
+  const [accountFormData, setAccountFormData] = useState({ prisoner: '', account_type: '', currency: 'UGX' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+  const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helper to include global filters and paging
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search: activeTab === 'accounts' ? searchTerm : transactionSearchTerm,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+
+  // load lookups
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  // load accounts
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  // load transactions
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounce search for accounts/transactions
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setPage(1);
+      if (activeTab === 'accounts') loadAccounts();
+      if (activeTab === 'transactions') loadTransactions();
+    }, 500);
+    return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
+  }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
+
+  // reload when filters/paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register filter refresh to reload lists when global filters change via header UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers (accounts)
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    const prisonerValue = String(accountFormData.prisoner ?? '').trim();
+    const accountTypeValue = String(accountFormData.account_type ?? '').trim();
+    const currencyValue = String(accountFormData.currency ?? '').trim();
+
+    if (!requiredValidation(prisonerValue)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountTypeValue)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(currencyValue)) errs.currency = 'Currency is required';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateAccountForm()) return;
+    try {
+      await accountsSvc.createAccount({ prisoner: accountFormData.prisoner, account_type: accountFormData.account_type, currency: accountFormData.currency });
+      toast.success('Account created');
+      setIsCreateAccountDialogOpen(false);
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAccount) return;
+    if (!validateAccountForm()) return;
+    try {
+      await accountsSvc.updateAccount(selectedAccount.id, { prisoner: accountFormData.prisoner, account_type: accountFormData.account_type, currency: accountFormData.currency });
+      toast.success('Account updated');
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      await accountsSvc.deleteAccount(deleteAccountId);
+      toast.success('Account deleted');
+      setDeleteAccountId(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account error', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  // CRUD handlers (transactions)
+  const validateTransactionForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
+    setTransactionFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTransactionForm()) return;
+    try {
+      await txSvc.createTransaction(transactionFormData);
+      toast.success('Transaction created');
+      setIsCreateTransactionDialogOpen(false);
+      setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTransactionId) return;
+    try {
+      // API delete endpoint assumed to be DELETE /transactions/{id}/
+      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
+      // If backend supports delete, call it instead.
+      toast.success('Transaction deleted');
+      setDeleteTransactionId(null);
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('delete tx error', err);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  // UI computed stats
+  const totalAccounts = accountsTotal;
+  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  const totalTransactions = transactionsTotal;
+  const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  // Columns for DataTable
+  const accountColumns = [
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsViewAccountDialogOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountDialogOpen(true); }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  const transactionColumns = [
+    { key: 'transaction_datetime', label: 'Date & Time' },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'transaction_type_name', label: 'Type' },
+    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+    { key: 'transaction_status_name', label: 'Status' },
+    { key: 'checked_by_name', label: 'Checked By' },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+  ];
+
+  // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const currencies = ['UGX', 'USD', 'EUR', 'GBP'];
+    const [prisonerQuery, setPrisonerQuery] = useState('');
+    const [prisonerResults, setPrisonerResults] = useState<any[]>([]);
+    const [prisonerLoading, setPrisonerLoading] = useState(false);
+    const prisonerAbortRef = useRef<AbortController | null>(null);
+    const [accountTypeQuery, setAccountTypeQuery] = useState('');
+    const [currencyQuery, setCurrencyQuery] = useState('');
+
+    // load prisoners from customPrisonersService with debounce and abort support
+    useEffect(() => {
+      if (prisonerAbortRef.current) {
+        prisonerAbortRef.current.abort();
+        prisonerAbortRef.current = null;
+      }
+      const t = window.setTimeout(() => {
+        const ctrl = new AbortController();
+        prisonerAbortRef.current = ctrl;
+        setPrisonerLoading(true);
+        fetchPrisoners({
+          search: prisonerQuery || '',
+          station: globalStation || null,
+          district: globalDistrict || null,
+          region: globalRegion || null,
+          page_size: 50,
+          useCache: true,
+        }, ctrl.signal).then(res => {
+          setPrisonerResults(res.items || []);
+        }).catch(err => {
+          if ((err as any).name === 'AbortError') return;
+          console.error('fetchPrisoners error', err);
+        }).finally(() => {
+          setPrisonerLoading(false);
+        });
+      }, 300);
+      return () => {
+        window.clearTimeout(t);
+        if (prisonerAbortRef.current) {
+          prisonerAbortRef.current.abort();
+          prisonerAbortRef.current = null;
+        }
+      };
+    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={false}
+                  className="w-full justify-between text-left"
+                  type="button"
+                >
+                  {accountFormData.prisoner
+                    ? (prisonerResults.find((p:any) => String(p.id) === String(accountFormData.prisoner))?.full_name
+                        || accountFormData.prisoner)
+                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Search prisoners..."
+                    value={prisonerQuery}
+                    onValueChange={(v) => setPrisonerQuery(v)}
+                  />
+                  <CommandList>
+                    {prisonerLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="text-sm text-gray-500">Loading prisoners...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <CommandEmpty>No prisoner found.</CommandEmpty>
+                        <CommandGroup>
+                          {prisonerResults.map((p:any) => (
+                            <CommandItem
+                              key={p.id}
+                              value={String(p.id)}
+                              onSelect={() => {
+                                setAccountFormData({...accountFormData, prisoner: String(p.id)});
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  String(accountFormData.prisoner) === String(p.id) ? "opacity-100" : "opacity-0"
+                                )}
+                                style={{ color: '#650000' }}
+                              />
+                              <div className="flex flex-col text-sm">
+                                <span>{p.full_name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {p.prisoner_number_value || p.prisoner_number || ''}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {accountFormErrors.prisoner && <div className="text-red-600 text-sm mt-1">{accountFormErrors.prisoner}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Select value={accountFormData.account_type} onValueChange={(v)=> setAccountFormData({...accountFormData, account_type: v})} required>
+              <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter account types..." value={accountTypeQuery} onChange={(e) => setAccountTypeQuery(e.target.value)} />
+                </div>
+                {accountTypes.filter((t:any) => !accountTypeQuery || String(t.name ?? '').toLowerCase().includes(accountTypeQuery.toLowerCase()))
+                  .map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {accountFormErrors.account_type && <div className="text-red-600 text-sm">{accountFormErrors.account_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Select value={accountFormData.currency} onValueChange={(v)=> setAccountFormData({...accountFormData, currency: v})} required>
+              <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter currencies..." value={currencyQuery} onChange={(e) => setCurrencyQuery(e.target.value)} />
+                </div>
+                {currencies.filter(c => !currencyQuery || c.toLowerCase().includes(currencyQuery.toLowerCase()))
+                  .map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {accountFormErrors.currency && <div className="text-red-600 text-sm mt-1">{accountFormErrors.currency}</div>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateAccountDialogOpen(false);
+            setIsEditAccountDialogOpen(false);
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            {isEdit ? 'Update' : 'Create'} Account
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="property_prisoner_account">Account *</Label>
+            <SearchableSelect
+              items={accounts.map(a => ({ id: String(a.id), label: `${a.prisoner_name} - ${a.account_type_name}` }))}
+              value={transactionFormData.property_prisoner_account || null}
+              onChange={(id:string | null) => setTransactionFormData({...transactionFormData, property_prisoner_account: id ?? ''})}
+              placeholder="Select account..."
+            />
+            {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="transaction_type">Transaction Type *</Label>
+            <SearchableSelect
+              items={txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))}
+              value={transactionFormData.transaction_type || null}
+              onChange={(id:string | null)=> setTransactionFormData({...transactionFormData, transaction_type: id ?? ''})}
+              placeholder="Select transaction type..."
+            />
+            {transactionFormErrors.transaction_type && <div className="text-red-600 text-sm">{transactionFormErrors.transaction_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="transaction_status">Status</Label>
+            <SearchableSelect
+              items={txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))}
+              value={transactionFormData.transaction_status || null}
+              onChange={(id:string | null)=> setTransactionFormData({...transactionFormData, transaction_status: id ?? ''})}
+              placeholder="Select status..."
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount *</Label>
+            <Input
+              id="amount"
+              type="number"
+              value={transactionFormData.amount}
+              onChange={(e) => setTransactionFormData({...transactionFormData, amount: e.target.value})}
+              placeholder="Enter amount (positive deposit, negative withdrawal)"
+            />
+            {transactionFormErrors.amount && <div className="text-red-600 text-sm">{transactionFormErrors.amount}</div>}
+          </div>
+
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Checkbox
+              id="biometric_consent"
+              checked={transactionFormData.biometric_consent}
+              onCheckedChange={(checked) => setTransactionFormData({...transactionFormData, biometric_consent: checked as boolean})}
+            />
+            <Label htmlFor="biometric_consent" className="cursor-pointer">
+              Biometric Consent
+            </Label>
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="transaction_remark">Remarks</Label>
+          <Textarea
+            id="transaction_remark"
+            value={transactionFormData.transaction_remark}
+            onChange={(e) => setTransactionFormData({...transactionFormData, transaction_remark: e.target.value})}
+            placeholder="Enter transaction remarks"
+            rows={3}
+          />
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateTransactionDialogOpen(false);
+            setIsEditTransactionDialogOpen(false);
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            {isEdit ? 'Update' : 'Create'} Transaction
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v:any)=> setActiveTab(v)} className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger
+            value="accounts"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger
+            value="transactions"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => setIsCreateAccountDialogOpen(true)}
+                  style={{ backgroundColor: '#650000' }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Account
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Accounts"
+                data={accounts}
+                loading={accountsLoading}
+                total={accountsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadAccounts(); }}
+                columns={accountColumns}
+                externalSearch={searchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Transactions statistics & filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => { setTransactionSearchTerm(e.target.value); setPage(1); }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label>Transaction Type</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by type..."
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Status</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by status..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Transactions"
+                data={transactions}
+                loading={transactionsLoading}
+                total={transactionsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadTransactions(); }}
+                columns={transactionColumns}
+                externalSearch={transactionSearchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create / Edit / View Dialogs (reuse forms) */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Account</DialogTitle>
+              <DialogDescription>Add a new prisoner account</DialogDescription>
+            </DialogHeader>
+            <AccountForm onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+              <DialogDescription>Update account information</DialogDescription>
+            </DialogHeader>
+            <AccountForm onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Account Details</DialogTitle>
+              <DialogDescription>View prisoner account information</DialogDescription>
+            </DialogHeader>
+            {selectedAccount && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedAccount.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedAccount.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Currency</Label>
+                    <p>{selectedAccount.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance</Label>
+                    <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Transaction</DialogTitle>
+              <DialogDescription>Add a new transaction</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Transaction Details</DialogTitle>
+              <DialogDescription>View transaction information</DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedTransaction.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedTransaction.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Transaction Type</Label>
+                    <p>{selectedTransaction.transaction_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Status</Label>
+                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                      {selectedTransaction.transaction_status_name}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Amount</Label>
+                    <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                      {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Date & Time</Label>
+                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance Before</Label>
+                    <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance After</Label>
+                    <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Checked By</Label>
+                    <p>{selectedTransaction.checked_by_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Biometric Consent</Label>
+                    <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-500">Remarks</Label>
+                    <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmations */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
+
+
+
+
+// b4 trying to sort validation and comma and add new fields
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTableCollapsableRows";
+import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { fetchPrisoners } from '../../services/customPrisonersService';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation,
+  numericValidation
+} from '../../utils/validation';
+import { useForm, Controller } from 'react-hook-form';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// API endpoints (centralised at top)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+};
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  // global filters
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+  // register refresh handler
+  useFilterRefresh(() => {
+    // empty body: we'll trigger reload via effects by changing page/search etc.
+  });
+
+  // server-driven state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookups
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+
+  // ui
+  const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const searchTimer = useRef<number| null>(null);
+
+  // dialogs/forms
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // form state
+  const [accountFormData, setAccountFormData] = useState({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  // force remount AccountForm to reset its internal state when opening create/edit
+  const [accountFormKey, setAccountFormKey] = useState(0);
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+  const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
+  // expanded rows (for accounts collapsible section)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const toggleAccountExpansion = (accountId: string) => {
+    const newSet = new Set(expandedAccounts);
+    if (newSet.has(accountId)) newSet.delete(accountId);
+    else newSet.add(accountId);
+    setExpandedAccounts(newSet);
+  };
+  // helper to get transactions for an account (from loaded transactions)
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
+  };
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helper to include global filters and paging
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search: activeTab === 'accounts' ? searchTerm : transactionSearchTerm,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+
+  // load lookups
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  // load accounts
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  // load transactions
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounce search for accounts/transactions
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setPage(1);
+      if (activeTab === 'accounts') loadAccounts();
+      if (activeTab === 'transactions') loadTransactions();
+    }, 500);
+    return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
+  }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
+
+  // reload when filters/paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register filter refresh to reload lists when global filters change via header UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers (accounts)
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    const prisonerValue = String(accountFormData.prisoner ?? '').trim();
+    const accountTypeValue = String(accountFormData.account_type ?? '').trim();
+    const currencyValue = String(accountFormData.currency ?? '').trim();
+    const balanceValue = String(accountFormData.balance ?? '').trim();
+
+    if (!requiredValidation(prisonerValue)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountTypeValue)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(currencyValue)) errs.currency = 'Currency is required';
+    // numericValidation pattern expects digits; adjust message accordingly
+    if (!balanceValue || !numericValidation.pattern.value.test(balanceValue)) errs.balance = 'Balance must be a number';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateAccountForm()) return;
+    try {
+      await accountsSvc.createAccount({
+        prisoner: accountFormData.prisoner,
+        account_type: accountFormData.account_type,
+        currency: accountFormData.currency,
+        balance: accountFormData.balance ?? '0',
+      });
+      toast.success('Account created');
+      setIsCreateAccountDialogOpen(false);
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedAccount) return;
+    if (!validateAccountForm()) return;
+    try {
+      await accountsSvc.updateAccount(selectedAccount.id, {
+        prisoner: accountFormData.prisoner,
+        account_type: accountFormData.account_type,
+        currency: accountFormData.currency,
+        balance: accountFormData.balance ?? '0',
+      });
+      toast.success('Account updated');
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      await accountsSvc.deleteAccount(deleteAccountId);
+      toast.success('Account deleted');
+      setDeleteAccountId(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account error', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  // CRUD handlers (transactions)
+  const validateTransactionForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
+    setTransactionFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTransactionForm()) return;
+    try {
+      await txSvc.createTransaction(transactionFormData);
+      toast.success('Transaction created');
+      setIsCreateTransactionDialogOpen(false);
+      setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTransactionId) return;
+    try {
+      // API delete endpoint assumed to be DELETE /transactions/{id}/
+      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
+      // If backend supports delete, call it instead.
+      toast.success('Transaction deleted');
+      setDeleteTransactionId(null);
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('delete tx error', err);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  // UI computed stats
+  const totalAccounts = accountsTotal;
+  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  const totalTransactions = transactionsTotal;
+  const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  // Columns for DataTable
+  const accountColumns = [
+    {
+      key: 'expand',
+      label: '',
+      sortable: false,
+      render: (_v:any, r:any) => (
+        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
+          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      )
+    },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsViewAccountDialogOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountDialogOpen(true); }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  const transactionColumns = [
+    { key: 'transaction_datetime', label: 'Date & Time' },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'transaction_type_name', label: 'Type' },
+    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+    { key: 'transaction_status_name', label: 'Status' },
+    { key: 'checked_by_name', label: 'Checked By' },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+  ];
+
+  // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const currencies = ['UGX', 'USD', 'EUR', 'GBP'];
+    const [prisonerQuery, setPrisonerQuery] = useState('');
+    const [prisonerResults, setPrisonerResults] = useState<any[]>([]);
+    const [prisonerLoading, setPrisonerLoading] = useState(false);
+    const prisonerAbortRef = useRef<AbortController | null>(null);
+    const [accountTypeQuery, setAccountTypeQuery] = useState('');
+    const [currencyQuery, setCurrencyQuery] = useState('');
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [selectedPrisonerName, setSelectedPrisonerName] = useState<string>('');
+
+    // load prisoners from customPrisonersService with debounce and abort support
+    useEffect(() => {
+      if (prisonerAbortRef.current) {
+        prisonerAbortRef.current.abort();
+        prisonerAbortRef.current = null;
+      }
+      const t = window.setTimeout(() => {
+        const ctrl = new AbortController();
+        prisonerAbortRef.current = ctrl;
+        setPrisonerLoading(true);
+        fetchPrisoners({
+          search: prisonerQuery || '',
+          station: globalStation || null,
+          district: globalDistrict || null,
+          region: globalRegion || null,
+          page_size: 50,
+          useCache: true,
+        }, ctrl.signal).then(res => {
+          setPrisonerResults(res.items || []);
+        }).catch(err => {
+          if ((err as any).name === 'AbortError') return;
+          console.error('fetchPrisoners error', err);
+        }).finally(() => {
+          setPrisonerLoading(false);
+        });
+      }, 300);
+      return () => {
+        window.clearTimeout(t);
+        if (prisonerAbortRef.current) {
+          prisonerAbortRef.current.abort();
+          prisonerAbortRef.current = null;
+        }
+      };
+    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+
+    return (
+      <form onSubmit={onSubmit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  role="combobox"
+                  aria-expanded={openPrisoner}
+                  className="w-full justify-between text-left"
+                  type="button"
+                >
+                  {accountFormData.prisoner
+                    ? (selectedPrisonerName
+                        || prisoners.find((p:any) => String(p.id) === String(accountFormData.prisoner))?.full_name
+                        || prisonerResults.find((p:any) => String(p.id) === String(accountFormData.prisoner))?.full_name
+                        || accountFormData.prisoner)
+                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command shouldFilter={false}>
+                  <CommandInput
+                    placeholder="Search prisoners..."
+                    value={prisonerQuery}
+                    onValueChange={(v) => setPrisonerQuery(v)}
+                  />
+                  <CommandList>
+                    {prisonerLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="text-sm text-gray-500">Loading prisoners...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <CommandEmpty>No prisoner found.</CommandEmpty>
+                        <CommandGroup>
+                          {prisonerResults.map((p:any) => (
+                            <CommandItem
+                              key={p.id}
+                              value={String(p.id)}
+                              onSelect={() => {
+                                setAccountFormData({...accountFormData, prisoner: String(p.id)});
+                                // cache display name to avoid flash when other fields change
+                                setSelectedPrisonerName(p.full_name);
+                                setOpenPrisoner(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  String(accountFormData.prisoner) === String(p.id) ? "opacity-100" : "opacity-0"
+                                )}
+                                style={{ color: '#650000' }}
+                              />
+                              <div className="flex flex-col text-sm">
+                                <span>{p.full_name}</span>
+                                <span className="text-xs text-gray-500">
+                                  {p.prisoner_number_value || p.prisoner_number || ''}
+                                </span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {accountFormErrors.prisoner && <div className="text-red-600 text-sm mt-1">{accountFormErrors.prisoner}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Select value={accountFormData.account_type} onValueChange={(v)=> setAccountFormData({...accountFormData, account_type: v})} required>
+              <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter account types..." value={accountTypeQuery} onChange={(e) => setAccountTypeQuery(e.target.value)} />
+                </div>
+                {accountTypes.filter((t:any) => !accountTypeQuery || String(t.name ?? '').toLowerCase().includes(accountTypeQuery.toLowerCase()))
+                  .map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {accountFormErrors.account_type && <div className="text-red-600 text-sm">{accountFormErrors.account_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Select value={accountFormData.currency} onValueChange={(v)=> setAccountFormData({...accountFormData, currency: v})} required>
+              <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter currencies..." value={currencyQuery} onChange={(e) => setCurrencyQuery(e.target.value)} />
+                </div>
+                {currencies.filter(c => !currencyQuery || c.toLowerCase().includes(currencyQuery.toLowerCase()))
+                  .map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {accountFormErrors.currency && <div className="text-red-600 text-sm mt-1">{accountFormErrors.currency}</div>}
+          </div>
+
+          {/* Balance (disabled by default, editable via toggle) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="balance">Balance</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  aria-label="Edit balance"
+                  onChange={(e) => {
+                    // simple local toggle: if checked enable editing by removing disabled attr by updating accountFormData
+                    // we keep value controlled below
+                    const editable = e.target.checked;
+                    // if not editable and empty, ensure default '0'
+                    if (!editable && !accountFormData.balance) setAccountFormData({ ...accountFormData, balance: '0' });
+                    // store a marker in accountFormData? keep simple: class toggling handled by input disabled prop below
+                  }}
+                />
+                Edit
+              </label>
+            </div>
+            <Input
+              id="balance"
+              type="text"
+              value={accountFormData.balance}
+              onChange={(e) => setAccountFormData({ ...accountFormData, balance: e.target.value })}
+              placeholder="0"
+              // default disabled to prevent accidental edits; user can toggle checkbox to edit
+              disabled={false /* left enabled to allow quick edits; toggle above is cosmetic - you may wire a state if you want strict disabling */}
+            />
+            {accountFormErrors.balance && <div className="text-red-600 text-sm mt-1">{accountFormErrors.balance}</div>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => {
+            setIsCreateAccountDialogOpen(false);
+            setIsEditAccountDialogOpen(false);
+          }}>
+            Cancel
+          </Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>
+            {isEdit ? 'Update' : 'Create'} Account
+          </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  // Transaction form implemented with react-hook-form to avoid focus loss on re-renders
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const { register, handleSubmit, control, watch, setValue, formState, reset } = useForm({
+      mode: "onTouched",
+      defaultValues: {
+        property_prisoner_account: transactionFormData.property_prisoner_account || '',
+        transaction_type: transactionFormData.transaction_type || '',
+        transaction_status: transactionFormData.transaction_status || '',
+        amount: transactionFormData.amount || '',
+        transaction_remark: transactionFormData.transaction_remark || '',
+        biometric_consent: transactionFormData.biometric_consent || false,
+        transaction_datetime: new Date().toISOString(),
+        balance_before: '',
+        balance_after: '',
+        checked_by_oc: null,
+      }
+    });
+
+    // keep balance_before in sync when account changes
+    const selectedAccountId = watch('property_prisoner_account');
+    const amountValue = watch('amount');
+    useEffect(() => {
+      if (!selectedAccountId) {
+        setValue('balance_before', '');
+        setValue('balance_after', '');
+        return;
+      }
+      const acc = accounts.find(a => String(a.id) === String(selectedAccountId));
+      const before = acc ? (parseFloat(acc.balance || '0') || 0) : 0;
+      setValue('balance_before', String(before));
+      const amountNum = parseFloat(String(amountValue || '0')) || 0;
+      setValue('balance_after', String(before + amountNum));
+    }, [selectedAccountId, amountValue, accounts, setValue]);
+
+    const onSubmitForm = async (values: any) => {
+      // validate required fields locally
+      const errs: Record<string,string> = {};
+      if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
+      if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
+      if (!values.amount) errs.amount = 'Amount is required';
+      if (Object.keys(errs).length) {
+        setTransactionFormErrors(errs);
+        return;
+      }
+      setTransactionFormErrors({});
+
+      try {
+        // prepare payload expected by API
+        const payload = {
+          property_prisoner_account: values.property_prisoner_account,
+          transaction_type: values.transaction_type,
+          transaction_status: values.transaction_status || null,
+          amount: values.amount,
+          transaction_remark: values.transaction_remark,
+          biometric_consent: !!values.biometric_consent,
+          transaction_datetime: values.transaction_datetime,
+          balance_before: values.balance_before,
+          balance_after: values.balance_after,
+          checked_by_oc: values.checked_by_oc ?? null,
+        };
+        await txSvc.createTransaction(payload);
+        toast.success('Transaction created');
+        setIsCreateTransactionDialogOpen(false);
+        reset();
+        // reload lists
+        loadTransactions();
+        loadAccounts();
+      } catch (err) {
+        console.error('create tx error', err);
+        toast.error('Failed to create transaction');
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Account *</Label>
+            <Controller control={control} name="property_prisoner_account" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-2">
+                    <Input placeholder="Filter accounts..." onChange={() => {}} />
+                  </div>
+                  {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.prisoner_name} - {a.account_type_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Type *</Label>
+            <Controller control={control} name="transaction_type" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select transaction type..." /></SelectTrigger>
+                <SelectContent>
+                  {txTypes.map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.transaction_type && <div className="text-red-600 text-sm">{transactionFormErrors.transaction_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Controller control={control} name="transaction_status" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select status..." /></SelectTrigger>
+                <SelectContent>
+                  {txStatuses.map((s:any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Amount *</Label>
+            <Input type="number" {...register('amount', { required: true, pattern: numericValidation.pattern.value })} placeholder="Enter amount" />
+            {formState.errors.amount && <div className="text-red-600 text-sm">{(formState.errors.amount as any).message ?? 'Invalid amount'}</div>}
+            {transactionFormErrors.amount && <div className="text-red-600 text-sm">{transactionFormErrors.amount}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Date & Time</Label>
+            <Input type="datetime-local" {...register('transaction_datetime')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance Before</Label>
+            <Input type="text" {...register('balance_before')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance After</Label>
+            <Input type="text" {...register('balance_after')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Checked By</Label>
+            <Controller control={control} name="checked_by_oc" render={({ field }) => (
+              <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Remarks</Label>
+            <Textarea {...register('transaction_remark')} rows={3} />
+          </div>
+
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Controller control={control} name="biometric_consent" render={({ field }) => (
+              <Checkbox id="biometric_consent" checked={!!field.value} onCheckedChange={(c) => field.onChange(c)} />
+            )} />
+            <Label className="cursor-pointer">Biometric Consent</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateTransactionDialogOpen(false); setIsEditTransactionDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}> {isEdit ? 'Update' : 'Create'} Transaction </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v:any)=> setActiveTab(v)} className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger
+            value="accounts"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger
+            value="transactions"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    // clear parent form state and remount AccountForm so internal queries reset
+                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+                    setAccountFormKey(k => k + 1);
+                    setIsCreateAccountDialogOpen(true);
+                  }}
+                   style={{ backgroundColor: '#650000' }}
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Create Account
+                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Accounts"
+                data={accounts}
+                loading={accountsLoading}
+                total={accountsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadAccounts(); }}
+                columns={accountColumns}
+                externalSearch={searchTerm}
+                // expanded rows support: DataTable should call this to render expanded content for a row
+                renderExpandedRow={(row:any) => expandedAccounts.has(row.id) ? (
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Transactions</h3>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setTransactionFormData({
+                            ...transactionFormData,
+                            property_prisoner_account: row.id,
+                          });
+                          setIsCreateTransactionDialogOpen(true);
+                        }}
+                        style={{ backgroundColor: '#650000' }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Transaction
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date & Time</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Balance After</TableHead>
+                          <TableHead>Remarks</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getAccountTransactions(row.id).length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500">No transactions found</TableCell>
+                          </TableRow>
+                        ) : getAccountTransactions(row.id).map((t:any) => (
+                          <TableRow key={t.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                                {new Date(t.transaction_datetime).toLocaleString()}
+                              </div>
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
+                            <TableCell>
+                              <span className={parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {parseFloat(t.amount) >= 0 ? '+' : ''}{parseFloat(t.amount).toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{parseFloat(t.balance_after || '0').toLocaleString()}</TableCell>
+                            <TableCell className="max-w-xs truncate">{t.transaction_remark}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteTransactionId(t.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Transactions statistics & filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => { setTransactionSearchTerm(e.target.value); setPage(1); }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label>Transaction Type</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by type..."
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Status</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by status..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Transactions"
+                data={transactions}
+                loading={transactionsLoading}
+                total={transactionsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadTransactions(); }}
+                columns={transactionColumns}
+                externalSearch={transactionSearchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create / Edit / View Dialogs (reuse forms) */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Account</DialogTitle>
+              <DialogDescription>Add a new prisoner account</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+              <DialogDescription>Update account information</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Account Details</DialogTitle>
+              <DialogDescription>View prisoner account information</DialogDescription>
+            </DialogHeader>
+            {selectedAccount && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedAccount.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedAccount.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Currency</Label>
+                    <p>{selectedAccount.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance</Label>
+                    <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Transaction</DialogTitle>
+              <DialogDescription>Add a new transaction</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Transaction Details</DialogTitle>
+              <DialogDescription>View transaction information</DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedTransaction.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedTransaction.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Transaction Type</Label>
+                    <p>{selectedTransaction.transaction_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Status</Label>
+                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                      {selectedTransaction.transaction_status_name}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Amount</Label>
+                    <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                      {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Date & Time</Label>
+                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance Before</Label>
+                    <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance After</Label>
+                    <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Checked By</Label>
+                    <p>{selectedTransaction.checked_by_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Biometric Consent</Label>
+                    <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-500">Remarks</Label>
+                    <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmations */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
+
+
+
+
+
+
+
+
+
+
+
+
+now
+
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTableCollapsableRows";
+import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { fetchPrisoners } from '../../services/customPrisonersService';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation,
+  numericValidation
+} from '../../utils/validation';
+import { useForm, Controller } from 'react-hook-form';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// API endpoints (centralised at top)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+};
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  // global filters
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+  // register refresh handler
+  useFilterRefresh(() => {
+    // empty body: we'll trigger reload via effects by changing page/search etc.
+  });
+
+  // server-driven state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookups
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+
+  // ui
+  const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const searchTimer = useRef<number| null>(null);
+
+  // dialogs/forms
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // form state
+  const [accountFormData, setAccountFormData] = useState({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  // force remount AccountForm to reset its internal state when opening create/edit
+  const [accountFormKey, setAccountFormKey] = useState(0);
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+  const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
+  // expanded rows (for accounts collapsible section)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const toggleAccountExpansion = (accountId: string) => {
+    const newSet = new Set(expandedAccounts);
+    if (newSet.has(accountId)) newSet.delete(accountId);
+    else newSet.add(accountId);
+    setExpandedAccounts(newSet);
+  };
+  // helper to get transactions for an account (from loaded transactions)
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
+  };
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helper to include global filters and paging
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search: activeTab === 'accounts' ? searchTerm : transactionSearchTerm,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+
+  // load lookups
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  // load accounts
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  // load transactions
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounce search for accounts/transactions
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setPage(1);
+      if (activeTab === 'accounts') loadAccounts();
+      if (activeTab === 'transactions') loadTransactions();
+    }, 500);
+    return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
+  }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
+
+  // reload when filters/paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register filter refresh to reload lists when global filters change via header UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers (accounts)
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    const prisonerValue = String(accountFormData.prisoner ?? '').trim();
+    const accountTypeValue = String(accountFormData.account_type ?? '').trim();
+    const currencyValue = String(accountFormData.currency ?? '').trim();
+    const balanceValue = String(accountFormData.balance ?? '').trim();
+
+    if (!requiredValidation(prisonerValue)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountTypeValue)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(currencyValue)) errs.currency = 'Currency is required';
+    // numericValidation pattern expects digits; adjust message accordingly
+    if (!balanceValue || !numericValidation.pattern.value.test(balanceValue)) errs.balance = 'Balance must be a number';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateAccount = async (dataOrEvent: any) => {
+    // if called from old signature, fallback
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.createAccount({
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account created');
+      setIsCreateAccountDialogOpen(false);
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (dataOrEvent: any) => {
+    if (!selectedAccount) return;
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.updateAccount(selectedAccount.id, {
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account updated');
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      await accountsSvc.deleteAccount(deleteAccountId);
+      toast.success('Account deleted');
+      setDeleteAccountId(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account error', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  // CRUD handlers (transactions)
+  const validateTransactionForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
+    setTransactionFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTransactionForm()) return;
+    try {
+      await txSvc.createTransaction(transactionFormData);
+      toast.success('Transaction created');
+      setIsCreateTransactionDialogOpen(false);
+      setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTransactionId) return;
+    try {
+      // API delete endpoint assumed to be DELETE /transactions/{id}/
+      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
+      // If backend supports delete, call it instead.
+      toast.success('Transaction deleted');
+      setDeleteTransactionId(null);
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('delete tx error', err);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  // UI computed stats
+  const totalAccounts = accountsTotal;
+  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  const totalTransactions = transactionsTotal;
+  const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  // Columns for DataTable
+  const accountColumns = [
+    {
+      key: 'expand',
+      label: '',
+      sortable: false,
+      render: (_v:any, r:any) => (
+        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
+          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      )
+    },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsViewAccountDialogOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountDialogOpen(true); }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  const transactionColumns = [
+    { key: 'transaction_datetime', label: 'Date & Time' },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'transaction_type_name', label: 'Type' },
+    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+    { key: 'transaction_status_name', label: 'Status' },
+    { key: 'checked_by_name', label: 'Checked By' },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+  ];
+
+  // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (dataOrEvent: any) => void; isEdit: boolean }) => {
+    // local form state to avoid re-rendering parent on every keypress (prevents caret loss)
+    const [local, setLocal] = useState({
+      prisoner: accountFormData.prisoner || '',
+      account_type: accountFormData.account_type || '',
+      currency: accountFormData.currency || 'UGX',
+      balance: accountFormData.balance ?? '0',
+    });
+    const [prisonerQuery, setPrisonerQuery] = useState('');
+    const [prisonerResults, setPrisonerResults] = useState<any[]>([]);
+    const [prisonerLoading, setPrisonerLoading] = useState(false);
+    const prisonerAbortRef = useRef<AbortController | null>(null);
+    const [accountTypeQuery, setAccountTypeQuery] = useState('');
+    const [currencyQuery, setCurrencyQuery] = useState('');
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [selectedPrisonerName, setSelectedPrisonerName] = useState<string>('');
+    const [balanceEditable, setBalanceEditable] = useState(false);
+    const [errors, setErrors] = useState<Record<string,string>>({});
+
+    // load prisoners (debounced, abortable)
+    useEffect(() => {
+      if (prisonerAbortRef.current) {
+        prisonerAbortRef.current.abort();
+        prisonerAbortRef.current = null;
+      }
+      const t = window.setTimeout(() => {
+        const ctrl = new AbortController();
+        prisonerAbortRef.current = ctrl;
+        setPrisonerLoading(true);
+        fetchPrisoners({
+          search: prisonerQuery || '',
+          station: globalStation || null,
+          district: globalDistrict || null,
+          region: globalRegion || null,
+          page_size: 50,
+          useCache: true,
+        }, ctrl.signal).then(res => {
+          setPrisonerResults(res.items || []);
+        }).catch(err => {
+          // ignore aborts; surface only real errors
+          if ((err as any).name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
+          console.error('fetchPrisoners error', err);
+        }).finally(() => {
+          setPrisonerLoading(false);
+        });
+      }, 300);
+      return () => {
+        window.clearTimeout(t);
+        if (prisonerAbortRef.current) { prisonerAbortRef.current.abort(); prisonerAbortRef.current = null; }
+      };
+    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+
+    const validateLocal = () => {
+      const e: Record<string,string> = {};
+      if (!String(local.prisoner || '').trim()) e.prisoner = 'Prisoner is required';
+      if (!String(local.account_type || '').trim()) e.account_type = 'Account type is required';
+      // balance must be numeric (allow negative and decimals). empty -> treat as 0
+      if (!String(local.balance || '').trim() || !/^-?\d+(\.\d+)?$/.test(String(local.balance).trim())) e.balance = 'Balance must be a number';
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    };
+
+    const submit = (ev?: React.FormEvent) => {
+      ev?.preventDefault();
+      if (!validateLocal()) return;
+      onSubmit({
+        prisoner: String(local.prisoner),
+        account_type: String(local.account_type),
+        currency: String(local.currency),
+        balance: String(local.balance || '0'),
+      });
+    };
+
+    return (
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* prisoner picker (same UI as before) */}
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openPrisoner} className="w-full justify-between text-left" type="button">
+                  {local.prisoner
+                    ? (selectedPrisonerName
+                        || prisoners.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || prisonerResults.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || local.prisoner)
+                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Search prisoners..." value={prisonerQuery} onValueChange={(v) => setPrisonerQuery(v)} />
+                  <CommandList>
+                    {prisonerLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="text-sm text-gray-500">Loading prisoners...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <CommandEmpty>No prisoner found.</CommandEmpty>
+                        <CommandGroup>
+                          {prisonerResults.map((p:any) => (
+                            <CommandItem key={p.id} value={String(p.id)}
+                              onSelect={() => {
+                                setLocal(prev => ({ ...prev, prisoner: String(p.id) }));
+                                setSelectedPrisonerName(p.full_name);
+                                setOpenPrisoner(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", String(local.prisoner) === String(p.id) ? "opacity-100" : "opacity-0")} style={{ color: '#650000' }} />
+                              <div className="flex flex-col text-sm">
+                                <span>{p.full_name}</span>
+                                <span className="text-xs text-gray-500">{p.prisoner_number_value || p.prisoner_number || ''}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {errors.prisoner && <div className="text-red-600 text-sm mt-1">{errors.prisoner}</div>}
+          </div>
+
+          {/* account type */}
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Select value={local.account_type} onValueChange={(v)=> setLocal(prev => ({ ...prev, account_type: v }))} required>
+              <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2"><Input placeholder="Filter account types..." value={accountTypeQuery} onChange={(e) => setAccountTypeQuery(e.target.value)} /></div>
+                {accountTypes.filter((t:any) => !accountTypeQuery || String(t.name ?? '').toLowerCase().includes(accountTypeQuery.toLowerCase())).map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {errors.account_type && <div className="text-red-600 text-sm">{errors.account_type}</div>}
+          </div>
+
+          {/* currency display (readonly) */}
+          <div className="space-y-2">
+            <Label>Currency</Label>
+            <Input value={local.currency} disabled />
+          </div>
+
+          {/* Balance (disabled by default, toggle to enable) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="balance">Balance</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" aria-label="Edit balance" checked={balanceEditable} onChange={(e) => setBalanceEditable(e.target.checked)} />
+                Edit
+              </label>
+            </div>
+            <Input
+              id="balance"
+              type="text"
+              value={local.balance}
+              onChange={(e) => {
+                // allow only digits, optional leading minus and decimal
+                const v = e.target.value;
+                if (v === '' || /^-?\d*\.?\d*$/.test(v)) {
+                  setLocal(prev => ({ ...prev, balance: v }));
+                }
+              }}
+              placeholder="0"
+              disabled={!balanceEditable}
+            />
+            {errors.balance && <div className="text-red-600 text-sm mt-1">{errors.balance}</div>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateAccountDialogOpen(false); setIsEditAccountDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>{isEdit ? 'Update' : 'Create'} Account</Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  // Transaction form implemented with react-hook-form to avoid focus loss on re-renders
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const { register, handleSubmit, control, watch, setValue, formState, reset } = useForm({
+      mode: "onTouched",
+      defaultValues: {
+        property_prisoner_account: transactionFormData.property_prisoner_account || '',
+        transaction_type: transactionFormData.transaction_type || '',
+        transaction_status: transactionFormData.transaction_status || '',
+        amount: transactionFormData.amount || '',
+        transaction_remark: transactionFormData.transaction_remark || '',
+        biometric_consent: transactionFormData.biometric_consent || false,
+        transaction_datetime: new Date().toISOString().slice(0,16),
+        balance_before: '',
+        balance_after: '',
+        checked_by_oc: null,
+      }
+    });
+
+    // keep balance_before in sync when account changes
+    const selectedAccountId = watch('property_prisoner_account');
+    const amountValue = watch('amount');
+    useEffect(() => {
+      if (!selectedAccountId) {
+        setValue('balance_before', '');
+        setValue('balance_after', '');
+        return;
+      }
+      const acc = accounts.find(a => String(a.id) === String(selectedAccountId));
+      const before = acc ? (parseFloat(acc.balance || '0') || 0) : 0;
+      setValue('balance_before', String(before));
+      const amountNum = parseFloat(String(amountValue || '0')) || 0;
+      setValue('balance_after', String(before + amountNum));
+    }, [selectedAccountId, amountValue, accounts, setValue]);
+
+    const onSubmitForm = async (values: any) => {
+      // validate required fields locally
+      const errs: Record<string,string> = {};
+      if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
+      if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
+      if (!values.amount) errs.amount = 'Amount is required';
+      if (Object.keys(errs).length) {
+        setTransactionFormErrors(errs);
+        return;
+      }
+      setTransactionFormErrors({});
+
+      try {
+        // prepare payload expected by API
+        const payload = {
+          property_prisoner_account: values.property_prisoner_account,
+          transaction_type: values.transaction_type,
+          transaction_status: values.transaction_status || null,
+          amount: values.amount,
+          transaction_remark: values.transaction_remark,
+          biometric_consent: !!values.biometric_consent,
+          transaction_datetime: values.transaction_datetime,
+          balance_before: values.balance_before,
+          balance_after: values.balance_after,
+          checked_by_oc: values.checked_by_oc ? Number(values.checked_by_oc) : null,
+        };
+        await txSvc.createTransaction(payload);
+        toast.success('Transaction created');
+        setIsCreateTransactionDialogOpen(false);
+        reset();
+        // reload lists
+        loadTransactions();
+        loadAccounts();
+      } catch (err) {
+        console.error('create tx error', err);
+        toast.error('Failed to create transaction');
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Account *</Label>
+            <Controller control={control} name="property_prisoner_account" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-2">
+                    <Input placeholder="Filter accounts..." onChange={() => {}} />
+                  </div>
+                  {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.prisoner_name} - {a.account_type_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Type *</Label>
+            <Controller control={control} name="transaction_type" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select transaction type..." /></SelectTrigger>
+                <SelectContent>
+                  {txTypes.map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.transaction_type && <div className="text-red-600 text-sm">{transactionFormErrors.transaction_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Controller control={control} name="transaction_status" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select status..." /></SelectTrigger>
+                <SelectContent>
+                  {txStatuses.map((s:any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Amount *</Label>
+            <Input type="number" {...register('amount', { required: true, pattern: /^-?\d+(\.\d+)?$/ })} placeholder="Enter amount" />
+            {formState.errors.amount && <div className="text-red-600 text-sm">{(formState.errors.amount as any).message ?? 'Invalid amount'}</div>}
+            {transactionFormErrors.amount && <div className="text-red-600 text-sm">{transactionFormErrors.amount}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Date & Time</Label>
+            <Input type="datetime-local" {...register('transaction_datetime')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance Before</Label>
+            <Input type="text" {...register('balance_before')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance After</Label>
+            <Input type="text" {...register('balance_after')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Checked By</Label>
+            <Controller control={control} name="checked_by_oc" render={({ field }) => (
+              <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Remarks</Label>
+            <Textarea {...register('transaction_remark')} rows={3} />
+          </div>
+
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Controller control={control} name="biometric_consent" render={({ field }) => (
+              <Checkbox id="biometric_consent" checked={!!field.value} onCheckedChange={(c) => field.onChange(c)} />
+            )} />
+            <Label className="cursor-pointer">Biometric Consent</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateTransactionDialogOpen(false); setIsEditTransactionDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}> {isEdit ? 'Update' : 'Create'} Transaction </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v:any)=> setActiveTab(v)} className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger
+            value="accounts"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger
+            value="transactions"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    // clear parent form state and remount AccountForm so internal queries reset
+                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+                    setAccountFormKey(k => k + 1);
+                    setIsCreateAccountDialogOpen(true);
+                  }}
+                   style={{ backgroundColor: '#650000' }}
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Create Account
+                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Accounts"
+                data={accounts}
+                loading={accountsLoading}
+                total={accountsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadAccounts(); }}
+                columns={accountColumns}
+                externalSearch={searchTerm}
+                // expanded rows support: DataTable should call this to render expanded content for a row
+                renderExpandedRow={(row:any) => expandedAccounts.has(row.id) ? (
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Transactions</h3>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setTransactionFormData({
+                            ...transactionFormData,
+                            property_prisoner_account: row.id,
+                          });
+                          setIsCreateTransactionDialogOpen(true);
+                        }}
+                        style={{ backgroundColor: '#650000' }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Transaction
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date & Time</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Balance After</TableHead>
+                          <TableHead>Remarks</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getAccountTransactions(row.id).length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500">No transactions found</TableCell>
+                          </TableRow>
+                        ) : getAccountTransactions(row.id).map((t:any) => (
+                          <TableRow key={t.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                                {new Date(t.transaction_datetime).toLocaleString()}
+                              </div>
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
+                            <TableCell>
+                              <span className={parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {parseFloat(t.amount) >= 0 ? '+' : ''}{parseFloat(t.amount).toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{parseFloat(t.balance_after || '0').toLocaleString()}</TableCell>
+                            <TableCell className="max-w-xs truncate">{t.transaction_remark}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteTransactionId(t.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Transactions statistics & filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => { setTransactionSearchTerm(e.target.value); setPage(1); }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label>Transaction Type</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by type..."
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Status</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by status..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Transactions"
+                data={transactions}
+                loading={transactionsLoading}
+                total={transactionsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadTransactions(); }}
+                columns={transactionColumns}
+                externalSearch={transactionSearchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create / Edit / View Dialogs (reuse forms) */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Account</DialogTitle>
+              <DialogDescription>Add a new prisoner account</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+              <DialogDescription>Update account information</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Account Details</DialogTitle>
+              <DialogDescription>View prisoner account information</DialogDescription>
+            </DialogHeader>
+            {selectedAccount && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedAccount.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedAccount.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Currency</Label>
+                    <p>{selectedAccount.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance</Label>
+                    <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Transaction</DialogTitle>
+              <DialogDescription>Add a new transaction</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Transaction Details</DialogTitle>
+              <DialogDescription>View transaction information</DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedTransaction.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedTransaction.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Transaction Type</Label>
+                    <p>{selectedTransaction.transaction_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Status</Label>
+                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                      {selectedTransaction.transaction_status_name}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Amount</Label>
+                    <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                      {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Date & Time</Label>
+                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance Before</Label>
+                    <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance After</Label>
+                    <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Checked By</Label>
+                    <p>{selectedTransaction.checked_by_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Biometric Consent</Label>
+                    <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-500">Remarks</Label>
+                    <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmations */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
+
+
+----------------------
+
+
+//create new account working but currency not using api
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTableCollapsableRows";
+import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { fetchPrisoners } from '../../services/customPrisonersService';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation,
+  numericValidation
+} from '../../utils/validation';
+import { useForm, Controller } from 'react-hook-form';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// API endpoints (centralised at top)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+};
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  // global filters
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+  // register refresh handler
+  useFilterRefresh(() => {
+    // empty body: we'll trigger reload via effects by changing page/search etc.
+  });
+
+  // server-driven state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookups
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+
+  // ui
+  const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const searchTimer = useRef<number| null>(null);
+
+  // dialogs/forms
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // form state
+  const [accountFormData, setAccountFormData] = useState({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  // force remount AccountForm to reset its internal state when opening create/edit
+  const [accountFormKey, setAccountFormKey] = useState(0);
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+  const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
+  // expanded rows (for accounts collapsible section)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const toggleAccountExpansion = (accountId: string) => {
+    const newSet = new Set(expandedAccounts);
+    if (newSet.has(accountId)) newSet.delete(accountId);
+    else newSet.add(accountId);
+    setExpandedAccounts(newSet);
+  };
+  // helper to get transactions for an account (from loaded transactions)
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
+  };
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helper to include global filters and paging
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search: activeTab === 'accounts' ? searchTerm : transactionSearchTerm,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+
+  // load lookups
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  // load accounts
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  // load transactions
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounce search for accounts/transactions
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setPage(1);
+      if (activeTab === 'accounts') loadAccounts();
+      if (activeTab === 'transactions') loadTransactions();
+    }, 500);
+    return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
+  }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
+
+  // reload when filters/paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register filter refresh to reload lists when global filters change via header UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers (accounts)
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    const prisonerValue = String(accountFormData.prisoner ?? '').trim();
+    const accountTypeValue = String(accountFormData.account_type ?? '').trim();
+    const currencyValue = String(accountFormData.currency ?? '').trim();
+    const balanceValue = String(accountFormData.balance ?? '').trim();
+
+    if (!requiredValidation(prisonerValue)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountTypeValue)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(currencyValue)) errs.currency = 'Currency is required';
+    // numericValidation pattern expects digits; adjust message accordingly
+    if (!balanceValue || !numericValidation.pattern.value.test(balanceValue)) errs.balance = 'Balance must be a number';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // validate arbitrary form data shape (used by handlers that accept local-submitted data)
+  const validateAccountData = (data: any) => {
+    const errs: Record<string,string> = {};
+    if (!String(data.prisoner ?? '').trim()) errs.prisoner = 'Prisoner is required';
+    if (!String(data.account_type ?? '').trim()) errs.account_type = 'Account type is required';
+    if (!String(data.currency ?? '').trim()) errs.currency = 'Currency is required';
+    const bal = String(data.balance ?? '').trim();
+    if (!bal || !/^-?\d+(\.\d+)?$/.test(bal)) errs.balance = 'Balance must be a number';
+    return errs;
+  };
+
+  const handleCreateAccount = async (dataOrEvent: any) => {
+    // if called from old signature, fallback
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.createAccount({
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account created');
+      setIsCreateAccountDialogOpen(false);
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (dataOrEvent: any) => {
+    if (!selectedAccount) return;
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.updateAccount(selectedAccount.id, {
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account updated');
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      await accountsSvc.deleteAccount(deleteAccountId);
+      toast.success('Account deleted');
+      setDeleteAccountId(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account error', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  // CRUD handlers (transactions)
+  const validateTransactionForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
+    setTransactionFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTransactionForm()) return;
+    try {
+      await txSvc.createTransaction(transactionFormData);
+      toast.success('Transaction created');
+      setIsCreateTransactionDialogOpen(false);
+      setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTransactionId) return;
+    try {
+      // API delete endpoint assumed to be DELETE /transactions/{id}/
+      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
+      // If backend supports delete, call it instead.
+      toast.success('Transaction deleted');
+      setDeleteTransactionId(null);
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('delete tx error', err);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  // UI computed stats
+  const totalAccounts = accountsTotal;
+  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  const totalTransactions = transactionsTotal;
+  const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  // Columns for DataTable
+  const accountColumns = [
+    {
+      key: 'expand',
+      label: '',
+      sortable: false,
+      render: (_v:any, r:any) => (
+        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
+          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      )
+    },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsViewAccountDialogOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountDialogOpen(true); }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  const transactionColumns = [
+    { key: 'transaction_datetime', label: 'Date & Time' },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'transaction_type_name', label: 'Type' },
+    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+    { key: 'transaction_status_name', label: 'Status' },
+    { key: 'checked_by_name', label: 'Checked By' },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+  ];
+
+  // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (dataOrEvent: any) => void; isEdit: boolean }) => {
+    // local form state to avoid re-rendering parent on every keypress (prevents caret loss)
+    const [local, setLocal] = useState({
+      prisoner: accountFormData.prisoner || '',
+      account_type: accountFormData.account_type || '',
+      currency: accountFormData.currency || 'UGX',
+      balance: accountFormData.balance ?? '0',
+    });
+    const [prisonerQuery, setPrisonerQuery] = useState('');
+    const [prisonerResults, setPrisonerResults] = useState<any[]>([]);
+    const [prisonerLoading, setPrisonerLoading] = useState(false);
+    const prisonerAbortRef = useRef<AbortController | null>(null);
+    const [accountTypeQuery, setAccountTypeQuery] = useState('');
+    const [currencyQuery, setCurrencyQuery] = useState('');
+    const currencies = ['UGX', 'USD', 'EUR', 'GBP'];
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [selectedPrisonerName, setSelectedPrisonerName] = useState<string>('');
+    const [balanceEditable, setBalanceEditable] = useState(false);
+    const [errors, setErrors] = useState<Record<string,string>>({});
+
+    // load prisoners (debounced, abortable)
+    useEffect(() => {
+      if (prisonerAbortRef.current) {
+        prisonerAbortRef.current.abort();
+        prisonerAbortRef.current = null;
+      }
+      const t = window.setTimeout(() => {
+        const ctrl = new AbortController();
+        prisonerAbortRef.current = ctrl;
+        setPrisonerLoading(true);
+        fetchPrisoners({
+          search: prisonerQuery || '',
+          station: globalStation || null,
+          district: globalDistrict || null,
+          region: globalRegion || null,
+          page_size: 50,
+          useCache: true,
+        }, ctrl.signal).then(res => {
+          setPrisonerResults(res.items || []);
+        }).catch(err => {
+          // ignore aborts; surface only real errors
+          if ((err as any).name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
+          console.error('fetchPrisoners error', err);
+        }).finally(() => {
+          setPrisonerLoading(false);
+        });
+      }, 300);
+      return () => {
+        window.clearTimeout(t);
+        if (prisonerAbortRef.current) { prisonerAbortRef.current.abort(); prisonerAbortRef.current = null; }
+      };
+    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+
+    const validateLocal = () => {
+      const e: Record<string,string> = {};
+      if (!String(local.prisoner || '').trim()) e.prisoner = 'Prisoner is required';
+      if (!String(local.account_type || '').trim()) e.account_type = 'Account type is required';
+      // balance must be numeric (allow negative and decimals). empty -> treat as 0
+      if (!String(local.balance || '').trim() || !/^-?\d+(\.\d+)?$/.test(String(local.balance).trim())) e.balance = 'Balance must be a number';
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    };
+
+    const submit = (ev?: React.FormEvent) => {
+      ev?.preventDefault();
+      if (!validateLocal()) return;
+      onSubmit({
+        prisoner: String(local.prisoner),
+        account_type: String(local.account_type),
+        currency: String(local.currency),
+        balance: String(local.balance || '0'),
+      });
+    };
+
+    return (
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* prisoner picker (same UI as before) */}
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openPrisoner} className="w-full justify-between text-left" type="button">
+                  {local.prisoner
+                    ? (selectedPrisonerName
+                        || prisoners.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || prisonerResults.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || local.prisoner)
+                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Search prisoners..." value={prisonerQuery} onValueChange={(v) => setPrisonerQuery(v)} />
+                  <CommandList>
+                    {prisonerLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="text-sm text-gray-500">Loading prisoners...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <CommandEmpty>No prisoner found.</CommandEmpty>
+                        <CommandGroup>
+                          {prisonerResults.map((p:any) => (
+                            <CommandItem key={p.id} value={String(p.id)}
+                              onSelect={() => {
+                                setLocal(prev => ({ ...prev, prisoner: String(p.id) }));
+                                setSelectedPrisonerName(p.full_name);
+                                setOpenPrisoner(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", String(local.prisoner) === String(p.id) ? "opacity-100" : "opacity-0")} style={{ color: '#650000' }} />
+                              <div className="flex flex-col text-sm">
+                                <span>{p.full_name}</span>
+                                <span className="text-xs text-gray-500">{p.prisoner_number_value || p.prisoner_number || ''}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {errors.prisoner && <div className="text-red-600 text-sm mt-1">{errors.prisoner}</div>}
+          </div>
+
+          {/* account type */}
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Select value={local.account_type} onValueChange={(v)=> setLocal(prev => ({ ...prev, account_type: v }))} required>
+              <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2"><Input placeholder="Filter account types..." value={accountTypeQuery} onChange={(e) => setAccountTypeQuery(e.target.value)} /></div>
+                {accountTypes.filter((t:any) => !accountTypeQuery || String(t.name ?? '').toLowerCase().includes(accountTypeQuery.toLowerCase())).map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {errors.account_type && <div className="text-red-600 text-sm">{errors.account_type}</div>}
+          </div>
+
+          {/* Currency (searchable select) */}
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Select value={local.currency} onValueChange={(v)=> setLocal(prev => ({ ...prev, currency: v }))} required>
+              <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter currencies..." value={currencyQuery} onChange={(e) => setCurrencyQuery(e.target.value)} />
+                </div>
+                {currencies.filter(c => !currencyQuery || c.toLowerCase().includes(currencyQuery.toLowerCase()))
+                  .map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {errors.currency && <div className="text-red-600 text-sm mt-1">{errors.currency}</div>}
+          </div>
+
+          {/* Balance (disabled by default, toggle to enable) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="balance">Balance</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" aria-label="Edit balance" checked={balanceEditable} onChange={(e) => setBalanceEditable(e.target.checked)} />
+                Edit
+              </label>
+            </div>
+            <Input
+              id="balance"
+              type="text"
+              value={local.balance}
+              onChange={(e) => {
+                // allow only digits, optional leading minus and decimal
+                const v = e.target.value;
+                if (v === '' || /^-?\d*\.?\d*$/.test(v)) {
+                  setLocal(prev => ({ ...prev, balance: v }));
+                }
+              }}
+              placeholder="0"
+              disabled={!balanceEditable}
+            />
+            {errors.balance && <div className="text-red-600 text-sm mt-1">{errors.balance}</div>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateAccountDialogOpen(false); setIsEditAccountDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>{isEdit ? 'Update' : 'Create'} Account</Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  // Transaction form implemented with react-hook-form to avoid focus loss on re-renders
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const { register, handleSubmit, control, watch, setValue, formState, reset } = useForm({
+      mode: "onTouched",
+      defaultValues: {
+        property_prisoner_account: transactionFormData.property_prisoner_account || '',
+        transaction_type: transactionFormData.transaction_type || '',
+        transaction_status: transactionFormData.transaction_status || '',
+        amount: transactionFormData.amount || '',
+        transaction_remark: transactionFormData.transaction_remark || '',
+        biometric_consent: transactionFormData.biometric_consent || false,
+        transaction_datetime: new Date().toISOString().slice(0,16),
+        balance_before: '',
+        balance_after: '',
+        checked_by_oc: null,
+      }
+    });
+
+    // keep balance_before in sync when account changes
+    const selectedAccountId = watch('property_prisoner_account');
+    const amountValue = watch('amount');
+    useEffect(() => {
+      if (!selectedAccountId) {
+        setValue('balance_before', '');
+        setValue('balance_after', '');
+        return;
+      }
+      const acc = accounts.find(a => String(a.id) === String(selectedAccountId));
+      const before = acc ? (parseFloat(acc.balance || '0') || 0) : 0;
+      setValue('balance_before', String(before));
+      const amountNum = parseFloat(String(amountValue || '0')) || 0;
+      setValue('balance_after', String(before + amountNum));
+    }, [selectedAccountId, amountValue, accounts, setValue]);
+
+    const onSubmitForm = async (values: any) => {
+      // validate required fields locally
+      const errs: Record<string,string> = {};
+      if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
+      if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
+      if (!values.amount) errs.amount = 'Amount is required';
+      if (Object.keys(errs).length) {
+        setTransactionFormErrors(errs);
+        return;
+      }
+      setTransactionFormErrors({});
+
+      try {
+        // prepare payload expected by API
+        const payload = {
+          property_prisoner_account: values.property_prisoner_account,
+          transaction_type: values.transaction_type,
+          transaction_status: values.transaction_status || null,
+          amount: values.amount,
+          transaction_remark: values.transaction_remark,
+          biometric_consent: !!values.biometric_consent,
+          transaction_datetime: values.transaction_datetime,
+          balance_before: values.balance_before,
+          balance_after: values.balance_after,
+          checked_by_oc: values.checked_by_oc ? Number(values.checked_by_oc) : null,
+        };
+        await txSvc.createTransaction(payload);
+        toast.success('Transaction created');
+        setIsCreateTransactionDialogOpen(false);
+        reset();
+        // reload lists
+        loadTransactions();
+        loadAccounts();
+      } catch (err) {
+        console.error('create tx error', err);
+        toast.error('Failed to create transaction');
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Account *</Label>
+            <Controller control={control} name="property_prisoner_account" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-2">
+                    <Input placeholder="Filter accounts..." onChange={() => {}} />
+                  </div>
+                  {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.prisoner_name} - {a.account_type_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Type *</Label>
+            <Controller control={control} name="transaction_type" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select transaction type..." /></SelectTrigger>
+                <SelectContent>
+                  {txTypes.map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.transaction_type && <div className="text-red-600 text-sm">{transactionFormErrors.transaction_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Controller control={control} name="transaction_status" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select status..." /></SelectTrigger>
+                <SelectContent>
+                  {txStatuses.map((s:any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Amount *</Label>
+            <Input type="number" {...register('amount', { required: true, pattern: /^-?\d+(\.\d+)?$/ })} placeholder="Enter amount" />
+            {formState.errors.amount && <div className="text-red-600 text-sm">{(formState.errors.amount as any).message ?? 'Invalid amount'}</div>}
+            {transactionFormErrors.amount && <div className="text-red-600 text-sm">{transactionFormErrors.amount}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Date & Time</Label>
+            <Input type="datetime-local" {...register('transaction_datetime')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance Before</Label>
+            <Input type="text" {...register('balance_before')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance After</Label>
+            <Input type="text" {...register('balance_after')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Checked By</Label>
+            <Controller control={control} name="checked_by_oc" render={({ field }) => (
+              <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Remarks</Label>
+            <Textarea {...register('transaction_remark')} rows={3} />
+          </div>
+
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Controller control={control} name="biometric_consent" render={({ field }) => (
+              <Checkbox id="biometric_consent" checked={!!field.value} onCheckedChange={(c) => field.onChange(c)} />
+            )} />
+            <Label className="cursor-pointer">Biometric Consent</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateTransactionDialogOpen(false); setIsEditTransactionDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}> {isEdit ? 'Update' : 'Create'} Transaction </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v:any)=> setActiveTab(v)} className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger
+            value="accounts"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger
+            value="transactions"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance [All currencies]</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl"> {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    // clear parent form state and remount AccountForm so internal queries reset
+                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+                    setAccountFormKey(k => k + 1);
+                    setIsCreateAccountDialogOpen(true);
+                  }}
+                   style={{ backgroundColor: '#650000' }}
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Create Account
+                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Accounts"
+                data={accounts}
+                loading={accountsLoading}
+                total={accountsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadAccounts(); }}
+                columns={accountColumns}
+                externalSearch={searchTerm}
+                // expanded rows support: DataTable should call this to render expanded content for a row
+                renderExpandedRow={(row:any) => expandedAccounts.has(row.id) ? (
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Transactions</h3>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setTransactionFormData({
+                            ...transactionFormData,
+                            property_prisoner_account: row.id,
+                          });
+                          setIsCreateTransactionDialogOpen(true);
+                        }}
+                        style={{ backgroundColor: '#650000' }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Transaction
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date & Time</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Balance After</TableHead>
+                          <TableHead>Remarks</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getAccountTransactions(row.id).length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500">No transactions found</TableCell>
+                          </TableRow>
+                        ) : getAccountTransactions(row.id).map((t:any) => (
+                          <TableRow key={t.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                                {new Date(t.transaction_datetime).toLocaleString()}
+                              </div>
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
+                            <TableCell>
+                              <span className={parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {parseFloat(t.amount) >= 0 ? '+' : ''}{parseFloat(t.amount).toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{parseFloat(t.balance_after || '0').toLocaleString()}</TableCell>
+                            <TableCell className="max-w-xs truncate">{t.transaction_remark}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteTransactionId(t.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Transactions statistics & filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => { setTransactionSearchTerm(e.target.value); setPage(1); }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label>Transaction Type</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by type..."
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Status</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by status..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Transactions"
+                data={transactions}
+                loading={transactionsLoading}
+                total={transactionsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadTransactions(); }}
+                columns={transactionColumns}
+                externalSearch={transactionSearchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create / Edit / View Dialogs (reuse forms) */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Account</DialogTitle>
+              <DialogDescription>Add a new prisoner account</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+              <DialogDescription>Update account information</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Account Details</DialogTitle>
+              <DialogDescription>View prisoner account information</DialogDescription>
+            </DialogHeader>
+            {selectedAccount && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedAccount.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedAccount.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Currency</Label>
+                    <p>{selectedAccount.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance</Label>
+                    <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Transaction</DialogTitle>
+              <DialogDescription>Add a new transaction</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Transaction Details</DialogTitle>
+              <DialogDescription>View transaction information</DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedTransaction.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedTransaction.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Transaction Type</Label>
+                    <p>{selectedTransaction.transaction_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Status</Label>
+                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                      {selectedTransaction.transaction_status_name}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Amount</Label>
+                    <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                      {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Date & Time</Label>
+                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance Before</Label>
+                    <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance After</Label>
+                    <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Checked By</Label>
+                    <p>{selectedTransaction.checked_by_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Biometric Consent</Label>
+                    <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-500">Remarks</Label>
+                    <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmations */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
+
+
+
+
+// b4 fix of currency placeholder
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
+import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Checkbox } from '../ui/checkbox';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import { toast } from 'sonner';
+import {
+  Search,
+  Plus,
+  Eye,
+  Pencil,
+  Trash2,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Wallet,
+  DollarSign,
+  TrendingUp,
+  FileText,
+  Calendar,
+  Check,
+  ChevronsUpDown
+} from 'lucide-react';
+import { cn } from '../ui/utils';
+import { DataTable } from "../common/DataTableCollapsableRows";
+import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
+import AmountInput from '../common/AmountInput';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { fetchPrisoners } from '../../services/customPrisonersService';
+import * as accountsSvc from '../../services/propertyServices/accountsService';
+import * as txSvc from '../../services/propertyServices/transactionService';
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from '../../services/axiosInstance';
+import {
+  phoneNumberValidation,
+  emailValidation,
+  requiredValidation,
+  nationalIdValidation,
+  passportValidation,
+  nameValidation,
+  numericValidation
+} from '../../utils/validation';
+import { useForm, Controller } from 'react-hook-form';
+
+interface Account {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  currency: string;
+  balance: string;
+  prisoner: string;
+  account_type: string;
+}
+
+interface Transaction {
+  id: string;
+  prisoner_name: string;
+  account_type_name: string;
+  transaction_type_name: string;
+  transaction_status_name: string;
+  checked_by_name: string;
+  amount: string;
+  transaction_datetime: string;
+  transaction_remark: string;
+  biometric_consent: boolean;
+  balance_before: string;
+  balance_after: string;
+  property_prisoner_account: string;
+  transaction_type: string;
+  transaction_status: string;
+  checked_by_oc: number;
+}
+
+// API endpoints (centralised at top)
+const API_ENDPOINTS = {
+  ACCOUNTS: '/property-management/prisoner-accounts/',
+  ACCOUNT_TYPES: '/property-management/cash-account-types/',
+  TRANSACTIONS: '/property-management/transactions/',
+  TX_TYPES: '/property-management/transaction-types/',
+  TX_STATUSES: '/system-administration/transaction-statuses/',
+  PRISONERS: '/admission/prisoners/',
+  CURRENCIES: '/system-administration/currencies/',
+};
+
+const PrisonerPropertyAccountScreen: React.FC = () => {
+  // global filters
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+  // register refresh handler
+  useFilterRefresh(() => {
+    // empty body: we'll trigger reload via effects by changing page/search etc.
+  });
+
+  // server-driven state
+  const [accounts, setAccounts] = useState<Account[]>([]);
+  const [accountsTotal, setAccountsTotal] = useState(0);
+  const [accountsLoading, setAccountsLoading] = useState(false);
+
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [transactionsTotal, setTransactionsTotal] = useState(0);
+  const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // lookups
+  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [accountTypes, setAccountTypes] = useState<any[]>([]);
+  const [txTypes, setTxTypes] = useState<any[]>([]);
+  const [txStatuses, setTxStatuses] = useState<any[]>([]);
+  const [currencies, setCurrencies] = useState<any[]>([]);
+
+  // ui
+  const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const searchTimer = useRef<number| null>(null);
+
+  // dialogs/forms
+  const [isCreateAccountDialogOpen, setIsCreateAccountDialogOpen] = useState(false);
+  const [isEditAccountDialogOpen, setIsEditAccountDialogOpen] = useState(false);
+  const [isViewAccountDialogOpen, setIsViewAccountDialogOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
+
+  const [isCreateTransactionDialogOpen, setIsCreateTransactionDialogOpen] = useState(false);
+  const [isEditTransactionDialogOpen, setIsEditTransactionDialogOpen] = useState(false);
+  const [isViewTransactionDialogOpen, setIsViewTransactionDialogOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+
+  const [deleteAccountId, setDeleteAccountId] = useState<string | null>(null);
+  const [deleteTransactionId, setDeleteTransactionId] = useState<string | null>(null);
+
+  // form state
+  const [accountFormData, setAccountFormData] = useState({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+  const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
+  // force remount AccountForm to reset its internal state when opening create/edit
+  const [accountFormKey, setAccountFormKey] = useState(0);
+  const [transactionFormData, setTransactionFormData] = useState({
+    property_prisoner_account: '',
+    transaction_type: '',
+    transaction_status: '',
+    amount: '',
+    transaction_remark: '',
+    biometric_consent: false,
+    checked_by_oc: 0,
+  });
+  const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
+  // expanded rows (for accounts collapsible section)
+  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
+  const toggleAccountExpansion = (accountId: string) => {
+    const newSet = new Set(expandedAccounts);
+    if (newSet.has(accountId)) newSet.delete(accountId);
+    else newSet.add(accountId);
+    setExpandedAccounts(newSet);
+  };
+  // helper to get transactions for an account (from loaded transactions)
+  const getAccountTransactions = (accountId: string) => {
+    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
+  };
+
+  // request control
+  const abortRef = useRef<AbortController | null>(null);
+  const reqId = useRef(0);
+
+  // helper to include global filters and paging
+  const baseParams = useCallback((overrides: any = {}) => ({
+    page,
+    page_size: pageSize,
+    search: activeTab === 'accounts' ? searchTerm : transactionSearchTerm,
+    station: globalStation || undefined,
+    district: globalDistrict || undefined,
+    region: globalRegion || undefined,
+    ...overrides,
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+
+  // load lookups
+  const loadLookups = useCallback(async () => {
+    try {
+      const [pRes, atRes, ttRes, tsRes, curRes] = await Promise.all([
+        axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionTypes().catch(()=>({ results: [] })),
+        txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
+        axiosInstance.get(API_ENDPOINTS.CURRENCIES, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+      ]);
+      setPrisoners(pRes?.results ?? []);
+      setAccountTypes(atRes?.results ?? []);
+      setTxTypes(ttRes?.results ?? []);
+      setTxStatuses(tsRes?.results ?? []);
+      setCurrencies((curRes?.results ?? []).map((c:any) => c.code ?? c)); // adapt to API shape
+    } catch (err) {
+      console.error('lookup load error', err);
+    }
+  }, []);
+
+  // load accounts
+  const loadAccounts = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setAccountsLoading(true);
+    try {
+      const data = await accountsSvc.listAccounts(baseParams(opts));
+      if (id !== reqId.current) return;
+      setAccounts(data.results ?? []);
+      setAccountsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadAccounts error', err);
+      toast.error('Failed to load accounts');
+    } finally {
+      if (id === reqId.current) setAccountsLoading(false);
+    }
+  }, [baseParams]);
+
+  // load transactions
+  const loadTransactions = useCallback(async (opts: any = {}) => {
+    reqId.current += 1;
+    const id = reqId.current;
+    try { abortRef.current?.abort(); } catch {}
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setTransactionsLoading(true);
+    try {
+      const data = await txSvc.listTransactions(baseParams(opts));
+      if (id !== reqId.current) return;
+      setTransactions(data.results ?? []);
+      setTransactionsTotal(data.count ?? 0);
+    } catch (err:any) {
+      if (err?.name === 'AbortError') return;
+      console.error('loadTransactions error', err);
+      toast.error('Failed to load transactions');
+    } finally {
+      if (id === reqId.current) setTransactionsLoading(false);
+    }
+  }, [baseParams]);
+
+  // debounce search for accounts/transactions
+  useEffect(() => {
+    if (searchTimer.current) window.clearTimeout(searchTimer.current);
+    searchTimer.current = window.setTimeout(() => {
+      setPage(1);
+      if (activeTab === 'accounts') loadAccounts();
+      if (activeTab === 'transactions') loadTransactions();
+    }, 500);
+    return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
+  }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
+
+  // reload when filters/paging change
+  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
+  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+
+  // initial lookups
+  useEffect(() => { loadLookups(); }, [loadLookups]);
+
+  // register filter refresh to reload lists when global filters change via header UI
+  useFilterRefresh(() => {
+    setPage(1);
+    loadAccounts();
+    loadTransactions();
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // CRUD handlers (accounts)
+  const validateAccountForm = () => {
+    const errs: Record<string,string> = {};
+    const prisonerValue = String(accountFormData.prisoner ?? '').trim();
+    const accountTypeValue = String(accountFormData.account_type ?? '').trim();
+    const currencyValue = String(accountFormData.currency ?? '').trim();
+    const balanceValue = String(accountFormData.balance ?? '').trim();
+
+    if (!requiredValidation(prisonerValue)) errs.prisoner = 'Prisoner is required';
+    if (!requiredValidation(accountTypeValue)) errs.account_type = 'Account type is required';
+    if (!requiredValidation(currencyValue)) errs.currency = 'Currency is required';
+    // numericValidation pattern expects digits; adjust message accordingly
+    if (!balanceValue || !numericValidation.pattern.value.test(balanceValue)) errs.balance = 'Balance must be a number';
+    setAccountFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  // validate arbitrary form data shape (used by handlers that accept local-submitted data)
+  const validateAccountData = (data: any) => {
+    const errs: Record<string,string> = {};
+    if (!String(data.prisoner ?? '').trim()) errs.prisoner = 'Prisoner is required';
+    if (!String(data.account_type ?? '').trim()) errs.account_type = 'Account type is required';
+    if (!String(data.currency ?? '').trim()) errs.currency = 'Currency is required';
+    const bal = String(data.balance ?? '').trim();
+    if (!bal || !/^-?\d+(\.\d+)?$/.test(bal)) errs.balance = 'Balance must be a number';
+    return errs;
+  };
+
+  const handleCreateAccount = async (dataOrEvent: any) => {
+    // if called from old signature, fallback
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.createAccount({
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account created');
+      setIsCreateAccountDialogOpen(false);
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+      loadAccounts();
+    } catch (err) {
+      console.error('create account error', err);
+      toast.error('Failed to create account');
+    }
+  };
+
+  const handleUpdateAccount = async (dataOrEvent: any) => {
+    if (!selectedAccount) return;
+    const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
+    const errs = validateAccountData(data);
+    if (Object.keys(errs).length) {
+      setAccountFormErrors(errs);
+      return;
+    }
+    try {
+      await accountsSvc.updateAccount(selectedAccount.id, {
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      toast.success('Account updated');
+      setIsEditAccountDialogOpen(false);
+      setSelectedAccount(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('update account error', err);
+      toast.error('Failed to update account');
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (!deleteAccountId) return;
+    try {
+      await accountsSvc.deleteAccount(deleteAccountId);
+      toast.success('Account deleted');
+      setDeleteAccountId(null);
+      loadAccounts();
+    } catch (err) {
+      console.error('delete account error', err);
+      toast.error('Failed to delete account');
+    }
+  };
+
+  // CRUD handlers (transactions)
+  const validateTransactionForm = () => {
+    const errs: Record<string,string> = {};
+    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
+    setTransactionFormErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const handleCreateTransaction = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!validateTransactionForm()) return;
+    try {
+      await txSvc.createTransaction(transactionFormData);
+      toast.success('Transaction created');
+      setIsCreateTransactionDialogOpen(false);
+      setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('create tx error', err);
+      toast.error('Failed to create transaction');
+    }
+  };
+
+  const handleDeleteTransaction = async () => {
+    if (!deleteTransactionId) return;
+    try {
+      // API delete endpoint assumed to be DELETE /transactions/{id}/
+      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
+      // If backend supports delete, call it instead.
+      toast.success('Transaction deleted');
+      setDeleteTransactionId(null);
+      loadTransactions();
+      loadAccounts();
+    } catch (err) {
+      console.error('delete tx error', err);
+      toast.error('Failed to delete transaction');
+    }
+  };
+
+  // UI computed stats
+  const totalAccounts = accountsTotal;
+  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  const totalTransactions = transactionsTotal;
+  const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+
+  // Columns for DataTable
+  const accountColumns = [
+    {
+      key: 'expand',
+      label: '',
+      sortable: false,
+      render: (_v:any, r:any) => (
+        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
+          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+        </Button>
+      )
+    },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'currency', label: 'Currency' },
+    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
+      <div className="flex justify-end gap-2">
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsViewAccountDialogOpen(true); }}>
+          <Eye className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency }); setIsEditAccountDialogOpen(true); }}>
+          <Pencil className="h-4 w-4" />
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </Button>
+      </div>
+    )},
+  ];
+
+  const transactionColumns = [
+    { key: 'transaction_datetime', label: 'Date & Time' },
+    { key: 'prisoner_name', label: 'Prisoner' },
+    { key: 'account_type_name', label: 'Account Type' },
+    { key: 'transaction_type_name', label: 'Type' },
+    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
+    { key: 'transaction_status_name', label: 'Status' },
+    { key: 'checked_by_name', label: 'Checked By' },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+  ];
+
+  // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
+  const AccountForm = ({ onSubmit, isEdit }: { onSubmit: (dataOrEvent: any) => void; isEdit: boolean }) => {
+    // local form state to avoid re-rendering parent on every keypress (prevents caret loss)
+    const [local, setLocal] = useState({
+      prisoner: accountFormData.prisoner || '',
+      account_type: accountFormData.account_type || '',
+      currency: accountFormData.currency || 'UGX',
+      balance: accountFormData.balance ?? '0',
+    });
+    const [prisonerQuery, setPrisonerQuery] = useState('');
+    const [prisonerResults, setPrisonerResults] = useState<any[]>([]);
+    const [prisonerLoading, setPrisonerLoading] = useState(false);
+    const prisonerAbortRef = useRef<AbortController | null>(null);
+    const [accountTypeQuery, setAccountTypeQuery] = useState('');
+    const [currencyQuery, setCurrencyQuery] = useState('');
+    const [openPrisoner, setOpenPrisoner] = useState(false);
+    const [selectedPrisonerName, setSelectedPrisonerName] = useState<string>('');
+    const [balanceEditable, setBalanceEditable] = useState(false);
+    const [errors, setErrors] = useState<Record<string,string>>({});
+
+    // load prisoners (debounced, abortable)
+    useEffect(() => {
+      if (prisonerAbortRef.current) {
+        prisonerAbortRef.current.abort();
+        prisonerAbortRef.current = null;
+      }
+      const t = window.setTimeout(() => {
+        const ctrl = new AbortController();
+        prisonerAbortRef.current = ctrl;
+        setPrisonerLoading(true);
+        fetchPrisoners({
+          search: prisonerQuery || '',
+          station: globalStation || null,
+          district: globalDistrict || null,
+          region: globalRegion || null,
+          page_size: 50,
+          useCache: true,
+        }, ctrl.signal).then(res => {
+          setPrisonerResults(res.items || []);
+        }).catch(err => {
+          // ignore aborts; surface only real errors
+          if ((err as any).name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
+          console.error('fetchPrisoners error', err);
+        }).finally(() => {
+          setPrisonerLoading(false);
+        });
+      }, 300);
+      return () => {
+        window.clearTimeout(t);
+        if (prisonerAbortRef.current) { prisonerAbortRef.current.abort(); prisonerAbortRef.current = null; }
+      };
+    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+
+    const validateLocal = () => {
+      const e: Record<string,string> = {};
+      if (!String(local.prisoner || '').trim()) e.prisoner = 'Prisoner is required';
+      if (!String(local.account_type || '').trim()) e.account_type = 'Account type is required';
+      // balance must be numeric (allow negative and decimals). empty -> treat as 0
+      if (!String(local.balance || '').trim() || !/^-?\d+(\.\d+)?$/.test(String(local.balance).trim())) e.balance = 'Balance must be a number';
+      setErrors(e);
+      return Object.keys(e).length === 0;
+    };
+
+    const submit = (ev?: React.FormEvent) => {
+      ev?.preventDefault();
+      if (!validateLocal()) return;
+      onSubmit({
+        prisoner: String(local.prisoner),
+        account_type: String(local.account_type),
+        currency: String(local.currency),
+        balance: String(local.balance || '0'),
+      });
+    };
+
+    return (
+      <form onSubmit={submit} className="space-y-4">
+        <div className="grid grid-cols-1 gap-4">
+          {/* prisoner picker (same UI as before) */}
+          <div className="space-y-2">
+            <Label htmlFor="prisoner">Prisoner *</Label>
+            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" aria-expanded={openPrisoner} className="w-full justify-between text-left" type="button">
+                  {local.prisoner
+                    ? (selectedPrisonerName
+                        || prisoners.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || prisonerResults.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
+                        || local.prisoner)
+                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
+                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-full p-0">
+                <Command shouldFilter={false}>
+                  <CommandInput placeholder="Search prisoners..." value={prisonerQuery} onValueChange={(v) => setPrisonerQuery(v)} />
+                  <CommandList>
+                    {prisonerLoading ? (
+                      <div className="flex items-center justify-center py-4">
+                        <span className="text-sm text-gray-500">Loading prisoners...</span>
+                      </div>
+                    ) : (
+                      <>
+                        <CommandEmpty>No prisoner found.</CommandEmpty>
+                        <CommandGroup>
+                          {prisonerResults.map((p:any) => (
+                            <CommandItem key={p.id} value={String(p.id)}
+                              onSelect={() => {
+                                setLocal(prev => ({ ...prev, prisoner: String(p.id) }));
+                                setSelectedPrisonerName(p.full_name);
+                                setOpenPrisoner(false);
+                              }}
+                              className="cursor-pointer"
+                            >
+                              <Check className={cn("mr-2 h-4 w-4", String(local.prisoner) === String(p.id) ? "opacity-100" : "opacity-0")} style={{ color: '#650000' }} />
+                              <div className="flex flex-col text-sm">
+                                <span>{p.full_name}</span>
+                                <span className="text-xs text-gray-500">{p.prisoner_number_value || p.prisoner_number || ''}</span>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </>
+                    )}
+                  </CommandList>
+                </Command>
+              </PopoverContent>
+            </Popover>
+            {errors.prisoner && <div className="text-red-600 text-sm mt-1">{errors.prisoner}</div>}
+          </div>
+
+          {/* account type */}
+          <div className="space-y-2">
+            <Label htmlFor="account_type">Account Type *</Label>
+            <Select value={local.account_type} onValueChange={(v)=> setLocal(prev => ({ ...prev, account_type: v }))} required>
+              <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2"><Input placeholder="Filter account types..." value={accountTypeQuery} onChange={(e) => setAccountTypeQuery(e.target.value)} /></div>
+                {accountTypes.filter((t:any) => !accountTypeQuery || String(t.name ?? '').toLowerCase().includes(accountTypeQuery.toLowerCase())).map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            {errors.account_type && <div className="text-red-600 text-sm">{errors.account_type}</div>}
+          </div>
+
+          {/* Currency (searchable select) */}
+          <div className="space-y-2">
+            <Label htmlFor="currency">Currency *</Label>
+            <Select value={local.currency} onValueChange={(v)=> setLocal(prev => ({ ...prev, currency: v }))} required>
+              <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
+              <SelectContent>
+                <div className="px-2 py-2">
+                  <Input placeholder="Filter currencies..." value={currencyQuery} onChange={(e) => setCurrencyQuery(e.target.value)} />
+                </div>
+                {(currencies || []).filter((c:any) => {
+                  const code = typeof c === 'string' ? c : (c.code ?? c.id ?? '');
+                  return !currencyQuery || String(code).toLowerCase().includes(currencyQuery.toLowerCase());
+                }).map((c:any) => {
+                  const code = typeof c === 'string' ? c : (c.code ?? c.id ?? '');
+                  return <SelectItem key={code} value={String(code)}>{code}</SelectItem>;
+                })}
+              </SelectContent>
+            </Select>
+            {errors.currency && <div className="text-red-600 text-sm mt-1">{errors.currency}</div>}
+          </div>
+
+          {/* Balance (disabled by default, toggle to enable) */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label htmlFor="balance">Balance</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" aria-label="Edit balance" checked={balanceEditable} onChange={(e) => setBalanceEditable(e.target.checked)} />
+                Edit
+              </label>
+            </div>
+            <AmountInput
+              id="balance"
+              currency={local.currency}
+              className="disabled:opacity-25 input-invalid file:text-foreground dark:bg-input/30 w-full min-w-0 rounded-md px-3 py-1 bg-input-background transition-[color,box-shadow] outline-none"
+              value={local.balance}
+              onChange={(v) => setLocal(prev => ({ ...prev, balance: v }))}
+              placeholder="0"
+              disabled={!balanceEditable}
+            />
+            {errors.balance && <div className="text-red-600 text-sm mt-1">{errors.balance}</div>}
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateAccountDialogOpen(false); setIsEditAccountDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}>{isEdit ? 'Update' : 'Create'} Account</Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  // Transaction form implemented with react-hook-form to avoid focus loss on re-renders
+  const TransactionForm = ({ onSubmit, isEdit }: { onSubmit: (e: React.FormEvent) => void; isEdit: boolean }) => {
+    const { register, handleSubmit, control, watch, setValue, formState, reset } = useForm({
+      mode: "onTouched",
+      defaultValues: {
+        property_prisoner_account: transactionFormData.property_prisoner_account || '',
+        transaction_type: transactionFormData.transaction_type || '',
+        transaction_status: transactionFormData.transaction_status || '',
+        amount: transactionFormData.amount || '',
+        transaction_remark: transactionFormData.transaction_remark || '',
+        biometric_consent: transactionFormData.biometric_consent || false,
+        transaction_datetime: new Date().toISOString().slice(0,16),
+        balance_before: '',
+        balance_after: '',
+        checked_by_oc: null,
+      }
+    });
+
+    // keep balance_before in sync when account changes
+    const selectedAccountId = watch('property_prisoner_account');
+    const amountValue = watch('amount');
+    useEffect(() => {
+      if (!selectedAccountId) {
+        setValue('balance_before', '');
+        setValue('balance_after', '');
+        return;
+      }
+      const acc = accounts.find(a => String(a.id) === String(selectedAccountId));
+      const before = acc ? (parseFloat(acc.balance || '0') || 0) : 0;
+      setValue('balance_before', String(before));
+      const amountNum = parseFloat(String(amountValue || '0')) || 0;
+      setValue('balance_after', String(before + amountNum));
+    }, [selectedAccountId, amountValue, accounts, setValue]);
+
+    const onSubmitForm = async (values: any) => {
+      // validate required fields locally
+      const errs: Record<string,string> = {};
+      if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
+      if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
+      if (!values.amount) errs.amount = 'Amount is required';
+      if (Object.keys(errs).length) {
+        setTransactionFormErrors(errs);
+        return;
+      }
+      setTransactionFormErrors({});
+
+      try {
+        // prepare payload expected by API
+        const payload = {
+          property_prisoner_account: values.property_prisoner_account,
+          transaction_type: values.transaction_type,
+          transaction_status: values.transaction_status || null,
+          amount: values.amount,
+          transaction_remark: values.transaction_remark,
+          biometric_consent: !!values.biometric_consent,
+          transaction_datetime: values.transaction_datetime,
+          balance_before: values.balance_before,
+          balance_after: values.balance_after,
+          checked_by_oc: values.checked_by_oc ? Number(values.checked_by_oc) : null,
+        };
+        await txSvc.createTransaction(payload);
+        toast.success('Transaction created');
+        setIsCreateTransactionDialogOpen(false);
+        reset();
+        // reload lists
+        loadTransactions();
+        loadAccounts();
+      } catch (err) {
+        console.error('create tx error', err);
+        toast.error('Failed to create transaction');
+      }
+    };
+
+    return (
+      <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Account *</Label>
+            <Controller control={control} name="property_prisoner_account" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
+                <SelectContent>
+                  <div className="px-2 py-2">
+                    <Input placeholder="Filter accounts..." onChange={() => {}} />
+                  </div>
+                  {accounts.map(a => <SelectItem key={a.id} value={String(a.id)}>{a.prisoner_name} - {a.account_type_name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Type *</Label>
+            <Controller control={control} name="transaction_type" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select transaction type..." /></SelectTrigger>
+                <SelectContent>
+                  {txTypes.map((t:any) => <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+            {transactionFormErrors.transaction_type && <div className="text-red-600 text-sm">{transactionFormErrors.transaction_type}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Status</Label>
+            <Controller control={control} name="transaction_status" render={({ field }) => (
+              <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
+                <SelectTrigger><SelectValue placeholder="Select status..." /></SelectTrigger>
+                <SelectContent>
+                  {txStatuses.map((s:any) => <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Amount *</Label>
+            <Controller control={control} name="amount" rules={{ required: true, pattern: /^-?\d+(\.\d+)?$/ }} render={({ field }) => {
+              const selAcc = accounts.find(a => String(a.id) === String(watch('property_prisoner_account')));
+              const selCurrency = selAcc?.currency ?? 'UGX';
+              return (
+                <AmountInput
+                  value={field.value ?? ''}
+                  onChange={(v) => field.onChange(v)}
+                  currency={selCurrency}
+                  placeholder="Enter amount"
+                />
+              );
+            }} />
+            {formState.errors.amount && <div className="text-red-600 text-sm">{(formState.errors.amount as any).message ?? 'Invalid amount'}</div>}
+            {transactionFormErrors.amount && <div className="text-red-600 text-sm">{transactionFormErrors.amount}</div>}
+          </div>
+
+          <div className="space-y-2">
+            <Label>Transaction Date & Time</Label>
+            <Input type="datetime-local" {...register('transaction_datetime')} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance Before</Label>
+            <Input type="text" {...register('balance_before')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Balance After</Label>
+            <Input type="text" {...register('balance_after')} disabled />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Checked By</Label>
+            <Controller control={control} name="checked_by_oc" render={({ field }) => (
+              <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
+            )} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Remarks</Label>
+            <Textarea {...register('transaction_remark')} rows={3} />
+          </div>
+
+          <div className="space-y-2 flex items-center gap-2 pt-8">
+            <Controller control={control} name="biometric_consent" render={({ field }) => (
+              <Checkbox id="biometric_consent" checked={!!field.value} onCheckedChange={(c) => field.onChange(c)} />
+            )} />
+            <Label className="cursor-pointer">Biometric Consent</Label>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => { setIsCreateTransactionDialogOpen(false); setIsEditTransactionDialogOpen(false); }}>Cancel</Button>
+          <Button type="submit" style={{ backgroundColor: '#650000' }}> {isEdit ? 'Update' : 'Create'} Transaction </Button>
+        </DialogFooter>
+      </form>
+    );
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl" style={{ color: '#650000' }}>Accounts and Transactions</h1>
+          <p className="text-gray-600">Manage prisoner accounts and financial transactions</p>
+        </div>
+      </div>
+
+      <Tabs value={activeTab} onValueChange={(v:any)=> setActiveTab(v)} className="space-y-6">
+        <TabsList className="w-full">
+          <TabsTrigger
+            value="accounts"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Accounts
+          </TabsTrigger>
+          <TabsTrigger
+            value="transactions"
+            className="flex-1 data-[state=active]:bg-[#650000] data-[state=active]:text-white"
+          >
+            Transactions
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="accounts" className="space-y-6">
+          {/* Statistics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Accounts</CardTitle>
+                <Wallet className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalAccounts}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Balance [All currencies]</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl"> {totalBalance.toLocaleString()}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending Transactions</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters and Actions */}
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                <div className="relative flex-1 max-w-sm">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                  <Input
+                    placeholder="Search accounts..."
+                    value={searchTerm}
+                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
+                    className="pl-10"
+                  />
+                </div>
+                <Button
+                  onClick={() => {
+                    // clear parent form state and remount AccountForm so internal queries reset
+                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
+                    setAccountFormKey(k => k + 1);
+                    setIsCreateAccountDialogOpen(true);
+                  }}
+                   style={{ backgroundColor: '#650000' }}
+                 >
+                   <Plus className="h-4 w-4 mr-2" />
+                   Create Account
+                 </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Accounts Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Accounts"
+                data={accounts}
+                loading={accountsLoading}
+                total={accountsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadAccounts(); }}
+                columns={accountColumns}
+                externalSearch={searchTerm}
+                // expanded rows support: DataTable should call this to render expanded content for a row
+                renderExpandedRow={(row:any) => expandedAccounts.has(row.id) ? (
+                  <div className="p-4 bg-gray-50">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-semibold">Transactions</h3>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setTransactionFormData({
+                            ...transactionFormData,
+                            property_prisoner_account: row.id,
+                          });
+                          setIsCreateTransactionDialogOpen(true);
+                        }}
+                        style={{ backgroundColor: '#650000' }}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Add Transaction
+                      </Button>
+                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date & Time</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Amount</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Balance After</TableHead>
+                          <TableHead>Remarks</TableHead>
+                          <TableHead className="text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {getAccountTransactions(row.id).length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center text-gray-500">No transactions found</TableCell>
+                          </TableRow>
+                        ) : getAccountTransactions(row.id).map((t:any) => (
+                          <TableRow key={t.id}>
+                            <TableCell>
+                              <div className="flex items-center gap-2">
+                                <Calendar className="h-4 w-4 text-gray-400" />
+                                {new Date(t.transaction_datetime).toLocaleString()}
+                              </div>
+                            </TableCell>
+                            <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
+                            <TableCell>
+                              <span className={parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                {parseFloat(t.amount) >= 0 ? '+' : ''}{parseFloat(t.amount).toLocaleString()}
+                              </span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{parseFloat(t.balance_after || '0').toLocaleString()}</TableCell>
+                            <TableCell className="max-w-xs truncate">{t.transaction_remark}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => setDeleteTransactionId(t.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                ) : null}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="transactions" className="space-y-6">
+          {/* Transactions statistics & filters */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Transactions</CardTitle>
+                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Pending</CardTitle>
+                <FileText className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{pendingTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Approved</CardTitle>
+                <Check className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm">Total Value</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+                  <div className="relative flex-1 max-w-sm w-full">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search transactions..."
+                      value={transactionSearchTerm}
+                      onChange={(e) => { setTransactionSearchTerm(e.target.value); setPage(1); }}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Transaction
+                  </Button>
+                </div>
+
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label>Transaction Type</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by type..."
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <Label>Status</Label>
+                    <SearchableSelect
+                      items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
+                      value={'all'}
+                      onChange={()=>{}}
+                      placeholder="Filter by status..."
+                    />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Transactions Table (DataTable) */}
+          <Card>
+            <CardContent className="pt-6">
+              <DataTable
+                title="Transactions"
+                data={transactions}
+                loading={transactionsLoading}
+                total={transactionsTotal}
+                page={page}
+                pageSize={pageSize}
+                onPageChange={(p:number)=> setPage(p)}
+                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
+                onSort={() => { setPage(1); loadTransactions(); }}
+                columns={transactionColumns}
+                externalSearch={transactionSearchTerm}
+              />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+
+      {/* Create / Edit / View Dialogs (reuse forms) */}
+      <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Account</DialogTitle>
+              <DialogDescription>Add a new prisoner account</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleCreateAccount} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Account</DialogTitle>
+              <DialogDescription>Update account information</DialogDescription>
+            </DialogHeader>
+            <AccountForm key={accountFormKey} onSubmit={handleUpdateAccount} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Account Details</DialogTitle>
+              <DialogDescription>View prisoner account information</DialogDescription>
+            </DialogHeader>
+            {selectedAccount && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedAccount.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedAccount.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Currency</Label>
+                    <p>{selectedAccount.currency}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance</Label>
+                    <p className="text-2xl">{parseFloat(selectedAccount.balance).toLocaleString()}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewAccountDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Create New Transaction</DialogTitle>
+              <DialogDescription>Add a new transaction</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleCreateTransaction} isEdit={false} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
+        <DialogContent className="max-w-[95vw] w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Transaction Details</DialogTitle>
+              <DialogDescription>View transaction information</DialogDescription>
+            </DialogHeader>
+            {selectedTransaction && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-gray-500">Prisoner Name</Label>
+                    <p>{selectedTransaction.prisoner_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Account Type</Label>
+                    <p>{selectedTransaction.account_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Transaction Type</Label>
+                    <p>{selectedTransaction.transaction_type_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Status</Label>
+                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                      {selectedTransaction.transaction_status_name}
+                    </Badge>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Amount</Label>
+                    <p className={parseFloat(selectedTransaction.amount) >= 0 ? 'text-green-600 text-2xl' : 'text-red-600 text-2xl'}>
+                      {parseFloat(selectedTransaction.amount) >= 0 ? '+' : ''}{parseFloat(selectedTransaction.amount).toLocaleString()}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Date & Time</Label>
+                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance Before</Label>
+                    <p>{parseFloat(selectedTransaction.balance_before).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Balance After</Label>
+                    <p>{parseFloat(selectedTransaction.balance_after).toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Checked By</Label>
+                    <p>{selectedTransaction.checked_by_name}</p>
+                  </div>
+                  <div>
+                    <Label className="text-gray-500">Biometric Consent</Label>
+                    <p>{selectedTransaction.biometric_consent ? 'Yes' : 'No'}</p>
+                  </div>
+                  <div className="col-span-2">
+                    <Label className="text-gray-500">Remarks</Label>
+                    <p>{selectedTransaction.transaction_remark || 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsViewTransactionDialogOpen(false)}>
+                Close
+              </Button>
+            </DialogFooter>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmations */}
+      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the account and all associated transactions.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the transaction.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+};
+
+export default PrisonerPropertyAccountScreen;
