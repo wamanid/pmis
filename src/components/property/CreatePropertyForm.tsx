@@ -89,9 +89,24 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
     const [visitors, setVisitors] = useState<Visitor[]>([]);
     const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
     const [isPropertyItemsOpen, setIsPropertyItemsOpen] = useState(true);
-    const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
+    // const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
+    //   id: '1',
+    //   property_type: getPropertyTypeUtil(propertyTypes),
+    //   property_category: '',
+    //   property_item: '',
+    //   measurement_unit: '',
+    //   property_bag: '',
+    //   next_of_kin: '',
+    //   property_status: '',
+    //   quantity: '',
+    //   amount: '',
+    //   note: '',
+    //   destination: '',
+    //   visitor_item: '',
+    // }]);
+   const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
       id: '1',
-      property_type: getPropertyTypeUtil(propertyTypes),
+      property_type: "",
       property_category: '',
       property_item: '',
       measurement_unit: '',
@@ -208,6 +223,23 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         // setLoading(prev =>({...prev, property: false}))
         setVisitorItems([])
         fetchVisitorItems(visitorInfo.visitor)
+      }
+      else {
+          setPropertyItems([{
+              id: '1',
+              property_type: '',
+              property_category: '',
+              property_item: '',
+              measurement_unit: '',
+              property_bag: '',
+              next_of_kin: '',
+              property_status: '',
+              quantity: '',
+              amount: '',
+              note: '',
+              destination: '',
+              visitor_item: '',
+            }])
       }
     }, [visitorInfo]);
 

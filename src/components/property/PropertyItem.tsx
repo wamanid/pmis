@@ -18,7 +18,12 @@ import {Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandL
 import {cn} from "../ui/utils";
 import {Input} from "../ui/input";
 import {Textarea} from "../ui/textarea";
-import {handleCatchError, handleEmptyList, handleServerError} from "../../services/stationServices/utils";
+import {
+    getPropertyTypeUtil,
+    handleCatchError,
+    handleEmptyList,
+    handleServerError
+} from "../../services/stationServices/utils";
 import {toast} from "sonner";
 
 interface ChildProps {
@@ -95,7 +100,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
         const updates = {
             quantity: visitorItem.quantity.toString(),
-            property_type: "",
+            property_type: getPropertyTypeUtil(propertyTypes),
             amount: visitorItem.amount,
             visitor_item: visitorItem.id,
             property_category: visitorItem.item_category,
@@ -297,9 +302,9 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                       <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={!item.visitor_item}
+                                  disabled={item.visitor_item}
                           >
-                            {!item.visitor_item && !!propertyTypes.length && propertyTypes.find(type => type.name === "Incoming Supplementary")
+                            {item.visitor_item && !!propertyTypes.length && propertyTypes.find(type => type.name === "Incoming Supplementary")
                                 ? "Incoming Supplementary"
                                 : item.property_type
                                   ? propertyTypes.find((t) => t.id === item.property_type)?.name
