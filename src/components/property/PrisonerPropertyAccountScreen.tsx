@@ -712,10 +712,11 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         amount: transactionFormData.amount || '',
         transaction_remark: transactionFormData.transaction_remark || '',
         biometric_consent: transactionFormData.biometric_consent || false,
-        transaction_datetime: new Date().toISOString().slice(0,16),
+        // keep transaction_datetime as full ISO string (backend expects Z)
+        transaction_datetime: new Date().toISOString(),
         balance_before: '',
         balance_after: '',
-        checked_by_oc: null,
+        checked_by_oc: transactionFormData.checked_by_oc ?? '',
       }
     });
 
@@ -735,12 +736,32 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       setValue('balance_after', String(before + amountNum));
     }, [selectedAccountId, amountValue, accounts, setValue]);
 
+    // datetime editing state: disabled by default, value in form is ISO string
+    const [dtEditable, setDtEditable] = useState(false);
+    // maintain local datetime-local string for editing UI
+    const currentIso = watch('transaction_datetime') || new Date().toISOString();
+    const isoToLocal = (iso:string) => {
+      try {
+        const d = new Date(iso);
+        // datetime-local expects "YYYY-MM-DDTHH:mm"
+        return d.toISOString().slice(0,16);
+      } catch { return ''; }
+    };
+    const [localDt, setLocalDt] = useState(isoToLocal(currentIso));
+    // keep localDt synced when form value changes externally (but not while editing)
+    useEffect(() => {
+      if (!dtEditable) setLocalDt(isoToLocal(currentIso));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentIso, dtEditable]);
+
     const onSubmitForm = async (values: any) => {
       // validate required fields locally
       const errs: Record<string,string> = {};
       if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
       if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
       if (!values.amount) errs.amount = 'Amount is required';
+      // backend requires checked_by_oc non-null
+      if (!values.checked_by_oc) errs.checked_by_oc = 'Checked By is required';
       if (Object.keys(errs).length) {
         setTransactionFormErrors(errs);
         return;
@@ -756,10 +777,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           amount: values.amount,
           transaction_remark: values.transaction_remark,
           biometric_consent: !!values.biometric_consent,
+          // ensure we send full ISO string (Z)
           transaction_datetime: values.transaction_datetime,
           balance_before: values.balance_before,
           balance_after: values.balance_after,
-          checked_by_oc: values.checked_by_oc ? Number(values.checked_by_oc) : null,
+          // checked_by_oc must be provided (we expect a uuid or id as returned by StaffProfileSelect)
+          checked_by_oc: values.checked_by_oc,
         };
         await txSvc.createTransaction(payload);
         toast.success('Transaction created');
@@ -791,6 +814,15 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               </Select>
             )} />
             {transactionFormErrors.property_prisoner_account && <div className="text-red-600 text-sm">{transactionFormErrors.property_prisoner_account}</div>}
+          </div>
+
+          {/* Display selected account currency (read-only, not submitted) */}
+          <div className="space-y-2">
+            <Label>Account Currency</Label>
+            <Input value={(() => {
+              const acc = accounts.find(a => String(a.id) === String(watch('property_prisoner_account')));
+              return acc ? getCurrencyLabel(acc.currency) : '';
+            })()} disabled />
           </div>
 
           <div className="space-y-2">
@@ -837,8 +869,37 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Transaction Date & Time</Label>
-            <Input type="datetime-local" {...register('transaction_datetime')} />
+            <div className="flex items-center justify-between">
+              <Label>Transaction Date & Time</Label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" aria-label="Edit transaction datetime" checked={dtEditable} onChange={(e) => {
+                  const next = e.target.checked;
+                  setDtEditable(next);
+                  // if disabling, write back current localDt as ISO to form (keeps sync)
+                  if (!next) {
+                    const iso = new Date(localDt).toISOString();
+                    setValue('transaction_datetime', iso);
+                  }
+                }} />
+                Edit
+              </label>
+            </div>
+            {!dtEditable ? (
+              // display-only formatted local datetime (not editable)
+              <Input type="text" value={localDt ? localDt.replace('T', ' ') : ''} disabled />
+            ) : (
+              <input
+                type="datetime-local"
+                className="w-full rounded-md px-3 py-1"
+                value={localDt}
+                onChange={(e) => {
+                  setLocalDt(e.target.value);
+                  // convert to ISO Z and set form value for submission
+                  const iso = new Date(e.target.value).toISOString();
+                  setValue('transaction_datetime', iso);
+                }}
+              />
+            )}
           </div>
 
           <div className="space-y-2">
@@ -852,10 +913,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Checked By</Label>
-            <Controller control={control} name="checked_by_oc" render={({ field }) => (
+            <Label>Checked By *</Label>
+            <Controller control={control} name="checked_by_oc" rules={{ required: true }} render={({ field }) => (
               <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
             )} />
+            {formState.errors.checked_by_oc && <div className="text-red-600 text-sm">Checked By is required</div>}
+            {transactionFormErrors.checked_by_oc && <div className="text-red-600 text-sm">{transactionFormErrors.checked_by_oc}</div>}
           </div>
 
           <div className="space-y-2">
