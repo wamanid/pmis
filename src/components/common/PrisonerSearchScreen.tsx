@@ -6,7 +6,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-import { toast } from 'sonner@2.0.3';
+// import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Search, 
   User, 

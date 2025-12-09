@@ -1,9 +1,9 @@
-import axiosInstance from './axiosInstance';
-import { DashboardResponse, DashboardFilters } from '../models/admission';
+import axiosInstance from '../axiosInstance';
+import { DashboardResponse, DashboardFilters } from '../../models/admission';
 
 /**
- * Admission Service
- * Handles all API calls related to prisoner admissions
+ * Dashboard Service
+ * Handles API calls for admission dashboard statistics
  */
 
 /**
@@ -34,12 +34,3 @@ export const getAdmissionDashboard = async (
     throw error;
   }
 };
-
-/**
- * Export all admission service functions
- */
-export const admissionService = {
-  getAdmissionDashboard,
-};
-
-export default admissionService;

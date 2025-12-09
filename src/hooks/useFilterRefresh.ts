@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import {useEffect, useRef} from 'react';
 
 /**
  * Custom hook to automatically refetch data when filters change
@@ -27,13 +27,22 @@ export function useFilterRefresh(
   refetchCallback: () => void | Promise<void>,
   dependencies: any[] = []
 ) {
+  const prevDeps = useRef<any[] | null>(null);
+
   useEffect(() => {
     // Call on mount
     refetchCallback();
 
     // Listen for filter changes
     const handleFilterChange = () => {
-      refetchCallback();
+      const hasChanged = prevDeps.current
+        ? dependencies.some((dep, index) => dep !== prevDeps.current![index])
+        : true;
+
+      if (hasChanged) {
+        refetchCallback(); // only handle NEW values
+        prevDeps.current = [...dependencies];
+      }
     };
 
     window.addEventListener('filterChanged', handleFilterChange);
@@ -41,5 +50,16 @@ export function useFilterRefresh(
     return () => {
       window.removeEventListener('filterChanged', handleFilterChange);
     };
-  }, dependencies); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (prevDeps.current) {
+      const hasChanged = dependencies.some((dep, index) => dep !== prevDeps.current![index]);
+      if (hasChanged) {
+        refetchCallback();
+      }
+    }
+    prevDeps.current = [...dependencies];
+  }, dependencies);
+
 }

@@ -922,21 +922,21 @@ export const fetchMenus = async (): Promise<MenuApiResponse> => {
         deleted_by: null,
         parent: null
       },
-      {
-        id: "4",
-        parent_name: null,
-        created_datetime: "2025-10-20T09:53:28.460Z",
-        is_active: true,
-        updated_datetime: "2025-10-20T09:53:28.460Z",
-        deleted_datetime: null,
-        name: "Property Management",
-        url: "/property-management",
-        icon: "Package",
-        created_by: 1,
-        updated_by: null,
-        deleted_by: null,
-        parent: null
-      },
+      // {
+      //   id: "4",
+      //   parent_name: null,
+      //   created_datetime: "2025-10-20T09:53:28.460Z",
+      //   is_active: true,
+      //   updated_datetime: "2025-10-20T09:53:28.460Z",
+      //   deleted_datetime: null,
+      //   name: "Property Management",
+      //   url: "/property-management",
+      //   icon: "Package",
+      //   created_by: 1,
+      //   updated_by: null,
+      //   deleted_by: null,
+      //   parent: null
+      // },
       {
         id: "5",
         parent_name: null,
