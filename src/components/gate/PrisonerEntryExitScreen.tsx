@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -17,6 +17,7 @@ import {
   LogOut,
   Clock
 } from 'lucide-react';
+import { entryexit } from '../../services/gateService';
 
 interface PrisonerGatePass {
   id: string;
@@ -59,7 +60,6 @@ interface PrisonerDetail {
   date_of_birth: string;
   gender: string;
 }
-
 // Mock Data
 const mockPrisonerGatePasses: PrisonerGatePass[] = [
   {
@@ -74,66 +74,6 @@ const mockPrisonerGatePasses: PrisonerGatePass[] = [
     gate_pass: 'gp1',
     working_party: null
   },
-  {
-    id: '2',
-    prisoner_name: 'Michael Smith',
-    working_party_name: '',
-    destination: 'General Hospital',
-    time_out: '2025-10-28T09:30:00Z',
-    time_in: null,
-    reason: 'Medical emergency',
-    prisoner: 'pr2',
-    gate_pass: 'gp2',
-    working_party: null
-  },
-  {
-    id: '3',
-    prisoner_name: 'David Wilson',
-    working_party_name: 'Farm Labor',
-    destination: 'Prison Farm',
-    time_out: '2025-10-28T06:00:00Z',
-    time_in: '2025-10-28T15:00:00Z',
-    reason: 'Daily farm work',
-    prisoner: 'pr3',
-    gate_pass: 'gp3',
-    working_party: 'wp1'
-  },
-  {
-    id: '4',
-    prisoner_name: 'Thomas Anderson',
-    working_party_name: 'Farm Labor',
-    destination: 'Prison Farm',
-    time_out: '2025-10-28T06:00:00Z',
-    time_in: '2025-10-28T15:00:00Z',
-    reason: 'Daily farm work',
-    prisoner: 'pr4',
-    gate_pass: 'gp3',
-    working_party: 'wp1'
-  },
-  {
-    id: '5',
-    prisoner_name: 'James Taylor',
-    working_party_name: 'Kitchen Duty',
-    destination: 'Main Kitchen',
-    time_out: null,
-    time_in: null,
-    reason: 'Kitchen work',
-    prisoner: 'pr5',
-    gate_pass: 'gp4',
-    working_party: 'wp2'
-  },
-  {
-    id: '6',
-    prisoner_name: 'Robert Martinez',
-    working_party_name: '',
-    destination: 'Central Police Station',
-    time_out: '2025-10-28T10:00:00Z',
-    time_in: null,
-    reason: 'Investigation',
-    prisoner: 'pr6',
-    gate_pass: 'gp5',
-    working_party: null
-  }
 ];
 
 const mockGatePassDetails: Record<string, GatePassDetail> = {
@@ -262,7 +202,7 @@ const mockPrisonerDetails: Record<string, PrisonerDetail> = {
   }
 };
 
-export default function PrisonerEntryExitScreen() {
+export  function PrisonerEntryExitScreen() {
   const [prisonerGatePasses, setPrisonerGatePasses] = useState<PrisonerGatePass[]>(mockPrisonerGatePasses);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -270,12 +210,31 @@ export default function PrisonerEntryExitScreen() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerGatePass | null>(null);
 
+    const [isLoading, setIsLoading]=useState(true);
+
   const itemsPerPage = 10;
 
   // Get status based on time_out
   const getInOutStatus = (timeOut: string | null) => {
     return timeOut ? 'OUT' : 'IN';
   };
+
+
+
+
+useEffect (() => {
+  //use effect
+
+    entryexit().then((data) => {
+        setIsLoading(true);
+    setPrisonerGatePasses(data.results);
+     setIsLoading(false);
+  }).catch((error) => {
+    alert(error);
+      setIsLoading(false);
+  });
+
+});
 
   // Filter prisoner gate passes
   const filteredRecords = prisonerGatePasses.filter(record => {
@@ -335,6 +294,18 @@ export default function PrisonerEntryExitScreen() {
   const prisonersOut = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'OUT').length;
   const prisonersIn = prisonerGatePasses.filter(p => getInOutStatus(p.time_out) === 'IN').length;
   const onWorkingParty = prisonerGatePasses.filter(p => p.working_party).length;
+
+
+    if (isLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -550,27 +521,27 @@ export default function PrisonerEntryExitScreen() {
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Prisoner Information</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {mockPrisonerDetails[selectedRecord.prisoner] ? (
+                    {selectedRecord.prisoner ? (
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Full Name</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].full_name}</p>
+                          <p>{selectedRecord.prisoner.first_name} {selectedRecord.prisoner.last_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Prisoner Number</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].prisoner_number}</p>
+                          <p>{selectedRecord.prisoner.prisoner_number}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Category</p>
-                          <Badge variant="outline">{mockPrisonerDetails[selectedRecord.prisoner].category}</Badge>
+                          <Badge variant="outline">{selectedRecord.prisoner.prisoner_category}</Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gender</p>
-                          <p>{mockPrisonerDetails[selectedRecord.prisoner].gender}</p>
+                          <p>{selectedRecord.prisoner.sex}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Date of Birth</p>
-                          <p>{new Date(mockPrisonerDetails[selectedRecord.prisoner].date_of_birth).toLocaleDateString()}</p>
+                          <p>{new Date(selectedRecord.prisoner.date_of_birth).toLocaleDateString()}</p>
                         </div>
                       </div>
                     ) : (
@@ -620,46 +591,30 @@ export default function PrisonerEntryExitScreen() {
                 <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Gate Pass Details</h3>
                 <Card>
                   <CardContent className="p-4">
-                    {mockGatePassDetails[selectedRecord.gate_pass] ? (
+                  
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <p className="text-sm text-gray-600">Gate Pass Type</p>
-                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_pass_type_name}</p>
+                          <p>{selectedRecord.gate_pass.gate_pass_type_name}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Gatekeeper</p>
-                          <p>{mockGatePassDetails[selectedRecord.gate_pass].gate_keeper_username}</p>
+                          <p>{selectedRecord.gate_pass.gate_keeper_username}</p>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Main Gate Required</p>
-                          <Badge className={mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'bg-green-600' : ''}>
-                            {mockGatePassDetails[selectedRecord.gate_pass].main_gate_required ? 'Yes' : 'No'}
+                          <Badge className={selectedRecord.gate_pass.main_gate_required ? 'bg-green-600' : ''}>
+                            {selectedRecord.gate_pass.main_gate_required ? 'Yes' : 'No'}
                           </Badge>
                         </div>
                         <div>
                           <p className="text-sm text-gray-600">Status</p>
-                          <Badge variant="outline">{mockGatePassDetails[selectedRecord.gate_pass].status}</Badge>
+                          <Badge variant="outline">{selectedRecord.gate_pass.status_name}</Badge>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Created At</p>
-                          <p>{formatDateTime(mockGatePassDetails[selectedRecord.gate_pass].created_at)}</p>
-                        </div>
-                        {mockGatePassDetails[selectedRecord.gate_pass].exception_reason && (
-                          <div className="col-span-2">
-                            <p className="text-sm text-gray-600">Exception Reason</p>
-                            <p>{mockGatePassDetails[selectedRecord.gate_pass].exception_reason}</p>
-                          </div>
-                        )}
-                        {mockGatePassDetails[selectedRecord.gate_pass].remarks && (
-                          <div className="col-span-2">
-                            <p className="text-sm text-gray-600">Remarks</p>
-                            <p>{mockGatePassDetails[selectedRecord.gate_pass].remarks}</p>
-                          </div>
-                        )}
+                       
+                       
                       </div>
-                    ) : (
-                      <p className="text-gray-500">Gate pass details not available</p>
-                    )}
+                  
                   </CardContent>
                 </Card>
               </div>
@@ -672,24 +627,14 @@ export default function PrisonerEntryExitScreen() {
                     <h3 className="text-sm mb-3" style={{ color: '#650000' }}>Working Party Details</h3>
                     <Card>
                       <CardContent className="p-4">
-                        {mockWorkingPartyDetails[selectedRecord.working_party] ? (
-                          <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-2 gap-4">
                             <div>
                               <p className="text-sm text-gray-600">Name</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].name}</p>
+                              <p>{selectedRecord.working_party_name}</p>
                             </div>
-                            <div>
-                              <p className="text-sm text-gray-600">Capacity</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].current_members} / {mockWorkingPartyDetails[selectedRecord.working_party].capacity}</p>
-                            </div>
-                            <div className="col-span-2">
-                              <p className="text-sm text-gray-600">Description</p>
-                              <p>{mockWorkingPartyDetails[selectedRecord.working_party].description}</p>
-                            </div>
+                          
                           </div>
-                        ) : (
-                          <p className="text-gray-500">Working party details not available</p>
-                        )}
+                       
                       </CardContent>
                     </Card>
                   </div>

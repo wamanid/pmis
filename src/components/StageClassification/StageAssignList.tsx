@@ -72,7 +72,7 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { StageAssignForm, StageAssignment } from './StageAssignForm';
-import { getStageList, getStages } from '../../services/stageService';
+import { deleteStageData, getStageList, getStages } from '../../services/stageService';
 import { Stage } from '../../models/StageClassification';
 
 export function StageAssignList() {
@@ -125,8 +125,19 @@ export function StageAssignList() {
   const [autoDemoteRemark, setAutoDemoteRemark] = useState('');
 
     const [stages, setStages] = useState<Stage[]>([]);
+
+
+
+
     const loadStages = async () => {
         try {
+
+
+          //get the state assignments here
+
+
+
+
           // TODO: Replace with actual API call
           // const response = await fetch('/api/system-administration/stages/');
           // const data = await response.json();
@@ -138,9 +149,10 @@ export function StageAssignList() {
     
           //get stages
            getStages().then((data) => {
-           // alert(JSON.stringify(data));
+          // alert(JSON.stringify(data.results));
              stages = data.results;
              setStages(stages);
+
           }).catch((error) => {
             alert(error);
     
@@ -163,37 +175,25 @@ export function StageAssignList() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 500));
       let mockData: StageAssignment[] = [
-        {
-          id: '1',
-          prisoner_name: 'John Doe',
-          prisoner_number: 'P-2024-001',
-          stage_name: 'Orientation Stage',
-          start_date: '2024-01-15',
-          end_date: '2024-04-15',
-          remark: 'Initial stage assignment for new admission',
-          prisoner: '1',
-          stage: '1',
-        }
+      
       ];
-
-
-
-
-
-              getStageList().then((data) => {
-              // mockData = data.results;
-         // alert(JSON.stringify(data.results));
+          getStageList().then((data) => {
+          mockData = data.results;
+        //alert(JSON.stringify(data.results));
+      setStageAssignments(mockData);
+      setFilteredAssignments(mockData);
+      setTotalCount(mockData.length);
+      setTotalPages(Math.ceil(mockData.length / 10));
              
             }).catch((error) => {
               alert(error);
       
             });
 
-      setStageAssignments(mockData);
-      setFilteredAssignments(mockData);
-      setTotalCount(mockData.length);
-      setTotalPages(Math.ceil(mockData.length / 10));
+
+  
     } catch (error) {
+      alert(error);
       console.error('Failed to load stage assignments:', error);
       toast.error('Failed to load stage assignments');
     } finally {
@@ -207,6 +207,8 @@ export function StageAssignList() {
   };
 
   const handleEdit = (assignment: StageAssignment) => {
+ 
+   // alert(JSON.stringify(assignment));
     setSelectedAssignment(assignment);
     setFormOpen(true);
   };
@@ -226,8 +228,15 @@ export function StageAssignList() {
       // });
       // if (!response.ok) throw new Error('Failed to delete stage assignment');
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success('Stage assignment deleted successfully');
+     // await new Promise((resolve) => setTimeout(resolve, 500));
+
+          deleteStageData(assignmentToDelete.id).then((data) => {
+              toast.success('Stage assignment deleted successfully');
+            }).catch((error) => {
+              alert(error);
+      
+            });
+
       setDeleteDialogOpen(false);
       setAssignmentToDelete(null);
       loadStageAssignments();
@@ -505,9 +514,9 @@ export function StageAssignList() {
                  <SelectItem  value="all">
                     All Stages
                   </SelectItem>
-                {stages.map((stage) => (
+                 {stages.map((stage) => (
                   <SelectItem key={stage.id} value={stage.id}>
-                    {stage.stage}
+                    {stage.name}
                   </SelectItem>
                 ))}
               </SelectContent>
