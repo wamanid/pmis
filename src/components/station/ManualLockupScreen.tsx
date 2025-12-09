@@ -908,7 +908,7 @@ export function ManualLockupScreen() {
             </CardHeader>
             <CardContent>
               <DataTable
-              url="/station-management/api/manual-lockups"
+                url="/station-management/api/manual-lockups"
                 data={tableData}
                 loading={tableLoading}
                 total={total}

@@ -54,6 +54,7 @@ import {
   numericValidation
 } from '../../utils/validation';
 import { useForm, Controller } from 'react-hook-form';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 interface Account {
   id: string;
@@ -93,6 +94,7 @@ const API_ENDPOINTS = {
   TX_STATUSES: '/system-administration/transaction-statuses/',
   PRISONERS: '/admission/prisoners/',
   CURRENCIES: '/system-administration/currencies/',
+  STAFF: '/auth/staff-profiles/',
 };
 
 const PrisonerPropertyAccountScreen: React.FC = () => {
@@ -118,6 +120,8 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [txTypes, setTxTypes] = useState<any[]>([]);
   const [txStatuses, setTxStatuses] = useState<any[]>([]);
   const [currencies, setCurrencies] = useState<any[]>([]);
+  const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
+  const [staffProfilesError, setStaffProfilesError] = useState<string | null>(null);
 
   // ui
   const [activeTab, setActiveTab] = useState<'accounts'|'transactions'>('accounts');
@@ -125,6 +129,8 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [pageSize, setPageSize] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
   const [transactionSearchTerm, setTransactionSearchTerm] = useState('');
+  const [txFilterType, setTxFilterType] = useState<string>('all');
+  const [txFilterStatus, setTxFilterStatus] = useState<string>('all');
   const searchTimer = useRef<number| null>(null);
 
   // dialogs/forms
@@ -169,9 +175,15 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
   };
 
-  // request control
-  const abortRef = useRef<AbortController | null>(null);
+  // request control (no shared abort controller — rely on reqId to ignore stale responses)
   const reqId = useRef(0);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // utility to deep clone safely
+  const deepClone = (v: any) => {
+    try { return (globalThis as any).structuredClone ? (globalThis as any).structuredClone(v) : JSON.parse(JSON.stringify(v)); }
+    catch { try { return JSON.parse(JSON.stringify(v)); } catch { return v; } }
+  };
 
   // helper to include global filters and paging
   const baseParams = useCallback((overrides: any = {}) => ({
@@ -181,18 +193,25 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     station: globalStation || undefined,
     district: globalDistrict || undefined,
     region: globalRegion || undefined,
+    // include transaction filters automatically when on transactions tab
+    ...(activeTab === 'transactions' ? {
+      transaction_type: txFilterType && txFilterType !== 'all' ? txFilterType : undefined,
+      transaction_status: txFilterStatus && txFilterStatus !== 'all' ? txFilterStatus : undefined,
+    } : {}),
     ...overrides,
-  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab]);
+  }), [page, pageSize, searchTerm, transactionSearchTerm, globalStation, globalDistrict, globalRegion, activeTab, txFilterType, txFilterStatus]);
 
   // load lookups
   const loadLookups = useCallback(async () => {
     try {
-      const [pRes, atRes, ttRes, tsRes, curRes] = await Promise.all([
+      const [pRes, atRes, ttRes, tsRes, curRes, staffRes] = await Promise.all([
         axiosInstance.get(API_ENDPOINTS.PRISONERS, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
         accountsSvc.listAccountTypes().catch(()=>({ results: [] })),
         txSvc.listTransactionTypes().catch(()=>({ results: [] })),
         txSvc.listTransactionStatuses().catch(()=>({ results: [] })),
         axiosInstance.get(API_ENDPOINTS.CURRENCIES, { params: { page_size: 100 } }).then(r => r.data).catch(()=>({ results: [] })),
+        // staff profiles is optional - catch network errors to avoid blocking UI
+        axiosInstance.get(API_ENDPOINTS.STAFF, { params: { page_size: 200 }}).then(r => r.data).catch(err => { throw err; }),
       ]);
       setPrisoners(pRes?.results ?? []);
       setAccountTypes(atRes?.results ?? []);
@@ -200,8 +219,20 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       setTxStatuses(tsRes?.results ?? []);
       // store full currency objects (id, code, name) so UI can show name while saving id
       setCurrencies(curRes?.results ?? []);
-    } catch (err) {
+      // staff
+      if (staffRes && staffRes.results) {
+        setStaffProfiles(staffRes.results);
+        setStaffProfilesError(null);
+      } else {
+        setStaffProfiles([]);
+      }
+    } catch (err:any) {
       console.error('lookup load error', err);
+      // if staff fetch failed, set error but let UI continue
+      if (String(err?.config?.url || '').includes(API_ENDPOINTS.STAFF)) {
+        setStaffProfilesError('Failed to load staff list');
+        setStaffProfiles([]);
+      }
     }
   }, []);
 
@@ -209,21 +240,20 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const loadAccounts = useCallback(async (opts: any = {}) => {
     reqId.current += 1;
     const id = reqId.current;
-    try { abortRef.current?.abort(); } catch {}
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
     setAccountsLoading(true);
     try {
+      console.debug('loadAccounts request', baseParams(opts));
       const data = await accountsSvc.listAccounts(baseParams(opts));
+      console.debug('loadAccounts response', data);
       if (id !== reqId.current) return;
       setAccounts(data.results ?? []);
       setAccountsTotal(data.count ?? 0);
     } catch (err:any) {
-      if (err?.name === 'AbortError') return;
+      console.debug('loadAccounts error', err);
       console.error('loadAccounts error', err);
       toast.error('Failed to load accounts');
     } finally {
-      if (id === reqId.current) setAccountsLoading(false);
+      setAccountsLoading(false);
     }
   }, [baseParams]);
 
@@ -231,21 +261,20 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const loadTransactions = useCallback(async (opts: any = {}) => {
     reqId.current += 1;
     const id = reqId.current;
-    try { abortRef.current?.abort(); } catch {}
-    const ctrl = new AbortController();
-    abortRef.current = ctrl;
     setTransactionsLoading(true);
     try {
+      console.debug('loadTransactions request', baseParams(opts));
       const data = await txSvc.listTransactions(baseParams(opts));
+      console.debug('loadTransactions response', data);
       if (id !== reqId.current) return;
       setTransactions(data.results ?? []);
       setTransactionsTotal(data.count ?? 0);
     } catch (err:any) {
-      if (err?.name === 'AbortError') return;
+      console.debug('loadTransactions error', err);
       console.error('loadTransactions error', err);
       toast.error('Failed to load transactions');
     } finally {
-      if (id === reqId.current) setTransactionsLoading(false);
+      setTransactionsLoading(false);
     }
   }, [baseParams]);
 
@@ -327,6 +356,24 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     }
   };
 
+  // helper to map backend status to badge variant
+  const getStatusVariant = (status: string) => {
+    if (!status) return 'warning';
+    switch (String(status).toLowerCase()) {
+      case 'pending':
+        return 'secondary';
+      case 'approved':
+      case 'completed':
+      case 'success':
+        return 'success';
+      case 'failed':
+      case 'rejected':
+        return 'danger';
+      default:
+        return 'warning';
+    }
+  };
+
   const handleUpdateAccount = async (dataOrEvent: any) => {
     if (!selectedAccount) return;
     const data = dataOrEvent && dataOrEvent.prisoner ? dataOrEvent : accountFormData;
@@ -336,17 +383,20 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       return;
     }
     try {
-      await accountsSvc.updateAccount(selectedAccount.id, {
+      const res = await accountsSvc.updateAccount(selectedAccount.id, {
         prisoner: data.prisoner,
         account_type: data.account_type,
         currency: data.currency,
         balance: data.balance ?? '0',
       });
+      console.debug('updateAccount response', res);
       toast.success('Account updated');
       setIsEditAccountDialogOpen(false);
       setSelectedAccount(null);
-      loadAccounts();
+      // authoritative reload
+      await loadAccounts();
     } catch (err) {
+      console.debug('updateAccount error', err);
       console.error('update account error', err);
       toast.error('Failed to update account');
     }
@@ -356,52 +406,110 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     if (!deleteAccountId) return;
     try {
       await accountsSvc.deleteAccount(deleteAccountId);
+      console.debug('deleteAccount success', deleteAccountId);
       toast.success('Account deleted');
       setDeleteAccountId(null);
-      loadAccounts();
+      await loadAccounts();
     } catch (err) {
+      console.debug('deleteAccount error', err);
       console.error('delete account error', err);
       toast.error('Failed to delete account');
     }
   };
 
   // CRUD handlers (transactions)
-  const validateTransactionForm = () => {
+  const validateTransactionData = (data: any) => {
     const errs: Record<string,string> = {};
-    if (!requiredValidation(transactionFormData.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
-    if (!requiredValidation(transactionFormData.transaction_type)) errs.transaction_type = 'Transaction type is required';
-    if (!requiredValidation(transactionFormData.amount)) errs.amount = 'Amount is required';
-    setTransactionFormErrors(errs);
-    return Object.keys(errs).length === 0;
+    if (!requiredValidation(data.property_prisoner_account)) errs.property_prisoner_account = 'Account is required';
+    if (!requiredValidation(data.transaction_type)) errs.transaction_type = 'Transaction type is required';
+    if (!requiredValidation(data.amount)) errs.amount = 'Amount is required';
+    if (!data.checked_by_oc) errs.checked_by_oc = 'Checked By is required';
+    return errs;
   };
 
-  const handleCreateTransaction = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!validateTransactionForm()) return;
+  const handleCreateTransaction = async (values: any) => {
+    const errs = validateTransactionData(values);
+    if (Object.keys(errs).length) {
+      setTransactionFormErrors(errs);
+      return;
+    }
+    setTransactionFormErrors({});
     try {
-      await txSvc.createTransaction(transactionFormData);
+      const res = await txSvc.createTransaction(values);
+      console.debug('createTransaction response', res);
       toast.success('Transaction created');
       setIsCreateTransactionDialogOpen(false);
       setTransactionFormData({ property_prisoner_account: '', transaction_type: '', transaction_status: '', amount: '', transaction_remark: '', biometric_consent: false, checked_by_oc: 0 });
-      loadTransactions();
-      loadAccounts();
+      // authoritative reload
+      await loadTransactions();
+      await loadAccounts();
     } catch (err) {
+      console.debug('createTransaction error', err);
       console.error('create tx error', err);
       toast.error('Failed to create transaction');
+    }
+  };
+
+  // add update transaction handler
+  const handleUpdateTransaction = async (dataOrEvent: any) => {
+    // dataOrEvent is provided by TransactionForm (react-hook-form)
+    const values = dataOrEvent && dataOrEvent.property_prisoner_account ? dataOrEvent : transactionFormData;
+    const errs: Record<string,string> = {};
+    if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
+    if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
+    if (!values.amount) errs.amount = 'Amount is required';
+    if (!values.checked_by_oc) errs.checked_by_oc = 'Checked By is required';
+    if (Object.keys(errs).length) {
+      setTransactionFormErrors(errs);
+      return;
+    }
+    if (!selectedTransaction) return;
+    try {
+      const payload = {
+        property_prisoner_account: values.property_prisoner_account,
+        transaction_type: values.transaction_type,
+        transaction_status: values.transaction_status || null,
+        amount: values.amount,
+        transaction_remark: values.transaction_remark,
+        biometric_consent: !!values.biometric_consent,
+        transaction_datetime: values.transaction_datetime,
+        balance_before: values.balance_before,
+        balance_after: values.balance_after,
+        checked_by_oc: values.checked_by_oc,
+      };
+      const res = (typeof txSvc.updateTransaction === 'function')
+        ? await txSvc.updateTransaction(selectedTransaction.id, payload)
+        : (await axiosInstance.patch(`${API_ENDPOINTS.TRANSACTIONS}${selectedTransaction.id}/`, payload)).data;
+      console.debug('updateTransaction response', res);
+      toast.success('Transaction updated');
+      setIsEditTransactionDialogOpen(false);
+      setSelectedTransaction(null);
+      // authoritative reloads
+      await loadTransactions();
+      await loadAccounts();
+    } catch (err) {
+      console.debug('updateTransaction error', err);
+      console.error('update tx error', err);
+      toast.error('Failed to update transaction');
     }
   };
 
   const handleDeleteTransaction = async () => {
     if (!deleteTransactionId) return;
     try {
-      // API delete endpoint assumed to be DELETE /transactions/{id}/
-      await txSvc.createTransaction({}); // placeholder if no delete endpoint; replace with txSvc.deleteTransaction if available
-      // If backend supports delete, call it instead.
+      if (typeof txSvc.deleteTransaction === 'function') {
+        await txSvc.deleteTransaction(deleteTransactionId);
+      } else {
+        await axiosInstance.delete(`${API_ENDPOINTS.TRANSACTIONS}${deleteTransactionId}/`);
+      }
+      console.debug('deleteTransaction success', deleteTransactionId);
       toast.success('Transaction deleted');
       setDeleteTransactionId(null);
-      loadTransactions();
-      loadAccounts();
+      // authoritative reloads
+      await loadTransactions();
+      await loadAccounts();
     } catch (err) {
+      console.debug('deleteTransaction error', err);
       console.error('delete tx error', err);
       toast.error('Failed to delete transaction');
     }
@@ -422,6 +530,14 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     return String(val);
   };
 
+  // helper to render checked_by name using staffProfiles fallback to API name
+  const getCheckedByName = (val?: string | number, fallbackName?: string) => {
+    if (!val && !fallbackName) return '';
+    const found = staffProfiles.find((s:any) => String(s.id) === String(val) || String(s.user)?.toLowerCase() === String(val)?.toLowerCase() || String(s.id) === String(fallbackName));
+    if (found) return found.full_name ?? found.name ?? String(found.id);
+    return fallbackName ?? String(val ?? '');
+  };
+
   // Columns for DataTable
   const accountColumns = [
     {
@@ -439,7 +555,8 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     { key: 'currency', label: 'Currency', render: (v:any, r:any) => <span>{getCurrencyLabel(v)}</span> },
     { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
     { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
-      <div className="flex justify-end gap-2">
+      <div className="flex">
+        {/* <div className="flex justify-end gap-2"> */}
 
         <Button variant="ghost" size="sm" onClick={() => {
             setSelectedAccount(r);
@@ -450,30 +567,94 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
            <Eye className="h-4 w-4" />
          </Button>
 
-        <Button variant="ghost" size="sm" onClick={() => {
-            setSelectedAccount(r);
-            setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency, balance: r.balance ?? '0' });
+        {/* <Button variant="ghost" size="sm" onClick={() => {
+            const copy = deepClone(r);
+            setSelectedAccount(copy);
+            setAccountFormData({ prisoner: copy.prisoner, account_type: copy.account_type, currency: copy.currency, balance: copy.balance ?? '0' });
             setAccountFormKey(k => k + 1); // ensure AccountForm remounts with fresh data
             setIsEditAccountDialogOpen(true);
           }}>
            <Pencil className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={() => setDeleteAccountId(r.id)}>
+        </Button> */}
+        {/* <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setDeleteAccountId(r.id); }}>
           <Trash2 className="h-4 w-4 text-red-600" />
-        </Button>
+        </Button> */}
       </div>
     )},
   ];
 
   const transactionColumns = [
-    { key: 'transaction_datetime', label: 'Date & Time' },
+    {
+      key: "transaction_datetime",
+      label: "Date & Time",
+      render: (value: any) => {
+        let v = '';
+        try { v = value ? new Date(value).toLocaleString() : ''; } catch { v = String(value); }
+        return (
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            <span>{v}</span>
+          </div>
+        );
+      },
+    },
     { key: 'prisoner_name', label: 'Prisoner' },
-    { key: 'account_type_name', label: 'Account Type' },
-    { key: 'transaction_type_name', label: 'Type' },
+    // { key: 'account_type_name', label: 'Account Type' },
+    {
+      key: "account_type_name",
+      label: "Account Type",
+      render: (value: any) => (
+        <Badge variant="outline">{value}</Badge>
+      ),
+    },
+    // { key: 'transaction_type_name', label: 'Type' },
+    {
+      key: "transaction_type_name",
+      label: "Type",
+      render: (value: any) => (
+        <Badge variant="outline">{value}</Badge>
+      ),
+    },
     { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
-    { key: 'transaction_status_name', label: 'Status' },
+    // { key: 'transaction_status_name', label: 'Status' },
+    {
+      key: "transaction_status_name",
+      label: "Status",
+      render: (value: any) => (
+        <Badge variant={getStatusVariant(value)}>{value}</Badge>
+      ),
+    },
     { key: 'checked_by_name', label: 'Checked By' },
     { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (_v:any, r:any) => (
+        <div className="flex justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(deepClone(r)); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => {
+            const copy = deepClone(r);
+            setSelectedTransaction(copy);
+            // populate form data for editing (use cloned values)
+            setTransactionFormData({
+              property_prisoner_account: copy.property_prisoner_account,
+              transaction_type: copy.transaction_type,
+              transaction_status: copy.transaction_status,
+              amount: copy.amount,
+              transaction_remark: copy.transaction_remark,
+              biometric_consent: copy.biometric_consent,
+              checked_by_oc: copy.checked_by_oc ?? '',
+              transaction_datetime: copy.transaction_datetime ?? new Date().toISOString(),
+              balance_before: copy.balance_before ?? '',
+              balance_after: copy.balance_after ?? '',
+            });
+            setIsEditTransactionDialogOpen(true);
+          }}><Pencil className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(deepClone(r)); setDeleteTransactionId(r.id); }}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+        </div>
+      )
+    },
   ];
 
   // Forms: use SearchableSelect for searchable dropdowns (keeps look & behavior)
@@ -754,46 +935,31 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [currentIso, dtEditable]);
 
-    const onSubmitForm = async (values: any) => {
-      // validate required fields locally
-      const errs: Record<string,string> = {};
-      if (!values.property_prisoner_account) errs.property_prisoner_account = 'Account is required';
-      if (!values.transaction_type) errs.transaction_type = 'Transaction type is required';
-      if (!values.amount) errs.amount = 'Amount is required';
-      // backend requires checked_by_oc non-null
-      if (!values.checked_by_oc) errs.checked_by_oc = 'Checked By is required';
-      if (Object.keys(errs).length) {
-        setTransactionFormErrors(errs);
-        return;
-      }
-      setTransactionFormErrors({});
+    // Reset form values whenever transactionFormData changes (ensures useForm fields use updated cloned data)
+    useEffect(() => {
+      try { reset({
+        property_prisoner_account: transactionFormData.property_prisoner_account || '',
+        transaction_type: transactionFormData.transaction_type || '',
+        transaction_status: transactionFormData.transaction_status || '',
+        amount: transactionFormData.amount || '',
+        transaction_remark: transactionFormData.transaction_remark || '',
+        biometric_consent: transactionFormData.biometric_consent || false,
+        transaction_datetime: transactionFormData.transaction_datetime || new Date().toISOString(),
+        balance_before: transactionFormData.balance_before || '',
+        balance_after: transactionFormData.balance_after || '',
+        checked_by_oc: transactionFormData.checked_by_oc ?? '',
+      }); } catch (e) { /* ignore */ }
+    }, [transactionFormData, reset]);
 
+    const onSubmitForm = async (values: any) => {
+      // delegate create/update to parent handler passed via props.onSubmit
       try {
-        // prepare payload expected by API
-        const payload = {
-          property_prisoner_account: values.property_prisoner_account,
-          transaction_type: values.transaction_type,
-          transaction_status: values.transaction_status || null,
-          amount: values.amount,
-          transaction_remark: values.transaction_remark,
-          biometric_consent: !!values.biometric_consent,
-          // ensure we send full ISO string (Z)
-          transaction_datetime: values.transaction_datetime,
-          balance_before: values.balance_before,
-          balance_after: values.balance_after,
-          // checked_by_oc must be provided (we expect a uuid or id as returned by StaffProfileSelect)
-          checked_by_oc: values.checked_by_oc,
-        };
-        await txSvc.createTransaction(payload);
-        toast.success('Transaction created');
-        setIsCreateTransactionDialogOpen(false);
-        reset();
-        // reload lists
-        loadTransactions();
-        loadAccounts();
+        await onSubmit(values);
+        // if parent didn't close/reset, ensure local form resets for create case
+        if (!isEdit) reset();
       } catch (err) {
-        console.error('create tx error', err);
-        toast.error('Failed to create transaction');
+        // parent shows toast; keep error here for debug
+        console.error('Transaction submit error', err);
       }
     };
 
@@ -942,6 +1108,15 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     );
   };
 
+  // update transactionColumns Checked By render to use helper
+  // find the column object for checked_by_name and replace its render:
+  const updatedTransactionColumns = transactionColumns.map(col => {
+    if (col.key === 'checked_by_name') {
+      return { ...col, render: (v:any, r:any) => <span>{getCheckedByName(r.checked_by_oc ?? r.checked_by_name, v)}</span> };
+    }
+    return col;
+  });
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -983,7 +1158,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm">Total Balance [All currencies]</CardTitle>
+                <CardTitle className="text-sm">Total Balance</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
@@ -1025,18 +1200,14 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                     className="pl-10"
                   />
                 </div>
-                <Button
-                  onClick={() => {
-                    // start with empty currency so placeholder shows; AccountForm will map to id when user selects
-                    setAccountFormData({ prisoner: '', account_type: '', currency: '', balance: '0' });
-                    setAccountFormKey(k => k + 1);
+                <Button onClick={() => {
+                    // reset account form to blank defaults for Create
+                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
                     setIsCreateAccountDialogOpen(true);
-                  }}
-                   style={{ backgroundColor: '#650000' }}
-                 >
-                   <Plus className="h-4 w-4 mr-2" />
-                   Create Account
-                 </Button>
+                  }} style={{ backgroundColor: '#650000' }}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Account
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -1045,6 +1216,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <DataTable
+                url="/property-management/prisoner-accounts/"
                 title="Accounts"
                 data={accounts}
                 loading={accountsLoading}
@@ -1064,10 +1236,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       <Button
                         size="sm"
                         onClick={() => {
-                          setTransactionFormData({
-                            ...transactionFormData,
-                            property_prisoner_account: row.id,
-                          });
+                          setTransactionFormData((prev) => ({ ...deepClone(prev), property_prisoner_account: row.id }));
                           setIsCreateTransactionDialogOpen(true);
                         }}
                         style={{ backgroundColor: '#650000' }}
@@ -1117,7 +1286,25 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                             <TableCell className="text-right">
                               <div className="flex justify-end gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => setDeleteTransactionId(t.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => {
+                                    const copy = deepClone(t);
+                                    setSelectedTransaction(copy);
+                                    // populate form data for editing (use cloned values)
+                                    setTransactionFormData({
+                                      property_prisoner_account: copy.property_prisoner_account,
+                                      transaction_type: copy.transaction_type,
+                                      transaction_status: copy.transaction_status,
+                                      amount: copy.amount,
+                                      transaction_remark: copy.transaction_remark,
+                                      biometric_consent: copy.biometric_consent,
+                                      checked_by_oc: copy.checked_by_oc ?? '',
+                                      transaction_datetime: copy.transaction_datetime ?? new Date().toISOString(),
+                                      balance_before: copy.balance_before ?? '',
+                                      balance_after: copy.balance_after ?? '',
+                                    });
+                                    setIsEditTransactionDialogOpen(true);
+                                  }}><Pencil className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(deepClone(t)); setDeleteTransactionId(t.id); }}><Trash2 className="h-4 w-4 text-red-600" /></Button>
                               </div>
                             </TableCell>
                           </TableRow>
@@ -1188,7 +1375,19 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       className="pl-10"
                     />
                   </div>
-                  <Button onClick={() => setIsCreateTransactionDialogOpen(true)} style={{ backgroundColor: '#650000' }}>
+                  <Button onClick={() => {
+                      // reset transaction form to blank defaults for Create
+                      setTransactionFormData({
+                        property_prisoner_account: '',
+                        transaction_type: '',
+                        transaction_status: '',
+                        amount: '',
+                        transaction_remark: '',
+                        biometric_consent: false,
+                        checked_by_oc: '',
+                      });
+                      setIsCreateTransactionDialogOpen(true);
+                    }} style={{ backgroundColor: '#650000' }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Create Transaction
                   </Button>
@@ -1196,20 +1395,30 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
                 <div className="flex flex-col md:flex-row gap-4">
                   <div className="flex-1">
-                    <Label>Transaction Type</Label>
+                    <Label className="mb-3">Transaction Type</Label>
                     <SearchableSelect
                       items={[{ id: 'all', label: 'All Types' }, ...txTypes.map((t:any)=>({ id:String(t.id), label:t.name }))]}
-                      value={'all'}
-                      onChange={()=>{}}
+                      value={txFilterType}
+                      labelField="label"
+                      onChange={(v) => {
+                        setTxFilterType(v ?? 'all');
+                        setPage(1);
+                        // baseParams now includes txFilterType so loadTransactions will be triggered by effects
+                      }}
                       placeholder="Filter by type..."
                     />
                   </div>
                   <div className="flex-1">
-                    <Label>Status</Label>
+                    <Label className="mb-3">Status</Label>
                     <SearchableSelect
                       items={[{ id: 'all', label: 'All Statuses' }, ...txStatuses.map((s:any)=>({ id:String(s.id), label:s.name }))]}
-                      value={'all'}
-                      onChange={()=>{}}
+                      value={txFilterStatus}
+                      labelField="label"
+                      onChange={(v) => {
+                        setTxFilterStatus(v ?? 'all');
+                        setPage(1);
+                        // baseParams now includes txFilterStatus so loadTransactions will be triggered by effects
+                      }}
                       placeholder="Filter by status..."
                     />
                   </div>
@@ -1222,6 +1431,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <DataTable
+                url="/property-management/transactions/"
                 title="Transactions"
                 data={transactions}
                 loading={transactionsLoading}
@@ -1231,7 +1441,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                 onPageChange={(p:number)=> setPage(p)}
                 onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
                 onSort={() => { setPage(1); loadTransactions(); }}
-                columns={transactionColumns}
+                columns={updatedTransactionColumns}
                 externalSearch={transactionSearchTerm}
               />
             </CardContent>
@@ -1314,10 +1524,23 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Edit Transaction Dialog */}
+      <Dialog open={isEditTransactionDialogOpen} onOpenChange={setIsEditTransactionDialogOpen}>
+        <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle>Edit Transaction</DialogTitle>
+              <DialogDescription>Update transaction information</DialogDescription>
+            </DialogHeader>
+            <TransactionForm onSubmit={handleUpdateTransaction} isEdit={true} />
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={isViewTransactionDialogOpen} onOpenChange={setIsViewTransactionDialogOpen}>
         <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
           <div className="flex-1 overflow-y-auto p-6">
-            <DialogHeader>
+            <DialogHeader className='mb-4'>
               <DialogTitle>Transaction Details</DialogTitle>
               <DialogDescription>View transaction information</DialogDescription>
             </DialogHeader>
@@ -1382,44 +1605,50 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
             </DialogFooter>
           </div>
         </DialogContent>
-      </Dialog>
+           </Dialog>
 
       {/* Delete confirmations */}
-      <AlertDialog open={!!deleteAccountId} onOpenChange={() => setDeleteAccountId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the account and all associated transactions.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteAccount} style={{ backgroundColor: '#650000' }}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteAccountId}
+        onOpenChange={(o) => { if (!o) { setDeleteAccountId(null); setSelectedAccount(null); } }}
+        title="Delete Account"
+        description="Are you sure you want to delete this account? This action cannot be undone."
+        details={selectedAccount ? (
+          <div>
+            <div><strong>Prisoner:</strong> {selectedAccount.prisoner_name}</div>
+            <div><strong>Account Type:</strong> {selectedAccount.account_type_name}</div>
+          </div>
+        ) : null}
+        confirmLabel="Delete"
+               cancelLabel="Cancel"
+        onConfirm={async () => {
+          await handleDeleteAccount();
+        }}
+      />
 
-      <AlertDialog open={!!deleteTransactionId} onOpenChange={() => setDeleteTransactionId(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the transaction.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteTransaction} style={{ backgroundColor: '#650000' }}>
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={!!deleteTransactionId}
+        onOpenChange={(o) => { if (!o) { setDeleteTransactionId(null); setSelectedTransaction(null); } }}
+        title="Delete Transaction"
+        description="Are you sure you want to delete this transaction? This action cannot be undone."
+        details={selectedTransaction ? (
+          <div>
+            <div><strong>Prisoner:</strong> {selectedTransaction.prisoner_name}</div>
+            <div><strong>Amount:</strong> {parseFloat(selectedTransaction.amount).toLocaleString()}</div>
+            <div><strong>Date:</strong> {new Date(selectedTransaction.transaction_datetime).toLocaleString()}</div>
+          </div>
+        ) : null}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          await handleDeleteTransaction();
+        }}
+      />
     </div>
   );
 };
 
 export default PrisonerPropertyAccountScreen;
+
+// helper to safely get length of previous arrays (used in optimistic fallbacks)
+function prevLengthSafe(arr:any[]) { try { return Array.isArray(arr) ? arr.length : 0; } catch { return 0; } }

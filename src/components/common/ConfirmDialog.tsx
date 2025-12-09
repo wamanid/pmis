@@ -7,6 +7,7 @@ export interface ConfirmDialogProps {
   onOpenChange: (open: boolean) => void;
   title?: string;
   description?: string;
+  details?: React.ReactNode; // new: details block shown below the description
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => Promise<void> | void;
@@ -17,6 +18,7 @@ export default function ConfirmDialog({
   onOpenChange,
   title = "Confirm",
   description = "",
+  details = null,
   confirmLabel = "Delete",
   cancelLabel = "Cancel",
   onConfirm,
@@ -29,7 +31,6 @@ export default function ConfirmDialog({
       await onConfirm();
       onOpenChange(false);
     } catch (err) {
-      // let caller show toast / error; still close or keep open as desired
       onOpenChange(false);
       throw err;
     } finally {
@@ -37,13 +38,23 @@ export default function ConfirmDialog({
     }
   };
 
+  const descId = description ? 'confirm-dialog-desc' : undefined;
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby="confirm-dialog-desc" className="max-w-md">
+      {/* only set aria-describedby if description exists to avoid warning */}
+      <DialogContent {...(descId ? { 'aria-describedby': descId } : {})} className="max-w-md">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
-          {description && <DialogDescription id="confirm-dialog-desc">{description}</DialogDescription>}
+          {description && <DialogDescription id={descId}>{description}</DialogDescription>}
         </DialogHeader>
+
+        {details && (
+          <div className="bg-gray-100 rounded-md p-4 my-4 text-sm">
+            {details}
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
             {cancelLabel}
@@ -56,6 +67,68 @@ export default function ConfirmDialog({
     </Dialog>
   );
 }
+
+// ...existing code...
+
+
+// import React, { useState } from "react";
+// import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "../ui/dialog";
+// import { Button } from "../ui/button";
+
+// export interface ConfirmDialogProps {
+//   open: boolean;
+//   onOpenChange: (open: boolean) => void;
+//   title?: string;
+//   description?: string;
+//   confirmLabel?: string;
+//   cancelLabel?: string;
+//   onConfirm: () => Promise<void> | void;
+// }
+
+// export default function ConfirmDialog({
+//   open,
+//   onOpenChange,
+//   title = "Confirm",
+//   description = "",
+//   confirmLabel = "Delete",
+//   cancelLabel = "Cancel",
+//   onConfirm,
+// }: ConfirmDialogProps) {
+//   const [loading, setLoading] = useState(false);
+
+//   const handleConfirm = async () => {
+//     try {
+//       setLoading(true);
+//       await onConfirm();
+//       onOpenChange(false);
+//     } catch (err) {
+//       // let caller show toast / error; still close or keep open as desired
+//       onOpenChange(false);
+//       throw err;
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   return (
+//     <Dialog open={open} onOpenChange={onOpenChange}>
+//       <DialogContent aria-describedby="confirm-dialog-desc" className="max-w-md">
+//         <DialogHeader>
+//           <DialogTitle>{title}</DialogTitle>
+//           {description && <DialogDescription id="confirm-dialog-desc">{description}</DialogDescription>}
+//         </DialogHeader>
+//         <DialogFooter>
+//           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
+//             {cancelLabel}
+//           </Button>
+//           <Button variant="destructive" onClick={handleConfirm} disabled={loading}>
+//             {confirmLabel}
+//           </Button>
+//         </DialogFooter>
+//       </DialogContent>
+//     </Dialog>
+//   );
+// }
 
 
 
