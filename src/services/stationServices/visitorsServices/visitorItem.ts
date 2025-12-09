@@ -45,6 +45,7 @@ export interface VisitorItem {
   item_category: string;
   item: string;
   measurement_unit: string;
+  measurement_unit_name: string;
   item_status: string;
 }
 

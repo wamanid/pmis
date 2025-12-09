@@ -5,6 +5,7 @@ import { stationRoutes } from './station.routes';
 import { admissionRoutes } from './admission.routes';
 import { demoRoutes } from './demo.routes';
 import { propertyRoutes } from './property.routes'
+import { transferRoutes } from './transfer.routes';
 
 /**
  * Application Routes Configuration
@@ -31,6 +32,9 @@ export const routes: RouteObject[] = [
 
   // Property Management Routes
   ...propertyRoutes,
+
+  // Transfer Management Routes
+  ...transferRoutes,
 
   // Default/Fallback Route
   {

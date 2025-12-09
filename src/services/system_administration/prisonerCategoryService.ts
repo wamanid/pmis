@@ -34,7 +34,7 @@ export const fetchPrisonerCategoryById = async (id: string): Promise<PrisonerCat
 
 /**
  * Create a new prisoner category
- * @param data Prisoner Category data
+ * @param data Prisoner category data
  * @returns Promise with created prisoner category
  */
 export const createPrisonerCategory = async (data: Partial<PrisonerCategory>): Promise<PrisonerCategory> => {

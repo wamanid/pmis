@@ -21,7 +21,6 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log("token"+token);
     
     // Add location filters to query parameters
     const filterStorage = localStorage.getItem('pmis_user_filters');
@@ -50,12 +49,12 @@ axiosInstance.interceptors.request.use(
     }
     
     // Log request for debugging (remove in production)
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      params: config.params,
-      data: config.data,
-    });
+    // console.log('API Request:', {
+    //   method: config.method?.toUpperCase(),
+    //   url: config.url,
+    //   params: config.params,
+    //   data: config.data,
+    // });
     
     return config;
   },
@@ -66,14 +65,14 @@ axiosInstance.interceptors.request.use(
 );
 
 // Response interceptor
-   axiosInstance.interceptors.response.use(
+axiosInstance.interceptors.response.use(
   (response) => {
     // Log response for debugging (remove in production)
-    console.log('API Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data,
-    });
+    // console.log('API Response:', {
+    //   status: response.status,
+    //   url: response.config.url,
+    //   data: response.data,
+    // });
     
     // Handle cases where backend returns 200 but with success: false
     if (response.data && response.data.success === false) {
@@ -87,7 +86,7 @@ axiosInstance.interceptors.request.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+      console.log(error.response)
       switch (status) {
         case 400:
           toast.error(data?.message || 'Bad request. Please check your input.');
@@ -97,7 +96,9 @@ axiosInstance.interceptors.request.use(
           // Clear token and redirect to login
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
-          // You might want to redirect to login page here
+          localStorage.removeItem('pmis_user_filters');
+          // Redirect to login page
+          window.location.href = '/login';
           break;
         case 403:
           toast.error('Access forbidden. You do not have permission.');

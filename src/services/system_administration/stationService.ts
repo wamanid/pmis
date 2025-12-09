@@ -72,5 +72,3 @@ export const patchStation = async (id: string, data: Partial<Station>): Promise<
 export const deleteStation = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/system-administration/stations/${id}/`);
 };
-
-
