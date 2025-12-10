@@ -14,7 +14,6 @@ import {
   ChevronUp,
   User,
   X,
-  FileText,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -62,7 +61,6 @@ interface BulkTransferData {
   original_station_oc_approved_date: string;
   destination_station_oc_approved_date: string;
   selected_prisoners: string[];
-  transfer_request: string;
 }
 
 export default function TransferInOutBulkScreen() {
@@ -90,7 +88,6 @@ export default function TransferInOutBulkScreen() {
       original_station_oc_approved_date: "",
       destination_station_oc_approved_date: "",
       selected_prisoners: [],
-      transfer_request: "",
     },
   });
 
@@ -131,17 +128,12 @@ export default function TransferInOutBulkScreen() {
     { id: "4", name: "Completed" },
   ]);
 
-  const [transferRequests] = useState([
-    { id: "tr-1", request_id: "REQ-2025-0001" },
-    { id: "tr-2", request_id: "REQ-2025-0002" },
-    { id: "tr-3", request_id: "REQ-2025-0003" },
+  const [approvalStatuses] = useState([
+    { id: "1", name: "Pending" },
+    { id: "2", name: "Approved" },
+    { id: "3", name: "Rejected" },
+    { id: "4", name: "Under Review" },
   ]);
-  // const [approvalStatuses] = useState([
-  //   { id: "1", name: "Pending" },
-  //   { id: "2", name: "Approved" },
-  //   { id: "3", name: "Rejected" },
-  //   { id: "4", name: "Under Review" },
-  // ]);
 
   const [staff] = useState([
     { id: 1, name: "Officer John Smith" },
@@ -311,249 +303,409 @@ export default function TransferInOutBulkScreen() {
                 </Button>
               </CollapsibleTrigger>
               <CollapsibleContent className="space-y-6 pt-6">
-                {/* Transfer Request (searchable dropdown) */}
+                {/* Transfer Type */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <FileText className="h-4 w-4" />
-                    Transfer Request
-                  </Label>
+              <Label className="flex items-center gap-2">
+                <ArrowLeftRight className="h-4 w-4" />
+                Transfer Type
+              </Label>
+              <Controller
+                name="transfer_type"
+                control={control}
+                rules={{ required: "Transfer type is required" }}
+                render={({ field }) => (
+                  <RadioGroup
+                    value={field.value}
+                    onValueChange={field.onChange}
+                    className="flex gap-4"
+                  >
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
+                      <RadioGroupItem value="out" id="transfer-out" />
+                      <label
+                        htmlFor="transfer-out"
+                        className="cursor-pointer flex-1"
+                      >
+                        <div>Transfer Out</div>
+                        <div className="text-xs text-gray-500">
+                          Send prisoners to another station
+                        </div>
+                      </label>
+                    </div>
+                    <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
+                      <RadioGroupItem value="in" id="transfer-in" />
+                      <label
+                        htmlFor="transfer-in"
+                        className="cursor-pointer flex-1"
+                      >
+                        <div>Transfer In</div>
+                        <div className="text-xs text-gray-500">
+                          Receive prisoners from another station
+                        </div>
+                      </label>
+                    </div>
+                  </RadioGroup>
+                )}
+              />
+              {errors.transfer_type && (
+                <span className="text-sm text-red-500">
+                  {errors.transfer_type.message}
+                </span>
+              )}
+            </div>
+
+            {/* Stations */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Original Station
+                </Label>
+                <Controller
+                  name="original_station"
+                  control={control}
+                  rules={{ required: "Original station is required" }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select original station" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stations.map((station) => (
+                          <SelectItem key={station.id} value={station.id}>
+                            {station.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.original_station && (
+                  <span className="text-sm text-red-500">
+                    {errors.original_station.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Destination Station
+                </Label>
+                <Controller
+                  name="destination_station"
+                  control={control}
+                  rules={{ required: "Destination station is required" }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select destination station" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {stations.map((station) => (
+                          <SelectItem key={station.id} value={station.id}>
+                            {station.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.destination_station && (
+                  <span className="text-sm text-red-500">
+                    {errors.destination_station.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Reason, In Charge, Status */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label>Transfer Reason</Label>
+                <Controller
+                  name="reason"
+                  control={control}
+                  rules={{ required: "Reason is required" }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select reason" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {reasons.map((reason) => (
+                          <SelectItem key={reason.id} value={reason.id}>
+                            {reason.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.reason && (
+                  <span className="text-sm text-red-500">
+                    {errors.reason.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Officer In Charge</Label>
+                <Controller
+                  name="in_charge"
+                  control={control}
+                  rules={{ required: "Officer in charge is required" }}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value?.toString()}
+                      onValueChange={(value) => field.onChange(parseInt(value))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select officer" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {staff.map((officer) => (
+                          <SelectItem key={officer.id} value={officer.id.toString()}>
+                            {officer.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.in_charge && (
+                  <span className="text-sm text-red-500">
+                    {errors.in_charge.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Request Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  rules={{ required: "Status is required" }}
+                  render={({ field }) => (
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {statuses.map((status) => (
+                          <SelectItem key={status.id} value={status.id}>
+                            {status.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
+                {errors.status && (
+                  <span className="text-sm text-red-500">
+                    {errors.status.message}
+                  </span>
+                )}
+              </div>
+            </div>
+              </CollapsibleContent>
+            </Collapsible>
+
+            {/* OC Approval Section - Collapsible */}
+            <Collapsible
+              open={isOcApprovalOpen}
+              onOpenChange={setIsOcApprovalOpen}
+            >
+              <CollapsibleTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="flex items-center justify-between w-full p-4 hover:bg-[#650000]/10 rounded-lg border-2 border-[#650000] bg-[#650000]/5"
+                >
+                  <span className="flex items-center gap-2 text-[#650000]">
+                    <CheckCircle2 className="h-5 w-5" />
+                    <span className="font-semibold">OC Approval Information</span>
+                  </span>
+                  {isOcApprovalOpen ? (
+                    <ChevronUp className="h-5 w-5 text-[#650000]" />
+                  ) : (
+                    <ChevronDown className="h-5 w-5 text-[#650000]" />
+                  )}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="space-y-4 pt-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Original Station OC Approval Status</Label>
                   <Controller
-                    name="transfer_request"
+                    name="original_station_oc_approval_status"
                     control={control}
-                    rules={{ required: "Transfer request is required" }}
                     render={({ field }) => (
                       <Select value={field.value} onValueChange={field.onChange}>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select transfer request" />
+                          <SelectValue placeholder="Select approval status" />
                         </SelectTrigger>
                         <SelectContent>
-                          {transferRequests.map((request) => (
-                            <SelectItem key={request.id} value={request.id}>
-                              {request.request_id}
+                          {approvalStatuses.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                              {status.name}
                             </SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     )}
                   />
-                  {errors.transfer_request && (
-                    <span className="text-sm text-red-500">
-                      {errors.transfer_request.message}
-                    </span>
-                  )}
                 </div>
 
-                {/* Transfer Type */}
                 <div className="space-y-2">
-                  <Label className="flex items-center gap-2">
-                    <ArrowLeftRight className="h-4 w-4" />
-                    Transfer Type
-                  </Label>
+                  <Label>Destination Station OC Approval Status</Label>
                   <Controller
-                    name="transfer_type"
+                    name="destination_station_oc_approval_status"
                     control={control}
-                    rules={{ required: "Transfer type is required" }}
                     render={({ field }) => (
-                      <RadioGroup
-                        value={field.value}
-                        onValueChange={field.onChange}
-                        className="flex gap-4"
-                      >
-                        <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
-                          <RadioGroupItem value="out" id="transfer-out" />
-                          <label
-                            htmlFor="transfer-out"
-                            className="cursor-pointer flex-1"
-                          >
-                            <div>Transfer Out</div>
-                            <div className="text-xs text-gray-500">
-                              Send prisoners to another station
-                            </div>
-                          </label>
-                        </div>
-                        <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
-                          <RadioGroupItem value="in" id="transfer-in" />
-                          <label
-                            htmlFor="transfer-in"
-                            className="cursor-pointer flex-1"
-                          >
-                            <div>Transfer In</div>
-                            <div className="text-xs text-gray-500">
-                              Receive prisoners from another station
-                            </div>
-                          </label>
-                        </div>
-                      </RadioGroup>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select approval status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {approvalStatuses.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                              {status.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
                   />
-                  {errors.transfer_type && (
-                    <span className="text-sm text-red-500">
-                      {errors.transfer_type.message}
-                    </span>
-                  )}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Original Station OC Approved By</Label>
+                  <Controller
+                    name="original_station_oc_approved_by"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value) || 0)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select officer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">None</SelectItem>
+                          {staff.map((officer) => (
+                            <SelectItem key={officer.id} value={officer.id.toString()}>
+                              {officer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
                 </div>
 
-                {/* Stations */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Original Station
-                    </Label>
-                    <Controller
-                      name="original_station"
-                      control={control}
-                      rules={{ required: "Original station is required" }}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select original station" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stations.map((station) => (
-                              <SelectItem key={station.id} value={station.id}>
-                                {station.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.original_station && (
-                      <span className="text-sm text-red-500">
-                        {errors.original_station.message}
-                      </span>
+                <div className="space-y-2">
+                  <Label>Destination Station OC Approved By</Label>
+                  <Controller
+                    name="destination_station_oc_approved_by"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value) || 0)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select officer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">None</SelectItem>
+                          {staff.map((officer) => (
+                            <SelectItem key={officer.id} value={officer.id.toString()}>
+                              {officer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     )}
-                  </div>
+                  />
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4" />
-                      Destination Station
-                    </Label>
-                    <Controller
-                      name="destination_station"
-                      control={control}
-                      rules={{ required: "Destination station is required" }}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select destination station" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {stations.map((station) => (
-                              <SelectItem key={station.id} value={station.id}>
-                                {station.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.destination_station && (
-                      <span className="text-sm text-red-500">
-                        {errors.destination_station.message}
-                      </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Original Station OC Approval Date
+                  </Label>
+                  <Controller
+                    name="original_station_oc_approved_date"
+                    control={control}
+                    render={({ field }) => (
+                      <Input type="date" {...field} className="w-full" />
                     )}
-                  </div>
+                  />
                 </div>
 
-                {/* Reason, In Charge, Status */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Transfer Reason</Label>
-                    <Controller
-                      name="reason"
-                      control={control}
-                      rules={{ required: "Reason is required" }}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select reason" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {reasons.map((reason) => (
-                              <SelectItem key={reason.id} value={reason.id}>
-                                {reason.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.reason && (
-                      <span className="text-sm text-red-500">
-                        {errors.reason.message}
-                      </span>
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Destination Station OC Approval Date
+                  </Label>
+                  <Controller
+                    name="destination_station_oc_approved_date"
+                    control={control}
+                    render={({ field }) => (
+                      <Input type="date" {...field} className="w-full" />
                     )}
-                  </div>
+                  />
+                </div>
+              </div>
 
-                  <div className="space-y-2">
-                    <Label>Officer In Charge</Label>
-                    <Controller
-                      name="in_charge"
-                      control={control}
-                      rules={{ required: "Officer in charge is required" }}
-                      render={({ field }) => (
-                        <Select
-                          value={field.value?.toString()}
-                          onValueChange={(value) => field.onChange(parseInt(value))}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select officer" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {staff.map((officer) => (
-                              <SelectItem key={officer.id} value={officer.id.toString()}>
-                                {officer.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.in_charge && (
-                      <span className="text-sm text-red-500">
-                        {errors.in_charge.message}
-                      </span>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="original_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="original_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
                     )}
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Request Status</Label>
-                    <Controller
-                      name="status"
-                      control={control}
-                      rules={{ required: "Status is required" }}
-                      render={({ field }) => (
-                        <Select value={field.value} onValueChange={field.onChange}>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select status" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {statuses.map((status) => (
-                              <SelectItem key={status.id} value={status.id}>
-                                {status.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      )}
-                    />
-                    {errors.status && (
-                      <span className="text-sm text-red-500">
-                        {errors.status.message}
-                      </span>
-                    )}
-                  </div>
+                  />
+                  <label
+                    htmlFor="original_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Original Station OC Acknowledged
+                  </label>
                 </div>
 
-            
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="destination_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="destination_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="destination_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Destination Station OC Acknowledged
+                  </label>
+                </div>
+              </div>
               </CollapsibleContent>
             </Collapsible>
-
-            {/* OC Approval Section - Collapsible removed*/}
-
           </CardContent>
         </Card>
 

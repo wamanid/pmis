@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import {
-  FileText,
+  ArrowRightLeft,
   Search,
   Plus,
   Edit,
@@ -8,11 +8,10 @@ import {
   Calendar,
   User,
   Building2,
-  Users,
+  FileText,
   CheckCircle2,
   XCircle,
   Filter,
-  ArrowRightLeft,
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -34,7 +33,7 @@ import {
 } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner@2.0.3";
-import TransferRequestForm from "./TransferRequestForm";
+import TransferForm from "./TransferForm";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,59 +45,46 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 
-interface TransferRequest {
+interface Transfer {
   id?: string;
   prisoner_name?: string;
+  prisoner_number?: string;
   original_station_name?: string;
   destination_station_name?: string;
   reason_name?: string;
   status_name?: string;
-  in_charge_name?: string;
-  original_oc_approval_status_name?: string;
-  destination_oc_approval_status_name?: string;
-  bulk_transfer: boolean;
-  number_of_prisoners: number;
+  transfer_request_id?: string;
+  transfer_date: string;
+  biometric_consent: boolean;
   original_station_oc_acknowledged: boolean;
   destination_station_oc_acknowledged: boolean;
-  original_station_oc_approved_date: string;
-  destination_station_oc_approved_date: string;
+  original_station_oc_approved: boolean;
+  destination_station_oc_approved: boolean;
+  transfer_request: string;
   prisoner: string;
   original_station: string;
   destination_station: string;
   reason: string;
-  in_charge: number;
   status: string;
-  original_station_oc_approval_status: string;
-  destination_station_oc_approval_status: string;
-  original_station_oc_approved_by: number;
-  destination_station_oc_approved_by: number;
 }
 
-interface TransferRequestListProps {
-  initialData?: TransferRequest[];
+interface TransferListProps {
+  initialData?: Transfer[];
 }
 
-export default function TransferRequestList({
-  initialData = [],
-}: TransferRequestListProps) {
-  const [requests, setRequests] = useState<TransferRequest[]>(initialData);
-  const [filteredRequests, setFilteredRequests] = useState<TransferRequest[]>(
-    []
-  );
+export default function TransferList({ initialData = [] }: TransferListProps) {
+  const [transfers, setTransfers] = useState<Transfer[]>(initialData);
+  const [filteredTransfers, setFilteredTransfers] = useState<Transfer[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRequest, setEditingRequest] = useState<TransferRequest | null>(
-    null
-  );
+  const [editingTransfer, setEditingTransfer] = useState<Transfer | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
+  const [transferToDelete, setTransferToDelete] = useState<string | null>(null);
 
   // Search and filter states
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStation, setSelectedStation] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedReason, setSelectedReason] = useState<string>("all");
-  // const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<string>("all"); // removed 
-  const [transferType, setTransferType] = useState<string>("all"); // all, bulk, single
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
@@ -107,7 +93,6 @@ export default function TransferRequestList({
     { id: "1", name: "John Doe", number: "P001" },
     { id: "2", name: "Jane Smith", number: "P002" },
     { id: "3", name: "Mike Johnson", number: "P003" },
-    { id: "4", name: "Sarah Williams", number: "P004" },
   ]);
 
   const [stations] = useState([
@@ -115,7 +100,6 @@ export default function TransferRequestList({
     { id: "2", name: "North Prison" },
     { id: "3", name: "South Prison" },
     { id: "4", name: "East Prison" },
-    { id: "5", name: "West Prison" },
   ]);
 
   const [reasons] = useState([
@@ -123,161 +107,112 @@ export default function TransferRequestList({
     { id: "2", name: "Court Appearance" },
     { id: "3", name: "Overcrowding" },
     { id: "4", name: "Security" },
-    { id: "5", name: "Administrative" },
   ]);
 
   const [statuses] = useState([
     { id: "1", name: "Pending" },
     { id: "2", name: "Approved" },
-    { id: "3", name: "Rejected" },
-    { id: "4", name: "In Progress" },
-    { id: "5", name: "Completed" },
+    { id: "3", name: "In Transit" },
+    { id: "4", name: "Completed" },
+    { id: "5", name: "Rejected" },
   ]);
 
-  // approvalStatuses removed (no longer used)
-
-  const [staff] = useState([
-    { id: 1, name: "Officer John Smith" },
-    { id: 2, name: "Officer Mary Johnson" },
-    { id: 3, name: "Officer David Brown" },
-    { id: 4, name: "Officer Sarah Davis" },
+  const [transferRequests] = useState([
+    { id: "1", request_id: "TR-2025-001" },
+    { id: "2", request_id: "TR-2025-002" },
+    { id: "3", request_id: "TR-2025-003" },
   ]);
 
   // Load mock data on mount
   useEffect(() => {
-    if (requests.length === 0) {
-      const mockRequests: TransferRequest[] = [
+    if (transfers.length === 0) {
+      const mockTransfers: Transfer[] = [
         {
           id: "1",
           prisoner_name: "John Doe",
+          prisoner_number: "P001",
           original_station_name: "Central Prison",
           destination_station_name: "North Prison",
           reason_name: "Medical",
           status_name: "Approved",
-          in_charge_name: "Officer John Smith",
-          original_oc_approval_status_name: "Approved",
-          destination_oc_approval_status_name: "Pending",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
+          transfer_request_id: "TR-2025-001",
+          transfer_date: "2025-11-05T10:00:00Z",
+          biometric_consent: true,
           original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "2025-11-02T10:00:00Z",
-          destination_station_oc_approved_date: "",
+          destination_station_oc_acknowledged: true,
+          original_station_oc_approved: true,
+          destination_station_oc_approved: false,
+          transfer_request: "1",
           prisoner: "1",
           original_station: "1",
           destination_station: "2",
           reason: "1",
-          in_charge: 1,
           status: "2",
-          original_station_oc_approval_status: "2",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 1,
-          destination_station_oc_approved_by: 0,
         },
         {
           id: "2",
-          prisoner_name: "",
+          prisoner_name: "Jane Smith",
+          prisoner_number: "P002",
           original_station_name: "South Prison",
           destination_station_name: "East Prison",
-          reason_name: "Overcrowding",
-          status_name: "In Progress",
-          in_charge_name: "Officer Mary Johnson",
-          original_oc_approval_status_name: "Approved",
-          destination_oc_approval_status_name: "Approved",
-          bulk_transfer: true,
-          number_of_prisoners: 15,
+          reason_name: "Court Appearance",
+          status_name: "In Transit",
+          transfer_request_id: "TR-2025-002",
+          transfer_date: "2025-11-04T14:30:00Z",
+          biometric_consent: true,
           original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: true,
-          original_station_oc_approved_date: "2025-11-01T14:00:00Z",
-          destination_station_oc_approved_date: "2025-11-02T09:00:00Z",
-          prisoner: "",
+          destination_station_oc_acknowledged: false,
+          original_station_oc_approved: true,
+          destination_station_oc_approved: false,
+          transfer_request: "2",
+          prisoner: "2",
           original_station: "3",
           destination_station: "4",
-          reason: "3",
-          in_charge: 2,
-          status: "4",
-          original_station_oc_approval_status: "2",
-          destination_station_oc_approval_status: "2",
-          original_station_oc_approved_by: 2,
-          destination_station_oc_approved_by: 3,
+          reason: "2",
+          status: "3",
         },
         {
           id: "3",
           prisoner_name: "Mike Johnson",
-          original_station_name: "East Prison",
-          destination_station_name: "West Prison",
-          reason_name: "Court Appearance",
+          prisoner_number: "P003",
+          original_station_name: "Central Prison",
+          destination_station_name: "South Prison",
+          reason_name: "Overcrowding",
           status_name: "Pending",
-          in_charge_name: "Officer David Brown",
-          original_oc_approval_status_name: "Under Review",
-          destination_oc_approval_status_name: "Pending",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
+          transfer_request_id: "TR-2025-003",
+          transfer_date: "2025-11-06T09:00:00Z",
+          biometric_consent: false,
           original_station_oc_acknowledged: false,
           destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "",
-          destination_station_oc_approved_date: "",
+          original_station_oc_approved: false,
+          destination_station_oc_approved: false,
+          transfer_request: "3",
           prisoner: "3",
-          original_station: "4",
-          destination_station: "5",
-          reason: "2",
-          in_charge: 3,
+          original_station: "1",
+          destination_station: "3",
+          reason: "3",
           status: "1",
-          original_station_oc_approval_status: "4",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 0,
-          destination_station_oc_approved_by: 0,
-        },
-        {
-          id: "4",
-          prisoner_name: "Sarah Williams",
-          original_station_name: "North Prison",
-          destination_station_name: "Central Prison",
-          reason_name: "Security",
-          status_name: "Rejected",
-          in_charge_name: "Officer Sarah Davis",
-          original_oc_approval_status_name: "Rejected",
-          destination_oc_approval_status_name: "N/A",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
-          original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "2025-10-30T11:00:00Z",
-          destination_station_oc_approved_date: "",
-          prisoner: "4",
-          original_station: "2",
-          destination_station: "1",
-          reason: "4",
-          in_charge: 4,
-          status: "3",
-          original_station_oc_approval_status: "3",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 4,
-          destination_station_oc_approved_by: 0,
         },
       ];
-      setRequests(mockRequests);
+      setTransfers(mockTransfers);
     }
   }, []);
 
-  // Filter requests based on search and filters
+  // Filter transfers based on search and filters
   useEffect(() => {
-    let filtered = [...requests];
+    let filtered = [...transfers];
 
     // Search filter
     if (searchTerm) {
       filtered = filtered.filter(
-        (request) =>
-          request.prisoner_name
+        (transfer) =>
+          transfer.prisoner_name
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          request.in_charge_name
+          transfer.prisoner_number
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          request.original_station_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          request.destination_station_name
+          transfer.transfer_request_id
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase())
       );
@@ -286,165 +221,148 @@ export default function TransferRequestList({
     // Station filter
     if (selectedStation !== "all") {
       filtered = filtered.filter(
-        (request) =>
-          request.original_station === selectedStation ||
-          request.destination_station === selectedStation
+        (transfer) =>
+          transfer.original_station === selectedStation ||
+          transfer.destination_station === selectedStation
       );
     }
 
     // Status filter
     if (selectedStatus !== "all") {
       filtered = filtered.filter(
-        (request) => request.status === selectedStatus
+        (transfer) => transfer.status === selectedStatus
       );
     }
 
     // Reason filter
     if (selectedReason !== "all") {
       filtered = filtered.filter(
-        (request) => request.reason === selectedReason
+        (transfer) => transfer.reason === selectedReason
       );
-    }
-
-    // approval status filter removed
-
-    // Transfer type filter
-    if (transferType === "bulk") {
-      filtered = filtered.filter((request) => request.bulk_transfer === true);
-    } else if (transferType === "single") {
-      filtered = filtered.filter((request) => request.bulk_transfer === false);
     }
 
     // Date range filter
     if (dateFrom) {
       filtered = filtered.filter(
-        (request) =>
-          (request.original_station_oc_approved_date &&
-            new Date(request.original_station_oc_approved_date) >=
-              new Date(dateFrom + "T00:00:00Z")) ||
-          (request.destination_station_oc_approved_date &&
-            new Date(request.destination_station_oc_approved_date) >=
-              new Date(dateFrom + "T00:00:00Z"))
+        (transfer) =>
+          new Date(transfer.transfer_date) >= new Date(dateFrom + "T00:00:00Z")
       );
     }
 
     if (dateTo) {
       filtered = filtered.filter(
-        (request) =>
-          (request.original_station_oc_approved_date &&
-            new Date(request.original_station_oc_approved_date) <=
-              new Date(dateTo + "T23:59:59Z")) ||
-          (request.destination_station_oc_approved_date &&
-            new Date(request.destination_station_oc_approved_date) <=
-              new Date(dateTo + "T23:59:59Z"))
+        (transfer) =>
+          new Date(transfer.transfer_date) <= new Date(dateTo + "T23:59:59Z")
       );
     }
 
-    setFilteredRequests(filtered);
+    setFilteredTransfers(filtered);
   }, [
-    requests,
+    transfers,
     searchTerm,
     selectedStation,
     selectedStatus,
     selectedReason,
-    transferType,
     dateFrom,
     dateTo,
   ]);
 
-  const handleAddRequest = () => {
-    setEditingRequest(null);
+  const handleAddTransfer = () => {
+    setEditingTransfer(null);
     setIsDialogOpen(true);
   };
 
-  const handleEditRequest = (request: TransferRequest) => {
-    setEditingRequest(request);
+  const handleEditTransfer = (transfer: Transfer) => {
+    setEditingTransfer(transfer);
     setIsDialogOpen(true);
   };
 
   const handleDeleteClick = (id: string) => {
-    setRequestToDelete(id);
+    setTransferToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
-    if (!requestToDelete) return;
+    if (!transferToDelete) return;
 
     try {
       // API call would go here
-      // await fetch(`/api/transfer-management/requests/${requestToDelete}/`, {
+      // await fetch(`/api/transfer-management/transfers/${transferToDelete}/`, {
       //   method: 'DELETE',
       // });
 
-      setRequests(requests.filter((r) => r.id !== requestToDelete));
-      toast.success("Transfer request deleted successfully");
+      setTransfers(transfers.filter((t) => t.id !== transferToDelete));
+      toast.success("Transfer deleted successfully");
     } catch (error) {
-      toast.error("Failed to delete transfer request");
+      toast.error("Failed to delete transfer");
     } finally {
       setDeleteDialogOpen(false);
-      setRequestToDelete(null);
+      setTransferToDelete(null);
     }
   };
 
-  const handleSaveRequest = (requestData: TransferRequest) => {
-    if (editingRequest) {
-      // Update existing request
-      setRequests(
-        requests.map((r) =>
-          r.id === editingRequest.id
+  const handleSaveTransfer = (transferData: Transfer) => {
+    if (editingTransfer) {
+      // Update existing transfer
+      setTransfers(
+        transfers.map((t) =>
+          t.id === editingTransfer.id
             ? {
-                ...requestData,
-                id: editingRequest.id,
-                prisoner_name: requestData.bulk_transfer
-                  ? ""
-                  : prisoners.find((p) => p.id === requestData.prisoner)
-                      ?.name || "",
+                ...transferData,
+                id: editingTransfer.id,
+                prisoner_name:
+                  prisoners.find((p) => p.id === transferData.prisoner)
+                    ?.name || "",
+                prisoner_number:
+                  prisoners.find((p) => p.id === transferData.prisoner)
+                    ?.number || "",
                 original_station_name:
-                  stations.find((s) => s.id === requestData.original_station)
+                  stations.find((s) => s.id === transferData.original_station)
                     ?.name || "",
                 destination_station_name:
-                  stations.find((s) => s.id === requestData.destination_station)
+                  stations.find((s) => s.id === transferData.destination_station)
                     ?.name || "",
                 reason_name:
-                  reasons.find((r) => r.id === requestData.reason)?.name || "",
+                  reasons.find((r) => r.id === transferData.reason)?.name || "",
                 status_name:
-                  statuses.find((s) => s.id === requestData.status)?.name || "",
-                in_charge_name:
-                  staff.find((s) => s.id === requestData.in_charge)?.name || "",
-                // OC approval fields removed
+                  statuses.find((s) => s.id === transferData.status)?.name || "",
+                transfer_request_id:
+                  transferRequests.find(
+                    (tr) => tr.id === transferData.transfer_request
+                  )?.request_id || "",
               }
-            : r
+            : t
         )
       );
     } else {
-      // Add new request
-      const newRequest = {
-        ...requestData,
+      // Add new transfer
+      const newTransfer = {
+        ...transferData,
         id: Date.now().toString(),
-        prisoner_name: requestData.bulk_transfer
-          ? ""
-          : prisoners.find((p) => p.id === requestData.prisoner)?.name || "",
+        prisoner_name:
+          prisoners.find((p) => p.id === transferData.prisoner)?.name || "",
+        prisoner_number:
+          prisoners.find((p) => p.id === transferData.prisoner)?.number || "",
         original_station_name:
-          stations.find((s) => s.id === requestData.original_station)?.name ||
+          stations.find((s) => s.id === transferData.original_station)?.name ||
           "",
         destination_station_name:
-          stations.find((s) => s.id === requestData.destination_station)
+          stations.find((s) => s.id === transferData.destination_station)
             ?.name || "",
         reason_name:
-          reasons.find((r) => r.id === requestData.reason)?.name || "",
+          reasons.find((r) => r.id === transferData.reason)?.name || "",
         status_name:
-          statuses.find((s) => s.id === requestData.status)?.name || "",
-        in_charge_name:
-          staff.find((s) => s.id === requestData.in_charge)?.name || "",
-        // OC approval fields removed
+          statuses.find((s) => s.id === transferData.status)?.name || "",
+        transfer_request_id:
+          transferRequests.find((tr) => tr.id === transferData.transfer_request)
+            ?.request_id || "",
       };
-      setRequests([...requests, newRequest]);
+      setTransfers([...transfers, newTransfer]);
     }
     setIsDialogOpen(false);
   };
 
   const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
     const date = new Date(dateString);
     return date.toLocaleDateString("en-US", {
       year: "numeric",
@@ -456,11 +374,11 @@ export default function TransferRequestList({
   const getStatusBadgeVariant = (status: string) => {
     switch (status.toLowerCase()) {
       case "completed":
-      case "approved":
         return "default";
-      case "in progress":
-      case "under review":
+      case "approved":
         return "secondary";
+      case "in transit":
+        return "outline";
       case "pending":
         return "outline";
       case "rejected":
@@ -475,7 +393,6 @@ export default function TransferRequestList({
     setSelectedStation("all");
     setSelectedStatus("all");
     setSelectedReason("all");
-    setTransferType("all");
     setDateFrom("");
     setDateTo("");
   };
@@ -487,15 +404,15 @@ export default function TransferRequestList({
         <CardHeader className="border-b bg-gray-50">
           <div className="flex items-center justify-between">
             <CardTitle className="flex items-center gap-2 text-[#650000]">
-              <FileText className="h-6 w-6" />
-              Transfer Requests
+              <ArrowRightLeft className="h-6 w-6" />
+              Transfer Management
             </CardTitle>
             <Button
-              onClick={handleAddRequest}
+              onClick={handleAddTransfer}
               className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
             >
               <Plus className="h-4 w-4" />
-              Add Transfer Request
+              Add Transfer
             </Button>
           </div>
         </CardHeader>
@@ -505,12 +422,11 @@ export default function TransferRequestList({
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
               <Filter className="h-4 w-4 text-gray-500" />
-              <span className="text-sm text-gray-600">Filter Requests</span>
+              <span className="text-sm text-gray-600">Filter Transfers</span>
               {(searchTerm ||
                 selectedStation !== "all" ||
                 selectedStatus !== "all" ||
                 selectedReason !== "all" ||
-                transferType !== "all" ||
                 dateFrom ||
                 dateTo) && (
                 <Button
@@ -529,7 +445,7 @@ export default function TransferRequestList({
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
-                  placeholder="Search by prisoner name, officer, or station..."
+                  placeholder="Search by prisoner name, number, or request ID..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
@@ -538,7 +454,7 @@ export default function TransferRequestList({
             </div>
 
             {/* Filter Dropdowns */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Select value={selectedStation} onValueChange={setSelectedStation}>
                 <SelectTrigger>
                   <SelectValue placeholder="All Stations" />
@@ -581,22 +497,6 @@ export default function TransferRequestList({
                 </SelectContent>
               </Select>
 
-              {/* Approval Status filter removed */}
-            </div>
-
-            {/* Additional Filters Row */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <Select value={transferType} onValueChange={setTransferType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Transfer Type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="single">Single Transfer</SelectItem>
-                  <SelectItem value="bulk">Bulk Transfer</SelectItem>
-                </SelectContent>
-              </Select>
-
               <Input
                 type="date"
                 value={dateFrom}
@@ -615,104 +515,112 @@ export default function TransferRequestList({
         </CardContent>
       </Card>
 
-      {/* Requests Table */}
+      {/* Transfers Table */}
       <Card>
         <CardContent className="p-0">
           <Table>
             <TableHeader>
               <TableRow style={{ backgroundColor: '#650000' }}>
-                <TableHead className="text-white">Type</TableHead>
-                <TableHead className="text-white">Prisoner(s)</TableHead>
+                <TableHead className="text-white">Request ID</TableHead>
+                <TableHead className="text-white">Transfer Date</TableHead>
+                <TableHead className="text-white">Prisoner</TableHead>
                 <TableHead className="text-white">From → To</TableHead>
                 <TableHead className="text-white">Reason</TableHead>
-                <TableHead className="text-white">In Charge</TableHead>
                 <TableHead className="text-white">Status</TableHead>
-                {/* OC Approvals column removed */}
+                <TableHead className="text-white">Approvals</TableHead>
                 <TableHead className="text-white">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredRequests.length === 0 ? (
+              {filteredTransfers.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={8}
                     className="text-center py-8 text-gray-500"
                   >
-                    No transfer requests found
+                    No transfers found
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredRequests.map((request) => (
-                  <TableRow key={request.id}>
+                filteredTransfers.map((transfer) => (
+                  <TableRow key={transfer.id}>
                     <TableCell>
-                      {request.bulk_transfer ? (
-                        <Badge className="bg-purple-600 flex items-center gap-1 w-fit">
-                          <Users className="h-3 w-3" />
-                          Bulk
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                          <User className="h-3 w-3" />
-                          Single
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {request.bulk_transfer ? (
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">
-                            {request.number_of_prisoners} prisoners
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">{request.prisoner_name}</span>
-                        </div>
-                      )}
+                      <Badge className="bg-[#650000]">
+                        {transfer.transfer_request_id}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <div className="text-sm">
-                          <div>{request.original_station_name}</div>
-                          <div className="flex items-center gap-1 text-gray-500">
-                            <ArrowRightLeft className="h-3 w-3" />
-                            {request.destination_station_name}
+                        <Calendar className="h-4 w-4 text-gray-400" />
+                        <span className="text-sm">
+                          {formatDate(transfer.transfer_date)}
+                        </span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4 text-gray-400" />
+                        <div>
+                          <div>{transfer.prisoner_name}</div>
+                          <div className="text-sm text-gray-500">
+                            {transfer.prisoner_number}
                           </div>
                         </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant="outline">{request.reason_name}</Badge>
-                    </TableCell>
-                    <TableCell>
                       <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm">{request.in_charge_name}</span>
+                        <Building2 className="h-4 w-4 text-gray-400" />
+                        <div className="text-sm">
+                          <div>{transfer.original_station_name}</div>
+                          <div className="flex items-center gap-1 text-gray-500">
+                            <ArrowRightLeft className="h-3 w-3" />
+                            {transfer.destination_station_name}
+                          </div>
+                        </div>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={getStatusBadgeVariant(request.status_name || "")}>
-                        {request.status_name}
+                      <Badge variant="outline">{transfer.reason_name}</Badge>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={getStatusBadgeVariant(transfer.status_name || "")}>
+                        {transfer.status_name}
                       </Badge>
                     </TableCell>
-
-                     {/* OC Approvals cell removed */}
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1 text-xs">
+                          {transfer.original_station_oc_approved ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-gray-400" />
+                          )}
+                          <span className="text-gray-600">Origin OC</span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          {transfer.destination_station_oc_approved ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-gray-400" />
+                          )}
+                          <span className="text-gray-600">Dest. OC</span>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() => handleEditRequest(request)}
+                          onClick={() => handleEditTransfer(transfer)}
                         >
                           <Edit className="h-4 w-4" />
                         </Button>
                         <Button
                           size="sm"
                           variant="destructive"
-                          onClick={() => handleDeleteClick(request.id!)}
+                          onClick={() => handleDeleteClick(transfer.id!)}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -726,17 +634,17 @@ export default function TransferRequestList({
         </CardContent>
       </Card>
 
-      {/* Transfer Request Form Dialog */}
-      <TransferRequestForm
+      {/* Transfer Form Dialog */}
+      <TransferForm
         open={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        onSave={handleSaveRequest}
-        editingRequest={editingRequest}
+        onSave={handleSaveTransfer}
+        editingTransfer={editingTransfer}
         prisoners={prisoners}
         stations={stations}
         reasons={reasons}
         statuses={statuses}
-        staff={staff}
+        transferRequests={transferRequests}
       />
 
       {/* Delete Confirmation Dialog */}
@@ -745,8 +653,8 @@ export default function TransferRequestList({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transfer request? This action
-              cannot be undone.
+              Are you sure you want to delete this transfer? This action cannot
+              be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

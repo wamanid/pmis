@@ -451,8 +451,188 @@ export default function TransferRequestForm({
               </div>
             </div>
 
-    
-            {/* OC Approval Information removed */}
+            {/* Approval Statuses */}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="flex items-center gap-2 text-[#650000]">
+                <CheckCircle2 className="h-5 w-5" />
+                OC Approval Information
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Original Station OC Approval Status</Label>
+                  <Controller
+                    name="original_station_oc_approval_status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select approval status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {approvalStatuses.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                              {status.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Destination Station OC Approval Status</Label>
+                  <Controller
+                    name="destination_station_oc_approval_status"
+                    control={control}
+                    render={({ field }) => (
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select approval status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {approvalStatuses.map((status) => (
+                            <SelectItem key={status.id} value={status.id}>
+                              {status.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Approved By */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Original Station OC Approved By</Label>
+                  <Controller
+                    name="original_station_oc_approved_by"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value) || 0)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select officer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">None</SelectItem>
+                          {staff.map((officer) => (
+                            <SelectItem key={officer.id} value={officer.id.toString()}>
+                              {officer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Destination Station OC Approved By</Label>
+                  <Controller
+                    name="destination_station_oc_approved_by"
+                    control={control}
+                    render={({ field }) => (
+                      <Select
+                        value={field.value?.toString()}
+                        onValueChange={(value) => field.onChange(parseInt(value) || 0)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select officer" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="0">None</SelectItem>
+                          {staff.map((officer) => (
+                            <SelectItem key={officer.id} value={officer.id.toString()}>
+                              {officer.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Approval Dates */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Original Station OC Approval Date
+                  </Label>
+                  <Controller
+                    name="original_station_oc_approved_date"
+                    control={control}
+                    render={({ field }) => (
+                      <Input type="date" {...field} className="w-full" />
+                    )}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Destination Station OC Approval Date
+                  </Label>
+                  <Controller
+                    name="destination_station_oc_approved_date"
+                    control={control}
+                    render={({ field }) => (
+                      <Input type="date" {...field} className="w-full" />
+                    )}
+                  />
+                </div>
+              </div>
+
+              {/* Acknowledgment Checkboxes */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="original_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="original_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="original_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Original Station OC Acknowledged
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="destination_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="destination_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="destination_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Destination Station OC Acknowledged
+                  </label>
+                </div>
+              </div>
+            </div>
 
             {/* Form Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t">

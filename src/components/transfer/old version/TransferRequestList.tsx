@@ -97,7 +97,7 @@ export default function TransferRequestList({
   const [selectedStation, setSelectedStation] = useState<string>("all");
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedReason, setSelectedReason] = useState<string>("all");
-  // const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<string>("all"); // removed 
+  const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<string>("all");
   const [transferType, setTransferType] = useState<string>("all"); // all, bulk, single
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
@@ -134,7 +134,12 @@ export default function TransferRequestList({
     { id: "5", name: "Completed" },
   ]);
 
-  // approvalStatuses removed (no longer used)
+  const [approvalStatuses] = useState([
+    { id: "1", name: "Pending" },
+    { id: "2", name: "Approved" },
+    { id: "3", name: "Rejected" },
+    { id: "4", name: "Under Review" },
+  ]);
 
   const [staff] = useState([
     { id: 1, name: "Officer John Smith" },
@@ -306,7 +311,16 @@ export default function TransferRequestList({
       );
     }
 
-    // approval status filter removed
+    // Approval status filter
+    if (selectedApprovalStatus !== "all") {
+      filtered = filtered.filter(
+        (request) =>
+          request.original_station_oc_approval_status ===
+            selectedApprovalStatus ||
+          request.destination_station_oc_approval_status ===
+            selectedApprovalStatus
+      );
+    }
 
     // Transfer type filter
     if (transferType === "bulk") {
@@ -347,6 +361,7 @@ export default function TransferRequestList({
     selectedStation,
     selectedStatus,
     selectedReason,
+    selectedApprovalStatus,
     transferType,
     dateFrom,
     dateTo,
@@ -411,7 +426,14 @@ export default function TransferRequestList({
                   statuses.find((s) => s.id === requestData.status)?.name || "",
                 in_charge_name:
                   staff.find((s) => s.id === requestData.in_charge)?.name || "",
-                // OC approval fields removed
+                original_oc_approval_status_name:
+                  approvalStatuses.find(
+                    (s) => s.id === requestData.original_station_oc_approval_status
+                  )?.name || "",
+                destination_oc_approval_status_name:
+                  approvalStatuses.find(
+                    (s) => s.id === requestData.destination_station_oc_approval_status
+                  )?.name || "",
               }
             : r
         )
@@ -436,7 +458,14 @@ export default function TransferRequestList({
           statuses.find((s) => s.id === requestData.status)?.name || "",
         in_charge_name:
           staff.find((s) => s.id === requestData.in_charge)?.name || "",
-        // OC approval fields removed
+        original_oc_approval_status_name:
+          approvalStatuses.find(
+            (s) => s.id === requestData.original_station_oc_approval_status
+          )?.name || "",
+        destination_oc_approval_status_name:
+          approvalStatuses.find(
+            (s) => s.id === requestData.destination_station_oc_approval_status
+          )?.name || "",
       };
       setRequests([...requests, newRequest]);
     }
@@ -475,6 +504,7 @@ export default function TransferRequestList({
     setSelectedStation("all");
     setSelectedStatus("all");
     setSelectedReason("all");
+    setSelectedApprovalStatus("all");
     setTransferType("all");
     setDateFrom("");
     setDateTo("");
@@ -510,6 +540,7 @@ export default function TransferRequestList({
                 selectedStation !== "all" ||
                 selectedStatus !== "all" ||
                 selectedReason !== "all" ||
+                selectedApprovalStatus !== "all" ||
                 transferType !== "all" ||
                 dateFrom ||
                 dateTo) && (
@@ -581,7 +612,22 @@ export default function TransferRequestList({
                 </SelectContent>
               </Select>
 
-              {/* Approval Status filter removed */}
+              <Select
+                value={selectedApprovalStatus}
+                onValueChange={setSelectedApprovalStatus}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Approval Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Approval Statuses</SelectItem>
+                  {approvalStatuses.map((status) => (
+                    <SelectItem key={status.id} value={status.id}>
+                      {status.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Additional Filters Row */}
@@ -627,7 +673,7 @@ export default function TransferRequestList({
                 <TableHead className="text-white">Reason</TableHead>
                 <TableHead className="text-white">In Charge</TableHead>
                 <TableHead className="text-white">Status</TableHead>
-                {/* OC Approvals column removed */}
+                <TableHead className="text-white">OC Approvals</TableHead>
                 <TableHead className="text-white">Actions</TableHead>
               </TableRow>
             </TableHeader>
@@ -698,8 +744,38 @@ export default function TransferRequestList({
                         {request.status_name}
                       </Badge>
                     </TableCell>
-
-                     {/* OC Approvals cell removed */}
+                    <TableCell>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-1 text-xs">
+                          {request.original_oc_approval_status_name?.toLowerCase() ===
+                          "approved" ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          ) : request.original_oc_approval_status_name?.toLowerCase() ===
+                            "rejected" ? (
+                            <XCircle className="h-3 w-3 text-red-600" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-gray-400" />
+                          )}
+                          <span className="text-gray-600">
+                            Origin: {request.original_oc_approval_status_name}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1 text-xs">
+                          {request.destination_oc_approval_status_name?.toLowerCase() ===
+                          "approved" ? (
+                            <CheckCircle2 className="h-3 w-3 text-green-600" />
+                          ) : request.destination_oc_approval_status_name?.toLowerCase() ===
+                            "rejected" ? (
+                            <XCircle className="h-3 w-3 text-red-600" />
+                          ) : (
+                            <XCircle className="h-3 w-3 text-gray-400" />
+                          )}
+                          <span className="text-gray-600">
+                            Dest: {request.destination_oc_approval_status_name}
+                          </span>
+                        </div>
+                      </div>
+                    </TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button
@@ -736,6 +812,7 @@ export default function TransferRequestList({
         stations={stations}
         reasons={reasons}
         statuses={statuses}
+        approvalStatuses={approvalStatuses}
         staff={staff}
       />
 

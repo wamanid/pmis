@@ -391,7 +391,114 @@ export default function TransferForm({
             </div>
 
             {/* Checkboxes Section */}
-            {/* Consent & Acknowledgments removed */}
+            <div className="space-y-4 border-t pt-4">
+              <h3 className="flex items-center gap-2 text-[#650000]">
+                <CheckCircle2 className="h-5 w-5" />
+                Consent & Acknowledgments
+              </h3>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="biometric_consent"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="biometric_consent"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="biometric_consent"
+                    className="text-sm cursor-pointer"
+                  >
+                    Biometric Consent
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="original_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="original_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="original_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Original Station OC Acknowledged
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="destination_station_oc_acknowledged"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="destination_station_oc_acknowledged"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="destination_station_oc_acknowledged"
+                    className="text-sm cursor-pointer"
+                  >
+                    Destination Station OC Acknowledged
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="original_station_oc_approved"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="original_station_oc_approved"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="original_station_oc_approved"
+                    className="text-sm cursor-pointer"
+                  >
+                    Original Station OC Approved
+                  </label>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Controller
+                    name="destination_station_oc_approved"
+                    control={control}
+                    render={({ field }) => (
+                      <Checkbox
+                        id="destination_station_oc_approved"
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    )}
+                  />
+                  <label
+                    htmlFor="destination_station_oc_approved"
+                    className="text-sm cursor-pointer"
+                  >
+                    Destination Station OC Approved
+                  </label>
+                </div>
+              </div>
+            </div>
 
             {/* Form Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t">

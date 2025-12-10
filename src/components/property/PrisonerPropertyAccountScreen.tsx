@@ -8,7 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Badge } from '../ui/badge';
+import { Badge, badgeVariants } from '../ui/badge';
+import type { VariantProps } from 'class-variance-authority';
 import { Separator } from '../ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Checkbox } from '../ui/checkbox';
@@ -55,6 +56,9 @@ import {
 } from '../../utils/validation';
 import { useForm, Controller } from 'react-hook-form';
 import ConfirmDialog from '../common/ConfirmDialog';
+import DateTime, { formatDateTime } from '../common/DateTime';
+
+type BadgeVariant = VariantProps<typeof badgeVariants>['variant'];
 
 interface Account {
   id: string;
@@ -356,22 +360,35 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     }
   };
 
-  // helper to map backend status to badge variant
-  const getStatusVariant = (status: string) => {
-    if (!status) return 'warning';
-    switch (String(status).toLowerCase()) {
-      case 'pending':
-        return 'secondary';
-      case 'approved':
-      case 'completed':
-      case 'success':
-        return 'success';
-      case 'failed':
-      case 'rejected':
-        return 'danger';
-      default:
-        return 'warning';
-    }
+  // small wrapper to ensure success shows green background + white text and to centralize debug
+  const StatusBadge: React.FC<{ status?: string | null; className?:string }> = ({ status, className }) => {
+    const variant = getStatusVariant(status);
+    // debug: uncomment if you need to see mapping in console
+    // console.debug('StatusBadge', { status, variant });
+    // Force the green bg for success in case styles are being overridden elsewhere
+    const forceSuccess = variant === 'success' ? 'bg-green-500 text-white hover:bg-green-600' : '';
+    return (
+      <Badge variant={variant} className={cn(forceSuccess, className)}>
+        {status || 'N/A'}
+      </Badge>
+    );
+  };
+
+  const getStatusVariant = (status?: string | null): BadgeVariant => {
+    const sRaw = status ?? '';
+    const s = String(sRaw).toLowerCase().trim();
+    if (!s || s === 'n/a' || s === 'unknown') return 'outline';
+
+    // Use the badge variants that match your theme / existing visuals.
+    if (/(pending|awaiting|waiting)/i.test(s)) return 'secondary';
+    if (/(approved|completed|success|paid|settled|done)/i.test(s)) return 'default';
+    if (/(failed|rejected|declined|error|cancelled|canceled)/i.test(s)) return 'destructive';
+    if (/(processing|in[_\s-]?progress|on[-\s]?going|ongoing)/i.test(s)) return 'info';
+    if (/(hold|on[_\s-]?hold|warning)/i.test(s)) return 'warning';
+
+    // fallback
+    console.debug('getStatusVariant: unknown status string, falling back to outline', { status: sRaw });
+    return 'outline';
   };
 
   const handleUpdateAccount = async (dataOrEvent: any) => {
@@ -587,16 +604,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     {
       key: "transaction_datetime",
       label: "Date & Time",
-      render: (value: any) => {
-        let v = '';
-        try { v = value ? new Date(value).toLocaleString() : ''; } catch { v = String(value); }
-        return (
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <span>{v}</span>
-          </div>
-        );
-      },
+      render: (value: any) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-gray-400" />
+          <DateTime value={value} format="dMY" />
+        </div>
+      ),
     },
     { key: 'prisoner_name', label: 'Prisoner' },
     // { key: 'account_type_name', label: 'Account Type' },
@@ -1111,8 +1124,13 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   // update transactionColumns Checked By render to use helper
   // find the column object for checked_by_name and replace its render:
   const updatedTransactionColumns = transactionColumns.map(col => {
+    // if col.key === 'checked_by_name') {
+    //   // prefer API-provided checked_by_name (v). fallback to staff lookup (checked_by_oc) or fallback value
+    //   return { ...col, render: (v:any, r:any) => <span>{v || getCheckedByName(r.checked_by_oc, r.checked_by_name)}</span> };
+    // }
     if (col.key === 'checked_by_name') {
-      return { ...col, render: (v:any, r:any) => <span>{getCheckedByName(r.checked_by_oc ?? r.checked_by_name, v)}</span> };
+      // prefer API-provided checked_by_name (v). fallback to staff lookup (checked_by_oc) or fallback value
+      return { ...col, render: (v:any, r:any) => <span>{v || getCheckedByName(r.checked_by_oc, r.checked_by_name)}</span> };
     }
     return col;
   });
@@ -1267,7 +1285,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-gray-400" />
-                                {new Date(t.transaction_datetime).toLocaleString()}
+                                <DateTime value={t.transaction_datetime} format="dMY" />
                               </div>
                             </TableCell>
                             <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
@@ -1277,7 +1295,10 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                              {/* <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge> */}
+                              <Badge variant={getStatusVariant(t.transaction_status_name)}>
                                 {t.transaction_status_name}
                               </Badge>
                             </TableCell>
@@ -1561,9 +1582,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-gray-500">Status</Label>
-                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                    {/* <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
                       {selectedTransaction.transaction_status_name}
-                    </Badge>
+                    </Badge> */}
+                    <Badge variant={getStatusVariant(selectedTransaction.transaction_status_name)}>
++                      {selectedTransaction.transaction_status_name || 'N/A'}
++                    </Badge>
                   </div>
                   <div>
                     <Label className="text-gray-500">Amount</Label>
@@ -1573,7 +1597,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-gray-500">Date & Time</Label>
-                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                    <p><DateTime value={selectedTransaction.transaction_datetime} format="dMY" /></p>
                   </div>
                   <div>
                     <Label className="text-gray-500">Balance Before</Label>
