@@ -97,23 +97,14 @@ export default function TransferInOutBulkScreen() {
     formState: { errors },
   } = useForm<BulkTransferData>({
     defaultValues: {
-      transfer_type: "out",
-      number_of_prisoners: 0,
-      original_station: "",
-      destination_station: "",
-      reason: "",
-      in_charge: 0,
-      status: "",
-      original_station_oc_approval_status: "",
-      destination_station_oc_approval_status: "",
-      original_station_oc_approved_by: 0,
-      destination_station_oc_approved_by: 0,
-      original_station_oc_acknowledged: false,
-      destination_station_oc_acknowledged: false,
-      original_station_oc_approved_date: "",
-      destination_station_oc_approved_date: "",
-      selected_prisoners: [],
-      transfer_request: "",
+       transfer_type: "out",
+       original_station: "",
+       destination_station: "",
+       reason: "",
+       in_charge: "",
+       status: "",
+       selected_prisoners: [],
+       transfer_request: ""
     },
   });
 
@@ -183,7 +174,7 @@ export default function TransferInOutBulkScreen() {
   const [newDialogLoader, setNewDialogLoader] = useState(false)
   const [loaderText, setLoaderText] = useState("")
   const [bulk, setBulk] = useState<BulkTransferData>({
-    transfer_type: "in",
+    transfer_type: "out",
     original_station: "",
     destination_station: "",
     reason: "",
@@ -212,6 +203,19 @@ export default function TransferInOutBulkScreen() {
       return true
   }
 
+  function populateLists(response: any, msg: string): any[] | null {
+      if (handleResponseError(response)) return null
+
+      const data = response.results
+      // console.log(data)
+      if (!data.length) {
+        toast.error(msg)
+        return null
+      }
+
+      return data
+  }
+
   async function fetchData() {
     try {
       const response1 = await getTransferRequests(true)
@@ -237,7 +241,7 @@ export default function TransferInOutBulkScreen() {
     }
   }
 
-  function fetchId(request: TransferRequest, id: String, list: any[]) {
+  function fetchId(id: String, list: any[]) {
     const valueId = id
       ? list.find(li => li.id === id)?.id || ""
       : "";
@@ -246,15 +250,16 @@ export default function TransferInOutBulkScreen() {
 
   async function handleRequestChange(request: TransferRequest) {
     // console.log(request)
-    const reasonId = fetchId(request, request.reason, reasons)
-    const statusId = fetchId(request, request.status, statuses)
-    const origId = fetchId(request, request.original_station, stations)
-    const destId = fetchId(request, request.destination_station, stations)
+    const reasonId = fetchId(request.reason, reasons)
+    const statusId = fetchId(request.status, statuses)
+    const origId = fetchId(request.original_station, stations)
+    const destId = fetchId(request.destination_station, stations)
 
-    await getOfficers(origId)
-    console.log(staff)
-    const chargeId = fetchId(request, request.in_charge, staff)
-    console.log(chargeId)
+    const officers = await getOfficers(origId)
+    setStaff(officers)
+    // console.log(officers)
+    const chargeId = fetchId(request.in_charge, officers)
+    // console.log(chargeId)
 
     setBulk({
       ...bulk,
@@ -267,16 +272,30 @@ export default function TransferInOutBulkScreen() {
     })
   }
 
-  async function getOfficers(origId: string) {
+  useEffect(() => {
+    if(staff) {
+      const request = bulk.transfer_request
+      const in_charge = transferRequests.find(tr => tr.id === request)?.in_charge || ""
+      const chargeId = fetchId(in_charge, staff)
+      setBulk({
+        ...bulk,
+        in_charge: chargeId
+      })
+    }
+  }, [staff]);
+
+  async function getOfficers(origId: string): Promise<any[]> {
     setNewDialogLoader(true)
     setLoaderText("Fetching staff list")
     try {
       const response1 = await getStaffProfile(origId)
-      const ok1 = populateList(response1, "There are no officers for the selected original station", setStaff)
-      if (!ok1) return
+      const officers = populateLists(response1, "There are no officers for the selected original station")
+
+      return officers ?? []
 
     }catch (error) {
       handleCatchError(error)
+      return []
     }finally {
       setNewDialogLoader(false)
     }
@@ -284,14 +303,22 @@ export default function TransferInOutBulkScreen() {
 
   async function handleChange(name: string, value: string) {
 
-    setBulk({
-      ...bulk,
-      [name]: value,
-      destination_station: name === "original_station" && value === bulk.destination_station ? "" : bulk.destination_station
-    })
-
     if (name === "original_station"){
-      await getOfficers(value)
+      const officers = await getOfficers(value)
+      setStaff(officers)
+
+      setBulk({
+        ...bulk,
+        [name]: value,
+        destination_station: name === "original_station" && value === bulk.destination_station ? "" : bulk.destination_station,
+        in_charge: ""
+      })
+    }
+    else {
+      setBulk({
+        ...bulk,
+        [name]: value,
+      })
     }
   }
 
@@ -524,7 +551,10 @@ export default function TransferInOutBulkScreen() {
                         render={({ field }) => (
                           <RadioGroup
                             value={field.value}
-                            onValueChange={field.onChange}
+                            onValueChange={(value: string) => {
+                              field.onChange(value)
+                              handleChange("transfer_type", value)
+                            }}
                             className="flex gap-4"
                           >
                             <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
@@ -579,9 +609,9 @@ export default function TransferInOutBulkScreen() {
                                     ? stations.find(station => station.id === bulk.original_station)?.id || field.value
                                     : field.value
                                 }
-                                onValueChange={(id: string) => {
+                                onValueChange={async (id: string) => {
                                   field.onChange(id)
-                                  handleChange("original_station", id)
+                                  await handleChange("original_station", id)
                                 }}
                             >
                               <SelectTrigger>
@@ -695,7 +725,7 @@ export default function TransferInOutBulkScreen() {
                              <Select
                                 value={
                                   field.value === ""
-                                    ? staff.find(st => st.id === bulk.in_charge)?.id || field.value
+                                    ? staff.find(st => st.id === bulk.in_charge)?.id || ""
                                     : field.value
                                 }
                                 onValueChange={(id: string) => {
