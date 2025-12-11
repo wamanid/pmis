@@ -49,13 +49,14 @@ import {getStation, Station, StationItem} from "../../services/stationServices/m
 import {fetchShiftDetailDeployments} from "../../services/stationServices/shiftDeploymentsService";
 import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "../ui/dialog";
+import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
 
-interface Prisoner {
-  id: string;
-  name: string;
-  number: string;
-  category?: string;
-}
+// interface Prisoner {
+//   id: string;
+//   name: string;
+//   number: string;
+//   category?: string;
+// }
 
 // interface BulkTransferData {
 //   transfer_type: "in" | "out";
@@ -91,7 +92,6 @@ interface BulkTransferData {
 export default function TransferInOutBulkScreen() {
   const {
     control,
-    handleSubmit,
     watch,
     setValue,
     formState: { errors },
@@ -116,8 +116,8 @@ export default function TransferInOutBulkScreen() {
   const [isOcApprovalOpen, setIsOcApprovalOpen] = useState(false);
 
   // Available prisoners list
-  const [availablePrisoners, setAvailablePrisoners] = useState<Prisoner[]>([]);
-  const [selectedPrisoners, setSelectedPrisoners] = useState<Prisoner[]>([]);
+  const [availablePrisoners, setAvailablePrisoners] = useState<PrisonerItem[]>([]);
+  const [selectedPrisoners, setSelectedPrisoners] = useState<PrisonerItem[]>([]);
   const [availableSearch, setAvailableSearch] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("");
 
@@ -255,8 +255,10 @@ export default function TransferInOutBulkScreen() {
     const origId = fetchId(request.original_station, stations)
     const destId = fetchId(request.destination_station, stations)
 
-    const officers = await getOfficers(origId)
+    const { officers, newPrisoners } = await getOfficers(origId);
     setStaff(officers)
+    setAvailablePrisoners(newPrisoners)
+    setSelectedPrisoners([])
     // console.log(officers)
     const chargeId = fetchId(request.in_charge, officers)
     // console.log(chargeId)
@@ -284,18 +286,22 @@ export default function TransferInOutBulkScreen() {
     }
   }, [staff]);
 
-  async function getOfficers(origId: string): Promise<any[]> {
+  async function getOfficers(origId: string): Promise<{ officers: StaffItem[], newPrisoners: PrisonerItem[] }> {
     setNewDialogLoader(true)
     setLoaderText("Fetching staff list")
     try {
       const response1 = await getStaffProfile(origId)
-      const officers = populateLists(response1, "There are no officers for the selected original station")
+      const officers = populateLists(response1, "There are no officers for the selected original station") ?? []
 
-      return officers ?? []
+      const response2 = await getPrisoners()
+      const prisoners = populateLists(response2, "There are no prisoners") ?? []
+      const newPrisoners = prisoners.filter(pr => pr.current_station === origId)
+
+       return { officers, newPrisoners}
 
     }catch (error) {
       handleCatchError(error)
-      return []
+      return { officers: [], newPrisoners: [] };
     }finally {
       setNewDialogLoader(false)
     }
@@ -304,8 +310,10 @@ export default function TransferInOutBulkScreen() {
   async function handleChange(name: string, value: string) {
 
     if (name === "original_station"){
-      const officers = await getOfficers(value)
+      const { officers, newPrisoners } = await getOfficers(value);
       setStaff(officers)
+      setAvailablePrisoners(newPrisoners)
+      setSelectedPrisoners([])
 
       setBulk({
         ...bulk,
@@ -326,21 +334,21 @@ export default function TransferInOutBulkScreen() {
 
 
   // Load mock prisoners
-  useEffect(() => {
-    const mockPrisoners: Prisoner[] = [
-      { id: "1", name: "John Doe", number: "P001", category: "Convict" },
-      { id: "2", name: "Jane Smith", number: "P002", category: "Remand" },
-      { id: "3", name: "Mike Johnson", number: "P003", category: "Civil Debtor" },
-      { id: "4", name: "Sarah Williams", number: "P004", category: "Convict" },
-      { id: "5", name: "Robert Brown", number: "P005", category: "Remand" },
-      { id: "6", name: "Emily Davis", number: "P006", category: "Convict" },
-      { id: "7", name: "James Wilson", number: "P007", category: "Civil Debtor" },
-      { id: "8", name: "Linda Martinez", number: "P008", category: "Remand" },
-      { id: "9", name: "David Anderson", number: "P009", category: "Convict" },
-      { id: "10", name: "Patricia Taylor", number: "P010", category: "Remand" },
-    ];
-    setAvailablePrisoners(mockPrisoners);
-  }, []);
+  // useEffect(() => {
+  //   const mockPrisoners: Prisoner[] = [
+  //     { id: "1", name: "John Doe", number: "P001", category: "Convict" },
+  //     { id: "2", name: "Jane Smith", number: "P002", category: "Remand" },
+  //     { id: "3", name: "Mike Johnson", number: "P003", category: "Civil Debtor" },
+  //     { id: "4", name: "Sarah Williams", number: "P004", category: "Convict" },
+  //     { id: "5", name: "Robert Brown", number: "P005", category: "Remand" },
+  //     { id: "6", name: "Emily Davis", number: "P006", category: "Convict" },
+  //     { id: "7", name: "James Wilson", number: "P007", category: "Civil Debtor" },
+  //     { id: "8", name: "Linda Martinez", number: "P008", category: "Remand" },
+  //     { id: "9", name: "David Anderson", number: "P009", category: "Convict" },
+  //     { id: "10", name: "Patricia Taylor", number: "P010", category: "Remand" },
+  //   ];
+  //   setAvailablePrisoners(mockPrisoners);
+  // }, []);
 
   // Update number of prisoners count
   useEffect(() => {
@@ -354,24 +362,26 @@ export default function TransferInOutBulkScreen() {
   // Filter prisoners based on search
   const filteredAvailable = availablePrisoners.filter(
     (p) =>
-      p.name.toLowerCase().includes(availableSearch.toLowerCase()) ||
-      p.number.toLowerCase().includes(availableSearch.toLowerCase())
+      p.first_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.last_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.prisoner_number_value.toLowerCase().includes(availableSearch.toLowerCase())
   );
 
   const filteredSelected = selectedPrisoners.filter(
     (p) =>
-      p.name.toLowerCase().includes(selectedSearch.toLowerCase()) ||
-      p.number.toLowerCase().includes(selectedSearch.toLowerCase())
+      p.first_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.last_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.prisoner_number_value.toLowerCase().includes(availableSearch.toLowerCase())
   );
 
   // Move prisoner to selected list
-  const movePrisonerToSelected = (prisoner: Prisoner) => {
+  const movePrisonerToSelected = (prisoner: PrisonerItem) => {
     setAvailablePrisoners(availablePrisoners.filter((p) => p.id !== prisoner.id));
     setSelectedPrisoners([...selectedPrisoners, prisoner]);
   };
 
   // Move prisoner back to available list
-  const movePrisonerToAvailable = (prisoner: Prisoner) => {
+  const movePrisonerToAvailable = (prisoner: PrisonerItem) => {
     setSelectedPrisoners(selectedPrisoners.filter((p) => p.id !== prisoner.id));
     setAvailablePrisoners([...availablePrisoners, prisoner]);
   };
@@ -395,34 +405,40 @@ export default function TransferInOutBulkScreen() {
     );
   };
 
-  const onSubmit = async (data: BulkTransferData) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
     if (selectedPrisoners.length === 0) {
       toast.error("Please select at least one prisoner");
       return;
     }
 
-    try {
-      // API call would go here
-      // await fetch('/api/transfer-management/requests/bulk_transfers/', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data)
-      // });
-
-      toast.success(
-        `Bulk ${data.transfer_type === "in" ? "Transfer In" : "Transfer Out"} request created successfully for ${selectedPrisoners.length} prisoners`
-      );
-
-      // Reset form
-      setSelectedPrisoners([]);
-      // Reload available prisoners
-    } catch (error) {
-      toast.error("Failed to create bulk transfer request");
+    const bulkData: BulkTransferData = {
+      ...bulk,
+      selected_prisoners: selectedPrisoners.map(pr => pr.id)
     }
+
+    console.log(bulkData)
+
+    // try {
+    //   const bulk: BulkTransferData = {
+    //     ...data,
+    //
+    //   }
+    //
+    //   toast.success(
+    //     `Bulk ${data.transfer_type === "in" ? "Transfer In" : "Transfer Out"} request created successfully for ${selectedPrisoners.length} prisoners`
+    //   );
+    //
+    //   // Reset form
+    //   setSelectedPrisoners([]);
+    //   // Reload available prisoners
+    // } catch (error) {
+    //   toast.error("Failed to create bulk transfer request");
+    // }
   };
 
   const renderPrisonerCard = (
-    prisoner: Prisoner,
+    prisoner: PrisonerItem,
     onClick: () => void,
     icon: React.ReactNode
   ) => (
@@ -434,9 +450,10 @@ export default function TransferInOutBulkScreen() {
       <div className="flex items-center gap-3">
         <User className="h-4 w-4 text-gray-400" />
         <div>
-          <div className="text-sm">{prisoner.name}</div>
+          <div className="text-sm">{prisoner.full_name}</div>
           <div className="text-xs text-gray-500">
-            {prisoner.number} • {prisoner.category}
+            {/*{prisoner.number} • {prisoner.category}*/}
+            {prisoner.prisoner_number_value}
           </div>
         </div>
       </div>
@@ -464,7 +481,7 @@ export default function TransferInOutBulkScreen() {
             </div>
           </div>
         ) : (
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <Card>
               <CardHeader className="border-b bg-gray-50">
                 <CardTitle className="flex items-center gap-2 text-[#650000]">
