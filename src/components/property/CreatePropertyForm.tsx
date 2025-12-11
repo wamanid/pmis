@@ -10,7 +10,7 @@ import {
   getPropertyStatuses,
   getPropertyTypes, PrisonerProperty, Property,
   PropertyBag, updateProperty
-} from "../../services/stationServices/propertyService";
+} from "../../services/propertyServices/propertyService";
 import PropertyItem from "./PropertyItem";
 import {getNextOfKins, NextOfKinResponse} from "../../services/admission/nextOfKinService";
 import {

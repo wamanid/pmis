@@ -1,8 +1,8 @@
-import {ErrorResponse} from "./visitorsServices/VisitorsService";
+import {ErrorResponse} from "../stationServices/visitorsServices/VisitorsService";
 import axiosInstance from "../axiosInstance";
-import {WardsResponse} from "./housingService";
-import {Paginated} from "./utils";
-import {Unit} from "./visitorsServices/visitorItem";
+import {WardsResponse} from "../stationServices/housingService";
+import {Paginated} from "../stationServices/utils";
+import {Unit} from "../stationServices/visitorsServices/visitorItem";
 
 export interface DefaultPropertyItem {
   id: string;

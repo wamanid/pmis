@@ -5,7 +5,7 @@ import {
     getPropertyTypes, PrisonerProperty,
     PropertyBag,
     PropertyItem
-} from "../../services/stationServices/propertyService";
+} from "../../services/propertyServices/propertyService";
 import {ItemCategory, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 import {Card} from "../ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "../ui/collapsible";

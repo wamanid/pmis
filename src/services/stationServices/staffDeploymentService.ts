@@ -141,8 +141,10 @@ export type StaffResponse = StaffProfile | ErrorResponse;
 export type StaffDeploymentResp = StaffDeploymentResponse | ErrorResponse;
 export type StaffDeploymentRespList = StaffDeploymentList | ErrorResponse;
 
-export const getStaffProfile = async () : Promise<StaffResponse> => {
-  const response = await axiosInstance.get<StaffResponse>('/auth/staff-profiles/');
+export const getStaffProfile = async (station?: string) : Promise<StaffResponse> => {
+  const response = await axiosInstance.get<StaffResponse>('/auth/staff-profiles/', {
+    params: station ? { station } : undefined
+  });
   return response.data;
 }
 
