@@ -19,3 +19,11 @@ export interface StageAssignmentPost {
   status: String;
   prisoner: String;
 }
+
+export interface StageDemotionPost {
+  prisoners?: String[];
+  start_date: String;
+  end_date: String;
+  remark: String;
+  stage?: String;
+}

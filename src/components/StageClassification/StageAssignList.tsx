@@ -72,8 +72,8 @@ import {
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { StageAssignForm, StageAssignment } from './StageAssignForm';
-import { deleteStageData, getStageList, getStages } from '../../services/stageService';
-import { Stage } from '../../models/StageClassification';
+import { deleteStageData, demotePrioners, getStageList, getStages, manualPromotion, promotePrioners } from '../../services/stageService';
+import { Stage, StageDemotionPost } from '../../models/StageClassification';
 
 export function StageAssignList() {
   const [loading, setLoading] = useState(false);
@@ -190,8 +190,6 @@ export function StageAssignList() {
       
             });
 
-
-  
     } catch (error) {
       alert(error);
       console.error('Failed to load stage assignments:', error);
@@ -304,6 +302,7 @@ export function StageAssignList() {
     );
   };
 
+  // c
   const handleSelectAll = (checked: boolean) => {
     if (checked) {
       setSelectedRows(stageAssignments.map((assignment) => assignment.id));
@@ -312,9 +311,10 @@ export function StageAssignList() {
     }
   };
 
-  const handleSelectRow = (id: string, checked: boolean) => {
+  const handleSelectRow = (assment:StageAssignment,id: string, checked: boolean) => {
     if (checked) {
-      setSelectedRows([...selectedRows, id]);
+   
+      setSelectedRows([...selectedRows, assment.id]);
     } else {
       setSelectedRows(selectedRows.filter((rowId) => rowId !== id));
     }
@@ -354,8 +354,38 @@ export function StageAssignList() {
       // });
       // if (!response.ok) throw new Error('Failed to update stage assignments');
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success(`Successfully updated ${selectedRows.length} stage assignment(s)`);
+     
+     
+     
+     //batchEditStage
+     //here is the batch manual post page
+       selectedRows.forEach((rowId) => {
+        //get the assignment object
+        const assignment = stageAssignments.find((assignment) => assignment.id === rowId);
+        //get the prisoner id from the assignment object and add to prisonersSelected array
+          prisonersSelected.push(assignment.prisoner);
+
+      })
+    
+
+      let data: StageDemotionPost ={
+           //we need a loop here
+           stage:batchEditStage,
+           prisoners: prisonersSelected,
+           start_date: format(batchEditStartDate, 'yyyy-MM-dd'),
+           end_date: batchEditEndDate ? format(batchEditEndDate, 'yyyy-MM-dd') : "",
+           remark: batchEditRemark}
+          
+          // alert(JSON.stringify(data));
+             manualPromotion(data).then((result) => {
+                alert(JSON.stringify(result));
+          toast.success(`Successfully updated ${selectedRows.length} stage assignment(s)`);
+    
+           }).catch((error) => {
+              toast.error('Failed to auto-promoted prisoners and error has occured');
+           });
+     
+ 
       setBatchEditDialogOpen(false);
       setSelectedRows([]);
       loadStageAssignments();
@@ -379,27 +409,41 @@ export function StageAssignList() {
     }
 
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/stage-management/prisoner-stages/auto-promote/', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ids: selectedRows,
-      //     start_date: format(autoPromoteStartDate, 'yyyy-MM-dd'),
-      //     end_date: autoPromoteEndDate ? format(autoPromoteEndDate, 'yyyy-MM-dd') : null,
-      //     remark: autoPromoteRemark,
-      //   }),
-      // });
-      // if (!response.ok) throw new Error('Failed to auto-promote prisoners');
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success(`Successfully auto-promoted ${selectedRows.length} prisoner(s)`);
-      setAutoPromoteDialogOpen(false);
+      //loop through the selected rows and add to prisonersSelected array
+      selectedRows.forEach((rowId) => {
+        //get the assignment object
+        const assignment = stageAssignments.find((assignment) => assignment.id === rowId);
+        //get the prisoner id from the assignment object and add to prisonersSelected array
+          prisonersSelected.push(assignment.prisoner);
+
+      })
+    
+
+     // alert(JSON.stringify(prisonersSelected));
+
+      let data: StageDemotionPost ={
+           //we need a loop here
+           prisoners: prisonersSelected,
+           start_date: format(autoPromoteStartDate, 'yyyy-MM-dd'),
+           end_date: autoPromoteEndDate ? format(autoPromoteEndDate, 'yyyy-MM-dd') : "",
+           remark: autoPromoteRemark}
+          
+          // alert(JSON.stringify(data));
+              promotePrioners(data).then((result) => {
+               // alert(JSON.stringify(result));
+               toast.success(`Successfully auto-promoted ${selectedRows.length} prisoner(s)`);
+    
+           }).catch((error) => {
+              toast.error('Failed to auto-promoted prisoners and error has occured');
+           });
+
+     setAutoPromoteDialogOpen(false);
       setSelectedRows([]);
       loadStageAssignments();
     } catch (error) {
-      console.error('Failed to auto-promote prisoners:', error);
-      toast.error('Failed to auto-promote prisoners');
+      console.error('Failed to promote prisoners:', error);
+      toast.error('Failed to promote prisoners');
     }
   };
 
@@ -410,29 +454,53 @@ export function StageAssignList() {
     setAutoDemoteDialogOpen(true);
   };
 
+
+  let prisonersSelected: string[] = [];
+
+
+  //demotion
   const handleAutoDemoteSubmit = async () => {
     if (!autoDemoteStartDate) {
       toast.error('Please select a start date');
       return;
     }
-
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/stage-management/prisoner-stages/auto-demote/', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ids: selectedRows,
-      //     start_date: format(autoDemoteStartDate, 'yyyy-MM-dd'),
-      //     end_date: autoDemoteEndDate ? format(autoDemoteEndDate, 'yyyy-MM-dd') : null,
-      //     remark: autoDemoteRemark,
-      //   }),
-      // });
-      // if (!response.ok) throw new Error('Failed to auto-demote prisoners');
 
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      toast.success(`Successfully auto-demoted ${selectedRows.length} prisoner(s)`);
-      setAutoDemoteDialogOpen(false);
+      //loop through the selected rows and add to prisonersSelected array
+      selectedRows.forEach((rowId) => {
+        //get the assignment object
+        const assignment = stageAssignments.find((assignment) => assignment.id === rowId);
+        //get the prisoner id from the assignment object and add to prisonersSelected array
+          prisonersSelected.push(assignment.prisoner);
+
+      })
+    
+
+     // alert(JSON.stringify(prisonersSelected));
+
+      let data: StageDemotionPost ={
+           //we need a loop here
+           prisoners: prisonersSelected,
+           start_date: format(autoDemoteStartDate, 'yyyy-MM-dd'),
+           end_date: autoDemoteEndDate ? format(autoDemoteEndDate, 'yyyy-MM-dd') : "",
+           remark: autoDemoteRemark}
+           /*demotePrioners(data).then((result) => {
+           }).catch((error) => {
+               toast.error(error);
+           });*/
+         //  alert(JSON.stringify(data));
+              demotePrioners(data).then((result) => {
+             //   alert(JSON.stringify(result));
+               toast.success(`Successfully auto-demoted ${selectedRows.length} prisoner(s)`);
+    
+           }).catch((error) => {
+              toast.error('Failed to auto-demote prisoners and error has occured');
+           });
+
+
+
+
+     setAutoDemoteDialogOpen(false);
       setSelectedRows([]);
       loadStageAssignments();
     } catch (error) {
@@ -620,7 +688,7 @@ export function StageAssignList() {
               className="text-white hover:opacity-90"
             >
               <TrendingUp className="h-4 w-4 mr-2" />
-              Auto Promote
+              Promote
             </Button>
             <Button
               onClick={handleAutoDemote}
@@ -628,7 +696,7 @@ export function StageAssignList() {
               className="text-white hover:opacity-90"
             >
               <TrendingUp className="h-4 w-4 mr-2 rotate-180" />
-              Auto Demote
+              Demote
             </Button>
           </div>
         </div>
@@ -695,12 +763,13 @@ export function StageAssignList() {
                         <Checkbox
                           checked={selectedRows.includes(assignment.id)}
                           onCheckedChange={(checked) =>
-                            handleSelectRow(assignment.id, checked as boolean)
+                            handleSelectRow(assignment,assignment.id, checked as boolean)
                           }
                         />
                       </TableCell>
                       <TableCell className="font-medium">
                         {assignment.prisoner_number}
+                         
                       </TableCell>
                       <TableCell>{assignment.prisoner_name}</TableCell>
                       <TableCell>
@@ -835,83 +904,51 @@ export function StageAssignList() {
                   <SelectValue placeholder="Select a stage" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="1">Orientation Stage</SelectItem>
-                  <SelectItem value="2">Ordinary Stage</SelectItem>
-                  <SelectItem value="3">Star Stage</SelectItem>
-                  <SelectItem value="4">Special Stage</SelectItem>
+                  {stages.map((stage) => (
+                  <SelectItem key={stage.id} value={stage.id}>
+                    {stage.name}
+                  </SelectItem>
+                ))}
                 </SelectContent>
               </Select>
             </div>
 
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {batchEditStartDate ? (
-                      format(batchEditStartDate, 'PPP')
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={batchEditStartDate}
-                    onSelect={setBatchEditStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
 
-            {/* End Date */}
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {batchEditEndDate ? (
-                      format(batchEditEndDate, 'PPP')
-                    ) : (
-                      <span>Pick a date (optional)</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={batchEditEndDate}
-                    onSelect={setBatchEditEndDate}
-                    initialFocus
-                    disabled={(date) =>
-                      batchEditStartDate ? date < batchEditStartDate : false
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
-              {batchEditEndDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setBatchEditEndDate(undefined)}
-                  className="text-xs"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear end date
-                </Button>
-              )}
-            </div>
+
+ <div className="space-y-2">
+          <Label>
+            Start Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={batchEditStartDate}
+            onChange={(e) => {
+               setBatchEditStartDate(e.target.value);
+            }}
+            
+          />
+        </div>
+
+
+
+          <div className="space-y-2">
+          <Label>
+            End Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={batchEditEndDate}
+            onChange={(e) => {
+               setBatchEditEndDate(e.target.value);
+            }}
+            
+          />
+        </div>
+      
+
+
+
+
 
             {/* Remark */}
             <div className="space-y-2">
@@ -958,75 +995,36 @@ export function StageAssignList() {
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {autoPromoteStartDate ? (
-                      format(autoPromoteStartDate, 'PPP')
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={autoPromoteStartDate}
-                    onSelect={setAutoPromoteStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
+           <div className="space-y-2">
+          <Label>
+            Start Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={autoPromoteStartDate}
+            onChange={(e) => {
+               setAutoPromoteStartDate(e.target.value);
+            }}
+            
+          />
+        </div>
 
-            {/* End Date */}
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {autoPromoteEndDate ? (
-                      format(autoPromoteEndDate, 'PPP')
-                    ) : (
-                      <span>Pick a date (optional)</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={autoPromoteEndDate}
-                    onSelect={setAutoPromoteEndDate}
-                    initialFocus
-                    disabled={(date) =>
-                      autoPromoteStartDate ? date < autoPromoteStartDate : false
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
-              {autoPromoteEndDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAutoPromoteEndDate(undefined)}
-                  className="text-xs"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear end date
-                </Button>
-              )}
-            </div>
+
+
+          <div className="space-y-2">
+          <Label>
+            End Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={autoPromoteEndDate}
+            onChange={(e) => {
+               setAutoPromoteEndDate(e.target.value);
+            }}
+            
+          />
+        </div>
+      
 
             {/* Remark */}
             <div className="space-y-2">
@@ -1073,77 +1071,38 @@ export function StageAssignList() {
             </DialogDescription>
           </DialogHeader>
 
+
+          <div className="space-y-2">
+          <Label>
+            Start Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={autoDemoteStartDate}
+            onChange={(e) => {
+               setAutoDemoteStartDate(e.target.value);
+            }}
+            
+          />
+        </div>
+
+
+
+          <div className="space-y-2">
+          <Label>
+            End Date <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            type="date"
+            value={autoDemoteEndDate}
+            onChange={(e) => {
+               setAutoDemoteEndDate(e.target.value);
+            }}
+            
+          />
+        </div>
+      
           <div className="space-y-4 py-4">
-            {/* Start Date */}
-            <div className="space-y-2">
-              <Label>Start Date *</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {autoDemoteStartDate ? (
-                      format(autoDemoteStartDate, 'PPP')
-                    ) : (
-                      <span>Pick a date</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={autoDemoteStartDate}
-                    onSelect={setAutoDemoteStartDate}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-
-            {/* End Date */}
-            <div className="space-y-2">
-              <Label>End Date</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="w-full justify-start text-left font-normal"
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {autoDemoteEndDate ? (
-                      format(autoDemoteEndDate, 'PPP')
-                    ) : (
-                      <span>Pick a date (optional)</span>
-                    )}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0">
-                  <Calendar
-                    mode="single"
-                    selected={autoDemoteEndDate}
-                    onSelect={setAutoDemoteEndDate}
-                    initialFocus
-                    disabled={(date) =>
-                      autoDemoteStartDate ? date < autoDemoteStartDate : false
-                    }
-                  />
-                </PopoverContent>
-              </Popover>
-              {autoDemoteEndDate && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setAutoDemoteEndDate(undefined)}
-                  className="text-xs"
-                >
-                  <X className="h-3 w-3 mr-1" />
-                  Clear end date
-                </Button>
-              )}
-            </div>
-
             {/* Remark */}
             <div className="space-y-2">
               <Label htmlFor="auto-demote-remark">Remark</Label>

@@ -245,8 +245,6 @@ export function StageAssignForm({
         alert(error);
 
       });
-
-
        
       } else {
         // Create new stage assignments (multiple prisoners)
