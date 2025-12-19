@@ -37,8 +37,11 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "../ui/collapsible";
-import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
+import {getCurrentDateWithOffset, handleCatchError, handleResponseError, getCurrentDate} from "../../services/stationServices/utils";
 import {
+  addBulkTransfer,
+  BulkTransfer,
+  BulkTransferData,
   getTransferReasons,
   getTransferRequests, getTransferStatus,
   TransferReason,
@@ -78,16 +81,16 @@ import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitor
 //   transfer_request: string;
 // }
 
-interface BulkTransferData {
-  transfer_type: "in" | "out";
-  original_station: string;
-  destination_station: string;
-  reason: string;
-  in_charge: string;
-  status: string;
-  selected_prisoners: string[];
-  transfer_request: string;
-}
+// interface BulkTransferData {
+//   transfer_type: "in" | "out";
+//   original_station: string;
+//   destination_station: string;
+//   reason: string;
+//   // in_charge: string;
+//   status: string;
+//   selected_prisoners: string[];
+//   transfer_request: string;
+// }
 
 export default function TransferInOutBulkScreen() {
   const {
@@ -101,9 +104,9 @@ export default function TransferInOutBulkScreen() {
        original_station: "",
        destination_station: "",
        reason: "",
-       in_charge: "",
+       transfer_date: "",
        status: "",
-       selected_prisoners: [],
+       prisoners: [],
        transfer_request: ""
     },
   });
@@ -174,14 +177,14 @@ export default function TransferInOutBulkScreen() {
   const [newDialogLoader, setNewDialogLoader] = useState(false)
   const [loaderText, setLoaderText] = useState("")
   const [bulk, setBulk] = useState<BulkTransferData>({
-    transfer_type: "out",
+    transfer_request: "",
     original_station: "",
     destination_station: "",
     reason: "",
-    in_charge: "",
     status: "",
-    selected_prisoners: [],
-    transfer_request: ""
+    transfer_date: getCurrentDate(),
+    prisoners: [],
+    transfer_type: "out",
   });
 
   useEffect(() => {
@@ -189,6 +192,8 @@ export default function TransferInOutBulkScreen() {
       fetchData()
     }
   }, [loading]);
+  const [number, setNumber] = useState(0)
+  const [request, setRequest] = useState<TransferRequest | null>(null)
 
   function populateList(response: any, msg: string, setData: any) {
       if (handleResponseError(response)) return false
@@ -222,17 +227,17 @@ export default function TransferInOutBulkScreen() {
       const ok1 = populateList(response1, "There are no bulk transfer requests", setTransferRequests)
       if (!ok1) return
 
-      const response2 = await getTransferReasons()
-      const ok2 = populateList(response2, "There are no transfer reasons", setReasons)
-      if (!ok2) return
-
-      const response3 = await getTransferStatus()
-      const ok3 = populateList(response3, "There are no transfer statuses", setStatuses)
-      if (!ok3) return
-
-      const response4 = await getStation()
-      const ok4 = populateList(response4, "There are no available stations", setStations)
-      if (!ok4) return
+      // const response2 = await getTransferReasons()
+      // const ok2 = populateList(response2, "There are no transfer reasons", setReasons)
+      // if (!ok2) return
+      //
+      // const response3 = await getTransferStatus()
+      // const ok3 = populateList(response3, "There are no transfer statuses", setStatuses)
+      // if (!ok3) return
+      //
+      // const response4 = await getStation()
+      // const ok4 = populateList(response4, "There are no available stations", setStations)
+      // if (!ok4) return
 
     }catch (error) {
       handleCatchError(error)
@@ -249,51 +254,45 @@ export default function TransferInOutBulkScreen() {
   }
 
   async function handleRequestChange(request: TransferRequest) {
-    // console.log(request)
-    const reasonId = fetchId(request.reason, reasons)
-    const statusId = fetchId(request.status, statuses)
-    const origId = fetchId(request.original_station, stations)
-    const destId = fetchId(request.destination_station, stations)
 
-    const { officers, newPrisoners } = await getOfficers(origId);
-    setStaff(officers)
+    const { officers, newPrisoners } = await getOfficers(request.original_station);
+    // setStaff(officers)
     setAvailablePrisoners(newPrisoners)
     setSelectedPrisoners([])
-    // console.log(officers)
-    const chargeId = fetchId(request.in_charge, officers)
-    // console.log(chargeId)
 
     setBulk({
       ...bulk,
       transfer_request: request.id,
-      reason: reasonId,
-      status: statusId,
-      original_station: origId,
-      destination_station: destId,
-      in_charge: chargeId
+      reason: request.reason,
+      status: request.status,
+      original_station: request.original_station,
+      destination_station: request.destination_station,
     })
+    setNumber(request.number_of_prisoners)
+    setRequest(request)
   }
 
-  useEffect(() => {
-    if(staff) {
-      const request = bulk.transfer_request
-      const in_charge = transferRequests.find(tr => tr.id === request)?.in_charge || ""
-      const chargeId = fetchId(in_charge, staff)
-      setBulk({
-        ...bulk,
-        in_charge: chargeId
-      })
-    }
-  }, [staff]);
+  // useEffect(() => {
+  //   if(staff) {
+  //     const request = bulk.transfer_request
+  //     const in_charge = transferRequests.find(tr => tr.id === request)?.in_charge || ""
+  //     const chargeId = fetchId(in_charge, staff)
+  //     setBulk({
+  //       ...bulk,
+  //       in_charge: chargeId
+  //     })
+  //   }
+  // }, [staff]);
 
   async function getOfficers(origId: string): Promise<{ officers: StaffItem[], newPrisoners: PrisonerItem[] }> {
     setNewDialogLoader(true)
     setLoaderText("Fetching staff list")
     try {
-      const response1 = await getStaffProfile(origId)
-      const officers = populateLists(response1, "There are no officers for the selected original station") ?? []
+      // const response1 = await getStaffProfile(origId)
+      // const officers = populateLists(response1, "There are no officers for the selected original station") ?? []
+      const officers = []
 
-      const response2 = await getPrisoners()
+      const response2 = await getPrisoners(origId)
       const prisoners = populateLists(response2, "There are no prisoners") ?? []
       const newPrisoners = prisoners.filter(pr => pr.current_station === origId)
 
@@ -308,26 +307,29 @@ export default function TransferInOutBulkScreen() {
   }
 
   async function handleChange(name: string, value: string) {
-
-    if (name === "original_station"){
-      const { officers, newPrisoners } = await getOfficers(value);
-      setStaff(officers)
-      setAvailablePrisoners(newPrisoners)
-      setSelectedPrisoners([])
-
-      setBulk({
-        ...bulk,
-        [name]: value,
-        destination_station: name === "original_station" && value === bulk.destination_station ? "" : bulk.destination_station,
-        in_charge: ""
-      })
-    }
-    else {
-      setBulk({
+    setBulk({
         ...bulk,
         [name]: value,
       })
-    }
+    // if (name === "original_station"){
+    //   const { officers, newPrisoners } = await getOfficers(value);
+    //   // setStaff(officers)
+    //   setAvailablePrisoners(newPrisoners)
+    //   setSelectedPrisoners([])
+    //
+    //   setBulk({
+    //     ...bulk,
+    //     [name]: value,
+    //     destination_station: name === "original_station" && value === bulk.destination_station ? "" : bulk.destination_station,
+    //     // in_charge: ""
+    //   })
+    // }
+    // else {
+    //   setBulk({
+    //     ...bulk,
+    //     [name]: value,
+    //   })
+    // }
   }
 
   const destinationStations = stations.filter(station => station.id !== bulk.original_station)
@@ -405,36 +407,59 @@ export default function TransferInOutBulkScreen() {
     );
   };
 
+  function handleReset(){
+    setSelectedPrisoners([]);
+    setAvailableSearch("");
+    setSelectedSearch("");
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     if (selectedPrisoners.length === 0) {
       toast.error("Please select at least one prisoner");
       return;
     }
 
-    const bulkData: BulkTransferData = {
-      ...bulk,
-      selected_prisoners: selectedPrisoners.map(pr => pr.id)
+    if (selectedPrisoners.length > number) {
+      toast.error("The selected number of prisoners is greater than the number of prisoners in the selected transfer request");
+      return;
     }
 
-    console.log(bulkData)
+    const bulkD: BulkTransfer = {
+      transfer_date: bulk.transfer_date,
+      transfer_request: bulk.transfer_request,
+      original_station: bulk.original_station,
+      destination_station: bulk.destination_station,
+      reason: bulk.reason,
+      status: bulk.status,
+      prisoners: selectedPrisoners.map(pr => pr.id)
+    }
 
-    // try {
-    //   const bulk: BulkTransferData = {
-    //     ...data,
-    //
-    //   }
-    //
-    //   toast.success(
-    //     `Bulk ${data.transfer_type === "in" ? "Transfer In" : "Transfer Out"} request created successfully for ${selectedPrisoners.length} prisoners`
-    //   );
-    //
-    //   // Reset form
-    //   setSelectedPrisoners([]);
-    //   // Reload available prisoners
-    // } catch (error) {
-    //   toast.error("Failed to create bulk transfer request");
-    // }
+    try {
+      await addBulkTransfer(bulkD)
+      toast.success(
+        `Bulk ${bulk.transfer_type === "in" ? "Transfer In" : "Transfer Out"} request created successfully for ${selectedPrisoners.length} prisoners`
+      );
+      handleReset()
+      setAvailablePrisoners([]);
+      setBulk({
+        transfer_request: "",
+        original_station: "",
+        destination_station: "",
+        reason: "",
+        status: "",
+        transfer_date: getCurrentDate(),
+        prisoners: [],
+        transfer_type: "out",
+      })
+      setRequest(request)
+      setNumber(0)
+      setValue("transfer_request", "");
+    }catch (error) {
+      handleCatchError(error)
+    }
+
   };
 
   const renderPrisonerCard = (
@@ -541,7 +566,8 @@ export default function TransferInOutBulkScreen() {
                                     value={request.id}
                                 >
                                   {/*{request.request_id}*/}
-                                  {request.id}
+                                  {/*{request.id}*/}
+                                  {`NO: ${request.number_of_prisoners} | OS: ${request.original_station_name} | DS: ${request.destination_station_name}`}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -615,33 +641,43 @@ export default function TransferInOutBulkScreen() {
                           <Building2 className="h-4 w-4" />
                           Original Station
                         </Label>
+                        {/*<Controller*/}
+                        {/*  name="original_station"*/}
+                        {/*  control={control}*/}
+                        {/*  rules={{ required: "Original station is required" }}*/}
+                        {/*  render={({ field }) => (*/}
+                        {/*    <Select*/}
+                        {/*        value={*/}
+                        {/*          field.value === ""*/}
+                        {/*            ? stations.find(station => station.id === bulk.original_station)?.id || field.value*/}
+                        {/*            : field.value*/}
+                        {/*        }*/}
+                        {/*        onValueChange={async (id: string) => {*/}
+                        {/*          field.onChange(id)*/}
+                        {/*          await handleChange("original_station", id)*/}
+                        {/*        }}*/}
+                        {/*    >*/}
+                        {/*      <SelectTrigger>*/}
+                        {/*        <SelectValue placeholder="Select original station" />*/}
+                        {/*      </SelectTrigger>*/}
+                        {/*      <SelectContent>*/}
+                        {/*        {stations.map((station) => (*/}
+                        {/*          <SelectItem key={station.id} value={station.id}>*/}
+                        {/*            {station.name}*/}
+                        {/*          </SelectItem>*/}
+                        {/*        ))}*/}
+                        {/*      </SelectContent>*/}
+                        {/*    </Select>*/}
+                        {/*  )}*/}
+                        {/*/>*/}
                         <Controller
-                          name="original_station"
+                          name="orignal_station"
                           control={control}
                           rules={{ required: "Original station is required" }}
                           render={({ field }) => (
-                            <Select
-                                value={
-                                  field.value === ""
-                                    ? stations.find(station => station.id === bulk.original_station)?.id || field.value
-                                    : field.value
-                                }
-                                onValueChange={async (id: string) => {
-                                  field.onChange(id)
-                                  await handleChange("original_station", id)
-                                }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select original station" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {stations.map((station) => (
-                                  <SelectItem key={station.id} value={station.id}>
-                                    {station.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input type="text" {...field} className="w-full" disabled
+                                   value={request?.original_station_name ?? ""}
+                            />
                           )}
                         />
                         {errors.original_station && (
@@ -656,33 +692,44 @@ export default function TransferInOutBulkScreen() {
                           <Building2 className="h-4 w-4" />
                           Destination Station
                         </Label>
+                        {/*<Controller*/}
+                        {/*  name="destination_station"*/}
+                        {/*  control={control}*/}
+                        {/*  rules={{ required: "Destination station is required" }}*/}
+                        {/*  render={({ field }) => (*/}
+                        {/*    <Select*/}
+                        {/*        value={*/}
+                        {/*          field.value === ""*/}
+                        {/*            ? stations.find(station => station.id === bulk.destination_station)?.id || field.value*/}
+                        {/*            : field.value*/}
+                        {/*        }*/}
+                        {/*        onValueChange={(id: string) => {*/}
+                        {/*          field.onChange(id)*/}
+                        {/*          handleChange("destination_station", id)*/}
+                        {/*        }}*/}
+                        {/*        disabled*/}
+                        {/*    >*/}
+                        {/*      <SelectTrigger>*/}
+                        {/*        <SelectValue placeholder="Select destination station" />*/}
+                        {/*      </SelectTrigger>*/}
+                        {/*      <SelectContent>*/}
+                        {/*        {destinationStations.map((station) => (*/}
+                        {/*          <SelectItem key={station.id} value={station.id}>*/}
+                        {/*            {station.name}*/}
+                        {/*          </SelectItem>*/}
+                        {/*        ))}*/}
+                        {/*      </SelectContent>*/}
+                        {/*    </Select>*/}
+                        {/*  )}*/}
+                        {/*/>*/}
                         <Controller
                           name="destination_station"
                           control={control}
                           rules={{ required: "Destination station is required" }}
                           render={({ field }) => (
-                            <Select
-                                value={
-                                  field.value === ""
-                                    ? stations.find(station => station.id === bulk.destination_station)?.id || field.value
-                                    : field.value
-                                }
-                                onValueChange={(id: string) => {
-                                  field.onChange(id)
-                                  handleChange("destination_station", id)
-                                }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select destination station" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {destinationStations.map((station) => (
-                                  <SelectItem key={station.id} value={station.id}>
-                                    {station.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input type="text" {...field} className="w-full" disabled
+                                   value={request?.destination_station_name ?? ""}
+                            />
                           )}
                         />
                         {errors.destination_station && (
@@ -695,34 +742,67 @@ export default function TransferInOutBulkScreen() {
 
                     {/* Reason, In Charge, Status */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                      <div className="space-y-2">
+                        <Label className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4" />
+                          Transfer Date
+                        </Label>
+                        <Controller
+                          name="transfer_date"
+                          control={control}
+                          rules={{ required: "Transfer date is required" }}
+                          render={({ field }) => (
+                            <Input type="date" {...field} value={bulk.transfer_date} className="w-full" onChange={(event) => handleChange("transfer_date", event.target.value)} />
+                          )}
+                        />
+                        {errors.transfer_date && (
+                          <span className="text-sm text-red-500">
+                            {errors.transfer_date.message}
+                          </span>
+                        )}
+                      </div>
+
                       <div className="space-y-2">
                         <Label>Transfer Reason</Label>
+                        {/*<Controller*/}
+                        {/*  name="reason"*/}
+                        {/*  control={control}*/}
+                        {/*  rules={{ required: "Reason is required" }}*/}
+                        {/*  render={({ field }) => (*/}
+                        {/*    <Select*/}
+                        {/*        value={*/}
+                        {/*          field.value === ""*/}
+                        {/*            ? reasons.find(reason => reason.id === bulk.reason)?.id || field.value*/}
+                        {/*            : field.value*/}
+                        {/*        }*/}
+                        {/*        onValueChange={(id: string) => {*/}
+                        {/*          field.onChange(id)*/}
+                        {/*          handleChange("reason", id)*/}
+                        {/*        }}*/}
+                        {/*        disabled*/}
+                        {/*    >*/}
+                        {/*      <SelectTrigger>*/}
+                        {/*        <SelectValue placeholder="Select reason" />*/}
+                        {/*      </SelectTrigger>*/}
+                        {/*      <SelectContent>*/}
+                        {/*        {reasons.map((reason) => (*/}
+                        {/*          <SelectItem key={reason.id} value={reason.id}>*/}
+                        {/*            {reason.name}*/}
+                        {/*          </SelectItem>*/}
+                        {/*        ))}*/}
+                        {/*      </SelectContent>*/}
+                        {/*    </Select>*/}
+                        {/*  )}*/}
+                        {/*/>*/}
                         <Controller
                           name="reason"
                           control={control}
-                          rules={{ required: "Reason is required" }}
+                          rules={{ required: "Transfer reason is required" }}
                           render={({ field }) => (
-                            <Select
-                                value={
-                                  field.value === ""
-                                    ? reasons.find(reason => reason.id === bulk.reason)?.id || field.value
-                                    : field.value
-                                }
-                                onValueChange={(id: string) => {
-                                  field.onChange(id)
-                                  handleChange("reason", id)
-                                }}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select reason" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {reasons.map((reason) => (
-                                  <SelectItem key={reason.id} value={reason.id}>
-                                    {reason.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input type="text" {...field} className="w-full" disabled
+                                   value={request?.reason_name ?? ""}
+                            />
                           )}
                         />
                         {errors.reason && (
@@ -733,71 +813,45 @@ export default function TransferInOutBulkScreen() {
                       </div>
 
                       <div className="space-y-2">
-                        <Label>Officer In Charge</Label>
-                        <Controller
-                          name="in_charge"
-                          control={control}
-                          rules={{ required: "Officer in charge is required" }}
-                          render={({ field }) => (
-                             <Select
-                                value={
-                                  field.value === ""
-                                    ? staff.find(st => st.id === bulk.in_charge)?.id || ""
-                                    : field.value
-                                }
-                                onValueChange={(id: string) => {
-                                  field.onChange(id)
-                                  handleChange("in_charge", id)
-                                }}>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select officer" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {staff.map((officer) => (
-                                  <SelectItem key={officer.id} value={officer.id}>
-                                    {officer.first_name} {officer.last_name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          )}
-                        />
-                        {errors.in_charge && (
-                          <span className="text-sm text-red-500">
-                            {errors.in_charge.message}
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="space-y-2">
                         <Label>Request Status</Label>
+                        {/*<Controller*/}
+                        {/*  name="status"*/}
+                        {/*  control={control}*/}
+                        {/*  rules={{ required: "Status is required" }}*/}
+                        {/*  render={({ field }) => (*/}
+                        {/*    <Select*/}
+                        {/*        value={*/}
+                        {/*          field.value === ""*/}
+                        {/*            ? statuses.find(status => status.id === bulk.status)?.id || field.value*/}
+                        {/*            : field.value*/}
+                        {/*        }*/}
+                        {/*        onValueChange={(id: string) => {*/}
+                        {/*          field.onChange(id)*/}
+                        {/*          handleChange("status", id)*/}
+                        {/*        }}*/}
+                        {/*        disabled*/}
+                        {/*    >*/}
+                        {/*      <SelectTrigger>*/}
+                        {/*        <SelectValue placeholder="Select status" />*/}
+                        {/*      </SelectTrigger>*/}
+                        {/*      <SelectContent>*/}
+                        {/*        {statuses.map((status) => (*/}
+                        {/*          <SelectItem key={status.id} value={status.id}>*/}
+                        {/*            {status.name}*/}
+                        {/*          </SelectItem>*/}
+                        {/*        ))}*/}
+                        {/*      </SelectContent>*/}
+                        {/*    </Select>*/}
+                        {/*  )}*/}
+                        {/*/>*/}
                         <Controller
                           name="status"
                           control={control}
-                          rules={{ required: "Status is required" }}
+                          rules={{ required: "Transfer status is required" }}
                           render={({ field }) => (
-                            <Select
-                                value={
-                                  field.value === ""
-                                    ? statuses.find(status => status.id === bulk.status)?.id || field.value
-                                    : field.value
-                                }
-                                onValueChange={(id: string) => {
-                                  field.onChange(id)
-                                  handleChange("status", id)
-                                }}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {statuses.map((status) => (
-                                  <SelectItem key={status.id} value={status.id}>
-                                    {status.name}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
+                            <Input type="text" {...field} className="w-full" disabled
+                                   value={request?.status_name ?? ""}
+                            />
                           )}
                         />
                         {errors.status && (
@@ -992,11 +1046,7 @@ export default function TransferInOutBulkScreen() {
               <Button
                 type="button"
                 variant="outline"
-                onClick={() => {
-                  setSelectedPrisoners([]);
-                  setAvailableSearch("");
-                  setSelectedSearch("");
-                }}
+                onClick={handleReset}
                 className="gap-2"
               >
                 <X className="h-4 w-4" />

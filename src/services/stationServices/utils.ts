@@ -291,7 +291,7 @@ export async function fetchVillages(setData: any, setLoader: any, setLoderText: 
   }
 }
 
-export function getPropertyTypeUtil(propertyTypes: Unit){
+export function getPropertyTypeUtil(propertyTypes: Unit[]){
   if (!!propertyTypes.length) {
     const type = propertyTypes.find(type => type.name === "Incoming Supplementary")
     if (type) {
@@ -299,4 +299,35 @@ export function getPropertyTypeUtil(propertyTypes: Unit){
     }
   }
   return ""
+}
+
+export function getCurrentDateWithOffset(offsetHours = 3): string {
+  const now = new Date();
+
+  // Convert to UTC milliseconds
+  const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
+
+  // Apply desired offset (+03:00)
+  const offsetTime = new Date(utcTime + offsetHours * 3600000);
+
+  const pad = (n: number) => String(n).padStart(2, "0");
+
+  return (
+    `${offsetTime.getFullYear()}-` +
+    `${pad(offsetTime.getMonth() + 1)}-` +
+    `${pad(offsetTime.getDate())}T` +
+    `${pad(offsetTime.getHours())}:` +
+    `${pad(offsetTime.getMinutes())}:` +
+    `${pad(offsetTime.getSeconds())}+` +
+    `${pad(offsetHours)}:00`
+  );
+}
+
+export function getCurrentDate() {
+  const today = new Date();
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
 }
