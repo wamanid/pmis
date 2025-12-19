@@ -477,7 +477,9 @@ export default function TransferInOutBulkScreen() {
     }
 
     try {
-      await addBulkTransfer(bulkD)
+      const response = await addBulkTransfer(bulkD)
+      if (handleResponseError(response)) return
+
       toast.success(
         `Bulk ${bulk.transfer_type === "in" ? "Transfer In" : "Transfer Out"} request created successfully for ${selectedPrisoners.length} prisoners`
       );
@@ -496,6 +498,11 @@ export default function TransferInOutBulkScreen() {
       setRequest(request)
       setNumber(0)
       setValue("transfer_request", "");
+      setValue("original_station", "");
+      setValue("destination_station", "");
+      setValue("reason", "");
+      setValue("status", "");
+      setValue("transfer_date", getCurrentDate());
     }catch (error) {
       handleCatchError(error)
     }

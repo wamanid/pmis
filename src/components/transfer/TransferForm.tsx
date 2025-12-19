@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import React, {useEffect, useState} from "react";
 import { useForm, Controller } from "react-hook-form@7.55.0";
 import {
   ArrowRightLeft,
@@ -15,7 +15,7 @@ import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import {
   Dialog,
-  DialogContent,
+  DialogContent, DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "../ui/dialog";
@@ -28,40 +28,40 @@ import {
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner@2.0.3";
+import {addTransfer, Transfer, TransferRecord, TransferRequest} from "../../services/transferServices/bulkServices";
+import {getCurrentDate, handleCatchError, handleResponseError} from "../../services/stationServices/utils";
+import {PrisonerProperty} from "../../services/propertyServices/propertyService";
 
-interface Transfer {
-  id?: string;
-  prisoner_name?: string;
-  prisoner_number?: string;
-  original_station_name?: string;
-  destination_station_name?: string;
-  reason_name?: string;
-  status_name?: string;
-  transfer_request_id?: string;
-  transfer_date: string;
-  biometric_consent: boolean;
-  original_station_oc_acknowledged: boolean;
-  destination_station_oc_acknowledged: boolean;
-  original_station_oc_approved: boolean;
-  destination_station_oc_approved: boolean;
-  transfer_request: string;
-  prisoner: string;
-  original_station: string;
-  destination_station: string;
-  reason: string;
-  status: string;
-}
+// interface Transfer {
+//   id?: string;
+//   prisoner_name?: string;
+//   prisoner_number?: string;
+//   original_station_name?: string;
+//   destination_station_name?: string;
+//   reason_name?: string;
+//   status_name?: string;
+//   transfer_request_id?: string;
+//   transfer_date: string;
+//   biometric_consent: boolean;
+//   original_station_oc_acknowledged: boolean;
+//   destination_station_oc_acknowledged: boolean;
+//   original_station_oc_approved: boolean;
+//   destination_station_oc_approved: boolean;
+//   transfer_request: string;
+//   prisoner: string;
+//   original_station: string;
+//   destination_station: string;
+//   reason: string;
+//   status: string;
+// }
 
 interface TransferFormProps {
   open: boolean;
   onClose: () => void;
-  onSave: (data: Transfer) => void;
-  editingTransfer?: Transfer | null;
-  prisoners?: Array<{ id: string; name: string; number: string }>;
-  stations?: Array<{ id: string; name: string }>;
-  reasons?: Array<{ id: string; name: string }>;
-  statuses?: Array<{ id: string; name: string }>;
-  transferRequests?: Array<{ id: string; request_id: string }>;
+  onSave: (data: TransferRecord) => void;
+  editingTransfer?: TransferRecord | null;
+  transferRequests?: TransferRequest[];
+  setTransfers: React.Dispatch<React.SetStateAction<TransferRecord[]>>;
 }
 
 export default function TransferForm({
@@ -69,11 +69,8 @@ export default function TransferForm({
   onClose,
   onSave,
   editingTransfer,
-  prisoners = [],
-  stations = [],
-  reasons = [],
-  statuses = [],
-  transferRequests = [],
+  transferRequests,
+    setTransfers,
 }: TransferFormProps) {
   const {
     control,
@@ -84,12 +81,8 @@ export default function TransferForm({
     formState: { errors },
   } = useForm<Transfer>({
     defaultValues: {
-      transfer_date: new Date().toISOString().split("T")[0],
-      biometric_consent: false,
-      original_station_oc_acknowledged: false,
-      destination_station_oc_acknowledged: false,
-      original_station_oc_approved: false,
-      destination_station_oc_approved: false,
+      // transfer_date: new Date().toISOString().split("T")[0],
+      transfer_date: getCurrentDate(),
       transfer_request: "",
       prisoner: "",
       original_station: "",
@@ -98,6 +91,16 @@ export default function TransferForm({
       status: "",
     },
   });
+
+  const [transfer, setTransfer] = useState<Transfer>({
+    transfer_request: "",
+    original_station: "",
+    destination_station: "",
+    reason: "",
+    status: "",
+    transfer_date: getCurrentDate(),
+    prisoner: "",
+  })
 
   const selectedPrisoner = watch("prisoner");
   const selectedOriginalStation = watch("original_station");
@@ -144,6 +147,9 @@ export default function TransferForm({
   }, [editingTransfer, reset]);
 
   const onSubmit = async (data: Transfer) => {
+
+    // console.log(transfer)
+
     try {
       // API call would go here
       // const response = await fetch('/api/transfer-management/transfers/', {
@@ -152,22 +158,63 @@ export default function TransferForm({
       //   body: JSON.stringify(data)
       // });
 
-      onSave({ ...data, id: editingTransfer?.id || Date.now().toString() });
+      // onSave({ ...data, id: editingTransfer?.id || Date.now().toString() });
+      // toast.success(
+      //   editingTransfer
+      //     ? "Transfer updated successfully"
+      //     : "Transfer created successfully"
+      // );
+
+
+      const response = await addTransfer(transfer)
+      if (handleResponseError(response)) return
+
+      setTransfers(prev => ([response, ...prev]))
+
       toast.success(
         editingTransfer
           ? "Transfer updated successfully"
           : "Transfer created successfully"
       );
       handleClose();
+
     } catch (error) {
-      toast.error("Failed to save transfer");
+      handleCatchError(error)
     }
   };
 
   const handleClose = () => {
+    setTransfer({
+      transfer_request: "",
+      original_station: "",
+      destination_station: "",
+      reason: "",
+      status: "",
+      transfer_date: getCurrentDate(),
+      prisoner: "",
+    })
     reset();
     onClose();
   };
+
+  function handleRequestChange(request: TransferRequest) {
+    // console.log(request)
+    setValue("prisoner", request.prisoner_name)
+    setValue("original_station", request.original_station_name)
+    setValue("destination_station", request.destination_station_name)
+    setValue("reason", request.reason_name)
+    setValue("status", request.status_name)
+
+    setTransfer({
+      ...transfer,
+      transfer_request: request.id,
+      original_station: request.original_station,
+      destination_station: request.destination_station,
+      reason: request.reason,
+      status: request.status,
+      prisoner: request.prisoner,
+    })
+  }
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -178,6 +225,8 @@ export default function TransferForm({
               <ArrowRightLeft className="h-5 w-5" />
               {editingTransfer ? "Edit Transfer" : "Add Transfer"}
             </DialogTitle>
+            <DialogDescription>
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
@@ -193,14 +242,18 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Transfer request is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value} onValueChange={ (id: string) => {
+                      const selectedRequest = transferRequests.find(r => r.id === id);
+                      handleRequestChange(selectedRequest)
+                      field.onChange(id)
+                    }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Select transfer request" />
                       </SelectTrigger>
                       <SelectContent>
                         {transferRequests.map((request) => (
                           <SelectItem key={request.id} value={request.id}>
-                            {request.request_id}
+                            {request.request_number}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -224,18 +277,7 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Prisoner is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select prisoner" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {prisoners.map((prisoner) => (
-                          <SelectItem key={prisoner.id} value={prisoner.id}>
-                            {prisoner.name} ({prisoner.number})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                      <Input type="text" {...field} className="w-full" disabled />
                   )}
                 />
                 {errors.prisoner && (
@@ -258,18 +300,7 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Original station is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select original station" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stations.map((station) => (
-                          <SelectItem key={station.id} value={station.id}>
-                            {station.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input type="text" {...field} className="w-full" disabled />
                   )}
                 />
                 {errors.original_station && (
@@ -289,18 +320,7 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Destination station is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select destination station" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stations.map((station) => (
-                          <SelectItem key={station.id} value={station.id}>
-                            {station.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                   <Input type="text" {...field} className="w-full" disabled />
                   )}
                 />
                 {errors.destination_station && (
@@ -323,7 +343,10 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Transfer date is required" }}
                   render={({ field }) => (
-                    <Input type="date" {...field} className="w-full" />
+                    <Input type="date" {...field} className="w-full" onChange={(e) => {
+                      setTransfer({...transfer, transfer_date: e.target.value})
+                      setValue("transfer_date", e.target.value)
+                    }} />
                   )}
                 />
                 {errors.transfer_date && (
@@ -340,18 +363,7 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Reason is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {reasons.map((reason) => (
-                          <SelectItem key={reason.id} value={reason.id}>
-                            {reason.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input type="text" {...field} className="w-full" disabled />
                   )}
                 />
                 {errors.reason && (
@@ -368,18 +380,7 @@ export default function TransferForm({
                   control={control}
                   rules={{ required: "Status is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((status) => (
-                          <SelectItem key={status.id} value={status.id}>
-                            {status.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Input type="text" {...field} className="w-full" disabled />
                   )}
                 />
                 {errors.status && (

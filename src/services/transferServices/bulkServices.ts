@@ -28,6 +28,7 @@ export interface TransferRequest {
   prisoner: string;
   original_station: string;
   destination_station: string;
+  request_number: string;
   reason: string;
   in_charge: string;
   status: string;

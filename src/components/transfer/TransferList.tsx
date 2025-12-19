@@ -46,10 +46,10 @@ import {
 } from "../ui/alert-dialog";
 import {
   deleteTransfer,
-  getTransferReasons,
+  getTransferReasons, getTransferRequests,
   getTransfers, getTransferStatus,
   TransferReason,
-  TransferRecord,
+  TransferRecord, TransferRequest,
   TransferStatus
 } from "../../services/transferServices/bulkServices";
 import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
@@ -116,11 +116,7 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
   const [reasons, setReasons] = useState<TransferReason[]>([])
   const [statuses, setStatuses] = useState<TransferStatus[]>([]);
 
-  const [transferRequests] = useState([
-    { id: "1", request_id: "TR-2025-001" },
-    { id: "2", request_id: "TR-2025-002" },
-    { id: "3", request_id: "TR-2025-003" },
-  ]);
+  const [transferRequests, setTransferRequests] = useState<TransferRequest[]>([])
 
   // API integration
   const [loading, setLoading] = useState(true)
@@ -137,9 +133,11 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
       const data = response.results
       // console.log(data)
       if (!data.length) {
-        toast.error(msg)
+        if (msg) {
+          toast.error(msg)
+        }
       }
-      console.log(data)
+      // console.log(data)
       setData(data)
   }
 
@@ -153,6 +151,9 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
 
       const response3 = await getTransferReasons()
       populateList(response3, "There are no transfer reasons", setReasons)
+
+      const response4 = await getTransferRequests(false)
+      populateList(response4, "", setTransferRequests)
 
     }catch (error) {
       handleCatchError(error)
@@ -307,6 +308,10 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
   ]);
 
   const handleAddTransfer = () => {
+    if (!transferRequests.length) {
+      toast.error("There are no transfer requests")
+      return
+    }
     setEditingTransfer(null);
     setIsDialogOpen(true);
   };
@@ -696,11 +701,8 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
         onClose={() => setIsDialogOpen(false)}
         onSave={handleSaveTransfer}
         editingTransfer={editingTransfer}
-        prisoners={prisoners}
-        stations={stations}
-        reasons={reasons}
-        statuses={statuses}
         transferRequests={transferRequests}
+        setTransfers={setTransfers}
       />
 
       {/* Delete Confirmation Dialog */}
