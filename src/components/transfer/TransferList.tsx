@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 import {
+  deleteTransfer,
   getTransferReasons,
   getTransfers, getTransferStatus,
   TransferReason,
@@ -53,6 +54,7 @@ import {
 } from "../../services/transferServices/bulkServices";
 import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
 import {getStation} from "../../services/stationServices/manualLockupIntegration";
+import {deleteProperty} from "../../services/propertyServices/propertyService";
 
 interface Transfer {
   id?: string;
@@ -246,10 +248,10 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
           transfer.prisoner_name
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          transfer.prisoner_number
+          transfer.prisoner_number_value
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase()) ||
-          transfer.transfer_request_id
+          transfer.transfer_number
             ?.toLowerCase()
             .includes(searchTerm.toLowerCase())
       );
@@ -327,6 +329,8 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
       // await fetch(`/api/transfer-management/transfers/${transferToDelete}/`, {
       //   method: 'DELETE',
       // });
+       const response = await deleteTransfer(transferToDelete)
+       if (handleResponseError(response)) return;
 
       setTransfers(transfers.filter((t) => t.id !== transferToDelete));
       toast.success("Transfer deleted successfully");

@@ -244,3 +244,16 @@ export const getTransferStatus = async <T = TransferStatus>() : Promise<Transfer
   return response.data;
 }
 
+export const deleteTransfer = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/transfer-management/transfers/${id}/`);
+
+    return { message: "transfer deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to delete transfer."
+    };
+  }
+}
+
