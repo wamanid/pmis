@@ -56,7 +56,7 @@ return response.data;
 
 // manula promotion api call
 export const manualPromotion = async (gatePassData: StageDemotionPost): Promise<string> => {
-  const response = await axiosInstance.patch<string>('stage-management/prisoner-stages/promote/', gatePassData);
+  const response = await axiosInstance.post<string>('stage-management/prisoner-stages/bulk/', gatePassData);
 return response.data;
 
 };

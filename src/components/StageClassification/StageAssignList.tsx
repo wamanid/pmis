@@ -376,13 +376,13 @@ export function StageAssignList() {
            end_date: batchEditEndDate ? format(batchEditEndDate, 'yyyy-MM-dd') : "",
            remark: batchEditRemark}
           
-          // alert(JSON.stringify(data));
+         // alert(JSON.stringify(data));
              manualPromotion(data).then((result) => {
                 alert(JSON.stringify(result));
           toast.success(`Successfully updated ${selectedRows.length} stage assignment(s)`);
     
            }).catch((error) => {
-              toast.error('Failed to auto-promoted prisoners and error has occured');
+              toast.error('Failed to auto-promoted prisoners and error has occured'+error);
            });
      
  
