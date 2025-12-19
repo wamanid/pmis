@@ -102,6 +102,7 @@ export interface TransferRecord {
   id: UUID;
   prisoner_name: string;
   prisoner_number: string;
+  prisoner_number_value: string;
   original_station_name: string;
   destination_station_name: string;
   reason_name: string;
@@ -120,6 +121,7 @@ export interface TransferRecord {
   created_by: number;
   updated_by: number;
   deleted_by: number;
+  transfer_number: string;
   transfer_request: UUID;
   prisoner: UUID;
   original_station: UUID;
