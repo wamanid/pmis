@@ -199,6 +199,20 @@ export function StageAssignList() {
     }
   };
 
+
+
+  // Filter gate passes
+  const filteredAss = stageAssignments.filter(gatePass => {
+    const matchesSearch = 
+      gatePass.prisoner_number.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      gatePass.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    
+    return matchesSearch 
+  });
+
+
+
   const handleAddNew = () => {
     setSelectedAssignment(null);
     setFormOpen(true);
@@ -259,6 +273,13 @@ export function StageAssignList() {
     if (startDateTo) count++;
     return count;
   };
+
+
+
+
+
+
+
 
   const getStageColor = (stageName: string) => {
     switch (stageName) {
@@ -366,7 +387,6 @@ export function StageAssignList() {
           prisonersSelected.push(assignment.prisoner);
 
       })
-    
 
       let data: StageDemotionPost ={
            //we need a loop here
@@ -757,7 +777,7 @@ export function StageAssignList() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {stageAssignments.map((assignment) => (
+                  {filteredAss.map((assignment) => (
                     <TableRow key={assignment.id}>
                       <TableCell>
                         <Checkbox
