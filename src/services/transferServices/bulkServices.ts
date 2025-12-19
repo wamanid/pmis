@@ -221,8 +221,10 @@ export const updateTransfer = async (transfer: Transfer, id: string) : Promise<T
   return response.data;
 }
 
-export const getTransfers = async <T = TransferRecord>() : Promise<TransfersResponse<T>> => {
-  const response = await axiosInstance.get<Paginated<T>>('/transfer-management/transfers/');
+export const getTransfers = async <T = TransferRecord>(original_station?: string) : Promise<TransfersResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/transfer-management/transfers/', {
+    params: original_station ? { original_station } : undefined
+  });
   return response.data;
 }
 

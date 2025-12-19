@@ -52,9 +52,16 @@ import {
   TransferRecord, TransferRequest,
   TransferStatus
 } from "../../services/transferServices/bulkServices";
-import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
+import {
+  handleCatchError,
+  handleEffectLoad,
+  handleEffectLoad2,
+  handleResponseError
+} from "../../services/stationServices/utils";
 import {getStation} from "../../services/stationServices/manualLockupIntegration";
 import {deleteProperty} from "../../services/propertyServices/propertyService";
+import {useFilters} from "../../contexts/FilterContext";
+import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 
 interface Transfer {
   id?: string;
@@ -120,12 +127,19 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
 
   // API integration
   const [loading, setLoading] = useState(true)
+  const { region, district, station } = useFilters();
 
-  useEffect(() => {
-    if (loading){
-      fetchData()
-    }
-  }, [loading]);
+  const loadData = async () => {
+    await handleEffectLoad2(region, district, station, setLoading, fetchData)
+  };
+
+  useFilterRefresh(loadData, [region, district, station]);
+
+  // useEffect(() => {
+  //   if (loading){
+  //     fetchData()
+  //   }
+  // }, [loading]);
 
   function populateList(response: any, msg: string, setData: any) {
       if (handleResponseError(response)) return
@@ -141,9 +155,15 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
       setData(data)
   }
 
-  async function fetchData () {
+  async function fetchData (bool: boolean) {
     try {
-      const response1 = await getTransfers()
+      let response1: any
+      if (bool){
+        response1 = await getTransfers(station)
+      }
+      else {
+        response1 = await getTransfers()
+      }
       populateList(response1, "There are no transfers", setTransfers)
 
       const response2 = await getTransferStatus()
@@ -349,63 +369,63 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
   };
 
   const handleSaveTransfer = (transferData: TransferRecord) => {
-    if (editingTransfer) {
-      // Update existing transfer
-      setTransfers(
-        transfers.map((t) =>
-          t.id === editingTransfer.id
-            ? {
-                ...transferData,
-                id: editingTransfer.id,
-                prisoner_name:
-                  prisoners.find((p) => p.id === transferData.prisoner)
-                    ?.name || "",
-                prisoner_number:
-                  prisoners.find((p) => p.id === transferData.prisoner)
-                    ?.number || "",
-                original_station_name:
-                  stations.find((s) => s.id === transferData.original_station)
-                    ?.name || "",
-                destination_station_name:
-                  stations.find((s) => s.id === transferData.destination_station)
-                    ?.name || "",
-                reason_name:
-                  reasons.find((r) => r.id === transferData.reason)?.name || "",
-                status_name:
-                  statuses.find((s) => s.id === transferData.status)?.name || "",
-                transfer_request_id:
-                  transferRequests.find(
-                    (tr) => tr.id === transferData.transfer_request
-                  )?.request_id || "",
-              }
-            : t
-        )
-      );
-    } else {
-      // Add new transfer
-      const newTransfer = {
-        ...transferData,
-        id: Date.now().toString(),
-        prisoner_name:
-          prisoners.find((p) => p.id === transferData.prisoner)?.name || "",
-        prisoner_number:
-          prisoners.find((p) => p.id === transferData.prisoner)?.number || "",
-        original_station_name:
-          stations.find((s) => s.id === transferData.original_station)?.name ||
-          "",
-        destination_station_name:
-          stations.find((s) => s.id === transferData.destination_station)
-            ?.name || "",
-        reason_name:
-          reasons.find((r) => r.id === transferData.reason)?.name || "",
-        status_name:
-          statuses.find((s) => s.id === transferData.status)?.name || "",
-        transfer_request_id:
-          transferRequests.find((tr) => tr.id === transferData.transfer_request)
-            ?.request_id || "",
-      };
-      setTransfers([...transfers, newTransfer]);
-    }
+    // if (editingTransfer) {
+    //   // Update existing transfer
+    //   setTransfers(
+    //     transfers.map((t) =>
+    //       t.id === editingTransfer.id
+    //         ? {
+    //             ...transferData,
+    //             id: editingTransfer.id,
+    //             prisoner_name:
+    //               prisoners.find((p) => p.id === transferData.prisoner)
+    //                 ?.name || "",
+    //             prisoner_number:
+    //               prisoners.find((p) => p.id === transferData.prisoner)
+    //                 ?.number || "",
+    //             original_station_name:
+    //               stations.find((s) => s.id === transferData.original_station)
+    //                 ?.name || "",
+    //             destination_station_name:
+    //               stations.find((s) => s.id === transferData.destination_station)
+    //                 ?.name || "",
+    //             reason_name:
+    //               reasons.find((r) => r.id === transferData.reason)?.name || "",
+    //             status_name:
+    //               statuses.find((s) => s.id === transferData.status)?.name || "",
+    //             transfer_request_id:
+    //               transferRequests.find(
+    //                 (tr) => tr.id === transferData.transfer_request
+    //               )?.request_id || "",
+    //           }
+    //         : t
+    //     )
+    //   );
+    // } else {
+    //   // Add new transfer
+    //   const newTransfer = {
+    //     ...transferData,
+    //     id: Date.now().toString(),
+    //     prisoner_name:
+    //       prisoners.find((p) => p.id === transferData.prisoner)?.name || "",
+    //     prisoner_number:
+    //       prisoners.find((p) => p.id === transferData.prisoner)?.number || "",
+    //     original_station_name:
+    //       stations.find((s) => s.id === transferData.original_station)?.name ||
+    //       "",
+    //     destination_station_name:
+    //       stations.find((s) => s.id === transferData.destination_station)
+    //         ?.name || "",
+    //     reason_name:
+    //       reasons.find((r) => r.id === transferData.reason)?.name || "",
+    //     status_name:
+    //       statuses.find((s) => s.id === transferData.status)?.name || "",
+    //     transfer_request_id:
+    //       transferRequests.find((tr) => tr.id === transferData.transfer_request)
+    //         ?.request_id || "",
+    //   };
+    //   setTransfers([...transfers, newTransfer]);
+    // }
     setIsDialogOpen(false);
   };
 
@@ -515,19 +535,19 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
 
                     {/* Filter Dropdowns */}
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                      <Select value={selectedStation} onValueChange={setSelectedStation}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="All Stations" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Stations</SelectItem>
-                          {stations.map((station) => (
-                            <SelectItem key={station.id} value={station.id}>
-                              {station.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      {/*<Select value={selectedStation} onValueChange={setSelectedStation}>*/}
+                      {/*  <SelectTrigger>*/}
+                      {/*    <SelectValue placeholder="All Stations" />*/}
+                      {/*  </SelectTrigger>*/}
+                      {/*  <SelectContent>*/}
+                      {/*    <SelectItem value="all">All Stations</SelectItem>*/}
+                      {/*    {stations.map((station) => (*/}
+                      {/*      <SelectItem key={station.id} value={station.id}>*/}
+                      {/*        {station.name}*/}
+                      {/*      </SelectItem>*/}
+                      {/*    ))}*/}
+                      {/*  </SelectContent>*/}
+                      {/*</Select>*/}
 
                       <Select value={selectedStatus} onValueChange={setSelectedStatus}>
                         <SelectTrigger>

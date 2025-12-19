@@ -193,6 +193,50 @@ export function handleEffectLoad(
 
 }
 
+export async function handleEffectLoad2(
+  region: string | null,
+  district: string | null,
+  station: string | null,
+  setLoading: (value: boolean) => void,
+  fetchData: (bool: boolean) => void
+): Promise<boolean>{
+  setLoading(true);
+
+  if (!region && !district && !station) {
+    // console.log("code1")
+    // toast.error("Please select the region, district and station to load this information");
+    setLoading(false);
+    return false;
+  }
+
+  else if (region && !district && !station) {
+    // console.log("code2")
+    // toast.error("Please select the district and station too");
+    fetchData(false);
+    return false;
+  }
+
+  else if (region && district && !station) {
+    // console.log("code3")
+    // toast.error("Please select the station to load station information");
+    setLoading(false);
+    return false;
+  }
+
+  else if (region && district && station) {
+    // console.log("code4")
+    fetchData(true);
+    return true;
+  }
+
+  else {
+    // console.log("code5")
+    setLoading(false);
+    return false;
+  }
+
+}
+
 export function handleServerError (response: any, setLoading: any) {
   if ('error' in response){
         setLoading(false);
