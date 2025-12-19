@@ -1,7 +1,6 @@
 import {Paginated} from "../stationServices/utils";
-import {ErrorResponse, StationVisitor, VisitorResponse} from "../stationServices/visitorsServices/VisitorsService";
+import {ErrorResponse, VisitorGetResponse} from "../stationServices/visitorsServices/VisitorsService";
 import axiosInstance from "../axiosInstance";
-import {PrisonerProperty, PropertiesResponse} from "../propertyServices/propertyService";
 
 export interface TransferRequest {
   id: string;
@@ -87,6 +86,16 @@ export interface BulkTransfer {
   prisoners: string[];
 }
 
+export interface Transfer {
+  transfer_request: string;
+  original_station: string;
+  destination_station: string;
+  reason: string;
+  status: string;
+  transfer_date: string;
+  prisoner: string;
+}
+
 type UUID = string;
 
 export interface TransferRecord {
@@ -119,13 +128,98 @@ export interface TransferRecord {
   status: UUID;
 }
 
+export interface TransferPrisoner {
+  id: string;
+  prisoner: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  prisoner_number_value: string;
+  original_station: string;
+  original_station_name: string;
+  original_station_oc_acknowledged: boolean;
+  original_station_oc_approved: boolean;
+  destination_station: string;
+  destination_station_name: string;
+  destination_station_oc_acknowledged: boolean;
+  destination_station_oc_approved: boolean;
+  reason: string;
+  reason_name: string;
+  status: string;
+  status_name: string;
+  transfer_date: string;
+  transfer_request: string;
+  transfer_request_id: string;
+  biometric_consent: boolean;
+  is_active: boolean;
+  created_by: number | null;
+  created_datetime: string;
+  updated_by: number | null;
+  updated_datetime: string;
+  deleted_by: number | null;
+  deleted_datetime: string | null;
+}
+
+export interface TransferRequest2 {
+  id: string;
+  bulk_transfer: boolean;
+  number_of_prisoners: number;
+  original_station: string;
+  original_station_name: string;
+  original_station_oc_acknowledged: boolean;
+  original_station_oc_approval_status: string | null;
+  original_station_oc_approved_by: string | null;
+  original_station_oc_approved_date: string | null;
+  destination_station: string;
+  destination_station_name: string;
+  destination_station_oc_acknowledged: boolean;
+  destination_station_oc_approval_status: string | null;
+  destination_station_oc_approved_by: string | null;
+  destination_station_oc_approved_date: string | null;
+  reason: string;
+  reason_name: string;
+  status: string;
+  status_name: string;
+  in_charge: string;
+  in_charge_name: string;
+  prisoner: string | null;
+  prisoner_name: string | null;
+  is_active: boolean;
+  transfers: TransferPrisoner[];
+  created_by: string | null;
+  created_datetime: string;
+  updated_by: string | null;
+  updated_datetime: string;
+  deleted_by: string | null;
+  deleted_datetime: string | null;
+}
+
+
+
 export type TransferRequestResponse<T> = Paginated<T> | ErrorResponse
+export type TransfersResponse<T> = Paginated<T> | ErrorResponse
 export type TransferReasonResponse<T> = Paginated<T> | ErrorResponse
 export type TransferStatusResponse<T> = Paginated<T> | ErrorResponse
-export type BulkTransferResponse = TransferRecord | ErrorResponse
+// export type BulkTransferResponse = TransferRecord | ErrorResponse
+export type TransferResponse = TransferRecord | ErrorResponse
+export type TransferPrisonersResponse = TransferRequest2 | ErrorResponse
 
-export const addBulkTransfer = async (bulk: BulkTransfer) : Promise<BulkTransferResponse> => {
-  const response = await axiosInstance.post<BulkTransferResponse>('/transfer-management/transfers/bulk/', bulk);
+export const addBulkTransfer = async (bulk: BulkTransfer) : Promise<TransferResponse> => {
+  const response = await axiosInstance.post<TransferResponse>('/transfer-management/transfers/bulk/', bulk);
+  return response.data;
+}
+
+export const addTransfer = async (transfer: Transfer) : Promise<TransferResponse> => {
+  const response = await axiosInstance.post<TransferResponse>('/transfer-management/transfers/', transfer);
+  return response.data;
+}
+
+export const getTransfers = async <T = TransferRecord>() : Promise<TransfersResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/transfer-management/transfers/');
+  return response.data;
+}
+
+export const getTransferRequest = async (id: string) : Promise<TransferPrisonersResponse> => {
+  const response = await axiosInstance.get<TransferPrisonersResponse>(`/transfer-management/requests/${id}/`);
   return response.data;
 }
 

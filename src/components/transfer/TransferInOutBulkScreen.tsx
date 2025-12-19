@@ -42,8 +42,8 @@ import {
   addBulkTransfer,
   BulkTransfer,
   BulkTransferData,
-  getTransferReasons,
-  getTransferRequests, getTransferStatus,
+  getTransferReasons, getTransferRequest,
+  getTransferRequests, getTransferStatus, TransferPrisoner,
   TransferReason,
   TransferRequest,
   TransferStatus
@@ -53,6 +53,7 @@ import {fetchShiftDetailDeployments} from "../../services/stationServices/shiftD
 import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
 import {Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle} from "../ui/dialog";
 import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+import axiosInstance from "../../services/axiosInstance";
 
 // interface Prisoner {
 //   id: string;
@@ -92,6 +93,13 @@ import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitor
 //   transfer_request: string;
 // }
 
+interface Prisoner {
+  prisoner: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  prisoner_number_value: string;
+}
+
 export default function TransferInOutBulkScreen() {
   const {
     control,
@@ -119,8 +127,8 @@ export default function TransferInOutBulkScreen() {
   const [isOcApprovalOpen, setIsOcApprovalOpen] = useState(false);
 
   // Available prisoners list
-  const [availablePrisoners, setAvailablePrisoners] = useState<PrisonerItem[]>([]);
-  const [selectedPrisoners, setSelectedPrisoners] = useState<PrisonerItem[]>([]);
+  const [availablePrisoners, setAvailablePrisoners] = useState<Prisoner[]>([]);
+  const [selectedPrisoners, setSelectedPrisoners] = useState<Prisoner[]>([]);
   const [availableSearch, setAvailableSearch] = useState("");
   const [selectedSearch, setSelectedSearch] = useState("");
 
@@ -255,10 +263,17 @@ export default function TransferInOutBulkScreen() {
 
   async function handleRequestChange(request: TransferRequest) {
 
-    const { officers, newPrisoners } = await getOfficers(request.original_station);
+    const { newPrisoners, bool } = await getOfficers(request.original_station, request.id);
     // setStaff(officers)
-    setAvailablePrisoners(newPrisoners)
-    setSelectedPrisoners([])
+    // console.log(bool)
+    if (bool === "out"){
+      setAvailablePrisoners(newPrisoners)
+      setSelectedPrisoners([])
+    }
+    else {
+      setAvailablePrisoners([])
+      setSelectedPrisoners(newPrisoners)
+    }
 
     setBulk({
       ...bulk,
@@ -267,7 +282,9 @@ export default function TransferInOutBulkScreen() {
       status: request.status,
       original_station: request.original_station,
       destination_station: request.destination_station,
+      transfer_type: bool
     })
+    setValue("transfer_type", bool)
     setNumber(request.number_of_prisoners)
     setRequest(request)
   }
@@ -284,23 +301,48 @@ export default function TransferInOutBulkScreen() {
   //   }
   // }, [staff]);
 
-  async function getOfficers(origId: string): Promise<{ officers: StaffItem[], newPrisoners: PrisonerItem[] }> {
+  async function getOfficers(origId: string, requestId: string): Promise<{ newPrisoners: Prisoner[], bool: string }> {
     setNewDialogLoader(true)
     setLoaderText("Fetching staff list")
     try {
-      // const response1 = await getStaffProfile(origId)
-      // const officers = populateLists(response1, "There are no officers for the selected original station") ?? []
-      const officers = []
+      let newPrisoners: Prisoner[];
+      const response1 = await getTransferRequest(requestId)
+      if ('transfers' in response1) {
+        const transfers: TransferPrisoner[] = response1.transfers
+        // const responsex = await getPrisoners(origId)
+        // const prisoners = populateLists(responsex, "There are no prisoners") ?? []
+        // console.log(prisoners)
+        //
+        // console.log(transfers)
+        if (!transfers.length) {
+          // console.log("empty")
+          const response2 = await getPrisoners(origId)
+          const prisoners = populateLists(response2, "There are no prisoners") ?? []
+          newPrisoners = prisoners.map(prisoner => ({
+            prisoner: prisoner.id,
+            prisoner_name: prisoner.full_name,
+            prisoner_number: prisoner.prisoner_number,
+            prisoner_number_value: prisoner.prisoner_number_value
+          }))
 
-      const response2 = await getPrisoners(origId)
-      const prisoners = populateLists(response2, "There are no prisoners") ?? []
-      const newPrisoners = prisoners.filter(pr => pr.current_station === origId)
+          return { newPrisoners, bool: "out"}
+        }
+        else {
+          // console.log("not empty")
+          newPrisoners = transfers.map(prisoner => ({
+            prisoner: prisoner.prisoner,
+            prisoner_name: prisoner.prisoner_name,
+            prisoner_number: prisoner.prisoner_number,
+            prisoner_number_value: prisoner.prisoner_number_value
+          }))
 
-       return { officers, newPrisoners}
+          return { newPrisoners, bool: "in"}
+        }
+      }
 
     }catch (error) {
       handleCatchError(error)
-      return { officers: [], newPrisoners: [] };
+      return { newPrisoners: [], bool: "out" };
     }finally {
       setNewDialogLoader(false)
     }
@@ -364,27 +406,25 @@ export default function TransferInOutBulkScreen() {
   // Filter prisoners based on search
   const filteredAvailable = availablePrisoners.filter(
     (p) =>
-      p.first_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
-      p.last_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.prisoner_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
       p.prisoner_number_value.toLowerCase().includes(availableSearch.toLowerCase())
   );
 
   const filteredSelected = selectedPrisoners.filter(
     (p) =>
-      p.first_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
-      p.last_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
+      p.prisoner_name.toLowerCase().includes(availableSearch.toLowerCase()) ||
       p.prisoner_number_value.toLowerCase().includes(availableSearch.toLowerCase())
   );
 
   // Move prisoner to selected list
-  const movePrisonerToSelected = (prisoner: PrisonerItem) => {
-    setAvailablePrisoners(availablePrisoners.filter((p) => p.id !== prisoner.id));
+  const movePrisonerToSelected = (prisoner: Prisoner) => {
+    setAvailablePrisoners(availablePrisoners.filter((p) => p.prisoner !== prisoner.prisoner));
     setSelectedPrisoners([...selectedPrisoners, prisoner]);
   };
 
   // Move prisoner back to available list
-  const movePrisonerToAvailable = (prisoner: PrisonerItem) => {
-    setSelectedPrisoners(selectedPrisoners.filter((p) => p.id !== prisoner.id));
+  const movePrisonerToAvailable = (prisoner: Prisoner) => {
+    setSelectedPrisoners(selectedPrisoners.filter((p) => p.prisoner !== prisoner.prisoner));
     setAvailablePrisoners([...availablePrisoners, prisoner]);
   };
 
@@ -393,7 +433,7 @@ export default function TransferInOutBulkScreen() {
     setSelectedPrisoners([...selectedPrisoners, ...filteredAvailable]);
     setAvailablePrisoners(
       availablePrisoners.filter(
-        (p) => !filteredAvailable.find((f) => f.id === p.id)
+        (p) => !filteredAvailable.find((f) => f.prisoner === p.prisoner)
       )
     );
   };
@@ -402,7 +442,7 @@ export default function TransferInOutBulkScreen() {
     setAvailablePrisoners([...availablePrisoners, ...filteredSelected]);
     setSelectedPrisoners(
       selectedPrisoners.filter(
-        (p) => !filteredSelected.find((f) => f.id === p.id)
+        (p) => !filteredSelected.find((f) => f.prisoner === p.prisoner)
       )
     );
   };
@@ -433,7 +473,7 @@ export default function TransferInOutBulkScreen() {
       destination_station: bulk.destination_station,
       reason: bulk.reason,
       status: bulk.status,
-      prisoners: selectedPrisoners.map(pr => pr.id)
+      prisoners: selectedPrisoners.map(pr => pr.prisoner)
     }
 
     try {
@@ -463,19 +503,19 @@ export default function TransferInOutBulkScreen() {
   };
 
   const renderPrisonerCard = (
-    prisoner: PrisonerItem,
+    prisoner: Prisoner,
     onClick: () => void,
     icon: React.ReactNode
   ) => (
     <div
-      key={prisoner.id}
+      key={prisoner.prisoner}
       onClick={onClick}
       className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer transition-colors"
     >
       <div className="flex items-center gap-3">
         <User className="h-4 w-4 text-gray-400" />
         <div>
-          <div className="text-sm">{prisoner.full_name}</div>
+          <div className="text-sm">{prisoner.prisoner_name}</div>
           <div className="text-xs text-gray-500">
             {/*{prisoner.number} • {prisoner.category}*/}
             {prisoner.prisoner_number_value}
@@ -594,10 +634,6 @@ export default function TransferInOutBulkScreen() {
                         render={({ field }) => (
                           <RadioGroup
                             value={field.value}
-                            onValueChange={(value: string) => {
-                              field.onChange(value)
-                              handleChange("transfer_type", value)
-                            }}
                             className="flex gap-4"
                           >
                             <div className="flex items-center space-x-2 border rounded-lg p-3 flex-1">
