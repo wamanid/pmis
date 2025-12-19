@@ -28,7 +28,13 @@ import {
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
 import { toast } from "sonner@2.0.3";
-import {addTransfer, Transfer, TransferRecord, TransferRequest} from "../../services/transferServices/bulkServices";
+import {
+  addTransfer,
+  Transfer,
+  TransferRecord,
+  TransferRequest,
+  updateBulkTransfer, updateTransfer
+} from "../../services/transferServices/bulkServices";
 import {getCurrentDate, handleCatchError, handleResponseError} from "../../services/stationServices/utils";
 import {PrisonerProperty} from "../../services/propertyServices/propertyService";
 
@@ -112,30 +118,41 @@ export default function TransferForm({
     if (editingTransfer) {
       reset({
         transfer_date: editingTransfer.transfer_date?.split("T")[0] || "",
-        biometric_consent: editingTransfer.biometric_consent || false,
-        original_station_oc_acknowledged:
-          editingTransfer.original_station_oc_acknowledged || false,
-        destination_station_oc_acknowledged:
-          editingTransfer.destination_station_oc_acknowledged || false,
-        original_station_oc_approved:
-          editingTransfer.original_station_oc_approved || false,
-        destination_station_oc_approved:
-          editingTransfer.destination_station_oc_approved || false,
+        // biometric_consent: editingTransfer.biometric_consent || false,
+        // original_station_oc_acknowledged:
+        //   editingTransfer.original_station_oc_acknowledged || false,
+        // destination_station_oc_acknowledged:
+        //   editingTransfer.destination_station_oc_acknowledged || false,
+        // original_station_oc_approved:
+        //   editingTransfer.original_station_oc_approved || false,
+        // destination_station_oc_approved:
+        //   editingTransfer.destination_station_oc_approved || false,
         transfer_request: editingTransfer.transfer_request || "",
-        prisoner: editingTransfer.prisoner || "",
+        prisoner: editingTransfer.prisoner_name || "",
+        original_station: editingTransfer.original_station_name || "",
+        destination_station: editingTransfer.destination_station_name || "",
+        reason: editingTransfer.reason_name || "",
+        status: editingTransfer.status_name || "",
+      });
+
+      setTransfer({
+        transfer_date: editingTransfer.transfer_date?.split("T")[0] || "",
+        transfer_request: editingTransfer.transfer_request || "",
         original_station: editingTransfer.original_station || "",
         destination_station: editingTransfer.destination_station || "",
         reason: editingTransfer.reason || "",
         status: editingTransfer.status || "",
-      });
+        prisoner: editingTransfer.prisoner || "",
+      })
+
     } else {
       reset({
-        transfer_date: new Date().toISOString().split("T")[0],
-        biometric_consent: false,
-        original_station_oc_acknowledged: false,
-        destination_station_oc_acknowledged: false,
-        original_station_oc_approved: false,
-        destination_station_oc_approved: false,
+        transfer_date: getCurrentDate(),
+        // biometric_consent: false,
+        // original_station_oc_acknowledged: false,
+        // destination_station_oc_acknowledged: false,
+        // original_station_oc_approved: false,
+        // destination_station_oc_approved: false,
         transfer_request: "",
         prisoner: "",
         original_station: "",
@@ -151,25 +168,22 @@ export default function TransferForm({
     // console.log(transfer)
 
     try {
-      // API call would go here
-      // const response = await fetch('/api/transfer-management/transfers/', {
-      //   method: editingTransfer ? 'PUT' : 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data)
-      // });
 
-      // onSave({ ...data, id: editingTransfer?.id || Date.now().toString() });
-      // toast.success(
-      //   editingTransfer
-      //     ? "Transfer updated successfully"
-      //     : "Transfer created successfully"
-      // );
+      if (editingTransfer) {
+        const response = await updateTransfer(transfer, editingTransfer.id)
+        if (handleResponseError(response)) return
+        setTransfers(prev =>
+            prev.map(tr =>
+                tr.id === editingTransfer.id ? response : tr
+            )
+        )
+      }
+      else {
+        const response = await addTransfer(transfer)
+        if (handleResponseError(response)) return
 
-
-      const response = await addTransfer(transfer)
-      if (handleResponseError(response)) return
-
-      setTransfers(prev => ([response, ...prev]))
+        setTransfers(prev => ([response, ...prev]))
+      }
 
       toast.success(
         editingTransfer

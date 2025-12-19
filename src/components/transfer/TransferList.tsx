@@ -317,6 +317,7 @@ export default function TransferList({ initialData = [] }: TransferListProps) {
   };
 
   const handleEditTransfer = (transfer: Transfer) => {
+    // console.log(transfer)
     setEditingTransfer(transfer);
     setIsDialogOpen(true);
   };

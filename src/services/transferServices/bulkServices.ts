@@ -216,6 +216,11 @@ export const addTransfer = async (transfer: Transfer) : Promise<TransferResponse
   return response.data;
 }
 
+export const updateTransfer = async (transfer: Transfer, id: string) : Promise<TransferResponse> => {
+  const response = await axiosInstance.put<TransferResponse>(`/transfer-management/transfers/${id}/`, transfer);
+  return response.data;
+}
+
 export const getTransfers = async <T = TransferRecord>() : Promise<TransfersResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/transfer-management/transfers/');
   return response.data;
