@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { FilterProvider } from './contexts/FilterContext';
 import App from './App.tsx';
 import './index.css';
+import './styles/globals.css';
 
 createRoot(document.getElementById('root')!).render(
   <BrowserRouter>
