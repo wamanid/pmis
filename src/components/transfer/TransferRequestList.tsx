@@ -1,10 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { FileText, Search, Plus, Edit, Trash2, User, Building2, Users, Filter, ArrowRightLeft, Eye } from "lucide-react";
 import { DataTable } from '../common/DataTable';
 import ConfirmDialog from "../common/ConfirmDialog";
 import { useFilterRefresh } from "../../hooks/useFilterRefresh";
 import {
-  fetchTransferRequests,
   deleteTransferRequest,
   fetchStations,
   fetchReasons,
@@ -75,17 +74,37 @@ interface TransferRequest {
   destination_station_oc_approved_by: number;
 }
 
-interface TransferRequestListProps {
-  initialData?: TransferRequest[];
-}
+export default function TransferRequestList() {
+   // We no longer manage table data client-side. DataTable will fetch from the server.
+   const [reloadKey, setReloadKey] = useState<number>(0);
+   // debounce parent search so we don't spam the server with every keystroke
+   const [searchTerm, setSearchTerm] = useState("");
+   const [debouncedSearch, setDebouncedSearch] = useState("");
+   useEffect(() => {
+     const t = window.setTimeout(() => setDebouncedSearch(searchTerm.trim()), 350);
+     return () => window.clearTimeout(t);
+   }, [searchTerm]);
 
-export default function TransferRequestList({
-  initialData = [],
-}: TransferRequestListProps) {
-  const [requests, setRequests] = useState<TransferRequest[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [filteredRequests, setFilteredRequests] = useState<TransferRequest[]>([]);
+  // local helpers used by columns / dialogs
+  const handleViewRequest = (r: any) => { setViewRequest(r); setIsViewOpen(true); };
+  const handleEditRequest = (r: any) => { setEditingRequest(r); setIsFormOpen(true); };
+  const handleDelete = (r: any) => { setToDeleteRequest(r); setConfirmOpen(true); };
+
+  const confirmDelete = async () => {
+    const id = toDeleteRequest?.id;
+    if (!id) return;
+    try {
+      await deleteTransferRequest(id);
+      setReloadKey(k => k + 1); // ask DataTable to refresh
+      (toast as any)?.success?.("Transfer request deleted");
+    } catch (err) {
+      (toast as any)?.error?.("Failed to delete transfer request");
+    } finally {
+      setConfirmOpen(false);
+      setToDeleteRequest(null);
+    }
+  };
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingRequest, setEditingRequest] = useState<any | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -95,7 +114,7 @@ export default function TransferRequestList({
   const [isViewOpen, setIsViewOpen] = useState(false);
 
   // Filters
-  const [searchTerm, setSearchTerm] = useState("");
+  // (searchTerm is user typed, debouncedSearch is used to build server query)
   const [globalStation, setGlobalStation] = useState<string>("all"); // from global hook
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedReason, setSelectedReason] = useState<string>("all");
@@ -108,41 +127,12 @@ export default function TransferRequestList({
   const [reasons, setReasons] = useState<any[]>([]);
   const [statuses, setStatuses] = useState<any[]>([]);
 
-  // debounce
-  const searchRef = useRef<number | null>(null);
-
-  // wire global filter hook
+  // wire global filter hook: update globalStation and bump reload key so DataTable refetches
   useFilterRefresh(() => {
     const s = localStorage.getItem("selectedStation") || "all";
     setGlobalStation(s);
-    // trigger refresh: only pass original_station when it's a real value (not "all")
-    loadRequests({ search: searchTerm, original_station: s !== "all" ? s : undefined });
+    setReloadKey((k) => k + 1);
   }, [selectedStatus, selectedReason, transferType, dateFrom, dateTo]);
-
-  async function loadRequests(opts: any = {}) {
-    setLoading(true);
-    setError(null);
-    const controller = new AbortController();
-    try {
-      const res = await fetchTransferRequests({
-        search: opts.search ?? searchTerm,
-        original_station: opts.original_station ?? (globalStation !== "all" ? globalStation : undefined),
-        status: selectedStatus !== "all" ? selectedStatus : undefined,
-        reason: selectedReason !== "all" ? selectedReason : undefined,
-        transfer_type: transferType !== "all" ? transferType : undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-        page_size: 1000,
-      }, controller.signal);
-      setRequests(res.items || []);
-      setFilteredRequests(res.items || []);
-    } catch (err: any) {
-      setError(err?.message || "Failed to load transfer requests");
-    } finally {
-      setLoading(false);
-      controller.abort();
-    }
-  }
 
   useEffect(() => {
     // load lookups
@@ -153,101 +143,10 @@ export default function TransferRequestList({
     return () => c.abort();
   }, []);
 
+  // reload when external events happen
   useEffect(() => {
-    loadRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // client-side filters (applied on top of API results for local UI)
-  useEffect(() => {
-    let out = [...requests];
-    if (searchTerm) {
-      const q = searchTerm.toLowerCase();
-      out = out.filter((r) =>
-        (r.prisoner_name ?? "").toLowerCase().includes(q) ||
-        (r.in_charge_name ?? "").toLowerCase().includes(q) ||
-        (r.original_station_name ?? "").toLowerCase().includes(q) ||
-        (r.destination_station_name ?? "").toLowerCase().includes(q)
-      );
-    }
-    if (globalStation && globalStation !== "all") {
-      out = out.filter((r) => r.original_station === globalStation || r.destination_station === globalStation);
-    }
-    if (selectedStatus !== "all") out = out.filter((r) => r.status === selectedStatus);
-    if (selectedReason !== "all") out = out.filter((r) => r.reason === selectedReason);
-    if (transferType === "bulk") out = out.filter((r) => r.bulk_transfer === true);
-    if (transferType === "single") out = out.filter((r) => r.bulk_transfer === false);
-    // date filters (keep existing original/destination approved date semantics)
-    if (dateFrom) {
-      out = out.filter(
-        (r) =>
-          (r.original_station_oc_approved_date && new Date(r.original_station_oc_approved_date) >= new Date(dateFrom + "T00:00:00Z")) ||
-          (r.destination_station_oc_approved_date && new Date(r.destination_station_oc_approved_date) >= new Date(dateFrom + "T00:00:00Z"))
-      );
-    }
-    if (dateTo) {
-      out = out.filter(
-        (r) =>
-          (r.original_station_oc_approved_date && new Date(r.original_station_oc_approved_date) <= new Date(dateTo + "T23:59:59Z")) ||
-          (r.destination_station_oc_approved_date && new Date(r.destination_station_oc_approved_date) <= new Date(dateTo + "T23:59:59Z"))
-      );
-    }
-    setFilteredRequests(out);
-  }, [requests, searchTerm, globalStation, selectedStatus, selectedReason, transferType, dateFrom, dateTo]);
-
-  // debounced search handler (trigger API)
-  useEffect(() => {
-    if (searchRef.current) window.clearTimeout(searchRef.current);
-    searchRef.current = window.setTimeout(() => {
-      loadRequests({ search: searchTerm, original_station: globalStation !== "all" ? globalStation : undefined });
-    }, 450);
-    return () => {
-      if (searchRef.current) window.clearTimeout(searchRef.current);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchTerm, globalStation]);
-
-  const handleDelete = (request?: TransferRequest | null) => {
-    setToDeleteRequest(request ?? null);
-    setConfirmOpen(true);
-  };
-
-  const confirmDelete = async () => {
-    const id = toDeleteRequest?.id;
-    if (!id) return;
-    try {
-      await deleteTransferRequest(id);
-      setRequests((s) => s.filter((r) => r.id !== id));
-      setFilteredRequests((s) => s.filter((r) => r.id !== id));
-      (toast as any)?.success?.("Transfer request deleted");
-    } catch (err) {
-      (toast as any)?.error?.("Failed to delete transfer request");
-    } finally {
-      setConfirmOpen(false);
-      setToDeleteRequest(null);
-    }
-  };
-
-  // called when user clicks edit button in a row
-  const handleEditRequest = (item: any) => {
-    setEditingRequest(item);
-    setIsFormOpen(true);
-  };
-
-  // called when user clicks view button in a row
-  const handleViewRequest = (item: TransferRequest) => {
-    setViewRequest(item);
-    setIsViewOpen(true);
-  };  
-
-  // reload list when a transfer is created elsewhere (TransferRequestForm dispatches this)
-  useEffect(() => {
-    const reload = () => {
-      // reuse existing loader
-      loadRequests();
-    };
-    const onCreated = () => reload();
-    const onUpdated = () => reload();
+    const onCreated = () => setReloadKey(k => k + 1);
+    const onUpdated = () => setReloadKey(k => k + 1);
     window.addEventListener("transfer:created", onCreated as EventListener);
     window.addEventListener("transfer:updated", onUpdated as EventListener);
     return () => {
@@ -259,47 +158,75 @@ export default function TransferRequestList({
   const columns: DataColumn<any>[] = [
     {
       key: "type",
-      header: "Type",
-      render: (r) => r.bulk_transfer ? (<Badge className="bg-purple-600 flex items-center gap-1 w-fit"><Users className="h-3 w-3" />Bulk</Badge>) : (<Badge variant="outline" className="flex items-center gap-1 w-fit"><User className="h-3 w-3" />Single</Badge>),
-      accessor: (r) => (r.bulk_transfer ? "bulk" : "single"),
+      header: <span className="text-sm font-medium text-gray-700">Type</span>,
+      title: "Type",
+      label: "Type",
+      render: (_v, r) =>
+        r?.bulk_transfer
+          ? (<Badge className="bg-purple-600 flex items-center gap-1 w-fit"><Users className="h-3 w-3" />Bulk</Badge>)
+          : (<Badge variant="outline" className="flex items-center gap-1 w-fit"><User className="h-3 w-3" />Single</Badge>),
+      accessor: (r) => (r?.bulk_transfer ? "bulk" : "single"),
       sortable: true,
     },
     {
       key: "prisoners",
-      header: "Prisoner(s)",
-      render: (r) => r.bulk_transfer ? (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.number_of_prisoners} prisoners</span></div>) : (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.prisoner_name}</span></div>),
+      header: <span className="text-sm font-medium text-gray-700">Prisoner(s)</span>,
+      title: "Prisoner(s)",
+      label: "Prisoner(s)",
+      render: (_v, r) =>
+        r?.bulk_transfer
+          ? (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.number_of_prisoners} prisoners</span></div>)
+          : (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.prisoner_name}</span></div>),
       accessor: (r) => r.prisoner_name ?? "",
     },
     {
       key: "fromto",
-      header: "From → To",
-      render: (r) => (<div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-gray-400" /><div className="text-sm"><div>{r.original_station_name}</div><div className="flex items-center gap-1 text-gray-500"><ArrowRightLeft className="h-3 w-3" />{r.destination_station_name}</div></div></div>),
+      header: <span className="text-sm font-medium text-gray-700">From → To</span>,
+      title: "From → To",
+      label: "From → To",
+      render: (_v, r) => (
+        <div className="flex items-center gap-2">
+          <Building2 className="h-4 w-4 text-gray-400" />
+          <div className="text-sm">
+            <div>{r?.original_station_name}</div>
+            <div className="flex items-center gap-1 text-gray-500"><ArrowRightLeft className="h-3 w-3" />{r?.destination_station_name}</div>
+          </div>
+        </div>
+      ),
       accessor: (r) => `${r.original_station_name ?? ""}->${r.destination_station_name ?? ""}`,
       sortable: true,
     },
     {
       key: "reason",
-      header: "Reason",
-      render: (r) => <Badge variant="outline">{r.reason_name}</Badge>,
+      header: <span className="text-sm font-medium text-gray-700">Reason</span>,
+      title: "Reason",
+      label: "Reason",
+      render: (_v, r) => <Badge variant="outline">{r?.reason_name}</Badge>,
       accessor: (r) => r.reason_name ?? "",
     },
     {
       key: "in_charge",
-      header: "In Charge",
-      render: (r) => (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.in_charge_name}</span></div>),
+      header: <span className="text-sm font-medium text-gray-700">In Charge</span>,
+      title: "In Charge",
+      label: "In Charge",
+      render: (_v, r) => (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r?.in_charge_name}</span></div>),
       accessor: (r) => r.in_charge_name ?? "",
     },
     {
       key: "status",
-      header: "Status",
-      render: (r) => (<Badge variant={getStatusBadgeVariant(r.status_name || "")}>{r.status_name}</Badge>),
+      header: <span className="text-sm font-medium text-gray-700">Status</span>,
+      title: "Status",
+      label: "Status",
+      render: (_v, r) => (<Badge variant={getStatusBadgeVariant(r?.status_name || "")}>{r?.status_name}</Badge>),
       accessor: (r) => r.status_name ?? "",
       sortable: true,
     },
     {
       key: "actions",
-      header: "Actions",
-      render: (r) => (
+      header: <span className="text-sm font-medium text-gray-700">Actions</span>,
+      title: "Actions",
+      label: "Actions",
+      render: (_v, r) => (
         <div className="flex gap-2">
           <Button size="sm" variant="ghost" onClick={() => handleViewRequest(r)}><Eye className="h-4 w-4" /></Button>
           <Button size="sm" variant="outline" onClick={() => handleEditRequest(r)}><Edit className="h-4 w-4" /></Button>
@@ -309,6 +236,23 @@ export default function TransferRequestList({
       accessor: () => "",
     },
   ];
+
+  // build table url string (DataTable / axiosInstance expects a string)
+  // - use debouncedSearch to avoid firing on every keystroke
+  // - only include `search` when it is meaningful (min length 3)
+  const tableUrl = useMemo(() => {
+    const params: Record<string,string> = {};
+    const minSearchLen = 3;
+    if (debouncedSearch && debouncedSearch.length >= minSearchLen) params.search = String(debouncedSearch);
+    if (globalStation && globalStation !== "all") params.original_station = String(globalStation);
+    if (selectedStatus && selectedStatus !== "all") params.status = String(selectedStatus);
+    if (selectedReason && selectedReason !== "all") params.reason = String(selectedReason);
+    if (transferType && transferType !== "all") params.transfer_type = String(transferType);
+    if (dateFrom) params.date_from = String(dateFrom);
+    if (dateTo) params.date_to = String(dateTo);
+    const qs = new URLSearchParams(params).toString();
+    return `/transfer-management/requests/${qs ? `?${qs}` : ""}`;
+  }, [debouncedSearch, globalStation, selectedStatus, selectedReason, transferType, dateFrom, dateTo]);
 
   return (
     <div className="space-y-6">
@@ -393,23 +337,23 @@ export default function TransferRequestList({
 
           {/* DataTable */}
           <DataTable
-            url="/transfer-management/requests/"
-            title="Transfer Requests"
-            columns={columns}
-            data={filteredRequests}
-            config={{
-              search: false,
-              pagination: true,
-              lengthMenu: [10, 25, 50, 100],
-              export: {
-                pdf: true,
-                csv: true,
-                print: true,
-              },
-              summary: true,
-              rowSpacing: 'normal',
-            }}
-          />
+             key={reloadKey}
+             url={tableUrl}
+             title="Transfer Requests"
+             columns={columns}
+             config={{
+               search: true,
+               pagination: true,
+               lengthMenu: [10, 25, 50, 100],
+               export: {
+                 pdf: true,
+                 csv: true,
+                 print: true,
+               },
+               summary: true,
+               rowSpacing: 'normal',
+             }}
+           />
         </CardContent>
       </Card>
 
@@ -420,7 +364,8 @@ export default function TransferRequestList({
           setEditingRequest(null); // clear edit state on close
         }}
         onSave={async (createdOrUpdated: any) => {
-          await loadRequests();
+          // ask DataTable to refetch
+          setReloadKey(k => k + 1);
           window.dispatchEvent(new CustomEvent("transfer:updated", { detail: createdOrUpdated }));
           return createdOrUpdated;
         }}
