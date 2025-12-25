@@ -1,7 +1,7 @@
 import { ErrorResponse } from "./visitorsServices/VisitorsService";
 import axiosInstance from "../axiosInstance";
 import {Paginated} from "./utils";
-import {PrisonerProperty, PropertiesResponse} from "./propertyService";
+import {PrisonerProperty, PropertiesResponse} from "../propertyServices/propertyService";
 
 export interface Ward {
   id: string;
