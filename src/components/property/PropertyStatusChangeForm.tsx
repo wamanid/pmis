@@ -215,7 +215,7 @@ const PropertyStatusChangeForm: React.FC<PropertyStatusChangeFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Property Item Selection */}
             <div className="space-y-2">
-              <Label htmlFor="property">Property Item *</Label>
+              <Label htmlFor="property">Property Item <span className="text-red-500">*</span></Label>
               <Popover open={openProperty} onOpenChange={setOpenProperty}>
                 <PopoverTrigger asChild>
                   <Button
@@ -276,7 +276,7 @@ const PropertyStatusChangeForm: React.FC<PropertyStatusChangeFormProps> = ({
 
             {/* Property Status Selection */}
             <div className="space-y-2">
-              <Label htmlFor="property_status">New Property Status *</Label>
+              <Label htmlFor="property_status">New Property Status <span className="text-red-500">*</span></Label>
               <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
                 <PopoverTrigger asChild>
                   <Button
@@ -323,7 +323,7 @@ const PropertyStatusChangeForm: React.FC<PropertyStatusChangeFormProps> = ({
 
             {/* Date of Status Change */}
             <div className="space-y-2">
-              <Label>Date of Status Change *</Label>
+              <Label>Date of Status Change <span className="text-red-500">*</span></Label>
               <Popover open={openDate} onOpenChange={setOpenDate}>
                 <PopoverTrigger asChild>
                   <Button
@@ -365,7 +365,7 @@ const PropertyStatusChangeForm: React.FC<PropertyStatusChangeFormProps> = ({
 
             {/* Reason for Status Change */}
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="reason">Reason for Status Change *</Label>
+              <Label htmlFor="reason">Reason for Status Change <span className="text-red-500">*</span></Label>
               <Textarea
                 id="reason"
                 value={formData.reason_for_status_change}

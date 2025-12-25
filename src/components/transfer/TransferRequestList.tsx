@@ -1,30 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { FileText, Search, Plus, Edit, Trash2, User, Building2, Users, Filter, ArrowRightLeft, Eye } from "lucide-react";
+import { DataTable } from '../common/DataTable';
+import ConfirmDialog from "../common/ConfirmDialog";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
 import {
-  FileText,
-  Search,
-  Plus,
-  Edit,
-  Trash2,
-  Calendar,
-  User,
-  Building2,
-  Users,
-  CheckCircle2,
-  XCircle,
-  Filter,
-  ArrowRightLeft,
-} from "lucide-react";
+  fetchTransferRequests,
+  deleteTransferRequest,
+  fetchStations,
+  fetchReasons,
+  fetchStatuses,
+} from "../../services/transferServices/transferRequestService";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "../ui/table";
 import {
   Select,
   SelectContent,
@@ -33,7 +21,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Badge } from "../ui/badge";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import TransferRequestForm from "./TransferRequestForm";
 import {
   AlertDialog,
@@ -45,6 +33,19 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "../ui/alert-dialog";
+import DateTime from "../common/DateTime";
+import SearchableSelect from "../common/SearchableSelect";
+
+function getStatusBadgeVariant(status: string) {
+  const s = (status || "").toLowerCase();
+  if (s.includes("pending")) return "accent";
+  // if (s.includes("in-progress")) return "secondary";
+  if (s.includes("in-progress") || s.includes("in progress") || s.includes("Pending Approval")) return "secondary";
+  if (s.includes("approved") || s.includes("completed")) return "default";
+  if (s.includes("rejected") || s.includes("declined") || s.includes("cancel") || s.includes("cancelled")) return "destructive";
+  // fallback 
+  return "outline";
+}
 
 interface TransferRequest {
   id?: string;
@@ -81,515 +82,299 @@ interface TransferRequestListProps {
 export default function TransferRequestList({
   initialData = [],
 }: TransferRequestListProps) {
-  const [requests, setRequests] = useState<TransferRequest[]>(initialData);
-  const [filteredRequests, setFilteredRequests] = useState<TransferRequest[]>(
-    []
-  );
+  const [requests, setRequests] = useState<TransferRequest[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [filteredRequests, setFilteredRequests] = useState<TransferRequest[]>([]);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingRequest, setEditingRequest] = useState<TransferRequest | null>(
-    null
-  );
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [requestToDelete, setRequestToDelete] = useState<string | null>(null);
+  const [editingRequest, setEditingRequest] = useState<any | null>(null);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [toDeleteRequest, setToDeleteRequest] = useState<TransferRequest | null>(null);
+  const [viewRequest, setViewRequest] = useState<TransferRequest | null>(null);
+  const [isViewOpen, setIsViewOpen] = useState(false);
 
-  // Search and filter states
+  // Filters
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedStation, setSelectedStation] = useState<string>("all");
+  const [globalStation, setGlobalStation] = useState<string>("all"); // from global hook
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedReason, setSelectedReason] = useState<string>("all");
-  // const [selectedApprovalStatus, setSelectedApprovalStatus] = useState<string>("all"); // removed 
-  const [transferType, setTransferType] = useState<string>("all"); // all, bulk, single
+  const [transferType, setTransferType] = useState<string>("all");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
 
-  // Mock data for dropdowns
-  const [prisoners] = useState([
-    { id: "1", name: "John Doe", number: "P001" },
-    { id: "2", name: "Jane Smith", number: "P002" },
-    { id: "3", name: "Mike Johnson", number: "P003" },
-    { id: "4", name: "Sarah Williams", number: "P004" },
-  ]);
+  // lookups
+  const [stations, setStations] = useState<any[]>([]);
+  const [reasons, setReasons] = useState<any[]>([]);
+  const [statuses, setStatuses] = useState<any[]>([]);
 
-  const [stations] = useState([
-    { id: "1", name: "Central Prison" },
-    { id: "2", name: "North Prison" },
-    { id: "3", name: "South Prison" },
-    { id: "4", name: "East Prison" },
-    { id: "5", name: "West Prison" },
-  ]);
+  // debounce
+  const searchRef = useRef<number | null>(null);
 
-  const [reasons] = useState([
-    { id: "1", name: "Medical" },
-    { id: "2", name: "Court Appearance" },
-    { id: "3", name: "Overcrowding" },
-    { id: "4", name: "Security" },
-    { id: "5", name: "Administrative" },
-  ]);
+  // wire global filter hook
+  useFilterRefresh(() => {
+    const s = localStorage.getItem("selectedStation") || "all";
+    setGlobalStation(s);
+    // trigger refresh: only pass original_station when it's a real value (not "all")
+    loadRequests({ search: searchTerm, original_station: s !== "all" ? s : undefined });
+  }, [selectedStatus, selectedReason, transferType, dateFrom, dateTo]);
 
-  const [statuses] = useState([
-    { id: "1", name: "Pending" },
-    { id: "2", name: "Approved" },
-    { id: "3", name: "Rejected" },
-    { id: "4", name: "In Progress" },
-    { id: "5", name: "Completed" },
-  ]);
-
-  // approvalStatuses removed (no longer used)
-
-  const [staff] = useState([
-    { id: 1, name: "Officer John Smith" },
-    { id: 2, name: "Officer Mary Johnson" },
-    { id: 3, name: "Officer David Brown" },
-    { id: 4, name: "Officer Sarah Davis" },
-  ]);
-
-  // Load mock data on mount
-  useEffect(() => {
-    if (requests.length === 0) {
-      const mockRequests: TransferRequest[] = [
-        {
-          id: "1",
-          prisoner_name: "John Doe",
-          original_station_name: "Central Prison",
-          destination_station_name: "North Prison",
-          reason_name: "Medical",
-          status_name: "Approved",
-          in_charge_name: "Officer John Smith",
-          original_oc_approval_status_name: "Approved",
-          destination_oc_approval_status_name: "Pending",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
-          original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "2025-11-02T10:00:00Z",
-          destination_station_oc_approved_date: "",
-          prisoner: "1",
-          original_station: "1",
-          destination_station: "2",
-          reason: "1",
-          in_charge: 1,
-          status: "2",
-          original_station_oc_approval_status: "2",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 1,
-          destination_station_oc_approved_by: 0,
-        },
-        {
-          id: "2",
-          prisoner_name: "",
-          original_station_name: "South Prison",
-          destination_station_name: "East Prison",
-          reason_name: "Overcrowding",
-          status_name: "In Progress",
-          in_charge_name: "Officer Mary Johnson",
-          original_oc_approval_status_name: "Approved",
-          destination_oc_approval_status_name: "Approved",
-          bulk_transfer: true,
-          number_of_prisoners: 15,
-          original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: true,
-          original_station_oc_approved_date: "2025-11-01T14:00:00Z",
-          destination_station_oc_approved_date: "2025-11-02T09:00:00Z",
-          prisoner: "",
-          original_station: "3",
-          destination_station: "4",
-          reason: "3",
-          in_charge: 2,
-          status: "4",
-          original_station_oc_approval_status: "2",
-          destination_station_oc_approval_status: "2",
-          original_station_oc_approved_by: 2,
-          destination_station_oc_approved_by: 3,
-        },
-        {
-          id: "3",
-          prisoner_name: "Mike Johnson",
-          original_station_name: "East Prison",
-          destination_station_name: "West Prison",
-          reason_name: "Court Appearance",
-          status_name: "Pending",
-          in_charge_name: "Officer David Brown",
-          original_oc_approval_status_name: "Under Review",
-          destination_oc_approval_status_name: "Pending",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
-          original_station_oc_acknowledged: false,
-          destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "",
-          destination_station_oc_approved_date: "",
-          prisoner: "3",
-          original_station: "4",
-          destination_station: "5",
-          reason: "2",
-          in_charge: 3,
-          status: "1",
-          original_station_oc_approval_status: "4",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 0,
-          destination_station_oc_approved_by: 0,
-        },
-        {
-          id: "4",
-          prisoner_name: "Sarah Williams",
-          original_station_name: "North Prison",
-          destination_station_name: "Central Prison",
-          reason_name: "Security",
-          status_name: "Rejected",
-          in_charge_name: "Officer Sarah Davis",
-          original_oc_approval_status_name: "Rejected",
-          destination_oc_approval_status_name: "N/A",
-          bulk_transfer: false,
-          number_of_prisoners: 1,
-          original_station_oc_acknowledged: true,
-          destination_station_oc_acknowledged: false,
-          original_station_oc_approved_date: "2025-10-30T11:00:00Z",
-          destination_station_oc_approved_date: "",
-          prisoner: "4",
-          original_station: "2",
-          destination_station: "1",
-          reason: "4",
-          in_charge: 4,
-          status: "3",
-          original_station_oc_approval_status: "3",
-          destination_station_oc_approval_status: "1",
-          original_station_oc_approved_by: 4,
-          destination_station_oc_approved_by: 0,
-        },
-      ];
-      setRequests(mockRequests);
+  async function loadRequests(opts: any = {}) {
+    setLoading(true);
+    setError(null);
+    const controller = new AbortController();
+    try {
+      const res = await fetchTransferRequests({
+        search: opts.search ?? searchTerm,
+        original_station: opts.original_station ?? (globalStation !== "all" ? globalStation : undefined),
+        status: selectedStatus !== "all" ? selectedStatus : undefined,
+        reason: selectedReason !== "all" ? selectedReason : undefined,
+        transfer_type: transferType !== "all" ? transferType : undefined,
+        date_from: dateFrom || undefined,
+        date_to: dateTo || undefined,
+        page_size: 1000,
+      }, controller.signal);
+      setRequests(res.items || []);
+      setFilteredRequests(res.items || []);
+    } catch (err: any) {
+      setError(err?.message || "Failed to load transfer requests");
+    } finally {
+      setLoading(false);
+      controller.abort();
     }
+  }
+
+  useEffect(() => {
+    // load lookups
+    const c = new AbortController();
+    fetchStations(c.signal).then(setStations).catch(() => {});
+    fetchReasons(c.signal).then(setReasons).catch(() => {});
+    fetchStatuses(c.signal).then(setStatuses).catch(() => {});
+    return () => c.abort();
   }, []);
 
-  // Filter requests based on search and filters
   useEffect(() => {
-    let filtered = [...requests];
+    loadRequests();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    // Search filter
+  // client-side filters (applied on top of API results for local UI)
+  useEffect(() => {
+    let out = [...requests];
     if (searchTerm) {
-      filtered = filtered.filter(
-        (request) =>
-          request.prisoner_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          request.in_charge_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          request.original_station_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase()) ||
-          request.destination_station_name
-            ?.toLowerCase()
-            .includes(searchTerm.toLowerCase())
+      const q = searchTerm.toLowerCase();
+      out = out.filter((r) =>
+        (r.prisoner_name ?? "").toLowerCase().includes(q) ||
+        (r.in_charge_name ?? "").toLowerCase().includes(q) ||
+        (r.original_station_name ?? "").toLowerCase().includes(q) ||
+        (r.destination_station_name ?? "").toLowerCase().includes(q)
       );
     }
-
-    // Station filter
-    if (selectedStation !== "all") {
-      filtered = filtered.filter(
-        (request) =>
-          request.original_station === selectedStation ||
-          request.destination_station === selectedStation
-      );
+    if (globalStation && globalStation !== "all") {
+      out = out.filter((r) => r.original_station === globalStation || r.destination_station === globalStation);
     }
-
-    // Status filter
-    if (selectedStatus !== "all") {
-      filtered = filtered.filter(
-        (request) => request.status === selectedStatus
-      );
-    }
-
-    // Reason filter
-    if (selectedReason !== "all") {
-      filtered = filtered.filter(
-        (request) => request.reason === selectedReason
-      );
-    }
-
-    // approval status filter removed
-
-    // Transfer type filter
-    if (transferType === "bulk") {
-      filtered = filtered.filter((request) => request.bulk_transfer === true);
-    } else if (transferType === "single") {
-      filtered = filtered.filter((request) => request.bulk_transfer === false);
-    }
-
-    // Date range filter
+    if (selectedStatus !== "all") out = out.filter((r) => r.status === selectedStatus);
+    if (selectedReason !== "all") out = out.filter((r) => r.reason === selectedReason);
+    if (transferType === "bulk") out = out.filter((r) => r.bulk_transfer === true);
+    if (transferType === "single") out = out.filter((r) => r.bulk_transfer === false);
+    // date filters (keep existing original/destination approved date semantics)
     if (dateFrom) {
-      filtered = filtered.filter(
-        (request) =>
-          (request.original_station_oc_approved_date &&
-            new Date(request.original_station_oc_approved_date) >=
-              new Date(dateFrom + "T00:00:00Z")) ||
-          (request.destination_station_oc_approved_date &&
-            new Date(request.destination_station_oc_approved_date) >=
-              new Date(dateFrom + "T00:00:00Z"))
+      out = out.filter(
+        (r) =>
+          (r.original_station_oc_approved_date && new Date(r.original_station_oc_approved_date) >= new Date(dateFrom + "T00:00:00Z")) ||
+          (r.destination_station_oc_approved_date && new Date(r.destination_station_oc_approved_date) >= new Date(dateFrom + "T00:00:00Z"))
       );
     }
-
     if (dateTo) {
-      filtered = filtered.filter(
-        (request) =>
-          (request.original_station_oc_approved_date &&
-            new Date(request.original_station_oc_approved_date) <=
-              new Date(dateTo + "T23:59:59Z")) ||
-          (request.destination_station_oc_approved_date &&
-            new Date(request.destination_station_oc_approved_date) <=
-              new Date(dateTo + "T23:59:59Z"))
+      out = out.filter(
+        (r) =>
+          (r.original_station_oc_approved_date && new Date(r.original_station_oc_approved_date) <= new Date(dateTo + "T23:59:59Z")) ||
+          (r.destination_station_oc_approved_date && new Date(r.destination_station_oc_approved_date) <= new Date(dateTo + "T23:59:59Z"))
       );
     }
+    setFilteredRequests(out);
+  }, [requests, searchTerm, globalStation, selectedStatus, selectedReason, transferType, dateFrom, dateTo]);
 
-    setFilteredRequests(filtered);
-  }, [
-    requests,
-    searchTerm,
-    selectedStation,
-    selectedStatus,
-    selectedReason,
-    transferType,
-    dateFrom,
-    dateTo,
-  ]);
+  // debounced search handler (trigger API)
+  useEffect(() => {
+    if (searchRef.current) window.clearTimeout(searchRef.current);
+    searchRef.current = window.setTimeout(() => {
+      loadRequests({ search: searchTerm, original_station: globalStation !== "all" ? globalStation : undefined });
+    }, 450);
+    return () => {
+      if (searchRef.current) window.clearTimeout(searchRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchTerm, globalStation]);
 
-  const handleAddRequest = () => {
-    setEditingRequest(null);
-    setIsDialogOpen(true);
+  const handleDelete = (request?: TransferRequest | null) => {
+    setToDeleteRequest(request ?? null);
+    setConfirmOpen(true);
   };
 
-  const handleEditRequest = (request: TransferRequest) => {
-    setEditingRequest(request);
-    setIsDialogOpen(true);
-  };
-
-  const handleDeleteClick = (id: string) => {
-    setRequestToDelete(id);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!requestToDelete) return;
-
+  const confirmDelete = async () => {
+    const id = toDeleteRequest?.id;
+    if (!id) return;
     try {
-      // API call would go here
-      // await fetch(`/api/transfer-management/requests/${requestToDelete}/`, {
-      //   method: 'DELETE',
-      // });
-
-      setRequests(requests.filter((r) => r.id !== requestToDelete));
-      toast.success("Transfer request deleted successfully");
-    } catch (error) {
-      toast.error("Failed to delete transfer request");
+      await deleteTransferRequest(id);
+      setRequests((s) => s.filter((r) => r.id !== id));
+      setFilteredRequests((s) => s.filter((r) => r.id !== id));
+      (toast as any)?.success?.("Transfer request deleted");
+    } catch (err) {
+      (toast as any)?.error?.("Failed to delete transfer request");
     } finally {
-      setDeleteDialogOpen(false);
-      setRequestToDelete(null);
+      setConfirmOpen(false);
+      setToDeleteRequest(null);
     }
   };
 
-  const handleSaveRequest = (requestData: TransferRequest) => {
-    if (editingRequest) {
-      // Update existing request
-      setRequests(
-        requests.map((r) =>
-          r.id === editingRequest.id
-            ? {
-                ...requestData,
-                id: editingRequest.id,
-                prisoner_name: requestData.bulk_transfer
-                  ? ""
-                  : prisoners.find((p) => p.id === requestData.prisoner)
-                      ?.name || "",
-                original_station_name:
-                  stations.find((s) => s.id === requestData.original_station)
-                    ?.name || "",
-                destination_station_name:
-                  stations.find((s) => s.id === requestData.destination_station)
-                    ?.name || "",
-                reason_name:
-                  reasons.find((r) => r.id === requestData.reason)?.name || "",
-                status_name:
-                  statuses.find((s) => s.id === requestData.status)?.name || "",
-                in_charge_name:
-                  staff.find((s) => s.id === requestData.in_charge)?.name || "",
-                // OC approval fields removed
-              }
-            : r
-        )
-      );
-    } else {
-      // Add new request
-      const newRequest = {
-        ...requestData,
-        id: Date.now().toString(),
-        prisoner_name: requestData.bulk_transfer
-          ? ""
-          : prisoners.find((p) => p.id === requestData.prisoner)?.name || "",
-        original_station_name:
-          stations.find((s) => s.id === requestData.original_station)?.name ||
-          "",
-        destination_station_name:
-          stations.find((s) => s.id === requestData.destination_station)
-            ?.name || "",
-        reason_name:
-          reasons.find((r) => r.id === requestData.reason)?.name || "",
-        status_name:
-          statuses.find((s) => s.id === requestData.status)?.name || "",
-        in_charge_name:
-          staff.find((s) => s.id === requestData.in_charge)?.name || "",
-        // OC approval fields removed
-      };
-      setRequests([...requests, newRequest]);
-    }
-    setIsDialogOpen(false);
+  // called when user clicks edit button in a row
+  const handleEditRequest = (item: any) => {
+    setEditingRequest(item);
+    setIsFormOpen(true);
   };
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return "-";
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
-  };
+  // called when user clicks view button in a row
+  const handleViewRequest = (item: TransferRequest) => {
+    setViewRequest(item);
+    setIsViewOpen(true);
+  };  
 
-  const getStatusBadgeVariant = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "completed":
-      case "approved":
-        return "default";
-      case "in progress":
-      case "under review":
-        return "secondary";
-      case "pending":
-        return "outline";
-      case "rejected":
-        return "destructive";
-      default:
-        return "outline";
-    }
-  };
+  // reload list when a transfer is created elsewhere (TransferRequestForm dispatches this)
+  useEffect(() => {
+    const reload = () => {
+      // reuse existing loader
+      loadRequests();
+    };
+    const onCreated = () => reload();
+    const onUpdated = () => reload();
+    window.addEventListener("transfer:created", onCreated as EventListener);
+    window.addEventListener("transfer:updated", onUpdated as EventListener);
+    return () => {
+      window.removeEventListener("transfer:created", onCreated as EventListener);
+      window.removeEventListener("transfer:updated", onUpdated as EventListener);
+    };
+  }, []);
 
-  const clearFilters = () => {
-    setSearchTerm("");
-    setSelectedStation("all");
-    setSelectedStatus("all");
-    setSelectedReason("all");
-    setTransferType("all");
-    setDateFrom("");
-    setDateTo("");
-  };
+  const columns: DataColumn<any>[] = [
+    {
+      key: "type",
+      header: "Type",
+      render: (r) => r.bulk_transfer ? (<Badge className="bg-purple-600 flex items-center gap-1 w-fit"><Users className="h-3 w-3" />Bulk</Badge>) : (<Badge variant="outline" className="flex items-center gap-1 w-fit"><User className="h-3 w-3" />Single</Badge>),
+      accessor: (r) => (r.bulk_transfer ? "bulk" : "single"),
+      sortable: true,
+    },
+    {
+      key: "prisoners",
+      header: "Prisoner(s)",
+      render: (r) => r.bulk_transfer ? (<div className="flex items-center gap-2"><Users className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.number_of_prisoners} prisoners</span></div>) : (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.prisoner_name}</span></div>),
+      accessor: (r) => r.prisoner_name ?? "",
+    },
+    {
+      key: "fromto",
+      header: "From → To",
+      render: (r) => (<div className="flex items-center gap-2"><Building2 className="h-4 w-4 text-gray-400" /><div className="text-sm"><div>{r.original_station_name}</div><div className="flex items-center gap-1 text-gray-500"><ArrowRightLeft className="h-3 w-3" />{r.destination_station_name}</div></div></div>),
+      accessor: (r) => `${r.original_station_name ?? ""}->${r.destination_station_name ?? ""}`,
+      sortable: true,
+    },
+    {
+      key: "reason",
+      header: "Reason",
+      render: (r) => <Badge variant="outline">{r.reason_name}</Badge>,
+      accessor: (r) => r.reason_name ?? "",
+    },
+    {
+      key: "in_charge",
+      header: "In Charge",
+      render: (r) => (<div className="flex items-center gap-2"><User className="h-4 w-4 text-gray-400" /><span className="text-sm">{r.in_charge_name}</span></div>),
+      accessor: (r) => r.in_charge_name ?? "",
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (r) => (<Badge variant={getStatusBadgeVariant(r.status_name || "")}>{r.status_name}</Badge>),
+      accessor: (r) => r.status_name ?? "",
+      sortable: true,
+    },
+    {
+      key: "actions",
+      header: "Actions",
+      render: (r) => (
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" onClick={() => handleViewRequest(r)}><Eye className="h-4 w-4" /></Button>
+          <Button size="sm" variant="outline" onClick={() => handleEditRequest(r)}><Edit className="h-4 w-4" /></Button>
+          <Button size="sm" variant="destructive" onClick={() => handleDelete(r)}><Trash2 className="h-4 w-4" /></Button>
+        </div>
+      ),
+      accessor: () => "",
+    },
+  ];
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header & filters (keep layout, wire globalStation display) */}
       <Card>
         <CardHeader className="border-b bg-gray-50">
           <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2 text-[#650000]">
-              <FileText className="h-6 w-6" />
-              Transfer Requests
-            </CardTitle>
+            <CardTitle className="flex items-center gap-2 text-[#650000]"><FileText className="h-6 w-6" />Transfer Requests</CardTitle>
             <Button
-              onClick={handleAddRequest}
-              className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
-            >
-              <Plus className="h-4 w-4" />
-              Add Transfer Request
-            </Button>
+  onClick={() => {
+    setEditingRequest(null); // ensure create mode
+    setIsFormOpen(true);
+  }}
+  className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
+>
+  <Plus className="h-4 w-4" />Add Transfer Request
+</Button>
           </div>
         </CardHeader>
-
         <CardContent className="p-6">
-          {/* Filters */}
           <div className="space-y-4">
             <div className="flex items-center gap-2 mb-4">
               <Filter className="h-4 w-4 text-gray-500" />
               <span className="text-sm text-gray-600">Filter Requests</span>
-              {(searchTerm ||
-                selectedStation !== "all" ||
-                selectedStatus !== "all" ||
-                selectedReason !== "all" ||
-                transferType !== "all" ||
-                dateFrom ||
-                dateTo) && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={clearFilters}
-                  className="text-[#650000] hover:text-[#4a0000]"
-                >
-                  Clear Filters
-                </Button>
+              {(searchTerm || globalStation !== "all" || selectedStatus !== "all" || selectedReason !== "all" || transferType !== "all" || dateFrom || dateTo) && (
+                <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setGlobalStation("all"); setSelectedStatus("all"); setSelectedReason("all"); setTransferType("all"); setDateFrom(""); setDateTo(""); }} className="text-[#650000] hover:text-[#4a0000]">Clear Filters</Button>
               )}
             </div>
 
-            {/* Search Bar */}
-            <div className="flex items-center gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 items-center gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by prisoner name, officer, or station..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
+                <Input placeholder="Search by prisoner name, officer, or station..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+              </div>
+              {/* <div className="px-2">
+                <span className="text-sm text-gray-700">Station: {globalStation === "all" ? "All Stations" : stations.find(s => s.id === globalStation)?.name ?? "Unknown"}</span>
+              </div> */}
+
+              {/* Date filters */}
+              <div className="px-2 flex gap-2">
+                <Input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
               </div>
             </div>
 
-            {/* Filter Dropdowns */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <Select value={selectedStation} onValueChange={setSelectedStation}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Stations" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Stations</SelectItem>
-                  {stations.map((station) => (
-                    <SelectItem key={station.id} value={station.id}>
-                      {station.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedStatus} onValueChange={setSelectedStatus}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Statuses" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Statuses</SelectItem>
-                  {statuses.map((status) => (
-                    <SelectItem key={status.id} value={status.id}>
-                      {status.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Select value={selectedReason} onValueChange={setSelectedReason}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Reasons" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Reasons</SelectItem>
-                  {reasons.map((reason) => (
-                    <SelectItem key={reason.id} value={reason.id}>
-                      {reason.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              {/* Approval Status filter removed */}
-            </div>
-
-            {/* Additional Filters Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <SearchableSelect
+                value={selectedStatus}
+                onChange={(v) => setSelectedStatus(v ?? "all")}
+                items={[{ id: "all", name: "All Statuses" }, ...statuses]}
+                idField="id"
+                labelField="name"
+                placeholder="All Statuses"
+              />
+
+              <SearchableSelect
+                value={selectedReason}
+                onChange={(v) => setSelectedReason(v ?? "all")}
+                items={[{ id: "all", name: "All Reasons" }, ...reasons]}
+                idField="id"
+                labelField="name"
+                placeholder="All Reasons"
+              />
+
               <Select value={transferType} onValueChange={setTransferType}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Transfer Type" />
-                </SelectTrigger>
+                <SelectTrigger><SelectValue placeholder="Transfer Type" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Types</SelectItem>
                   <SelectItem value="single">Single Transfer</SelectItem>
@@ -597,169 +382,96 @@ export default function TransferRequestList({
                 </SelectContent>
               </Select>
 
-              <Input
-                type="date"
-                value={dateFrom}
-                onChange={(e) => setDateFrom(e.target.value)}
-                placeholder="From Date"
-              />
-
-              <Input
-                type="date"
-                value={dateTo}
-                onChange={(e) => setDateTo(e.target.value)}
-                placeholder="To Date"
-              />
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Requests Table */}
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow style={{ backgroundColor: '#650000' }}>
-                <TableHead className="text-white">Type</TableHead>
-                <TableHead className="text-white">Prisoner(s)</TableHead>
-                <TableHead className="text-white">From → To</TableHead>
-                <TableHead className="text-white">Reason</TableHead>
-                <TableHead className="text-white">In Charge</TableHead>
-                <TableHead className="text-white">Status</TableHead>
-                {/* OC Approvals column removed */}
-                <TableHead className="text-white">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRequests.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={8}
-                    className="text-center py-8 text-gray-500"
-                  >
-                    No transfer requests found
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredRequests.map((request) => (
-                  <TableRow key={request.id}>
-                    <TableCell>
-                      {request.bulk_transfer ? (
-                        <Badge className="bg-purple-600 flex items-center gap-1 w-fit">
-                          <Users className="h-3 w-3" />
-                          Bulk
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline" className="flex items-center gap-1 w-fit">
-                          <User className="h-3 w-3" />
-                          Single
-                        </Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {request.bulk_transfer ? (
-                        <div className="flex items-center gap-2">
-                          <Users className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">
-                            {request.number_of_prisoners} prisoners
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-gray-400" />
-                          <span className="text-sm">{request.prisoner_name}</span>
-                        </div>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Building2 className="h-4 w-4 text-gray-400" />
-                        <div className="text-sm">
-                          <div>{request.original_station_name}</div>
-                          <div className="flex items-center gap-1 text-gray-500">
-                            <ArrowRightLeft className="h-3 w-3" />
-                            {request.destination_station_name}
-                          </div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline">{request.reason_name}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <User className="h-4 w-4 text-gray-400" />
-                        <span className="text-sm">{request.in_charge_name}</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={getStatusBadgeVariant(request.status_name || "")}>
-                        {request.status_name}
-                      </Badge>
-                    </TableCell>
+      <Card className="my-5">
+        <CardContent className="m-5">
+          {/* <DataTable columns={columns} data={filteredRequests} pageSize={10} /> */}
 
-                     {/* OC Approvals cell removed */}
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditRequest(request)}
-                        >
-                          <Edit className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="destructive"
-                          onClick={() => handleDeleteClick(request.id!)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+          {/* DataTable */}
+          <DataTable
+            url="/transfer-management/requests/"
+            title="Transfer Requests"
+            columns={columns}
+            data={filteredRequests}
+            config={{
+              search: false,
+              pagination: true,
+              lengthMenu: [10, 25, 50, 100],
+              export: {
+                pdf: true,
+                csv: true,
+                print: true,
+              },
+              summary: true,
+              rowSpacing: 'normal',
+            }}
+          />
         </CardContent>
       </Card>
 
-      {/* Transfer Request Form Dialog */}
       <TransferRequestForm
-        open={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        onSave={handleSaveRequest}
+        open={isFormOpen}
+        onClose={() => {
+          setIsFormOpen(false);
+          setEditingRequest(null); // clear edit state on close
+        }}
+        onSave={async (createdOrUpdated: any) => {
+          await loadRequests();
+          window.dispatchEvent(new CustomEvent("transfer:updated", { detail: createdOrUpdated }));
+          return createdOrUpdated;
+        }}
         editingRequest={editingRequest}
-        prisoners={prisoners}
-        stations={stations}
-        reasons={reasons}
-        statuses={statuses}
-        staff={staff}
+        // pass any initial lookup props if required...
       />
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+      {/* View dialog for a single transfer request (read-only) */}
+      <AlertDialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
+            <AlertDialogTitle>Transfer Request Details</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this transfer request? This action
-              cannot be undone.
+              {viewRequest ? `Request ID: ${viewRequest.id ?? "N/A"}` : ""}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          <div className="grid grid-cols-1 gap-2 py-4">
+            <div><strong>Prisoner:</strong> {viewRequest?.prisoner_name ?? "-"}</div>
+            <div><strong>From → To:</strong> {viewRequest?.original_station_name ?? "-"} → {viewRequest?.destination_station_name ?? "-"}</div>
+            <div><strong>Reason:</strong> {viewRequest?.reason_name ?? "-"}</div>
+            <div><strong>Status:</strong> {viewRequest?.status_name ?? "-"}</div>
+            <div><strong>In Charge:</strong> {viewRequest?.in_charge_name ?? "-"}</div>
+            <div><strong>Type:</strong> {viewRequest?.bulk_transfer ? `Bulk (${viewRequest?.number_of_prisoners ?? 0})` : "Single"}</div>
+            <div><strong>Created:</strong> {viewRequest?.created_datetime ? <DateTime value={viewRequest.created_datetime} /> : "-"}</div>
+            <div><strong>Updated:</strong> {viewRequest?.updated_datetime ? <DateTime value={viewRequest.updated_datetime} /> : "-"}</div>
+          </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteConfirm}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel onClick={() => setIsViewOpen(false)}>Close</AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={setConfirmOpen}
+        title="Delete transfer request"
+        description="This will permanently delete the transfer request."
+        details={
+          <div className="text-sm space-y-1">
+            <div><strong>Request:</strong> {toDeleteRequest?.request_id ?? toDeleteRequest?.id ?? "N/A"}</div>
+            <div>
+              <strong>Type:</strong>{" "}
+              {toDeleteRequest?.bulk_transfer ? `Bulk (${toDeleteRequest?.number_of_prisoners ?? 0} prisoners)` : `Single (${toDeleteRequest?.prisoner_name ?? "-"})`}
+            </div>
+            <div><strong>From → To:</strong> {toDeleteRequest?.original_station_name ?? "-"} → {toDeleteRequest?.destination_station_name ?? "-"}</div>
+          </div>
+        }
+        onConfirm={confirmDelete}
+        confirmLabel="Delete"
+      />
     </div>
   );
 }

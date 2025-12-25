@@ -723,7 +723,7 @@ export default function ShiftDeploymentsScreen() {
               <form onSubmit={handleCreateShift} className="space-y-4 mt-4">
                 {/* Station - Searchable */}
                 <div className="space-y-2">
-                  <Label>Station *</Label>
+                  <Label>Station <span className="text-red-500">*</span></Label>
                   <Popover open={openStationCombo} onOpenChange={setOpenStationCombo}>
                     <PopoverTrigger asChild>
                       <Button
@@ -771,7 +771,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Shift - Searchable */}
                 <div className="space-y-2">
-                  <Label>Shift *</Label>
+                  <Label>Shift <span className="text-red-500">*</span></Label>
                   <Popover open={openShiftCombo} onOpenChange={setOpenShiftCombo}>
                     <PopoverTrigger asChild>
                       <Button
@@ -819,7 +819,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Shift Leader - Searchable */}
                 <div className="space-y-2">
-                  <Label>Shift Leader *</Label>
+                  <Label>Shift Leader <span className="text-red-500">*</span></Label>
                   <Popover open={openShiftLeaderCombo} onOpenChange={setOpenShiftLeaderCombo}>
                     <PopoverTrigger asChild>
                       <Button
@@ -937,7 +937,7 @@ export default function ShiftDeploymentsScreen() {
               <form onSubmit={handleAddStaffToShift} className="space-y-4 mt-4">
                 {/* Station - Defaults to selected station */}
                 <div className="space-y-2">
-                  <Label>Station *</Label>
+                  <Label>Station <span className="text-red-500">*</span></Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -985,7 +985,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Shift - Searchable */}
                 <div className="space-y-2">
-                  <Label>Shift *</Label>
+                  <Label>Shift <span className="text-red-500">*</span></Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -1031,7 +1031,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Staff - Searchable */}
                 <div className="space-y-2">
-                  <Label>Staff Member *</Label>
+                  <Label>Staff Member <span className="text-red-500">*</span></Label>
                   <Popover open={openStaffCombo} onOpenChange={setOpenStaffCombo}>
                     <PopoverTrigger asChild>
                       <Button
@@ -1079,7 +1079,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Deployment Area - Searchable */}
                 <div className="space-y-2">
-                  <Label>Deployment Area *</Label>
+                  <Label>Deployment Area <span className="text-red-500">*</span></Label>
                   <Popover open={openDeploymentAreaCombo} onOpenChange={setOpenDeploymentAreaCombo}>
                     <PopoverTrigger asChild>
                       <Button
@@ -1127,7 +1127,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* Shift Date */}
                 <div className="space-y-2">
-                  <Label>Shift Date *</Label>
+                  <Label>Shift Date <span className="text-red-500">*</span></Label>
                   <Popover open={shiftDateOpen} onOpenChange={setShiftDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
@@ -1163,7 +1163,7 @@ export default function ShiftDeploymentsScreen() {
 
                 {/* End Date */}
                 <div className="space-y-2">
-                  <Label>End Date *</Label>
+                  <Label>End Date <span className="text-red-500">*</span></Label>
                   <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                     <PopoverTrigger asChild>
                       <Button

@@ -27,16 +27,16 @@ function PrisonerListScreen() {
   // Define table columns
   const columns: DataTableColumn[] = [
     {
-      key: 'prison_number',
+      key: 'prisoner_number_value',
       label: 'Prison Number',
       sortable: true,
-      filterable: true,
+      filterable: false,
     },
     {
       key: 'full_name',
       label: 'Full Name',
       sortable: true,
-      filterable: true,
+      filterable: false,
     },
     {
       key: 'avg_security_rating',
@@ -45,25 +45,16 @@ function PrisonerListScreen() {
       render: (value) => getSecurityRatingBadge(value as number),
     },
     {
-      key: 'is_active',
-      label: 'Status',
+      key: 'current_station_name',
+      label: 'Station',
       sortable: true,
-      filterable: true,
-      render: (value) =>
-        value ? (
-          <Badge variant="default" className="gap-1">
-            <span className="h-2 w-2 rounded-full bg-green-500" />
-            Active
-          </Badge>
-        ) : (
-          <Badge variant="secondary">Inactive</Badge>
-        ),
+      filterable: false,
     },
     {
       key: 'habitual',
       label: 'Habitual',
       sortable: true,
-      filterable: true,
+      filterable: false,
       render: (value) =>
         value ? (
           <Badge variant="secondary" className="gap-1">
@@ -78,7 +69,7 @@ function PrisonerListScreen() {
       key: 'is_dangerous',
       label: 'Dangerous',
       sortable: true,
-      filterable: true,
+      filterable: false,
       render: (value) =>
         value ? (
           <Badge variant="destructive" className="gap-1">
@@ -146,7 +137,7 @@ function PrisonerListScreen() {
             print: true,
           },
           summary: true,
-          rowSpacing: 'normal',
+          rowSpacing: 'compact',
         }}
       />
     </div>

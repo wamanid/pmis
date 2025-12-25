@@ -14,7 +14,7 @@ import { DataTable } from '../common/DataTable';
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Plus, Search, Calendar as CalendarIcon, Clock, MapPin, Users, User } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Switch } from '../ui/switch';
 
 // validation utils
@@ -43,30 +43,6 @@ import ConfirmDialog from "../common/ConfirmDialog";
 const MANUAL_LOCKUP_API_BASE = "/station-management/api/manual-lockups";
 const MANUAL_LOCKUP_API = (id?: string) => id ? `${MANUAL_LOCKUP_API_BASE}/${id}/` : `${MANUAL_LOCKUP_API_BASE}/`;
 
-// Mock data for foreign key references
-// const mockStations = [
-//   { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
-//   { id: '550e8400-e29b-41d4-a716-446655440002', name: 'East Wing Station' },
-//   { id: '550e8400-e29b-41d4-a716-446655440003', name: 'West Wing Station' },
-// ];
-
-// const mockLockupTypes = [
-//   { id: '660e8400-e29b-41d4-a716-446655440001', name: 'Morning Lockup' },
-//   { id: '660e8400-e29b-41d4-a716-446655440002', name: 'Middayz Lockup' },
-//   { id: '660e8400-e29b-41d4-a716-446655440003', name: 'Evening Lockup' },
-// ];
-
-// const mockPrisonerCategories = [
-//   { id: '770e8400-e29b-41d4-a716-446655440001', name: 'Convict' },
-//   { id: '770e8400-e29b-41d4-a716-446655440002', name: 'Remand' },
-//   { id: '770e8400-e29b-41d4-a716-446655440003', name: 'Civil Debtor' },
-//   { id: '770e8400-e29b-41d4-a716-446655440004', name: 'Awaiting Trial' },
-// ];
-
-// const mockSexOptions = [
-//   { id: '880e8400-e29b-41d4-a716-446655440001', name: 'Male' },
-//   { id: '880e8400-e29b-41d4-a716-446655440002', name: 'Female' },
-// ];
 
 interface ManualLockup {
   id: string;
@@ -83,18 +59,15 @@ interface ManualLockup {
 
 export function ManualLockupScreen() {
   const { region, district, station } = useFilters();
-  const abortRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
-  const searchDebounceRef = useRef<number | null>(null);
-
+  // small local cache used for stats / summary view (not the DataTable)
   const [lockups, setLockups] = useState<ManualLockUpItem[]>([]);
-  const [tableData, setTableData] = useState<ManualLockUpItem[]>([]);
-  const [tableLoading, setTableLoading] = useState(true);
-  const [total, setTotal] = useState(0);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  // header search (kept to drive summary/local filtering)
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
+  // bump to force DataTable remount/refetch when global filters change
+  const [filtersReloadKey, setFiltersReloadKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [stationDataLoading, setStationDataLoading] = useState(true);
@@ -102,8 +75,59 @@ export function ManualLockupScreen() {
   const [stations, setStations] = useState<any[]>([])
   const [lockTypes, setLockTypes] = useState<any[]>([])
   const [sexes, setSexes] = useState<any[]>([])
+  const [locations, setLocations] = useState<any[]>([]) // <-- new
   const [prisonerCategories, setPrisonerCategories] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<"table-form"|"table-view"|"records">("table-form");
+ 
+  // load lookup data (stations, lock types, categories, sexes, locations)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        setStationDataLoading(true);
+        const [stationsRes, lockTypesRes, categoriesRes, sexesRes, locationsRes] = await Promise.all([
+          getStation(),
+          getLockType(),
+          getPrisonerCategories(),
+          getSexes(),
+          axiosInstance.get("/system-administration/locations/"),
+        ]);
+        if (!mounted) return;
+        setStations(stationsRes?.results ?? stationsRes ?? []);
+        setLockTypes(lockTypesRes?.results ?? lockTypesRes ?? []);
+        setPrisonerCategories(categoriesRes?.results ?? categoriesRes ?? []);
+        setSexes(sexesRes?.results ?? sexesRes ?? []);
+        const locPayload = locationsRes?.data ?? locationsRes ?? {};
+        setLocations(locPayload?.results ?? locPayload ?? []);
+      } catch (err) {
+        console.error('load lookups error', err);
+        toast.error('Failed to load lookup data (stations/types/categories/locations).');
+      } finally {
+        if (mounted) setStationDataLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // lightweight fetch for summary/stats/ManualLockupTableView (not the paginated DataTable)
+  const fetchLockupsForSummary = useCallback(async () => {
+    try {
+      const params: any = { page: 1, page_size: 1000 };
+      if (region) params.region = region;
+      if (district) params.district = district;
+      if (station) params.station = station;
+      // use canonical API helper so path matches other calls and avoids typos
+      const resp = await axiosInstance.get(MANUAL_LOCKUP_API(), { params });
+      const payload = resp?.data ?? resp ?? {};
+      const items = payload?.results ?? payload ?? [];
+      setLockups(Array.isArray(items) ? items : []);
+      setRecordsListLoading(false);
+    } catch (err) {
+      console.error("fetchLockupsForSummary error", err);
+      setLockups([]);
+      setRecordsListLoading(false);
+    }
+  }, [region, district, station]);
 
   // load table from API (used by initial load, pagination, search, filters, and after saves)
   const loadTable = useCallback(async (p = 1, ps = pageSize, q = '') => {
@@ -150,12 +174,14 @@ export function ManualLockupScreen() {
     }
   }, [pageSize]);
 
-  // Callback to handle records created from the table form (refresh server page 1)
-  const handleRecordsCreated = useCallback(async (records: ManualLockup[]) => {
+  // Callback to handle records created from the table form:
+  // - update local summary cache so stats & summary view reflect immediately
+  // - bump the DataTable reload key to force the table to refetch its current page
+  const handleRecordsCreated = useCallback((records: ManualLockup[]) => {
     setLockups(prev => [...records, ...prev]);
-    await loadTable(1, pageSize, debouncedSearch);
     setPage(1);
-  }, [loadTable, pageSize, debouncedSearch]);
+    setFiltersReloadKey(k => k + 1);
+  }, []);
 
   // react-hook-form for the modal form (so we can reuse requiredValidation helpers)
   const form = useForm({
@@ -217,8 +243,9 @@ export function ManualLockupScreen() {
         return;
       }
 
-      // reload server-backed table (keeps both recordlist & table-view in sync)
-      await loadTable(page, pageSize, debouncedSearch);
+      // trigger table refetch + refresh summary cache (no manual loadTable call)
+      setFiltersReloadKey(k => k + 1);
+      fetchLockupsForSummary();
       toast.success(values.id ? 'Manual lockup record updated' : 'Manual lockup record added successfully');
       setDialogOpen(false);
       reset(); // reset to default values (clears id too)
@@ -262,6 +289,16 @@ export function ManualLockupScreen() {
     const plainId = typeof id === 'string' ? id : (id?.id ?? id);
     const found = sexes.find((s) => String(s.id) === String(plainId));
     return found?.name ?? String((id as any)?.sex_name ?? plainId ?? 'Unknown');
+  };
+
+  // add this helper so table renderers can use readable classes
+  const getLocationBadgeColor = (loc: string | undefined | null) => {
+    const key = String(loc ?? '').toLowerCase();
+    if (key.includes('court')) return 'bg-yellow-100 text-yellow-800';
+    if (key.includes('labour')) return 'bg-blue-100 text-blue-800';
+    if (key.includes('station')) return 'bg-green-100 text-green-800';
+    // fallback neutral
+    return 'bg-gray-100 text-gray-800';
   };
 
   // edit / delete state & handlers (required by table actions and ConfirmDialog)
@@ -352,7 +389,9 @@ export function ManualLockupScreen() {
     try {
       await axiosInstance.delete(MANUAL_LOCKUP_API(idToDelete));
       toast.success('Record deleted');
-      await loadTable(page, pageSize, debouncedSearch);
+      // trigger refetch and refresh summary without calling removed loader
+      setFiltersReloadKey(k => k + 1);
+      fetchLockupsForSummary();
     } catch (err: any) {
       console.error('delete error', err);
       if (err?.response?.status === 404) {
@@ -384,100 +423,49 @@ export function ManualLockupScreen() {
     });
   }, [dialogOpen, stationDataLoading, reset]);
 
-  // Debug: log a sample item and available fields so we can identify the correct delete URL field
+  // Debug: log a sample item and available fields in the summary cache
   useEffect(() => {
-    if (tableData && tableData.length) {
-      console.debug('ManualLockupScreen: sample tableData[0]', tableData[0]);
+    if (lockups && lockups.length) {
+      console.debug('ManualLockupScreen: sample lockups[0]', lockups[0]);
     }
-  }, [tableData]);
+  }, [lockups]);
 
-  // Server-side search only: we no longer filter client-side.
-  // DataTable will show tableData (server page) and total (server count).
-  // Ensure helpers still work for renderers that show names.
-  const filteredLockups = lockups.filter(lockup => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      getStationName(lockup.station).toLowerCase().includes(searchLower) ||
-      getTypeName(lockup.type).toLowerCase().includes(searchLower) ||
-      getCategoryName(lockup.prisoner_category).toLowerCase().includes(searchLower) ||
-      lockup.location.toLowerCase().includes(searchLower) ||
-      lockup.date.includes(searchLower)
-    );
-  });
-  // use tableData (server results) as source for client-side filtering when user searches
-  const displayedData = (() => {
+  // client-side summary filtering for the small cache (used in stats and summary view)
+  const displayedSummary = (() => {
     const q = (debouncedSearch ?? "").trim().toLowerCase();
-    if (!q) return tableData;
-    return tableData.filter((item) => {
+    if (!q) return lockups;
+    return lockups.filter((item) => {
       return (
         String(getStationName(item.station)).toLowerCase().includes(q) ||
         String(getTypeName(item.type)).toLowerCase().includes(q) ||
         String(getCategoryName(item.prisoner_category)).toLowerCase().includes(q) ||
-        String(item.location ?? "").toLowerCase().includes(q) ||
+        String(item.location_name ?? "").toLowerCase().includes(q) ||
         String(item.date ?? "").toLowerCase().includes(q)
       );
     });
   })();
 
-  const getLocationBadgeColor = (location: string) => {
-    switch (location) {
-      case 'court': return 'bg-blue-100 text-blue-800 hover:bg-blue-100';
-      case 'labour': return 'bg-green-100 text-green-800 hover:bg-green-100';
-      case 'station': return 'bg-purple-100 text-purple-800 hover:bg-purple-100';
-      default: return '';
-    }
-  };
-
+  // debounce searchTerm -> debouncedSearch (simple)
   useEffect(() => {
-    // load lookups whenever the dialog opens (ensures fresh lists) OR on mount
-    const loadLookups = async () => {
-      setStationDataLoading(true);
-      try {
-        const [stnsRes, typesRes, categoriesRes, sexesRes] = await Promise.all([
-          getStation(undefined, undefined),
-          getLockType(undefined, undefined),
-          getPrisonerCategories(undefined, undefined),
-          getSexes(undefined, undefined),
-        ]);
-        if ('error' in stnsRes) throw stnsRes;
-        if ('error' in typesRes) throw typesRes;
-        if ('error' in categoriesRes) throw categoriesRes;
-        if ('error' in sexesRes) throw sexesRes;
-        setStations(stnsRes.results ?? stnsRes ?? []);
-        setLockTypes(typesRes.results ?? typesRes ?? []);
-        setPrisonerCategories(categoriesRes.results ?? categoriesRes ?? []);
-        setSexes(sexesRes.results ?? sexesRes ?? []);
-      } catch (err) {
-        console.error('lookup load error', err);
-        toast.error('Failed to load lookup data');
-      } finally {
-        setStationDataLoading(false);
-      }
-    };
-    loadLookups();
-   }, [dialogOpen]);
-
-  // debounce searchTerm -> debouncedSearch (Journal-style using ref)
-  useEffect(() => {
-    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
-    searchDebounceRef.current = window.setTimeout(() => {
-      setDebouncedSearch(searchTerm);
-    }, 350);
-    return () => {
-      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
-    };
+    const t = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => window.clearTimeout(t);
   }, [searchTerm]);
 
-  // initial load + respond to debouncedSearch
+  // initial load for summary cache
   useEffect(() => {
-    loadTable(1, pageSize, debouncedSearch);
-  }, [loadTable, pageSize, debouncedSearch]);
+    fetchLockupsForSummary();
+  }, [fetchLockupsForSummary]);
 
-  // auto reload when global location filters change (do NOT include local searchTerm)
-  // keep refresh tied to global filters only; local search uses debouncedSearch
-  useFilterRefresh(() => loadTable(1, pageSize, debouncedSearch), [region, district, station, pageSize]);
+  // auto reload summary cache when global filters change (do NOT include local searchTerm)
+  useFilterRefresh(() => {
+    // refresh summary cache
+    fetchLockupsForSummary();
+    // also bump DataTable reload key so paginated table refetches
+    setFiltersReloadKey(k => k + 1);
+  }, [region, district, station, pageSize]);
 
-  if (recordsListLoading && tableData.length === 0) {
+  // show initial skeleton while summary + table haven't loaded
+  if (recordsListLoading && lockups.length === 0) {
     return (
       <div className="size-full flex items-center justify-center">
         <div className="text-center">
@@ -694,24 +682,18 @@ export function ManualLockupScreen() {
                            <SelectValue placeholder="Select location" />
                          </SelectTrigger>
                          <SelectContent>
-                           <SelectItem value="court">
-                             <div className="flex items-center gap-2">
-                               <MapPin className="h-4 w-4" />
-                               Court
-                             </div>
-                           </SelectItem>
-                           <SelectItem value="labour">
-                             <div className="flex items-center gap-2">
-                               <MapPin className="h-4 w-4" />
-                               Labour
-                             </div>
-                           </SelectItem>
-                           <SelectItem value="station">
-                             <div className="flex items-center gap-2">
-                               <MapPin className="h-4 w-4" />
-                               Station
-                             </div>
-                           </SelectItem>
+                            {locations.length === 0 ? (
+                              <div className="p-3 text-sm text-muted-foreground">No locations</div>
+                            ) : (
+                              locations.map((loc: any) => (
+                                <SelectItem key={loc.id} value={String(loc.id)}>
+                                  <div className="flex items-center gap-2">
+                                    <MapPin className="h-4 w-4" />
+                                    {loc.name ?? loc.location_name ?? String(loc.id)}
+                                  </div>
+                                </SelectItem>
+                              ))
+                            )}
                          </SelectContent>
                        </Select>
                        <input type="hidden" {...register("location", { required: "Location is required" })} />
@@ -877,7 +859,7 @@ export function ManualLockupScreen() {
                   <CardTitle>Manual Lockup Records</CardTitle>
                   <CardDescription>View and manage all manual lockup entries</CardDescription>
                 </div>
-                <div className="relative w-full md:w-72">
+                {/* <div className="relative w-full md:w-72">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
                     type="search"
@@ -886,7 +868,7 @@ export function ManualLockupScreen() {
                     autoComplete="off"
                     value={searchTerm}
                     onChange={(e) => {
-                      e.stopPropagation(); // prevent global listeners
+                      e.stopPropagation(); 
                       setSearchTerm(e.target.value);
                       setPage(1);
                     }}
@@ -903,21 +885,21 @@ export function ManualLockupScreen() {
                       }
                     }}
                   />
-                </div>
+                </div> */}
               </div>
             </CardHeader>
             <CardContent>
               <DataTable
-                url="/station-management/api/manual-lockups"
-                data={tableData}
-                loading={tableLoading}
-                total={total}
+                key={`manual-lockups-${filtersReloadKey}-${region ?? ''}-${district ?? ''}-${station ?? ''}`}
+                // include current filters in the URL query so DataTable's internal fetch will include them
+                url={`/station-management/api/manual-lockups?${region ? `region=${encodeURIComponent(region)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${station ? `station=${encodeURIComponent(station)}&` : ''}`}
                 title="Manual Lockups"
                 columns={[
-                  { key: 'is_active', label: 'Status', render: (_v:any, r:any) => <Badge variant={r.is_active ? 'default' : 'secondary'}>{r.is_active ? 'Active' : 'Inactive'}</Badge> },
+                  { key: 'is_active', label: 'Status', render: (_v:any, r:any) => <Badge variant={r?.is_active ? 'default' : 'secondary'}>{r?.is_active ? 'Active' : 'Inactive'}</Badge> },
                   { key: 'date', label: 'Date', sortable: true },
                   { key: 'lockup_time', label: 'Time' },
-                  { key: 'location', label: 'Location', render: (_v:any, r:any) => <Badge className={getLocationBadgeColor(r.location)}>{r.location}</Badge> },
+                  // use location_name (API field) instead of UUID
+                  { key: 'location_name', label: 'Location', render: (_v:any, r:any) => <Badge className={getLocationBadgeColor(r?.location_name ?? r?.location)}>{r?.location_name ?? r?.location ?? 'Unknown'}</Badge> },
                   { key: 'station_name', label: 'Station' },
                   { key: 'type_name', label: 'Type' },
                   { key: 'prisoner_category_name', label: 'Category' },
@@ -938,12 +920,14 @@ export function ManualLockupScreen() {
                     )
                   }
                 ]}
+                // wire the header search into DataTable's search param (keeps UX)
                 externalSearch={searchTerm}
-                // match Journal: update local searchTerm -> debouncedSearch triggers actual reload
                 onSearch={(q) => { setSearchTerm(q); setPage(1); }}
-                onPageChange={(p) => { setPage(p); loadTable(p, pageSize, debouncedSearch); }}
-                onPageSizeChange={(s) => { setPageSize(s); setPage(1); loadTable(1, s, debouncedSearch); }}
-                onSort={(f, d) => { /* implement ordering if API supports */ loadTable(1, pageSize, debouncedSearch); }}
+                onPageChange={(p) => { setPage(p); }}
+                onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                onSort={(f, d) => { /* DataTable will handle ordering if supported */ setPage(1); }}
+                page={page}
+                pageSize={pageSize}
               />
 
               {/* Edit Modal (separate from Add) */}
@@ -980,9 +964,8 @@ export function ManualLockupScreen() {
                         };
                         await axiosInstance.patch(MANUAL_LOCKUP_API(values.id), payload);
                         toast.success('Manual lockup record updated');
-                        await loadTable(page, pageSize, debouncedSearch);
-                        setEditModalOpen(false);
-                        eReset();
+                        setFiltersReloadKey(k => k + 1);
+                        fetchLockupsForSummary();
                       } catch (err: any) {
                         console.error('update error', err);
                         toast.error('Failed to update record');
@@ -1057,6 +1040,7 @@ export function ManualLockupScreen() {
                               </Select>
                             )} />
                           </div>
+
                           <div className="space-y-2">
                             <Label htmlFor="e_prisoner_category">Prisoner Category <span className="text-red-500">*</span></Label>
                             <Controller control={eControl} name="prisoner_category" rules={{ required: true }} render={({ field }) => (
@@ -1073,33 +1057,33 @@ export function ManualLockupScreen() {
                           <Controller control={eControl} name="sex" rules={{ required: true }} render={({ field }) => (
                             <Select value={field.value || ""} onValueChange={(v) => field.onChange(v)}>
                               <SelectTrigger id="e_sex"><SelectValue placeholder="Select sex" /></SelectTrigger>
-                              <SelectContent>{sexes.map((s) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                              <SelectContent>{sexes.map((s) => <SelectItem key={s.id} value={s.id}><div className="flex items-center gap-2"><User className="h-4 w-4" />{s.name}</div></SelectItem>)}</SelectContent>
                             </Select>
                           )} />
                         </div>
 
                         <DialogFooter>
-                          <Button type="button" variant="outline" onClick={() => { setEditModalOpen(false); eReset(); }} disabled={loading}>Cancel</Button>
-                          <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90">{loading ? 'Saving...' : 'Save'}</Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setEditModalOpen(false)}
+                            disabled={loading}
+                          >
+                            Cancel
+                          </Button>
+                          <Button type="submit" disabled={loading} className="bg-primary hover:bg-primary/90">
+                            {loading ? 'Saving...' : 'Save Changes'}
+                          </Button>
                         </DialogFooter>
                       </div>
                     </form>
                   )}
                 </DialogContent>
               </Dialog>
-
-               {/* Inline accessible confirm dialog (replaces ConfirmDialog to avoid missing aria-describedby warnings) */}
-               <ConfirmDialog
-                 open={confirmOpen}
-                 onOpenChange={setConfirmOpen}
-                 title="Delete lockup record"
-                 description={confirmDescription || "Are you sure you want to delete this lockup record? This action cannot be undone."}
-                 onConfirm={handleConfirmDelete}
-               />
-              </CardContent>
-            </Card>
-           </TabsContent>
-       </Tabs>
-     </div>
-   );
- }
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}

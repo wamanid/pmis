@@ -6,8 +6,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
-// import { toast } from 'sonner@2.0.3';
-import { toast } from 'sonner';
+import { toast } from 'sonner@2.0.3';
 import { 
   Search, 
   User, 
@@ -20,8 +19,9 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import { getPrisoners } from '../../services/admission';
+import { getPrisoners } from '../../services/admission/prisonerService';
 import { Prisoner, PrisonerFilters } from '../../models/admission';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 interface PrisonerSearchScreenProps {
   value?: string; // Selected prisoner ID
@@ -51,7 +51,7 @@ export default function PrisonerSearchScreen({
   const [searchQuery, setSearchQuery] = useState('');
 
   // Load prisoner data from API with debounce
-  useEffect(() => {
+  useFilterRefresh(() => {
     const loadPrisoners = async () => {
       setIsLoading(true);
       try {

@@ -360,7 +360,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
             <div className="p-4">
               <h3 className="mb-4" style={{color: '#650000'}}>Prisoner Information</h3>
               <div className="space-y-2">
-                <Label htmlFor="prisoner">Prisoner *</Label>
+                <Label htmlFor="prisoner">Prisoner <span className="text-red-500">*</span></Label>
                 <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
                   <PopoverTrigger asChild>
                     <Button

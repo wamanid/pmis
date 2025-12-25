@@ -1,15 +1,15 @@
-import { useEffect } from "react";
-import { useForm, Controller } from "react-hook-form@7.55.0";
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
 import {
   FileText,
   Calendar,
   User,
   Building2,
   Users,
-  CheckCircle2,
   X,
   Save,
 } from "lucide-react";
+
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -18,6 +18,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription,
 } from "../ui/dialog";
 import {
   Select,
@@ -27,7 +28,17 @@ import {
   SelectValue,
 } from "../ui/select";
 import { Checkbox } from "../ui/checkbox";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
+
+import { fetchStations, fetchReasons, fetchStatuses } from "../../services/transferServices/transferRequestService";
+import { createTransferRequest, updateTransferRequest } from "../../services/transferServices/transferRequestService";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import SearchableSelect from "../common/SearchableSelect"; // reusable searchable select
+import StaffProfileSelect from "../common/StaffProfileSelect";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
 
 interface TransferRequest {
   id?: string;
@@ -75,12 +86,12 @@ export default function TransferRequestForm({
   onClose,
   onSave,
   editingRequest,
-  prisoners = [],
-  stations = [],
-  reasons = [],
-  statuses = [],
+  prisoners: prisonersProp = [],
+  stations: stationsProp = [],
+  reasons: reasonsProp = [],
+  statuses: statusesProp = [],
   approvalStatuses = [],
-  staff = [],
+  staff: staffProp = [],
 }: TransferRequestFormProps) {
   const {
     control,
@@ -101,16 +112,40 @@ export default function TransferRequestForm({
       original_station: "",
       destination_station: "",
       reason: "",
-      in_charge: 0,
+      in_charge: "", // <- use empty string (controlled Select expects string)
       status: "",
       original_station_oc_approval_status: "",
       destination_station_oc_approval_status: "",
-      original_station_oc_approved_by: 0,
-      destination_station_oc_approved_by: 0,
+      original_station_oc_approved_by: "",
+      destination_station_oc_approved_by: "",
     },
   });
 
   const isBulkTransfer = watch("bulk_transfer");
+
+  // remove local prisoners/staff usage for selects (we still keep for initial items)
+  const [stations, setStations] = useState<any[]>(stationsProp || []);
+  const [prisoners, setPrisoners] = useState<any[]>(prisonersProp || []);
+  const [reasons, setReasons] = useState<any[]>(reasonsProp || []);
+  const [statuses, setStatuses] = useState<any[]>(statusesProp || []);
+  const [staff, setStaff] = useState<any[]>(staffProp || []);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  // label to display for original station (when single transfer)
+  const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
+
+  // sync with global location filter to pre-filter stations when bulk
+  useFilterRefresh(() => {
+    const station = localStorage.getItem("selectedStation") || undefined;
+    const region = localStorage.getItem("selectedRegion") || undefined;
+    const district = localStorage.getItem("selectedDistrict") || undefined;
+    // when global filter changes, reload stations (only used when bulk)
+    loadStations({
+      station: station && station !== "all" ? station : undefined,
+      region: region && region !== "all" ? region : undefined,
+      district: district && district !== "all" ? district : undefined,
+    });
+  }, []);
 
   useEffect(() => {
     if (editingRequest) {
@@ -163,22 +198,43 @@ export default function TransferRequestForm({
   }, [editingRequest, reset]);
 
   const onSubmit = async (data: TransferRequest) => {
-    try {
-      // API call would go here
-      // const response = await fetch('/api/transfer-management/requests/', {
-      //   method: editingRequest ? 'PUT' : 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(data)
-      // });
+    console.log("Submitting transfer request:", data);
+    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+      toast.error("Original Station and Destination Station must be different");
+      return;
+    }
 
-      onSave({ ...data, id: editingRequest?.id || Date.now().toString() });
-      toast.success(
-        editingRequest
-          ? "Transfer request updated successfully"
-          : "Transfer request created successfully"
-      );
-      handleClose();
-    } catch (error) {
+    try {
+      // If editingRequest exists -> update path (use API)
+      if (editingRequest && editingRequest.id) {
+        // defensive: if the form is actually filled for a new record (no prisoner or id mismatch),
+        // fall back to create. Adjust the check to match your domain if needed.
+        const isLikelyCreate = !editingRequest.prisoner && !!data.prisoner;
+        if (!isLikelyCreate) {
+          // proceed with update
+          const updated = await updateTransferRequest(String(editingRequest.id), data);
+          console.log("updateTransferRequest result:", updated);
+          // notify parent callback and listeners
+          try { if (onSave) await Promise.resolve(onSave(updated)); } catch {}
+          try { window.dispatchEvent(new CustomEvent("transfer:updated", { detail: updated })); } catch {}
+          toast.success("Transfer request updated");
+          reset();
+          onClose();
+          return;
+        }
+      }
+
+      // Create path (call API here, then notify parent)
+      // Always perform create here, then notify parent with the created object
+      const created = await createTransferRequest(data);
+      console.log("createTransferRequest result:", created);
+      try { if (onSave) await Promise.resolve(onSave(created as any)); } catch (e) { console.warn("onSave handler failed:", e); }
+      try { window.dispatchEvent(new CustomEvent("transfer:created", { detail: created })); } catch (e) {}
+       toast.success("Transfer request saved");
+      reset();
+      onClose();
+    } catch (err) {
+      console.error("Failed to save transfer request:", err);
       toast.error("Failed to save transfer request");
     }
   };
@@ -188,15 +244,137 @@ export default function TransferRequestForm({
     onClose();
   };
 
+  useEffect(() => {
+    // load lookup data when form mounts
+    let mounted = true;
+    setLoadingLookups(true);
+    const c = new AbortController();
+    Promise.all([
+      fetchStations(c.signal).catch(() => []),
+      fetchReasons(c.signal).catch(() => []),
+      fetchStatuses(c.signal).catch(() => []),
+      fetchStaffProfiles("", c.signal).catch(() => ({ items: [] })), // keep staff if needed
+      // remove fetchPrisoners here to avoid duplicate requests - CustomPrisonerSearch will fetch itself
+      // fetchPrisoners({ page_size: 100 }, c.signal).catch(() => ({ items: [] })),
+    ])
+      .then(([st, rsn, sts, sfRes /*, prRes */]) => {
+        if (!mounted) return;
+        setStations(st);
+        setReasons(rsn);
+        setStatuses(sts);
+        setStaff(Array.isArray(sfRes) ? sfRes : (sfRes?.items ?? []));
+        // setPrisoners(prRes?.items ?? []); // remove or keep only if used elsewhere
+      })
+      .finally(() => {
+        setLoadingLookups(false);
+      });
+    return () => {
+      mounted = false;
+      c.abort();
+    };
+  }, []);
+
+  const loadStations = async (params?: any) => {
+    setLoadingLookups(true);
+    const c = new AbortController();
+    try {
+      const data = await fetchStations({ ...params, page_size: 100 }, c.signal);
+      setStations(data);
+    } catch (error) {
+      setStations([]);
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  // keep watcher
+  const prisonerVal = watch("prisoner");
+  const originalStationVal = watch("original_station");
+
+  useEffect(() => {
+    // When not bulk, auto-populate original station from selected prisoner.
+    // Try local cache first, then fall back to server lookup.
+    let cancelled = false;
+    const c = new AbortController();
+    async function resolvePrisonerStation(pId?: string | null) {
+      if (!pId) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+        return;
+      }
+
+      // 1) try local cache
+      const local = prisoners.find((p: any) => String(p.id) === String(pId));
+      if (local && local.current_station) {
+        setValue("original_station", local.current_station);
+        setOriginalStationLabel(local.current_station_name ?? "");
+        return;
+      }
+
+      // 2) try stations/search by id via fetchPrisoners - some backends support id lookup via search
+      // (you can keep or remove; if kept ensure useCache:true and page_size:1)
+      // try {
+      //   const res = await fetchPrisoners({ search: String(pId), page_size: 1 }, c.signal);
+      //   if (cancelled) return;
+      //   const p = res.items?.[0];
+      //   if (p && p.current_station) {
+      //     setValue("original_station", p.current_station);
+      //     return;
+      //   }
+      // } catch (_) {
+      //   // ignore network/abort errors — leave original_station blank
+      // }
+    }
+
+    if (!isBulkTransfer) {
+      resolvePrisonerStation(prisonerVal);
+    } else {
+      // when bulk, do not auto-populate
+      if (!prisonerVal) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      c.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBulkTransfer, prisonerVal, prisoners]);
+
+  // Keep originalStationLabel in sync when original_station value or stations list changes
+  useEffect(() => {
+    if (!originalStationVal) {
+      setOriginalStationLabel("");
+      return;
+    }
+    // prefer stations lookup
+    const s = stations.find((st: any) => String(st.id) === String(originalStationVal));
+    if (s) {
+      setOriginalStationLabel(s.name ?? "");
+      return;
+    }
+    // fallback: try to find prisoner and use its current_station_name
+    const p = prisoners.find((pr: any) => String(pr.id) === String(prisonerVal));
+    if (p && p.current_station_name) {
+      setOriginalStationLabel(p.current_station_name);
+      return;
+    }
+  }, [originalStationVal, stations, prisoners, prisonerVal]);
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+      <DialogContent className="max-w-xs max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
         <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
               <FileText className="h-5 w-5" />
               {editingRequest ? "Edit Transfer Request" : "Add Transfer Request"}
             </DialogTitle>
+            <DialogDescription>
+              {editingRequest ? "Please complete the form to update a transfer request." : "Please complete the form to create a transfer request."}
+            </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
@@ -242,18 +420,63 @@ export default function TransferRequestForm({
                     control={control}
                     rules={{ required: !isBulkTransfer ? "Prisoner is required" : false }}
                     render={({ field }) => (
-                      <Select value={field.value} onValueChange={field.onChange}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select prisoner" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {prisoners.map((prisoner) => (
-                            <SelectItem key={prisoner.id} value={prisoner.id}>
-                              {prisoner.name} ({prisoner.number})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        onSelectItem={(p) => {
+                          // immediately clear previous station to avoid showing stale data
+                          setValue("original_station", "");
+                          setOriginalStationLabel("");
+
+                          // derive stable station fields for the selected item
+                          const stationId =
+                            p?.current_station ??
+                            p?.station ??
+                            (p as any)?.stationId ??
+                            (p as any)?.station_id ??
+                            "";
+                          const stationName =
+                            p?.current_station_name ??
+                            p?.station_name ??
+                            (p as any)?.stationName ??
+                            "";
+
+                          try {
+                            console.log("Prisoner selected (final):", {
+                              id: p?.id ?? null,
+                              name:
+                                p?.full_name ??
+                                `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim(),
+                              stationId,
+                              stationName,
+                            });
+                          } catch {}
+
+                          // populate form field + label if available (will overwrite the cleared values)
+                          if (stationId) {
+                            setValue("original_station", stationId);
+                          }
+                          if (stationName) {
+                            setOriginalStationLabel(stationName);
+                          }
+
+                          // keep prisoners cache up-to-date (so other lookups can use it)
+                          setPrisoners((prev) => {
+                            if (!p) return prev;
+                            const exists = prev.some(
+                              (x: any) => String(x.id) === String(p.id)
+                            );
+                            if (exists) return prev;
+                            return [p, ...prev];
+                          });
+                        }}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                        disabled={false}
+                      />
                     )}
                   />
                   {errors.prisoner && (
@@ -272,14 +495,18 @@ export default function TransferRequestForm({
                     name="number_of_prisoners"
                     control={control}
                     rules={{
-                      required: isBulkTransfer ? "Number of prisoners is required" : false,
+                      required: isBulkTransfer
+                        ? "Number of prisoners is required"
+                        : false,
                       min: { value: 1, message: "Must be at least 1" },
                     }}
                     render={({ field }) => (
                       <Input
                         type="number"
                         {...field}
-                        onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
                         min="1"
                       />
                     )}
@@ -302,21 +529,12 @@ export default function TransferRequestForm({
                   control={control}
                   rules={{ required: "Officer in charge is required" }}
                   render={({ field }) => (
-                    <Select
-                      value={field.value?.toString()}
-                      onValueChange={(value) => field.onChange(parseInt(value))}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select officer" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {staff.map((officer) => (
-                          <SelectItem key={officer.id} value={officer.id.toString()}>
-                            {officer.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select officer in charge"
+                      initialItems={staff} // <-- pass initial items to avoid flicker
+                    />
                   )}
                 />
                 {errors.in_charge && (
@@ -337,27 +555,32 @@ export default function TransferRequestForm({
                 <Controller
                   name="original_station"
                   control={control}
-                  rules={{ required: "Original station is required" }}
-                  render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select original station" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stations.map((station) => (
-                          <SelectItem key={station.id} value={station.id}>
-                            {station.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
+                  rules={{ required: isBulkTransfer ? "Original station is required" : false }}
+                  render={({ field }) => {
+                    // when not bulk: show read-only label so user can't change; when bulk: full searchable select
+                    if (!isBulkTransfer) {
+                      const stationLabel = stations.find((s: any) => String(s.id) === String(field.value))?.name
+                        || originalStationLabel
+                        || (prisoners.find((p: any) => String(p.id) === String(prisonerVal))?.current_station_name)
+                        || "";
+                      return (
+                        <Input value={stationLabel} readOnly placeholder="Auto-filled from prisoner" />
+                      );
+                    }
+                    return (
+                      <SearchableSelect
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        placeholder="Select original station"
+                        items={stations}
+                        idField="id"
+                        labelField="name"
+                      />
+                    );
+                  }}
                 />
-                {errors.original_station && (
-                  <span className="text-sm text-red-500">
-                    {errors.original_station.message}
-                  </span>
-                )}
+                {!isBulkTransfer && <div className="text-xs text-gray-500">Auto-populated from selected prisoner (disabled for single transfers)</div>}
+                {errors.original_station && (<span className="text-sm text-red-500">{errors.original_station.message}</span>)}
               </div>
 
               <div className="space-y-2">
@@ -370,25 +593,17 @@ export default function TransferRequestForm({
                   control={control}
                   rules={{ required: "Destination station is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select destination station" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {stations.map((station) => (
-                          <SelectItem key={station.id} value={station.id}>
-                            {station.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      placeholder="Select destination station"
+                      items={stations.filter((s: any) => s.id !== (originalStationVal || ""))}
+                      idField="id"
+                      labelField="name"
+                    />
                   )}
                 />
-                {errors.destination_station && (
-                  <span className="text-sm text-red-500">
-                    {errors.destination_station.message}
-                  </span>
-                )}
+                {errors.destination_station && (<span className="text-sm text-red-500">{errors.destination_station.message}</span>)}
               </div>
             </div>
 
@@ -401,18 +616,14 @@ export default function TransferRequestForm({
                   control={control}
                   rules={{ required: "Reason is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select reason" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {reasons.map((reason) => (
-                          <SelectItem key={reason.id} value={reason.id}>
-                            {reason.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={reasons}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select reason"
+                    />
                   )}
                 />
                 {errors.reason && (
@@ -429,18 +640,14 @@ export default function TransferRequestForm({
                   control={control}
                   rules={{ required: "Status is required" }}
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {statuses.map((status) => (
-                          <SelectItem key={status.id} value={status.id}>
-                            {status.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={statuses}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select status"
+                    />
                   )}
                 />
                 {errors.status && (
@@ -451,7 +658,6 @@ export default function TransferRequestForm({
               </div>
             </div>
 
-    
             {/* OC Approval Information removed */}
 
             {/* Form Actions */}

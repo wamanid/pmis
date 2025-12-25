@@ -31,6 +31,8 @@ import {
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+import StaffProfileSelect from "../common/StaffProfileSelect";
 import {
    addStationVisitor,
    GateItem,
@@ -142,7 +144,7 @@ export default function VisitorRegistrationDialog({
 
   // Combobox states
   const [openGateCombo, setOpenGateCombo] = useState(false);
-  const [openPrisonerCombo, setOpenPrisonerCombo] = useState(false);
+  // const [openPrisonerCombo, setOpenPrisonerCombo] = useState(false);
   const [openVisitorTypeCombo, setOpenVisitorTypeCombo] = useState(false);
   const [openGateKeeperCombo, setOpenGateKeeperCombo] = useState(false);
   const [openRelationCombo, setOpenRelationCombo] = useState(false);
@@ -792,55 +794,12 @@ export default function VisitorRegistrationDialog({
                         {/* Gate Keeper */}
                         <div className="space-y-2">
                           <Label>Gate Keeper <span className="text-red-500">*</span></Label>
-                          <Popover
-                            open={openGateKeeperCombo}
-                            onOpenChange={setOpenGateKeeperCombo}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={openGateKeeperCombo}
-                                className="w-full justify-between"
-                              >
-                                {form.gate_keeper
-                                  ? (() => {
-                                    const staff = mockStaff.find((s) => s.id === form.gate_keeper);
-                                    return staff ? `${staff.first_name} ${staff.last_name}` : "";
-                                  })()
-                                  : "Select gate keeper..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0">
-                              <Command>
-                                <CommandInput placeholder="Search staff..." />
-                                <CommandEmpty>No staff found.</CommandEmpty>
-                                <CommandGroup>
-                                  {mockStaff.map((staff) => (
-                                    <CommandItem
-                                      key={staff.id}
-                                      value={`${staff.first_name} ${staff.last_name}`}
-                                      onSelect={() => {
-                                        setForm({ ...form, gate_keeper: staff.id });
-                                        setOpenGateKeeperCombo(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          form.gate_keeper === staff.id
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                      {staff.first_name} {staff.last_name} ({staff.force_number})
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                          <StaffProfileSelect
+                            value={form.gate_keeper ? String(form.gate_keeper) : ""}
+                            onChange={(val) => setForm({ ...form, gate_keeper: String(val || "") })}
+                            placeholder="Select gate keeper..."
+                            initialItems={mockStaff}
+                          />
                         </div>
                       </div>
 
@@ -848,53 +807,18 @@ export default function VisitorRegistrationDialog({
                         {/* Prisoner */}
                         <div className="space-y-2">
                           <Label>Prisoner <span className="text-red-500">*</span></Label>
-                          <Popover
-                            open={openPrisonerCombo}
-                            onOpenChange={setOpenPrisonerCombo}
-                          >
-                            <PopoverTrigger asChild>
-                              <Button
-                                variant="outline"
-                                role="combobox"
-                                aria-expanded={openPrisonerCombo}
-                                className="w-full justify-between"
-                              >
-                                {form.prisoner
-                                  ? mockPrisoners.find((p) => p.id === form.prisoner)
-                                      ?.full_name
-                                  : "Select prisoner..."}
-                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent className="w-full p-0">
-                              <Command>
-                                <CommandInput placeholder="Search prisoner..." />
-                                <CommandEmpty>No prisoner found.</CommandEmpty>
-                                <CommandGroup>
-                                  {mockPrisoners.map((prisoner) => (
-                                    <CommandItem
-                                      key={prisoner.id}
-                                      value={prisoner.full_name}
-                                      onSelect={() => {
-                                        setForm({ ...form, prisoner: prisoner.id });
-                                        setOpenPrisonerCombo(false);
-                                      }}
-                                    >
-                                      <Check
-                                        className={cn(
-                                          "mr-2 h-4 w-4",
-                                          form.prisoner === prisoner.id
-                                            ? "opacity-100"
-                                            : "opacity-0"
-                                        )}
-                                      />
-                                      {prisoner.full_name} ({prisoner.prisoner_number_value})
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </Command>
-                            </PopoverContent>
-                          </Popover>
+                          <CustomPrisonerSearch
+                            value={form.prisoner ? String(form.prisoner) : null}
+                            onChange={(val) => setForm(prev => ({ ...prev, prisoner: String(val || "") }))}
+                            onSelectItem={(p: any) => {
+                              setForm(prev => ({ ...prev, prisoner: String(p?.id ?? "") }));
+                            }}
+                            placeholder="Select prisoner..."
+                            idField="id"
+                            labelField="full_name"
+                            initialItems={mockPrisoners}
+                            pageSize={25}
+                          />
                         </div>
 
                         {/* Visitor Type */}

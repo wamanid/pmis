@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import { useFilters } from '../../contexts/FilterContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
@@ -12,7 +11,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Users, Search, UserPlus, Building2, MapPin, Calendar, CheckIcon } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import {
   fetchStaffDeployments,
   fetchStaffDeploymentSummary,
@@ -88,6 +88,8 @@ export function StaffDeploymentScreen() {
   const [pageSize, setPageSize] = useState<number>(10);
   const [sortField, setSortField] = useState<string | undefined>(undefined);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  // bump this to force DataTable remount/refetch when global filters change or after mutations
+  const [filtersReloadKey, setFiltersReloadKey] = useState<number>(0);
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
   // View modal state
@@ -343,15 +345,10 @@ export function StaffDeploymentScreen() {
 
   useFilterRefresh(() => {
     setPage(1);
-    // refresh summaries and related datasets (fetchData updates deployments, stationSummary, districtSummary, regionSummary)
-    // and also refresh the table page. Run fetchData first so summaries reflect the new filters quickly.
-    try {
-      // fire and forget fetchData (it updates state), then return the table loader promise
-      fetchData();
-    } catch (e) {
-      /* ignore */
-    }
-    return loadTable(1, pageSize, sortField, sortDir, debouncedSearch);
+    // refresh summary data for cards and lists
+    fetchData();
+    // bump DataTable key so it remounts and fetches with new URL params
+    setFiltersReloadKey(k => k + 1);
   }, [region, district, station]);
 
   if (loading) {
@@ -387,7 +384,7 @@ export function StaffDeploymentScreen() {
               Deploy Staff
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-2xl">
             {
               staffProfileLoading ? (
                   <>
@@ -551,13 +548,13 @@ export function StaffDeploymentScreen() {
                     </div>
                   </div>
                   <DialogFooter>
-              <Button variant="outline" onClick={() => { setDeployOpen(false); resetForm(); }}>
-                Cancel
-              </Button>
-              <Button onClick={handleDeploy} style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
-                Deploy Staff
-              </Button>
-            </DialogFooter>
+                    <Button variant="outline" onClick={() => { setDeployOpen(false); resetForm(); }}>
+                      Cancel
+                    </Button>
+                    <Button onClick={handleDeploy} style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
+                      Deploy Staff
+                    </Button>
+                  </DialogFooter>
                  </>
               )
             }
@@ -635,7 +632,7 @@ export function StaffDeploymentScreen() {
             </CardHeader>
             <CardContent className="space-y-4">
               {/* Search */}
-              <div className="relative max-w-sm">
+              {/* <div className="relative max-w-sm">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   placeholder="Search by name, force number, station..."
@@ -643,15 +640,14 @@ export function StaffDeploymentScreen() {
                   onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                   className="pl-9"
                 />
-              </div>
+              </div> */}
 
               {/* Deployments DataTable */}
               <div className="">
                 <DataTable
-                url="/station-management/api/staff-deployments/"
-                  data={tableData}
-                  loading={tableLoading}
-                  total={total}
+                  key={`staff-deployments-${filtersReloadKey}-${region ?? ''}-${district ?? ''}-${station ?? ''}`}
+                  url={`/station-management/api/staff-deployments/?${region ? `region=${encodeURIComponent(region)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${station ? `station=${encodeURIComponent(station)}&` : ''}`}
+                  externalSearch={debouncedSearch}
                   columns={[
                     { key: 'force_number', label: 'Force Number', sortable: true },
                     { key: 'full_name', label: 'Name', sortable: true },
@@ -802,7 +798,7 @@ export function StaffDeploymentScreen() {
 
       {/* View Modal (read-only) */}
       <Dialog open={viewOpen} onOpenChange={setViewOpen}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>Deployment Details</DialogTitle>
               <DialogDescription>Read-only details for the selected deployment</DialogDescription>

@@ -1,3 +1,571 @@
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import {
+  FileText,
+  Calendar,
+  User,
+  Building2,
+  Users,
+  X,
+  Save,
+} from "lucide-react";
+
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
+
+import {
+  fetchStations,
+  fetchReasons,
+  fetchStatuses,
+} from "../../services/transferServices/transferRequestService";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import SearchableSelect from "../common/SearchableSelect"; // reusable searchable select
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
+
+
+interface TransferRequest {
+  id?: string;
+  prisoner_name?: string;
+  original_station_name?: string;
+  destination_station_name?: string;
+  reason_name?: string;
+  status_name?: string;
+  in_charge_name?: string;
+  original_oc_approval_status_name?: string;
+  destination_oc_approval_status_name?: string;
+  bulk_transfer: boolean;
+  number_of_prisoners: number;
+  original_station_oc_acknowledged: boolean;
+  destination_station_oc_acknowledged: boolean;
+  original_station_oc_approved_date: string;
+  destination_station_oc_approved_date: string;
+  prisoner: string;
+  original_station: string;
+  destination_station: string;
+  reason: string;
+  in_charge: number;
+  status: string;
+  original_station_oc_approval_status: string;
+  destination_station_oc_approval_status: string;
+  original_station_oc_approved_by: number;
+  destination_station_oc_approved_by: number;
+}
+
+interface TransferRequestFormProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: TransferRequest) => void;
+  editingRequest?: TransferRequest | null;
+  prisoners?: Array<{ id: string; name: string; number: string }>;
+  stations?: Array<{ id: string; name: string }>;
+  reasons?: Array<{ id: string; name: string }>;
+  statuses?: Array<{ id: string; name: string }>;
+  approvalStatuses?: Array<{ id: string; name: string }>;
+  staff?: Array<{ id: number; name: string }>;
+}
+
+export default function TransferRequestForm({
+  open,
+  onClose,
+  onSave,
+  editingRequest,
+  prisoners: prisonersProp = [],
+  stations: stationsProp = [],
+  reasons: reasonsProp = [],
+  statuses: statusesProp = [],
+  approvalStatuses = [],
+  staff: staffProp = [],
+}: TransferRequestFormProps) {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<TransferRequest>({
+    defaultValues: {
+      bulk_transfer: false,
+      number_of_prisoners: 1,
+      original_station_oc_acknowledged: false,
+      destination_station_oc_acknowledged: false,
+      original_station_oc_approved_date: "",
+      destination_station_oc_approved_date: "",
+      prisoner: "",
+      original_station: "",
+      destination_station: "",
+      reason: "",
+      in_charge: 0,
+      status: "",
+      original_station_oc_approval_status: "",
+      destination_station_oc_approval_status: "",
+      original_station_oc_approved_by: 0,
+      destination_station_oc_approved_by: 0,
+    },
+  });
+
+  const isBulkTransfer = watch("bulk_transfer");
+
+  // remove local prisoners/staff usage for selects (we still keep for initial items)
+  const [stations, setStations] = useState<any[]>(stationsProp || []);
+  const [prisoners, setPrisoners] = useState<any[]>(prisonersProp || []);
+  const [reasons, setReasons] = useState<any[]>(reasonsProp || []);
+  const [statuses, setStatuses] = useState<any[]>(statusesProp || []);
+  const [staff, setStaff] = useState<any[]>(staffProp || []);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  // sync with global location filter to pre-filter stations when bulk
+  useFilterRefresh(() => {
+    const station = localStorage.getItem("selectedStation") || undefined;
+    const region = localStorage.getItem("selectedRegion") || undefined;
+    const district = localStorage.getItem("selectedDistrict") || undefined;
+    // when global filter changes, reload stations (only used when bulk)
+    loadStations({
+      station: station && station !== "all" ? station : undefined,
+      region: region && region !== "all" ? region : undefined,
+      district: district && district !== "all" ? district : undefined,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (editingRequest) {
+      reset({
+        bulk_transfer: editingRequest.bulk_transfer || false,
+        number_of_prisoners: editingRequest.number_of_prisoners || 1,
+        original_station_oc_acknowledged:
+          editingRequest.original_station_oc_acknowledged || false,
+        destination_station_oc_acknowledged:
+          editingRequest.destination_station_oc_acknowledged || false,
+        original_station_oc_approved_date:
+          editingRequest.original_station_oc_approved_date?.split("T")[0] || "",
+        destination_station_oc_approved_date:
+          editingRequest.destination_station_oc_approved_date?.split("T")[0] || "",
+        prisoner: editingRequest.prisoner || "",
+        original_station: editingRequest.original_station || "",
+        destination_station: editingRequest.destination_station || "",
+        reason: editingRequest.reason || "",
+        in_charge: editingRequest.in_charge || 0,
+        status: editingRequest.status || "",
+        original_station_oc_approval_status:
+          editingRequest.original_station_oc_approval_status || "",
+        destination_station_oc_approval_status:
+          editingRequest.destination_station_oc_approval_status || "",
+        original_station_oc_approved_by:
+          editingRequest.original_station_oc_approved_by || 0,
+        destination_station_oc_approved_by:
+          editingRequest.destination_station_oc_approved_by || 0,
+      });
+    } else {
+      reset({
+        bulk_transfer: false,
+        number_of_prisoners: 1,
+        original_station_oc_acknowledged: false,
+        destination_station_oc_acknowledged: false,
+        original_station_oc_approved_date: "",
+        destination_station_oc_approved_date: "",
+        prisoner: "",
+        original_station: "",
+        destination_station: "",
+        reason: "",
+        in_charge: 0,
+        status: "",
+        original_station_oc_approval_status: "",
+        destination_station_oc_approval_status: "",
+        original_station_oc_approved_by: 0,
+        destination_station_oc_approved_by: 0,
+      });
+    }
+  }, [editingRequest, reset]);
+
+  const onSubmit = (data: TransferRequest) => {
+    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+      toast.error("Original Station and Destination Station must be different");
+      return;
+    }
+    onSave(data);
+    reset();
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  useEffect(() => {
+    // load lookup data when form mounts
+    let mounted = true;
+    setLoadingLookups(true);
+    const c = new AbortController();
+    Promise.all([
+      fetchStations(c.signal).catch(() => []),
+      fetchReasons(c.signal).catch(() => []),
+      fetchStatuses(c.signal).catch(() => []),
+      fetchStaffProfiles("", c.signal).catch(() => []),
+      fetchPrisoners({ page_size: 100 }, c.signal).catch(() => ({ items: [] })),
+    ])
+      .then(([st, rsn, sts, sf, prRes]) => {
+        if (!mounted) return;
+        setStations(st);
+        setReasons(rsn);
+        setStatuses(sts);
+        setStaff(sf);
+        // fetchPrisoners returns {items, count}
+        setPrisoners(prRes?.items ?? []);
+      })
+      .finally(() => {
+        setLoadingLookups(false);
+      });
+    return () => {
+      mounted = false;
+      c.abort();
+    };
+  }, []);
+
+  const loadStations = async (params?: any) => {
+    setLoadingLookups(true);
+    const c = new AbortController();
+    try {
+      const data = await fetchStations({ ...params, page_size: 100 }, c.signal);
+      setStations(data);
+    } catch (error) {
+      setStations([]);
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  // keep watcher
+  const prisonerVal = watch("prisoner");
+  const originalStationVal = watch("original_station");
+
+  useEffect(() => {
+    // When not bulk, auto-populate original station from selected prisoner
+    let cancelled = false;
+    if (!isBulkTransfer && prisonerVal) {
+      const c = new AbortController();
+      fetchPrisoners({ search: prisonerVal, page_size: 1 }, c.signal)
+        .then((res) => {
+          if (cancelled) return;
+          const p = res.items?.[0];
+          if (p) setValue("original_station", p.current_station || "");
+        })
+        .catch(() => {})
+        .finally(() => c.abort());
+      return () => {
+        cancelled = true;
+      };
+    }
+    if (!prisonerVal && !isBulkTransfer) {
+      setValue("original_station", "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBulkTransfer, prisonerVal]);
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle className="text-[#650000] flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {editingRequest ? "Edit Transfer Request" : "Add Transfer Request"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
+            {/* Bulk Transfer Toggle */}
+            <div className="border-b pb-4">
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="bulk_transfer"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="bulk_transfer"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          setValue("number_of_prisoners", 1);
+                        }
+                      }}
+                    />
+                  )}
+                />
+                <label
+                  htmlFor="bulk_transfer"
+                  className="text-sm cursor-pointer flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Bulk Transfer (Multiple Prisoners)
+                </label>
+              </div>
+            </div>
+
+            {/* Prisoner or Number of Prisoners */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isBulkTransfer ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Prisoner
+                  </Label>
+                  <Controller
+                    name="prisoner"
+                    control={control}
+                    rules={{ required: !isBulkTransfer ? "Prisoner is required" : false }}
+                    render={({ field }) => (
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                        disabled={false}
+                      />
+                    )}
+                  />
+                  {errors.prisoner && (
+                    <span className="text-sm text-red-500">
+                      {errors.prisoner.message}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Prisoners
+                  </Label>
+                  <Controller
+                    name="number_of_prisoners"
+                    control={control}
+                    rules={{
+                      required: isBulkTransfer
+                        ? "Number of prisoners is required"
+                        : false,
+                      min: { value: 1, message: "Must be at least 1" },
+                    }}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                        min="1"
+                      />
+                    )}
+                  />
+                  {errors.number_of_prisoners && (
+                    <span className="text-sm text-red-500">
+                      {errors.number_of_prisoners.message}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Officer In Charge
+                </Label>
+                <Controller
+                  name="in_charge"
+                  control={control}
+                  rules={{ required: "Officer in charge is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={String(field.value || "")}
+                      onChange={(v) => field.onChange(v)}
+                      items={staff}
+                      idField="id"
+                      labelField="full_name"
+                      placeholder="Select officer in charge"
+                    />
+                  )}
+                />
+                {errors.in_charge && (
+                  <span className="text-sm text-red-500">
+                    {errors.in_charge.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stations */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Original Station
+                </Label>
+                <Controller
+                  name="original_station"
+                  control={control}
+                  rules={{ required: isBulkTransfer ? "Original station is required" : false }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      disabled={!isBulkTransfer}
+                      placeholder={isBulkTransfer ? "Select original station" : "Auto-filled from prisoner"}
+                      // when bulk use the stations list; when single the field is disabled and shows auto-filled value
+                      items={stations}
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {!isBulkTransfer && <div className="text-xs text-gray-500">Auto-populated from selected prisoner (disabled for single transfers)</div>}
+                {errors.original_station && (<span className="text-sm text-red-500">{errors.original_station.message}</span>)}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Destination Station
+                </Label>
+                <Controller
+                  name="destination_station"
+                  control={control}
+                  rules={{ required: "Destination station is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      placeholder="Select destination station"
+                      items={stations.filter((s: any) => s.id !== (originalStationVal || ""))}
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {errors.destination_station && (<span className="text-sm text-red-500">{errors.destination_station.message}</span>)}
+              </div>
+            </div>
+
+            {/* Reason and Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Transfer Reason</Label>
+                <Controller
+                  name="reason"
+                  control={control}
+                  rules={{ required: "Reason is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={reasons}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select reason"
+                    />
+                  )}
+                />
+                {errors.reason && (
+                  <span className="text-sm text-red-500">
+                    {errors.reason.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Request Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  rules={{ required: "Status is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={statuses}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select status"
+                    />
+                  )}
+                />
+                {errors.status && (
+                  <span className="text-sm text-red-500">
+                    {errors.status.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* OC Approval Information removed */}
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
+              >
+                <Save className="h-4 w-4" />
+                {editingRequest ? "Update Request" : "Create Request"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+------------
+
+
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Button } from "../ui/button";
@@ -17763,3 +18331,3502 @@ export default PrisonerPropertyAccountScreen;
 function prevLengthSafe(arr:any[]) { try { return Array.isArray(arr) ? arr.length : 0; } catch { return 0; } }
 
  
+
+
+
+
+
+
+-------------
+
+
+
+
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import {
+  FileText,
+  Calendar,
+  User,
+  Building2,
+  Users,
+  X,
+  Save,
+} from "lucide-react";
+
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
+
+import {
+  fetchStations,
+  fetchReasons,
+  fetchStatuses,
+} from "../../services/transferServices/transferRequestService";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import SearchableSelect from "../common/SearchableSelect"; // reusable searchable select
+import StaffProfileSelect from "../common/StaffProfileSelect";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
+
+interface TransferRequest {
+  id?: string;
+  prisoner_name?: string;
+  original_station_name?: string;
+  destination_station_name?: string;
+  reason_name?: string;
+  status_name?: string;
+  in_charge_name?: string;
+  original_oc_approval_status_name?: string;
+  destination_oc_approval_status_name?: string;
+  bulk_transfer: boolean;
+  number_of_prisoners: number;
+  original_station_oc_acknowledged: boolean;
+  destination_station_oc_acknowledged: boolean;
+  original_station_oc_approved_date: string;
+  destination_station_oc_approved_date: string;
+  prisoner: string;
+  original_station: string;
+  destination_station: string;
+  reason: string;
+  in_charge: number;
+  status: string;
+  original_station_oc_approval_status: string;
+  destination_station_oc_approval_status: string;
+  original_station_oc_approved_by: number;
+  destination_station_oc_approved_by: number;
+}
+
+interface TransferRequestFormProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: TransferRequest) => void;
+  editingRequest?: TransferRequest | null;
+  prisoners?: Array<{ id: string; name: string; number: string }>;
+  stations?: Array<{ id: string; name: string }>;
+  reasons?: Array<{ id: string; name: string }>;
+  statuses?: Array<{ id: string; name: string }>;
+  approvalStatuses?: Array<{ id: string; name: string }>;
+  staff?: Array<{ id: number; name: string }>;
+}
+
+export default function TransferRequestForm({
+  open,
+  onClose,
+  onSave,
+  editingRequest,
+  prisoners: prisonersProp = [],
+  stations: stationsProp = [],
+  reasons: reasonsProp = [],
+  statuses: statusesProp = [],
+  approvalStatuses = [],
+  staff: staffProp = [],
+}: TransferRequestFormProps) {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<TransferRequest>({
+    defaultValues: {
+      bulk_transfer: false,
+      number_of_prisoners: 1,
+      original_station_oc_acknowledged: false,
+      destination_station_oc_acknowledged: false,
+      original_station_oc_approved_date: "",
+      destination_station_oc_approved_date: "",
+      prisoner: "",
+      original_station: "",
+      destination_station: "",
+      reason: "",
+      in_charge: "", // <- use empty string (controlled Select expects string)
+      status: "",
+      original_station_oc_approval_status: "",
+      destination_station_oc_approval_status: "",
+      original_station_oc_approved_by: "",
+      destination_station_oc_approved_by: "",
+    },
+  });
+
+  const isBulkTransfer = watch("bulk_transfer");
+
+  // remove local prisoners/staff usage for selects (we still keep for initial items)
+  const [stations, setStations] = useState<any[]>(stationsProp || []);
+  const [prisoners, setPrisoners] = useState<any[]>(prisonersProp || []);
+  const [reasons, setReasons] = useState<any[]>(reasonsProp || []);
+  const [statuses, setStatuses] = useState<any[]>(statusesProp || []);
+  const [staff, setStaff] = useState<any[]>(staffProp || []);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  // label to display for original station (when single transfer)
+  const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
+
+  // sync with global location filter to pre-filter stations when bulk
+  useFilterRefresh(() => {
+    const station = localStorage.getItem("selectedStation") || undefined;
+    const region = localStorage.getItem("selectedRegion") || undefined;
+    const district = localStorage.getItem("selectedDistrict") || undefined;
+    // when global filter changes, reload stations (only used when bulk)
+    loadStations({
+      station: station && station !== "all" ? station : undefined,
+      region: region && region !== "all" ? region : undefined,
+      district: district && district !== "all" ? district : undefined,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (editingRequest) {
+      reset({
+        bulk_transfer: editingRequest.bulk_transfer || false,
+        number_of_prisoners: editingRequest.number_of_prisoners || 1,
+        original_station_oc_acknowledged:
+          editingRequest.original_station_oc_acknowledged || false,
+        destination_station_oc_acknowledged:
+          editingRequest.destination_station_oc_acknowledged || false,
+        original_station_oc_approved_date:
+          editingRequest.original_station_oc_approved_date?.split("T")[0] || "",
+        destination_station_oc_approved_date:
+          editingRequest.destination_station_oc_approved_date?.split("T")[0] || "",
+        prisoner: editingRequest.prisoner || "",
+        original_station: editingRequest.original_station || "",
+        destination_station: editingRequest.destination_station || "",
+        reason: editingRequest.reason || "",
+        in_charge: editingRequest.in_charge || 0,
+        status: editingRequest.status || "",
+        original_station_oc_approval_status:
+          editingRequest.original_station_oc_approval_status || "",
+        destination_station_oc_approval_status:
+          editingRequest.destination_station_oc_approval_status || "",
+        original_station_oc_approved_by:
+          editingRequest.original_station_oc_approved_by || 0,
+        destination_station_oc_approved_by:
+          editingRequest.destination_station_oc_approved_by || 0,
+      });
+    } else {
+      reset({
+        bulk_transfer: false,
+        number_of_prisoners: 1,
+        original_station_oc_acknowledged: false,
+        destination_station_oc_acknowledged: false,
+        original_station_oc_approved_date: "",
+        destination_station_oc_approved_date: "",
+        prisoner: "",
+        original_station: "",
+        destination_station: "",
+        reason: "",
+        in_charge: 0,
+        status: "",
+        original_station_oc_approval_status: "",
+        destination_station_oc_approval_status: "",
+        original_station_oc_approved_by: 0,
+        destination_station_oc_approved_by: 0,
+      });
+    }
+  }, [editingRequest, reset]);
+
+  const onSubmit = async (data: TransferRequest) => {
+    console.log("Submitting transfer request:", data);
+    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+      toast.error("Original Station and Destination Station must be different");
+      return;
+    }
+
+    try {
+      // support sync or async onSave handlers
+      const result = await Promise.resolve(onSave ? onSave(data) : null);
+      console.log("onSave result:", result);
+      toast.success("Transfer request saved");
+      reset();
+      // notify parent to close modal (parent may also close when it receives saved data)
+      onClose();
+    } catch (err) {
+      console.error("Failed to save transfer request:", err);
+      toast.error("Failed to save transfer request");
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  useEffect(() => {
+    // load lookup data when form mounts
+    let mounted = true;
+    setLoadingLookups(true);
+    const c = new AbortController();
+    Promise.all([
+      fetchStations(c.signal).catch(() => []),
+      fetchReasons(c.signal).catch(() => []),
+      fetchStatuses(c.signal).catch(() => []),
+      fetchStaffProfiles("", c.signal).catch(() => ({ items: [] })), // keep staff if needed
+      // remove fetchPrisoners here to avoid duplicate requests - CustomPrisonerSearch will fetch itself
+      // fetchPrisoners({ page_size: 100 }, c.signal).catch(() => ({ items: [] })),
+    ])
+      .then(([st, rsn, sts, sfRes /*, prRes */]) => {
+        if (!mounted) return;
+        setStations(st);
+        setReasons(rsn);
+        setStatuses(sts);
+        setStaff(Array.isArray(sfRes) ? sfRes : (sfRes?.items ?? []));
+        // setPrisoners(prRes?.items ?? []); // remove or keep only if used elsewhere
+      })
+      .finally(() => {
+        setLoadingLookups(false);
+      });
+    return () => {
+      mounted = false;
+      c.abort();
+    };
+  }, []);
+
+  const loadStations = async (params?: any) => {
+    setLoadingLookups(true);
+    const c = new AbortController();
+    try {
+      const data = await fetchStations({ ...params, page_size: 100 }, c.signal);
+      setStations(data);
+    } catch (error) {
+      setStations([]);
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  // keep watcher
+  const prisonerVal = watch("prisoner");
+  const originalStationVal = watch("original_station");
+
+  useEffect(() => {
+    // When not bulk, auto-populate original station from selected prisoner.
+    // Try local cache first, then fall back to server lookup.
+    let cancelled = false;
+    const c = new AbortController();
+    async function resolvePrisonerStation(pId?: string | null) {
+      if (!pId) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+        return;
+      }
+
+      // 1) try local cache
+      const local = prisoners.find((p: any) => String(p.id) === String(pId));
+      if (local && local.current_station) {
+        setValue("original_station", local.current_station);
+        setOriginalStationLabel(local.current_station_name ?? "");
+        return;
+      }
+
+      // 2) try stations/search by id via fetchPrisoners - some backends support id lookup via search
+      // (you can keep or remove; if kept ensure useCache:true and page_size:1)
+      // try {
+      //   const res = await fetchPrisoners({ search: String(pId), page_size: 1 }, c.signal);
+      //   if (cancelled) return;
+      //   const p = res.items?.[0];
+      //   if (p && p.current_station) {
+      //     setValue("original_station", p.current_station);
+      //     return;
+      //   }
+      // } catch (_) {
+      //   // ignore network/abort errors — leave original_station blank
+      // }
+    }
+
+    if (!isBulkTransfer) {
+      resolvePrisonerStation(prisonerVal);
+    } else {
+      // when bulk, do not auto-populate
+      if (!prisonerVal) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      c.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBulkTransfer, prisonerVal, prisoners]);
+
+  // Keep originalStationLabel in sync when original_station value or stations list changes
+  useEffect(() => {
+    if (!originalStationVal) {
+      setOriginalStationLabel("");
+      return;
+    }
+    // prefer stations lookup
+    const s = stations.find((st: any) => String(st.id) === String(originalStationVal));
+    if (s) {
+      setOriginalStationLabel(s.name ?? "");
+      return;
+    }
+    // fallback: try to find prisoner and use its current_station_name
+    const p = prisoners.find((pr: any) => String(pr.id) === String(prisonerVal));
+    if (p && p.current_station_name) {
+      setOriginalStationLabel(p.current_station_name);
+      return;
+    }
+  }, [originalStationVal, stations, prisoners, prisonerVal]);
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-xs max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle className="text-[#650000] flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {editingRequest ? "Edit Transfer Request" : "Add Transfer Request"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
+            {/* Bulk Transfer Toggle */}
+            <div className="border-b pb-4">
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="bulk_transfer"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="bulk_transfer"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          setValue("number_of_prisoners", 1);
+                        }
+                      }}
+                    />
+                  )}
+                />
+                <label
+                  htmlFor="bulk_transfer"
+                  className="text-sm cursor-pointer flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Bulk Transfer (Multiple Prisoners)
+                </label>
+              </div>
+            </div>
+
+            {/* Prisoner or Number of Prisoners */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isBulkTransfer ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Prisoner
+                  </Label>
+                  <Controller
+                    name="prisoner"
+                    control={control}
+                    rules={{ required: !isBulkTransfer ? "Prisoner is required" : false }}
+                    render={({ field }) => (
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        onSelectItem={(p) => {
+
+                          // immediately clear previous station to avoid showing stale data
+                          setValue("original_station", "");
+                          setOriginalStationLabel("");
+                          // unified station fields (try multiple keys, include stationId/stationName emitted by dropdown)
+                          const stationId = p?.current_station ?? p?.station ?? p?.stationId ?? p?.stationId ?? p?.station_id ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ?? p?.stationId ??
+                          if (stationId) {
+                            setValue("original_station", stationId);
+                          }
+                          if (stationName) {
+                            setOriginalStationLabel(stationName);
+                          }
+
+                          // keep prisoners cache up-to-date (so other lookups can use it)
+                          setPrisoners((prev) => {
+                            if (!p) return prev;
+                            const exists = prev.some((x: any) => String(x.id) === String(p.id));
+                            if (exists) return prev;
+                            return [p, ...prev];
+                          });
+                        }}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                        disabled={false}
+                      />
+                    )}
+                  />
+                  {errors.prisoner && (
+                    <span className="text-sm text-red-500">
+                      {errors.prisoner.message}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Prisoners
+                  </Label>
+                  <Controller
+                    name="number_of_prisoners"
+                    control={control}
+                    rules={{
+                      required: isBulkTransfer
+                        ? "Number of prisoners is required"
+                        : false,
+                      min: { value: 1, message: "Must be at least 1" },
+                    }}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                        min="1"
+                      />
+                    )}
+                  />
+                  {errors.number_of_prisoners && (
+                    <span className="text-sm text-red-500">
+                      {errors.number_of_prisoners.message}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Officer In Charge
+                </Label>
+                <Controller
+                  name="in_charge"
+                  control={control}
+                  rules={{ required: "Officer in charge is required" }}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select officer in charge"
+                      initialItems={staff} // <-- pass initial items to avoid flicker
+                    />
+                  )}
+                />
+                {errors.in_charge && (
+                  <span className="text-sm text-red-500">
+                    {errors.in_charge.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stations */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Original Station
+                </Label>
+                <Controller
+                  name="original_station"
+                  control={control}
+                  rules={{ required: isBulkTransfer ? "Original station is required" : false }}
+                  render={({ field }) => {
+                    // when not bulk: show read-only label so user can't change; when bulk: full searchable select
+                    if (!isBulkTransfer) {
+                      const stationLabel = stations.find((s: any) => String(s.id) === String(field.value))?.name
+                        || originalStationLabel
+                        || (prisoners.find((p: any) => String(p.id) === String(prisonerVal))?.current_station_name)
+                        || "";
+                      return (
+                        <Input value={stationLabel} readOnly placeholder="Auto-filled from prisoner" />
+                      );
+                    }
+                    return (
+                      <SearchableSelect
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        placeholder="Select original station"
+                        items={stations}
+                        idField="id"
+                        labelField="name"
+                      />
+                    );
+                  }}
+                />
+                {!isBulkTransfer && <div className="text-xs text-gray-500">Auto-populated from selected prisoner (disabled for single transfers)</div>}
+                {errors.original_station && (<span className="text-sm text-red-500">{errors.original_station.message}</span>)}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Destination Station
+                </Label>
+                <Controller
+                  name="destination_station"
+                  control={control}
+                  rules={{ required: "Destination station is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      placeholder="Select destination station"
+                      items={stations.filter((s: any) => s.id !== (originalStationVal || ""))}
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {errors.destination_station && (<span className="text-sm text-red-500">{errors.destination_station.message}</span>)}
+              </div>
+            </div>
+
+            {/* Reason and Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Transfer Reason</Label>
+                <Controller
+                  name="reason"
+                  control={control}
+                  rules={{ required: "Reason is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={reasons}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select reason"
+                    />
+                  )}
+                />
+                {errors.reason && (
+                  <span className="text-sm text-red-500">
+                    {errors.reason.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Request Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  rules={{ required: "Status is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={statuses}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select status"
+                    />
+                  )}
+                />
+                {errors.status && (
+                  <span className="text-sm text-red-500">
+                    {errors.status.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* OC Approval Information removed */}
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
+              >
+                <Save className="h-4 w-4" />
+                {editingRequest ? "Update Request" : "Create Request"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+
+
+
+
+
+
+// ...existing code...
+-  const onSubmit = (data: TransferRequest) => {
+-    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+-      toast.error("Original Station and Destination Station must be different");
+-      return;
+-    }
+-    onSave(data);
+-    reset();
+-  };
++  const onSubmit = async (data: TransferRequest) => {
++    console.log("Submitting transfer request:", data);
++    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
++      toast.error("Original Station and Destination Station must be different");
++      return;
++    }
++
++    try {
++      // support sync or async onSave handlers
++      const result = await Promise.resolve(onSave ? onSave(data) : null);
++      console.log("onSave result:", result);
++      toast.success("Transfer request saved");
++      reset();
++      // notify parent to close modal (parent may also close when it receives saved data)
++      onClose();
++    } catch (err) {
++      console.error("Failed to save transfer request:", err);
++      toast.error("Failed to save transfer request");
++    }
++  };
+ // ...existing code...
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ [Debug] DataTable render rows: – 4 – "loading:" – false – "total:" – null (DataTable.tsx, line 115)
+[Log] Submitting transfer request: (TransferRequestForm.tsx, line 127)
+Object
+
+bulk_transfer: false
+
+destination_station: "674276bb-a81a-4d97-9580-248056cb4b71"
+
+destination_station_oc_acknowledged: false
+
+destination_station_oc_approval_status: ""
+
+destination_station_oc_approved_by: 0
+
+destination_station_oc_approved_date: ""
+
+in_charge: "fbb3380e-8b3d-4deb-9475-b10f5cac5726"
+
+number_of_prisoners: 1
+
+original_station: "aa2e5a10-08d0-4a2e-9ec2-02a46e1ad54f"
+
+original_station_oc_acknowledged: false
+
+original_station_oc_approval_status: ""
+
+original_station_oc_approved_by: 0
+
+original_station_oc_approved_date: ""
+
+prisoner: "c9749ce7-82ff-4266-9acc-ae18c0294eb7"
+
+reason: "a81ac3d7-a469-4956-85e2-98742b8d6752"
+
+status: "c7908c57-4d73-464a-9370-edbae19b1f53"
+
+Object Prototype
+[Log] onSave result: (TransferRequestForm.tsx, line 135)
+Object
+
+bulk_transfer: false
+
+destination_station: "674276bb-a81a-4d97-9580-248056cb4b71"
+
+destination_station_oc_acknowledged: false
+
+destination_station_oc_approval_status: ""
+
+destination_station_oc_approved_by: 0
+
+destination_station_oc_approved_date: ""
+
+in_charge: "fbb3380e-8b3d-4deb-9475-b10f5cac5726"
+
+number_of_prisoners: 1
+
+original_station: "aa2e5a10-08d0-4a2e-9ec2-02a46e1ad54f"
+
+original_station_oc_acknowledged: false
+
+original_station_oc_approval_status: ""
+
+original_station_oc_approved_by: 0
+
+original_station_oc_approved_date: ""
+
+prisoner: "c9749ce7-82ff-4266-9acc-ae18c0294eb7"
+
+reason: "a81ac3d7-a469-4956-85e2-98742b8d6752"
+
+status: "c7908c57-4d73-464a-9370-edbae19b1f53"
+
+Object Prototype
+[Debug] DataTable render rows: – 4 – "loading:" – false – "total:" – null (DataTable.tsx, line 115)
+
+
+
+
+
+
+
+
+
+
+
+
+// edit not wrking but drop down with loading
+
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import {
+  FileText,
+  Calendar,
+  User,
+  Building2,
+  Users,
+  X,
+  Save,
+} from "lucide-react";
+
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
+
+import { fetchStations, fetchReasons, fetchStatuses } from "../../services/transferServices/transferRequestService";
+import { createTransferRequest } from "../../services/transferServices/transferRequestService";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import SearchableSelect from "../common/SearchableSelect"; // reusable searchable select
+import StaffProfileSelect from "../common/StaffProfileSelect";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
+
+interface TransferRequest {
+  id?: string;
+  prisoner_name?: string;
+  original_station_name?: string;
+  destination_station_name?: string;
+  reason_name?: string;
+  status_name?: string;
+  in_charge_name?: string;
+  original_oc_approval_status_name?: string;
+  destination_oc_approval_status_name?: string;
+  bulk_transfer: boolean;
+  number_of_prisoners: number;
+  original_station_oc_acknowledged: boolean;
+  destination_station_oc_acknowledged: boolean;
+  original_station_oc_approved_date: string;
+  destination_station_oc_approved_date: string;
+  prisoner: string;
+  original_station: string;
+  destination_station: string;
+  reason: string;
+  in_charge: number;
+  status: string;
+  original_station_oc_approval_status: string;
+  destination_station_oc_approval_status: string;
+  original_station_oc_approved_by: number;
+  destination_station_oc_approved_by: number;
+}
+
+interface TransferRequestFormProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: TransferRequest) => void;
+  editingRequest?: TransferRequest | null;
+  prisoners?: Array<{ id: string; name: string; number: string }>;
+  stations?: Array<{ id: string; name: string }>;
+  reasons?: Array<{ id: string; name: string }>;
+  statuses?: Array<{ id: string; name: string }>;
+  approvalStatuses?: Array<{ id: string; name: string }>;
+  staff?: Array<{ id: number; name: string }>;
+}
+
+export default function TransferRequestForm({
+  open,
+  onClose,
+  onSave,
+  editingRequest,
+  prisoners: prisonersProp = [],
+  stations: stationsProp = [],
+  reasons: reasonsProp = [],
+  statuses: statusesProp = [],
+  approvalStatuses = [],
+  staff: staffProp = [],
+}: TransferRequestFormProps) {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<TransferRequest>({
+    defaultValues: {
+      bulk_transfer: false,
+      number_of_prisoners: 1,
+      original_station_oc_acknowledged: false,
+      destination_station_oc_acknowledged: false,
+      original_station_oc_approved_date: "",
+      destination_station_oc_approved_date: "",
+      prisoner: "",
+      original_station: "",
+      destination_station: "",
+      reason: "",
+      in_charge: "", // <- use empty string (controlled Select expects string)
+      status: "",
+      original_station_oc_approval_status: "",
+      destination_station_oc_approval_status: "",
+      original_station_oc_approved_by: "",
+      destination_station_oc_approved_by: "",
+    },
+  });
+
+  const isBulkTransfer = watch("bulk_transfer");
+
+  // remove local prisoners/staff usage for selects (we still keep for initial items)
+  const [stations, setStations] = useState<any[]>(stationsProp || []);
+  const [prisoners, setPrisoners] = useState<any[]>(prisonersProp || []);
+  const [reasons, setReasons] = useState<any[]>(reasonsProp || []);
+  const [statuses, setStatuses] = useState<any[]>(statusesProp || []);
+  const [staff, setStaff] = useState<any[]>(staffProp || []);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  // label to display for original station (when single transfer)
+  const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
+
+  // sync with global location filter to pre-filter stations when bulk
+  useFilterRefresh(() => {
+    const station = localStorage.getItem("selectedStation") || undefined;
+    const region = localStorage.getItem("selectedRegion") || undefined;
+    const district = localStorage.getItem("selectedDistrict") || undefined;
+    // when global filter changes, reload stations (only used when bulk)
+    loadStations({
+      station: station && station !== "all" ? station : undefined,
+      region: region && region !== "all" ? region : undefined,
+      district: district && district !== "all" ? district : undefined,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (editingRequest) {
+      reset({
+        bulk_transfer: editingRequest.bulk_transfer || false,
+        number_of_prisoners: editingRequest.number_of_prisoners || 1,
+        original_station_oc_acknowledged:
+          editingRequest.original_station_oc_acknowledged || false,
+        destination_station_oc_acknowledged:
+          editingRequest.destination_station_oc_acknowledged || false,
+        original_station_oc_approved_date:
+          editingRequest.original_station_oc_approved_date?.split("T")[0] || "",
+        destination_station_oc_approved_date:
+          editingRequest.destination_station_oc_approved_date?.split("T")[0] || "",
+        prisoner: editingRequest.prisoner || "",
+        original_station: editingRequest.original_station || "",
+        destination_station: editingRequest.destination_station || "",
+        reason: editingRequest.reason || "",
+        in_charge: editingRequest.in_charge || 0,
+        status: editingRequest.status || "",
+        original_station_oc_approval_status:
+          editingRequest.original_station_oc_approval_status || "",
+        destination_station_oc_approval_status:
+          editingRequest.destination_station_oc_approval_status || "",
+        original_station_oc_approved_by:
+          editingRequest.original_station_oc_approved_by || 0,
+        destination_station_oc_approved_by:
+          editingRequest.destination_station_oc_approved_by || 0,
+      });
+    } else {
+      reset({
+        bulk_transfer: false,
+        number_of_prisoners: 1,
+        original_station_oc_acknowledged: false,
+        destination_station_oc_acknowledged: false,
+        original_station_oc_approved_date: "",
+        destination_station_oc_approved_date: "",
+        prisoner: "",
+        original_station: "",
+        destination_station: "",
+        reason: "",
+        in_charge: 0,
+        status: "",
+        original_station_oc_approval_status: "",
+        destination_station_oc_approval_status: "",
+        original_station_oc_approved_by: 0,
+        destination_station_oc_approved_by: 0,
+      });
+    }
+  }, [editingRequest, reset]);
+
+  const onSubmit = async (data: TransferRequest) => {
+    console.log("Submitting transfer request:", data);
+    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+      toast.error("Original Station and Destination Station must be different");
+      return;
+    }
+
+    try {
+      // call parent onSave if provided
+      const result = await Promise.resolve(onSave ? onSave(data) : undefined);
+      console.log("onSave result:", result);
+
+      if (typeof result === "undefined") {
+        // Parent did not handle saving — fallback: call API directly
+        try {
+          const created = await createTransferRequest(data);
+          console.log("createTransferRequest result:", created);
+          toast.success("Transfer request saved");
+          reset();
+          onClose();
+          return;
+        } catch (err) {
+          console.error("createTransferRequest failed:", err);
+          toast.error("Failed to save transfer request");
+          return;
+        }
+      }
+
+      // parent returned something (assume success)
+      toast.success("Transfer request saved");
+      reset();
+      onClose();
+    } catch (err) {
+      console.error("Failed to save transfer request:", err);
+      toast.error("Failed to save transfer request");
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  useEffect(() => {
+    // load lookup data when form mounts
+    let mounted = true;
+    setLoadingLookups(true);
+    const c = new AbortController();
+    Promise.all([
+      fetchStations(c.signal).catch(() => []),
+      fetchReasons(c.signal).catch(() => []),
+      fetchStatuses(c.signal).catch(() => []),
+      fetchStaffProfiles("", c.signal).catch(() => ({ items: [] })), // keep staff if needed
+      // remove fetchPrisoners here to avoid duplicate requests - CustomPrisonerSearch will fetch itself
+      // fetchPrisoners({ page_size: 100 }, c.signal).catch(() => ({ items: [] })),
+    ])
+      .then(([st, rsn, sts, sfRes /*, prRes */]) => {
+        if (!mounted) return;
+        setStations(st);
+        setReasons(rsn);
+        setStatuses(sts);
+        setStaff(Array.isArray(sfRes) ? sfRes : (sfRes?.items ?? []));
+        // setPrisoners(prRes?.items ?? []); // remove or keep only if used elsewhere
+      })
+      .finally(() => {
+        setLoadingLookups(false);
+      });
+    return () => {
+      mounted = false;
+      c.abort();
+    };
+  }, []);
+
+  const loadStations = async (params?: any) => {
+    setLoadingLookups(true);
+    const c = new AbortController();
+    try {
+      const data = await fetchStations({ ...params, page_size: 100 }, c.signal);
+      setStations(data);
+    } catch (error) {
+      setStations([]);
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  // keep watcher
+  const prisonerVal = watch("prisoner");
+  const originalStationVal = watch("original_station");
+
+  useEffect(() => {
+    // When not bulk, auto-populate original station from selected prisoner.
+    // Try local cache first, then fall back to server lookup.
+    let cancelled = false;
+    const c = new AbortController();
+    async function resolvePrisonerStation(pId?: string | null) {
+      if (!pId) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+        return;
+      }
+
+      // 1) try local cache
+      const local = prisoners.find((p: any) => String(p.id) === String(pId));
+      if (local && local.current_station) {
+        setValue("original_station", local.current_station);
+        setOriginalStationLabel(local.current_station_name ?? "");
+        return;
+      }
+
+      // 2) try stations/search by id via fetchPrisoners - some backends support id lookup via search
+      // (you can keep or remove; if kept ensure useCache:true and page_size:1)
+      // try {
+      //   const res = await fetchPrisoners({ search: String(pId), page_size: 1 }, c.signal);
+      //   if (cancelled) return;
+      //   const p = res.items?.[0];
+      //   if (p && p.current_station) {
+      //     setValue("original_station", p.current_station);
+      //     return;
+      //   }
+      // } catch (_) {
+      //   // ignore network/abort errors — leave original_station blank
+      // }
+    }
+
+    if (!isBulkTransfer) {
+      resolvePrisonerStation(prisonerVal);
+    } else {
+      // when bulk, do not auto-populate
+      if (!prisonerVal) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      c.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBulkTransfer, prisonerVal, prisoners]);
+
+  // Keep originalStationLabel in sync when original_station value or stations list changes
+  useEffect(() => {
+    if (!originalStationVal) {
+      setOriginalStationLabel("");
+      return;
+    }
+    // prefer stations lookup
+    const s = stations.find((st: any) => String(st.id) === String(originalStationVal));
+    if (s) {
+      setOriginalStationLabel(s.name ?? "");
+      return;
+    }
+    // fallback: try to find prisoner and use its current_station_name
+    const p = prisoners.find((pr: any) => String(pr.id) === String(prisonerVal));
+    if (p && p.current_station_name) {
+      setOriginalStationLabel(p.current_station_name);
+      return;
+    }
+  }, [originalStationVal, stations, prisoners, prisonerVal]);
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-xs max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle className="text-[#650000] flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {editingRequest ? "Edit Transfer Request" : "Add Transfer Request"}
+            </DialogTitle>
+            <DialogDescription>
+             Please complete the form to create or update a transfer request.
+           </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
+            {/* Bulk Transfer Toggle */}
+            <div className="border-b pb-4">
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="bulk_transfer"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="bulk_transfer"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          setValue("number_of_prisoners", 1);
+                        }
+                      }}
+                    />
+                  )}
+                />
+                <label
+                  htmlFor="bulk_transfer"
+                  className="text-sm cursor-pointer flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Bulk Transfer (Multiple Prisoners)
+                </label>
+              </div>
+            </div>
+
+            {/* Prisoner or Number of Prisoners */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isBulkTransfer ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Prisoner
+                  </Label>
+                  <Controller
+                    name="prisoner"
+                    control={control}
+                    rules={{ required: !isBulkTransfer ? "Prisoner is required" : false }}
+                    render={({ field }) => (
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        onSelectItem={(p) => {
+                          // immediately clear previous station to avoid showing stale data
+                          setValue("original_station", "");
+                          setOriginalStationLabel("");
+
+                          // derive stable station fields for the selected item
+                          const stationId =
+                            p?.current_station ??
+                            p?.station ??
+                            (p as any)?.stationId ??
+                            (p as any)?.station_id ??
+                            "";
+                          const stationName =
+                            p?.current_station_name ??
+                            p?.station_name ??
+                            (p as any)?.stationName ??
+                            "";
+
+                          try {
+                            console.log("Prisoner selected (final):", {
+                              id: p?.id ?? null,
+                              name:
+                                p?.full_name ??
+                                `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim(),
+                              stationId,
+                              stationName,
+                            });
+                          } catch {}
+
+                          // populate form field + label if available (will overwrite the cleared values)
+                          if (stationId) {
+                            setValue("original_station", stationId);
+                          }
+                          if (stationName) {
+                            setOriginalStationLabel(stationName);
+                          }
+
+                          // keep prisoners cache up-to-date (so other lookups can use it)
+                          setPrisoners((prev) => {
+                            if (!p) return prev;
+                            const exists = prev.some(
+                              (x: any) => String(x.id) === String(p.id)
+                            );
+                            if (exists) return prev;
+                            return [p, ...prev];
+                          });
+                        }}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                        disabled={false}
+                      />
+                    )}
+                  />
+                  {errors.prisoner && (
+                    <span className="text-sm text-red-500">
+                      {errors.prisoner.message}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Prisoners
+                  </Label>
+                  <Controller
+                    name="number_of_prisoners"
+                    control={control}
+                    rules={{
+                      required: isBulkTransfer
+                        ? "Number of prisoners is required"
+                        : false,
+                      min: { value: 1, message: "Must be at least 1" },
+                    }}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                        min="1"
+                      />
+                    )}
+                  />
+                  {errors.number_of_prisoners && (
+                    <span className="text-sm text-red-500">
+                      {errors.number_of_prisoners.message}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Officer In Charge
+                </Label>
+                <Controller
+                  name="in_charge"
+                  control={control}
+                  rules={{ required: "Officer in charge is required" }}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select officer in charge"
+                      initialItems={staff} // <-- pass initial items to avoid flicker
+                    />
+                  )}
+                />
+                {errors.in_charge && (
+                  <span className="text-sm text-red-500">
+                    {errors.in_charge.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stations */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Original Station
+                </Label>
+                <Controller
+                  name="original_station"
+                  control={control}
+                  rules={{ required: isBulkTransfer ? "Original station is required" : false }}
+                  render={({ field }) => {
+                    // when not bulk: show read-only label so user can't change; when bulk: full searchable select
+                    if (!isBulkTransfer) {
+                      const stationLabel = stations.find((s: any) => String(s.id) === String(field.value))?.name
+                        || originalStationLabel
+                        || (prisoners.find((p: any) => String(p.id) === String(prisonerVal))?.current_station_name)
+                        || "";
+                      return (
+                        <Input value={stationLabel} readOnly placeholder="Auto-filled from prisoner" />
+                      );
+                    }
+                    return (
+                      <SearchableSelect
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        placeholder="Select original station"
+                        items={stations}
+                        idField="id"
+                        labelField="name"
+                      />
+                    );
+                  }}
+                />
+                {!isBulkTransfer && <div className="text-xs text-gray-500">Auto-populated from selected prisoner (disabled for single transfers)</div>}
+                {errors.original_station && (<span className="text-sm text-red-500">{errors.original_station.message}</span>)}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Destination Station
+                </Label>
+                <Controller
+                  name="destination_station"
+                  control={control}
+                  rules={{ required: "Destination station is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      placeholder="Select destination station"
+                      items={stations.filter((s: any) => s.id !== (originalStationVal || ""))}
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {errors.destination_station && (<span className="text-sm text-red-500">{errors.destination_station.message}</span>)}
+              </div>
+            </div>
+
+            {/* Reason and Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Transfer Reason</Label>
+                <Controller
+                  name="reason"
+                  control={control}
+                  rules={{ required: "Reason is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={reasons}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select reason"
+                    />
+                  )}
+                />
+                {errors.reason && (
+                  <span className="text-sm text-red-500">
+                    {errors.reason.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Request Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  rules={{ required: "Status is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={statuses}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select status"
+                    />
+                  )}
+                />
+                {errors.status && (
+                  <span className="text-sm text-red-500">
+                    {errors.status.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* OC Approval Information removed */}
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
+              >
+                <Save className="h-4 w-4" />
+                {editingRequest ? "Update Request" : "Create Request"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+
+// before adding view option
+
+import { useEffect, useState } from "react";
+import { useForm, Controller } from "react-hook-form";
+import {
+  FileText,
+  Calendar,
+  User,
+  Building2,
+  Users,
+  X,
+  Save,
+} from "lucide-react";
+
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "../ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
+import { Checkbox } from "../ui/checkbox";
+import { toast } from "sonner";
+
+import { fetchStations, fetchReasons, fetchStatuses } from "../../services/transferServices/transferRequestService";
+import { createTransferRequest, updateTransferRequest } from "../../services/transferServices/transferRequestService";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import SearchableSelect from "../common/SearchableSelect"; // reusable searchable select
+import StaffProfileSelect from "../common/StaffProfileSelect";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
+
+interface TransferRequest {
+  id?: string;
+  prisoner_name?: string;
+  original_station_name?: string;
+  destination_station_name?: string;
+  reason_name?: string;
+  status_name?: string;
+  in_charge_name?: string;
+  original_oc_approval_status_name?: string;
+  destination_oc_approval_status_name?: string;
+  bulk_transfer: boolean;
+  number_of_prisoners: number;
+  original_station_oc_acknowledged: boolean;
+  destination_station_oc_acknowledged: boolean;
+  original_station_oc_approved_date: string;
+  destination_station_oc_approved_date: string;
+  prisoner: string;
+  original_station: string;
+  destination_station: string;
+  reason: string;
+  in_charge: number;
+  status: string;
+  original_station_oc_approval_status: string;
+  destination_station_oc_approval_status: string;
+  original_station_oc_approved_by: number;
+  destination_station_oc_approved_by: number;
+}
+
+interface TransferRequestFormProps {
+  open: boolean;
+  onClose: () => void;
+  onSave: (data: TransferRequest) => void;
+  editingRequest?: TransferRequest | null;
+  prisoners?: Array<{ id: string; name: string; number: string }>;
+  stations?: Array<{ id: string; name: string }>;
+  reasons?: Array<{ id: string; name: string }>;
+  statuses?: Array<{ id: string; name: string }>;
+  approvalStatuses?: Array<{ id: string; name: string }>;
+  staff?: Array<{ id: number; name: string }>;
+}
+
+export default function TransferRequestForm({
+  open,
+  onClose,
+  onSave,
+  editingRequest,
+  prisoners: prisonersProp = [],
+  stations: stationsProp = [],
+  reasons: reasonsProp = [],
+  statuses: statusesProp = [],
+  approvalStatuses = [],
+  staff: staffProp = [],
+}: TransferRequestFormProps) {
+  const {
+    control,
+    handleSubmit,
+    reset,
+    setValue,
+    watch,
+    formState: { errors },
+  } = useForm<TransferRequest>({
+    defaultValues: {
+      bulk_transfer: false,
+      number_of_prisoners: 1,
+      original_station_oc_acknowledged: false,
+      destination_station_oc_acknowledged: false,
+      original_station_oc_approved_date: "",
+      destination_station_oc_approved_date: "",
+      prisoner: "",
+      original_station: "",
+      destination_station: "",
+      reason: "",
+      in_charge: "", // <- use empty string (controlled Select expects string)
+      status: "",
+      original_station_oc_approval_status: "",
+      destination_station_oc_approval_status: "",
+      original_station_oc_approved_by: "",
+      destination_station_oc_approved_by: "",
+    },
+  });
+
+  const isBulkTransfer = watch("bulk_transfer");
+
+  // remove local prisoners/staff usage for selects (we still keep for initial items)
+  const [stations, setStations] = useState<any[]>(stationsProp || []);
+  const [prisoners, setPrisoners] = useState<any[]>(prisonersProp || []);
+  const [reasons, setReasons] = useState<any[]>(reasonsProp || []);
+  const [statuses, setStatuses] = useState<any[]>(statusesProp || []);
+  const [staff, setStaff] = useState<any[]>(staffProp || []);
+  const [loadingLookups, setLoadingLookups] = useState(false);
+
+  // label to display for original station (when single transfer)
+  const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
+
+  // sync with global location filter to pre-filter stations when bulk
+  useFilterRefresh(() => {
+    const station = localStorage.getItem("selectedStation") || undefined;
+    const region = localStorage.getItem("selectedRegion") || undefined;
+    const district = localStorage.getItem("selectedDistrict") || undefined;
+    // when global filter changes, reload stations (only used when bulk)
+    loadStations({
+      station: station && station !== "all" ? station : undefined,
+      region: region && region !== "all" ? region : undefined,
+      district: district && district !== "all" ? district : undefined,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (editingRequest) {
+      reset({
+        bulk_transfer: editingRequest.bulk_transfer || false,
+        number_of_prisoners: editingRequest.number_of_prisoners || 1,
+        original_station_oc_acknowledged:
+          editingRequest.original_station_oc_acknowledged || false,
+        destination_station_oc_acknowledged:
+          editingRequest.destination_station_oc_acknowledged || false,
+        original_station_oc_approved_date:
+          editingRequest.original_station_oc_approved_date?.split("T")[0] || "",
+        destination_station_oc_approved_date:
+          editingRequest.destination_station_oc_approved_date?.split("T")[0] || "",
+        prisoner: editingRequest.prisoner || "",
+        original_station: editingRequest.original_station || "",
+        destination_station: editingRequest.destination_station || "",
+        reason: editingRequest.reason || "",
+        in_charge: editingRequest.in_charge || 0,
+        status: editingRequest.status || "",
+        original_station_oc_approval_status:
+          editingRequest.original_station_oc_approval_status || "",
+        destination_station_oc_approval_status:
+          editingRequest.destination_station_oc_approval_status || "",
+        original_station_oc_approved_by:
+          editingRequest.original_station_oc_approved_by || 0,
+        destination_station_oc_approved_by:
+          editingRequest.destination_station_oc_approved_by || 0,
+      });
+    } else {
+      reset({
+        bulk_transfer: false,
+        number_of_prisoners: 1,
+        original_station_oc_acknowledged: false,
+        destination_station_oc_acknowledged: false,
+        original_station_oc_approved_date: "",
+        destination_station_oc_approved_date: "",
+        prisoner: "",
+        original_station: "",
+        destination_station: "",
+        reason: "",
+        in_charge: 0,
+        status: "",
+        original_station_oc_approval_status: "",
+        destination_station_oc_approval_status: "",
+        original_station_oc_approved_by: 0,
+        destination_station_oc_approved_by: 0,
+      });
+    }
+  }, [editingRequest, reset]);
+
+  const onSubmit = async (data: TransferRequest) => {
+    console.log("Submitting transfer request:", data);
+    if (data.original_station && data.destination_station && data.original_station === data.destination_station) {
+      toast.error("Original Station and Destination Station must be different");
+      return;
+    }
+
+    try {
+      // If editingRequest exists -> update path (use API)
+      if (editingRequest && editingRequest.id) {
+        // defensive: if the form is actually filled for a new record (no prisoner or id mismatch),
+        // fall back to create. Adjust the check to match your domain if needed.
+        const isLikelyCreate = !editingRequest.prisoner && !!data.prisoner;
+        if (!isLikelyCreate) {
+          // proceed with update
+          const updated = await updateTransferRequest(String(editingRequest.id), data);
+          console.log("updateTransferRequest result:", updated);
+          // notify parent callback and listeners
+          try { if (onSave) await Promise.resolve(onSave(updated)); } catch {}
+          try { window.dispatchEvent(new CustomEvent("transfer:updated", { detail: updated })); } catch {}
+          toast.success("Transfer request updated");
+          reset();
+          onClose();
+          return;
+        }
+      }
+
+      // Create path (call API here, then notify parent)
+      // Always perform create here, then notify parent with the created object
+      const created = await createTransferRequest(data);
+      console.log("createTransferRequest result:", created);
+      try { if (onSave) await Promise.resolve(onSave(created as any)); } catch (e) { console.warn("onSave handler failed:", e); }
+      try { window.dispatchEvent(new CustomEvent("transfer:created", { detail: created })); } catch (e) {}
+       toast.success("Transfer request saved");
+      reset();
+      onClose();
+    } catch (err) {
+      console.error("Failed to save transfer request:", err);
+      toast.error("Failed to save transfer request");
+    }
+  };
+
+  const handleClose = () => {
+    reset();
+    onClose();
+  };
+
+  useEffect(() => {
+    // load lookup data when form mounts
+    let mounted = true;
+    setLoadingLookups(true);
+    const c = new AbortController();
+    Promise.all([
+      fetchStations(c.signal).catch(() => []),
+      fetchReasons(c.signal).catch(() => []),
+      fetchStatuses(c.signal).catch(() => []),
+      fetchStaffProfiles("", c.signal).catch(() => ({ items: [] })), // keep staff if needed
+      // remove fetchPrisoners here to avoid duplicate requests - CustomPrisonerSearch will fetch itself
+      // fetchPrisoners({ page_size: 100 }, c.signal).catch(() => ({ items: [] })),
+    ])
+      .then(([st, rsn, sts, sfRes /*, prRes */]) => {
+        if (!mounted) return;
+        setStations(st);
+        setReasons(rsn);
+        setStatuses(sts);
+        setStaff(Array.isArray(sfRes) ? sfRes : (sfRes?.items ?? []));
+        // setPrisoners(prRes?.items ?? []); // remove or keep only if used elsewhere
+      })
+      .finally(() => {
+        setLoadingLookups(false);
+      });
+    return () => {
+      mounted = false;
+      c.abort();
+    };
+  }, []);
+
+  const loadStations = async (params?: any) => {
+    setLoadingLookups(true);
+    const c = new AbortController();
+    try {
+      const data = await fetchStations({ ...params, page_size: 100 }, c.signal);
+      setStations(data);
+    } catch (error) {
+      setStations([]);
+    } finally {
+      setLoadingLookups(false);
+    }
+  };
+
+  // keep watcher
+  const prisonerVal = watch("prisoner");
+  const originalStationVal = watch("original_station");
+
+  useEffect(() => {
+    // When not bulk, auto-populate original station from selected prisoner.
+    // Try local cache first, then fall back to server lookup.
+    let cancelled = false;
+    const c = new AbortController();
+    async function resolvePrisonerStation(pId?: string | null) {
+      if (!pId) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+        return;
+      }
+
+      // 1) try local cache
+      const local = prisoners.find((p: any) => String(p.id) === String(pId));
+      if (local && local.current_station) {
+        setValue("original_station", local.current_station);
+        setOriginalStationLabel(local.current_station_name ?? "");
+        return;
+      }
+
+      // 2) try stations/search by id via fetchPrisoners - some backends support id lookup via search
+      // (you can keep or remove; if kept ensure useCache:true and page_size:1)
+      // try {
+      //   const res = await fetchPrisoners({ search: String(pId), page_size: 1 }, c.signal);
+      //   if (cancelled) return;
+      //   const p = res.items?.[0];
+      //   if (p && p.current_station) {
+      //     setValue("original_station", p.current_station);
+      //     return;
+      //   }
+      // } catch (_) {
+      //   // ignore network/abort errors — leave original_station blank
+      // }
+    }
+
+    if (!isBulkTransfer) {
+      resolvePrisonerStation(prisonerVal);
+    } else {
+      // when bulk, do not auto-populate
+      if (!prisonerVal) {
+        setValue("original_station", "");
+        setOriginalStationLabel("");
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      c.abort();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isBulkTransfer, prisonerVal, prisoners]);
+
+  // Keep originalStationLabel in sync when original_station value or stations list changes
+  useEffect(() => {
+    if (!originalStationVal) {
+      setOriginalStationLabel("");
+      return;
+    }
+    // prefer stations lookup
+    const s = stations.find((st: any) => String(st.id) === String(originalStationVal));
+    if (s) {
+      setOriginalStationLabel(s.name ?? "");
+      return;
+    }
+    // fallback: try to find prisoner and use its current_station_name
+    const p = prisoners.find((pr: any) => String(pr.id) === String(prisonerVal));
+    if (p && p.current_station_name) {
+      setOriginalStationLabel(p.current_station_name);
+      return;
+    }
+  }, [originalStationVal, stations, prisoners, prisonerVal]);
+
+  return (
+    <Dialog open={open} onOpenChange={handleClose}>
+      <DialogContent className="max-w-xs max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <div className="flex-1 overflow-y-auto p-6">
+          <DialogHeader>
+            <DialogTitle className="text-[#650000] flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              {editingRequest ? "Edit Transfer Request" : "Add Transfer Request"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingRequest ? "Please complete the form to update a transfer request." : "Please complete the form to create a transfer request."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6 mt-4">
+            {/* Bulk Transfer Toggle */}
+            <div className="border-b pb-4">
+              <div className="flex items-center space-x-2">
+                <Controller
+                  name="bulk_transfer"
+                  control={control}
+                  render={({ field }) => (
+                    <Checkbox
+                      id="bulk_transfer"
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        field.onChange(checked);
+                        if (!checked) {
+                          setValue("number_of_prisoners", 1);
+                        }
+                      }}
+                    />
+                  )}
+                />
+                <label
+                  htmlFor="bulk_transfer"
+                  className="text-sm cursor-pointer flex items-center gap-2"
+                >
+                  <Users className="h-4 w-4" />
+                  Bulk Transfer (Multiple Prisoners)
+                </label>
+              </div>
+            </div>
+
+            {/* Prisoner or Number of Prisoners */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isBulkTransfer ? (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Prisoner
+                  </Label>
+                  <Controller
+                    name="prisoner"
+                    control={control}
+                    rules={{ required: !isBulkTransfer ? "Prisoner is required" : false }}
+                    render={({ field }) => (
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        onSelectItem={(p) => {
+                          // immediately clear previous station to avoid showing stale data
+                          setValue("original_station", "");
+                          setOriginalStationLabel("");
+
+                          // derive stable station fields for the selected item
+                          const stationId =
+                            p?.current_station ??
+                            p?.station ??
+                            (p as any)?.stationId ??
+                            (p as any)?.station_id ??
+                            "";
+                          const stationName =
+                            p?.current_station_name ??
+                            p?.station_name ??
+                            (p as any)?.stationName ??
+                            "";
+
+                          try {
+                            console.log("Prisoner selected (final):", {
+                              id: p?.id ?? null,
+                              name:
+                                p?.full_name ??
+                                `${p?.first_name ?? ""} ${p?.last_name ?? ""}`.trim(),
+                              stationId,
+                              stationName,
+                            });
+                          } catch {}
+
+                          // populate form field + label if available (will overwrite the cleared values)
+                          if (stationId) {
+                            setValue("original_station", stationId);
+                          }
+                          if (stationName) {
+                            setOriginalStationLabel(stationName);
+                          }
+
+                          // keep prisoners cache up-to-date (so other lookups can use it)
+                          setPrisoners((prev) => {
+                            if (!p) return prev;
+                            const exists = prev.some(
+                              (x: any) => String(x.id) === String(p.id)
+                            );
+                            if (exists) return prev;
+                            return [p, ...prev];
+                          });
+                        }}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                        disabled={false}
+                      />
+                    )}
+                  />
+                  {errors.prisoner && (
+                    <span className="text-sm text-red-500">
+                      {errors.prisoner.message}
+                    </span>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Number of Prisoners
+                  </Label>
+                  <Controller
+                    name="number_of_prisoners"
+                    control={control}
+                    rules={{
+                      required: isBulkTransfer
+                        ? "Number of prisoners is required"
+                        : false,
+                      min: { value: 1, message: "Must be at least 1" },
+                    }}
+                    render={({ field }) => (
+                      <Input
+                        type="number"
+                        {...field}
+                        onChange={(e) =>
+                          field.onChange(parseInt(e.target.value) || 0)
+                        }
+                        min="1"
+                      />
+                    )}
+                  />
+                  {errors.number_of_prisoners && (
+                    <span className="text-sm text-red-500">
+                      {errors.number_of_prisoners.message}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Officer In Charge
+                </Label>
+                <Controller
+                  name="in_charge"
+                  control={control}
+                  rules={{ required: "Officer in charge is required" }}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select officer in charge"
+                      initialItems={staff} // <-- pass initial items to avoid flicker
+                    />
+                  )}
+                />
+                {errors.in_charge && (
+                  <span className="text-sm text-red-500">
+                    {errors.in_charge.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Stations */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Original Station
+                </Label>
+                <Controller
+                  name="original_station"
+                  control={control}
+                  rules={{ required: isBulkTransfer ? "Original station is required" : false }}
+                  render={({ field }) => {
+                    // when not bulk: show read-only label so user can't change; when bulk: full searchable select
+                    if (!isBulkTransfer) {
+                      const stationLabel = stations.find((s: any) => String(s.id) === String(field.value))?.name
+                        || originalStationLabel
+                        || (prisoners.find((p: any) => String(p.id) === String(prisonerVal))?.current_station_name)
+                        || "";
+                      return (
+                        <Input value={stationLabel} readOnly placeholder="Auto-filled from prisoner" />
+                      );
+                    }
+                    return (
+                      <SearchableSelect
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        placeholder="Select original station"
+                        items={stations}
+                        idField="id"
+                        labelField="name"
+                      />
+                    );
+                  }}
+                />
+                {!isBulkTransfer && <div className="text-xs text-gray-500">Auto-populated from selected prisoner (disabled for single transfers)</div>}
+                {errors.original_station && (<span className="text-sm text-red-500">{errors.original_station.message}</span>)}
+              </div>
+
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">
+                  <Building2 className="h-4 w-4" />
+                  Destination Station
+                </Label>
+                <Controller
+                  name="destination_station"
+                  control={control}
+                  rules={{ required: "Destination station is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      placeholder="Select destination station"
+                      items={stations.filter((s: any) => s.id !== (originalStationVal || ""))}
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {errors.destination_station && (<span className="text-sm text-red-500">{errors.destination_station.message}</span>)}
+              </div>
+            </div>
+
+            {/* Reason and Status */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Transfer Reason</Label>
+                <Controller
+                  name="reason"
+                  control={control}
+                  rules={{ required: "Reason is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={reasons}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select reason"
+                    />
+                  )}
+                />
+                {errors.reason && (
+                  <span className="text-sm text-red-500">
+                    {errors.reason.message}
+                  </span>
+                )}
+              </div>
+
+              <div className="space-y-2">
+                <Label>Request Status</Label>
+                <Controller
+                  name="status"
+                  control={control}
+                  rules={{ required: "Status is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      items={statuses}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select status"
+                    />
+                  )}
+                />
+                {errors.status && (
+                  <span className="text-sm text-red-500">
+                    {errors.status.message}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* OC Approval Information removed */}
+
+            {/* Form Actions */}
+            <div className="flex justify-end gap-3 pt-4 border-t">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleClose}
+                className="gap-2"
+              >
+                <X className="h-4 w-4" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                className="gap-2 bg-[#650000] hover:bg-[#4a0000]"
+              >
+                <Save className="h-4 w-4" />
+                {editingRequest ? "Update Request" : "Create Request"}
+              </Button>
+            </div>
+          </form>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+
+
+prisnoer search b4 scroll
+
+import React, { useEffect, useRef, useState } from "react";
+import { Button } from "../ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "../ui/command";
+import { Check, ChevronsUpDown } from "lucide-react";
+import { cn } from "../ui/utils";
+import { fetchPrisoners } from "../../services/customPrisonersService";
+import { useFilters } from "../../contexts/FilterContext";
+import { usePaginatedSearch } from "../../hooks/usePaginatedSearch";
+
+type Item = Record<string, any>;
+
+type Props = {
+  value?: string | null;
+  onChange: (val: string | null) => void;
+  placeholder?: string;
+  pageSize?: number;
+  disabled?: boolean;
+  className?: string;
+  idField?: string; // default "id"
+  labelField?: string; // default "full_name"
+  initialItems?: Item[]; // optional initial list
+  onSelectItem?: (item: Item) => void; // <--- add this prop
+};
+
+export default function CustomPrisonerSearch({
+  value = null,
+  onChange,
+  placeholder = "Search prisoner...",
+  pageSize = 25,
+  disabled = false,
+  className,
+  idField = "id",
+  labelField = "full_name",
+  initialItems = [],
+  onSelectItem, // <--- destructure here
+}: Props) {
+  const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
+
+  const [open, setOpen] = useState(false);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+
+  const triggerRef = useRef<HTMLButtonElement | null>(null);
+  const [contentWidth, setContentWidth] = useState<number | null>(null);
+
+  // use hook for paginated search (debounced + abort + loadMore)
+  const {
+    query,
+    setQuery,
+    items,
+    loading,
+    error,
+    hasNext,
+    loadMore,
+  } = usePaginatedSearch<Item>(fetchPrisoners, {
+    initialQuery: "",
+    pageSize,
+    debounceMs: 300,
+    filters: {
+      station: globalStation || null,
+      district: globalDistrict || null,
+      region: globalRegion || null,
+      useCache: true,
+    },
+    initialItems: initialItems || [],
+    idField,
+  });
+
+  // keep selected label in sync with provided value and items
+  useEffect(() => {
+    if (!value) {
+      setSelectedLabel(null);
+      return;
+    }
+    const found = items.find((it) => String(it[idField]) === String(value));
+    if (found) {
+      setSelectedLabel(found[labelField]);
+      return;
+    }
+    // if not found in current items, try to fetch single record
+    const ctrl = new AbortController();
+    fetchPrisoners({ search: String(value), page_size: 1, page: 1, station: globalStation || null, district: globalDistrict || null, region: globalRegion || null }, ctrl.signal)
+      .then((res) => {
+        const p = (res.items || [])[0];
+        if (p) {
+          setSelectedLabel(p[labelField]);
+        }
+      })
+      .catch(() => {})
+      .finally(() => ctrl.abort());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, items, idField, labelField]);
+
+  useEffect(() => {
+    if (!open) return;
+    const updateWidth = () => {
+      const w = triggerRef.current?.offsetWidth ?? null;
+      setContentWidth(w);
+    };
+    updateWidth();
+    window.addEventListener("resize", updateWidth);
+    return () => window.removeEventListener("resize", updateWidth);
+  }, [open]);
+
+  return (
+    <div className={cn("w-full", className)}>
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            ref={triggerRef}
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full justify-between text-left"
+            type="button"
+            disabled={disabled}
+            onClick={() => {
+              // open and ensure initial fetch for empty query
+              if (!open) {
+                // only trigger the debounced hook fetch when we don't already have items
+                if (items.length === 0) {
+                  setQuery(""); // trigger initial fetch (hook is debounced)
+                }
+              }
+            }}
+          >
+            {value ? (selectedLabel ?? String(value)) : <span className="text-gray-500 text-sm">{placeholder}</span>}
+            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent
+          className="p-0"
+          style={contentWidth ? { width: `${contentWidth}px` } : undefined}
+        >
+          <Command shouldFilter={false}>
+            <CommandInput placeholder={placeholder} value={query} onValueChange={(v) => setQuery(v)} />
+            <CommandList>
+              {loading && items.length === 0 ? (
+                <div className="flex items-center justify-center py-4">
+                  <span className="text-sm text-gray-500">Loading...</span>
+                </div>
+              ) : (
+                <>
+                  <CommandEmpty>No prisoner found.</CommandEmpty>
+                  <CommandGroup>
+                    {items.map((p) => {
+                      const id = String(p[idField]);
+                      const label = String(p[labelField] ?? id);
+
+                      // derive stable station fields for each item (tries multiple common keys)
+                      const stationId = p.current_station ?? p.station ?? p.current_station_id ?? p.station_id ?? p.stationId ?? "";
+                      const stationName = p.current_station_name ?? p.station_name ?? p.stationName ?? "";
+
+                      return (
+                        <CommandItem
+                          key={id}
+                          value={id}
+                          onSelect={() => {
+                            onChange(id);
+                            setSelectedLabel(label);
+                            // call parent with full item plus explicit station fields (guaranteed keys)
+                            try {
+                              onSelectItem?.({ ...p, stationId, stationName });
+                            } catch {}
+                            setOpen(false);
+                          }}
+                          className="cursor-pointer"
+                        >
+                          <Check className={cn("mr-2 h-4 w-4", String(value) === id ? "opacity-100" : "opacity-0")} style={{ color: "#650000" }} />
+                          <div className="flex flex-col text-sm">
+                            <span>{label}</span>
+                            <span className="text-xs text-gray-500">{p.prisoner_number_value ?? p.prisoner_number ?? ""}</span>
+                          </div>
+
+                          {/* hidden metadata (kept in DOM for debugging / easy extraction) */}
+                          <span style={{ display: "none" }} data-station-id={stationId} data-station-name={stationName} />
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+
+                  {/* Load more */}
+                  {hasNext && (
+                    <div className="flex items-center justify-center p-2">
+                      <button
+                        type="button"
+                        onClick={() => loadMore()}
+                        className="text-sm text-[#650000] px-3 py-1 rounded hover:underline"
+                        disabled={loading}
+                      >
+                        {loading ? "Loading..." : "Load more"}
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
+
+
+
+
+
+
+
+
+
+
+<div>
+                <Label htmlFor="welfare_officer">
+                  Welfare Officer <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="welfare_officer"
+                  control={callForm.control}
+                  rules={requiredValidation("Welfare officer")}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select welfare officer"
+                      initialItems={[]} // optional: replace with cached staff if available
+                    />
+                  )}
+                />
+                {callForm.formState.errors.welfare_officer && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.welfare_officer as any).message}</p>
+                )}
+              </div>
+
+
+
+
+
+
+
+
+
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Button } from "../ui/button";
+import { Input } from "../ui/input";
+import { Label } from "../ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { Textarea } from "../ui/textarea";
+import { Badge } from "../ui/badge";
+import { Plus, Search, Edit, Trash2, X, Save, Calendar as CalendarIcon, Upload, Phone, Mail } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
+import { toast } from "sonner"; // fixed import
+import SearchableSelect from "../common/SearchableSelect";
+import FileUploader from "../common/FileUploader";
+import { useForm, Controller } from "react-hook-form";
+import { Switch } from "../ui/switch";
+import { DataTable } from "../common/DataTable";
+import * as PhoneService from "../../services/stationServices/phoneService";
+import * as LetterService from "../../services/stationServices/letterService";
+import { phoneNumberValidation, emailValidation, requiredValidation } from "../../utils/validation";
+import { useFilterRefresh } from "../../hooks/useFilterRefresh";
+import { useFilters } from "../../contexts/FilterContext";
+import axiosInstance from "../../services/axiosInstance";
+// use the typed/custom prisoners service (returns { items, count })
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+
+/**
+ * Centralized API endpoints (single source of truth).
+ * Update these values to match backend routes. Use these variables
+ * everywhere instead of hardcoding strings.
+ */
+const API_ENDPOINTS = {
+  createLetter: "/rehabilitation/eletters/",        // POST to create letter (JSON)
+  createCall: "/rehabilitation/call-records/",      // POST to create call record (JSON)
+  // Upload endpoints used by uploadStrategyService.
+  // If your backend has dedicated upload endpoints, set them here.
+  // Otherwise uploadStrategyService will post base64 JSON to `doc` endpoint
+  // or multipart to `audio` endpoint depending on file type.
+
+};
+
+// create accept strings for inputs from the extension lists
+// keep these centralized so future devs can change formats in one place
+const AUDIO_UPLOAD_ACCEPT = "." + AUDIO_EXTS.join(".,");
+const LETTER_UPLOAD_ACCEPT = "." + LETTER_ALLOWED_EXTS.join(".,");
+;
+
+// helper: get extension in lowercase (without dot)
+function fileExt(file: File | null) {
+  if (!file) return "";
+  return (file.name.split(".").pop() || "").toLowerCase();
+}
+
+// new helper: format ISO -> "YYYY-MM-DDTHH:MM" for datetime-local inputs
+function toDatetimeLocal(iso?: string | null) {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// helper: extract a usable file reference from uploadStrategyService response
+function extractFileRefFromSendResult(res: any): string | null {
+  // backends vary; check common shapes and return a string usable by create endpoints
+  if (!res) return null;
+  // sometimes service returns normalized { ok, data }
+  const data = res.data ?? res;
+  if (!data) return null;
+  // common fields
+  if (typeof data === "string") return data;               // maybe base64 or URL string
+  if (data.file_identifier) return data.file_identifier;   // custom
+  if (data.id) return String(data.id);
+  if (data.url) return data.url;
+  if (data.path) return data.path;
+  // if API returned structure with file.content_base64
+  if (data.file && data.file.content_base64) return data.file.content_base64;
+  // fallback — caller can inspect res.data manually in logs
+  return null;
+}
+
+// helper: convert "YYYY-MM-DDTHH:MM" (datetime-local) to ISO string (UTC)
+function localToISOString(dtLocal?: string | null) {
+  if (!dtLocal) return null;
+  // expected format "YYYY-MM-DDTHH:MM" or "YYYY-MM-DDTHH:MM:SS"
+  const parts = dtLocal.split("T");
+  if (parts.length !== 2) return null;
+  const [y, m, d] = parts[0].split("-").map(Number);
+  const [hh, mmSec] = parts[1].split(":");
+  const hhNum = Number(hh);
+  const mmNum = Number(mmSec?.split(":")[0] ?? 0);
+  const ssNum = Number(mmSec?.split(":")[1] ?? 0);
+  const dt = new Date(y, (m || 1) - 1, d, hhNum, mmNum, ssNum);
+  if (Number.isNaN(dt.getTime())) return null;
+  return dt.toISOString();
+}
+
+// add near other helpers (fileExt, toDatetimeLocal, localToISOString, etc.)
+function normalizeSelectToId(v: any) {
+  if (v === null || v === undefined) return v;
+  if (typeof v === "object") return v.id ?? v.value ?? v;
+  return v;
+}
+
+function normalizeLetterForSubmit(raw: any) {
+  if (!raw) return raw;
+  const out: any = { ...raw };
+
+  out.prisoner = normalizeSelectToId(raw.prisoner);
+  out.letter_type = normalizeSelectToId(raw.letter_type);
+  out.relation_to_prisoner = normalizeSelectToId(raw.relation_to_prisoner);
+  out.welfare_officer = normalizeSelectToId(raw.welfare_officer);
+
+  // ensure ISO date
+  if (raw.letter_date) {
+    const iso = localToISOString(typeof raw.letter_date === "string" ? raw.letter_date : String(raw.letter_date));
+    if (iso) out.letter_date = iso;
+  }
+
+  // remove File before JSON submit (sendFile handles uploads)
+  if (out.letter_document instanceof File) delete out.letter_document;
+
+  return out;
+}
+
+type Tab = "calls" | "letters";
+
+export default function PhonesLettersScreen() {
+  const { station, district, region } = useFilters();
+
+  const [activeTab, setActiveTab] = useState<Tab>("calls");
+
+  // small totals used in tab labels (we still fetch totals separately)
+  const [callsTotal, setCallsTotal] = useState<number>(0);
+  const [lettersTotal, setLettersTotal] = useState<number>(0);
+
+  // paging / sort / search (shared pattern, separate state per table)
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [sortField, setSortField] = useState<string | undefined>(undefined);
+  const [sortDir, setSortDir] = useState<"asc" | "desc" | undefined>(undefined);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+  useEffect(() => {
+    const id = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
+    return () => window.clearTimeout(id);
+  }, [searchTerm]);
+
+  // bump to force DataTable remount/refetch (filters or after mutations)
+  const [filtersReloadKey, setFiltersReloadKey] = useState<number>(0);
+
+  // lookups for selects
+  const [callTypes, setCallTypes] = useState<any[]>([]);
+  const [relationships, setRelationships] = useState<any[]>([]);
+  const [letterTypes, setLetterTypes] = useState<any[]>([]);
+
+  // dialog / form state
+  const [callDialogOpen, setCallDialogOpen] = useState(false);
+  const [editingCall, setEditingCall] = useState<PhoneService.CallRecordItem | null>(null);
+  const [letterDialogOpen, setLetterDialogOpen] = useState(false);
+  const [editingLetter, setEditingLetter] = useState<LetterService.ELetterItem | null>(null);
+
+  // forms
+  const callForm = useForm<any>({ defaultValues: {} });
+  const letterForm = useForm<any>({ defaultValues: {} });
+
+  // Map API item -> table row (if you need normalization)
+  const mapCall = useCallback((it: any): PhoneService.CallRecordItem => ({ ...it }), []);
+  const mapLetter = useCallback((it: any): LetterService.ELetterItem => ({ ...it }), []);
+
+  // load lookups used in searchable selects
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        const [lt, rel] = await Promise.all([
+          LetterService.fetchLetterTypes(undefined, c.signal),
+          LetterService.fetchRelationships(undefined, c.signal),
+        ]);
+        if (!mounted) return;
+        setLetterTypes(lt ?? []);
+        setRelationships(rel ?? []);
+      } catch (err) {
+        console.error("lookup error", err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, []);
+
+  // helper: fetch totals only (used in tab headers)
+  const fetchCallsTotal = useCallback(async (q = debouncedSearch) => {
+    try {
+      const params: any = { page: 1, page_size: 1 };
+      if (q) params.search = q;
+      if (station) params.station = station;
+      if (district) params.district = district;
+      if (region) params.region = region;
+      const res = await PhoneService.fetchCallRecords(params);
+      const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
+      setCallsTotal(count);
+    } catch (err) {
+      console.error("fetchCallsTotal error", err);
+    }
+  }, [debouncedSearch, station, district, region]);
+
+  const fetchLettersTotal = useCallback(async (q = debouncedSearch) => {
+    try {
+      const params: any = { page: 1, page_size: 1 };
+      if (q) params.search = q;
+      if (station) params.station = station;
+      if (district) params.district = district;
+      if (region) params.region = region;
+      const res = await LetterService.fetchLetters(params);
+      const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
+      setLettersTotal(count);
+    } catch (err) {
+      console.error("fetchLettersTotal error", err);
+    }
+  }, [debouncedSearch, station, district, region]);
+
+  // refresh totals when filters/search/tab change (DataTable will fetch rows itself)
+  useEffect(() => {
+    fetchCallsTotal();
+    fetchLettersTotal();
+    // reset page when search or context changes
+    setPage(1);
+  }, [activeTab, debouncedSearch, station, district, region, fetchCallsTotal, fetchLettersTotal]);
+
+  // wire top-nav filter refresh
+  useFilterRefresh(() => {
+    // reset page and reload active tab
+    setPage(1);
+    // bump DataTable remount key so DataTable re-requests the current url (which contains filter params below)
+    setFiltersReloadKey(k => k + 1);
+    // refresh totals
+    fetchCallsTotal();
+    fetchLettersTotal();
+  }, [region, district, station]);
+
+  // datatable callbacks
+  const onSearch = (q: string) => { setSearchTerm(q); setPage(1); };
+  const onPageChange = (p: number) => setPage(p);
+  const onPageSizeChange = (s: number) => { setPageSize(s); setPage(1); };
+  const onSort = (f: string | null, d: "asc" | "desc" | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); };
+
+  // columns
+  const callsColumns = [
+    { key: "call_date", label: "Date", sortable: true, render: (v: any, row: any) => (<div className="flex items-center gap-2"><CalendarIcon className="h-4 w-4 text-muted-foreground" />{row.call_date ? new Date(row.call_date).toLocaleString() : "-"}</div>) },
+    { key: "prisoner_name", label: "Prisoner", sortable: true },
+    { key: "caller", label: "Caller" },
+    { key: "phone_number", label: "Phone" },
+    { key: "call_type_name", label: "Type" },
+    { key: "relation_name", label: "Relation" },
+    { key: "call_duration", label: "Duration" },
+    { key: "call_notes", label: "Notes", render: (v: any) => (<div className="max-w-xs truncate">{v || "-"}</div>) },
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => {
+        setEditingCall(r);
+        // ensure call_date is in datetime-local format
+        callForm.reset({ ...r, call_date: toDatetimeLocal(r?.call_date) });
+        setCallDialogOpen(true);
+      }}><Edit className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => {
+        confirmActionRef.current = {
+          title: "Delete Call Record",
+          description: `Delete call record for "${r.prisoner_name ?? r.caller ?? r.id}"? This action cannot be undone.`,
+          onConfirm: async () => {
+            try {
+              await PhoneService.deleteCallRecord(r.id);
+              toast.success("Call record deleted");
+              // trigger DataTable refetch + refresh totals
+              setFiltersReloadKey(k => k + 1);
+              fetchCallsTotal();
+            } catch (err) {
+              console.error("delete call error", err);
+              toast.error("Failed to delete call record");
+            }
+          },
+        };
+        setConfirmOpen(true);
+      }}><Trash2 className="h-4 w-4" /></Button></div>) }
+  ];
+
+  const lettersColumns = [
+    { key: "letter_date", label: "Date", sortable: true, render: (v: any, row: any) => (<div>{row.letter_date ? new Date(row.letter_date).toLocaleString() : "-"}</div>) },
+    { key: "prisoner_name", label: "Prisoner", sortable: true },
+    { key: "letter_tracking_number", label: "Tracking No." },
+    { key: "subject", label: "Subject" },
+    { key: "letter_type_name", label: "Type" },
+    { key: "relation_name", label: "Relation" },
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => {
+        setEditingLetter(r);
+        // ensure letter_date is in datetime-local format
+        letterForm.reset({
+          ...r,
+          prisoner: normalizeSelectToId(r.prisoner),
+          letter_type: normalizeSelectToId(r.letter_type),
+          relation_to_prisoner: normalizeSelectToId(r.relation_to_prisoner),
+          welfare_officer: normalizeSelectToId(r.welfare_officer),
+          letter_date: toDatetimeLocal(r?.letter_date),
+        });
+        setLetterDialogOpen(true);
+      }}><Edit className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => {
+        confirmActionRef.current = {
+          title: "Delete Letter",
+          description: `Delete letter "${r.subject ?? r.letter_tracking_number ?? r.id}" for "${r.prisoner_name ?? r.id}"? This action cannot be undone.`,
+          onConfirm: async () => {
+            try {
+              await LetterService.deleteLetter(r.id);
+              toast.success("Letter deleted");
+              // trigger DataTable refetch + refresh totals
+              setFiltersReloadKey(k => k + 1);
+              fetchLettersTotal();
+            } catch (err) {
+              console.error("delete letter error", err);
+              toast.error("Failed to delete letter");
+            }
+          },
+        };
+        setConfirmOpen(true);
+      }}><Trash2 className="h-4 w-4" /></Button></div>) }
+  ];
+
+  // wrapper that forwards current filter context to centralized service
+  const fetchPrisoners = useCallback(async (q = "", signal?: AbortSignal) => {
+    try {
+      const res = await fetchPrisonersService(
+        { search: q || "", station: station ?? null, district: district ?? null, region: region ?? null, page_size: 100 },
+        signal
+      );
+
+      // NORMALIZE: service may return { items, count } or an array
+      const items: any[] = Array.isArray(res) ? res : (res?.items ?? []);
+
+      // safety: ensure we always operate on an array
+      if (!Array.isArray(items)) return [];
+
+      const qlc = (q || "").trim().toLowerCase();
+      if (!qlc) return items;
+
+      return items.filter((it: any) => {
+        return String(it.full_name ?? "").toLowerCase().includes(qlc) ||
+               String(it.prisoner_number_value ?? "").toLowerCase().includes(qlc) ||
+               String(it.prisoner_number ?? "").toLowerCase().includes(qlc);
+      });
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return [];
+      console.error("prisoners lookup error", err);
+      toast.error("Failed to load prisoners (network).");
+      // toast.error("Failed to load prisoners (network). Check CORS / backend or use dev proxy.");
+      return [];
+    }
+  }, [station, district, region]);
+
+  const fetchCallTypes = useCallback(async (q = "", signal?: AbortSignal) => {
+    const res = await axiosInstance.get("/rehabilitation/call-types/", { params: { search: q, page_size: 50 }, signal });
+    return res.data?.results ?? [];
+  }, []);
+
+  // small wrappers for preloaded lists (relationships, letterTypes)
+  const fetchRelationshipsLocal = useCallback(async (q = "") => {
+    if (!q) return relationships;
+    const qlc = q.toLowerCase();
+    return relationships.filter((r:any) => String(r.name ?? "").toLowerCase().includes(qlc));
+  }, [relationships]);
+
+  const fetchLetterTypesLocal = useCallback(async (q = "") => {
+    if (!q) return letterTypes;
+    const qlc = q.toLowerCase();
+    return letterTypes.filter((t:any) => String(t.name ?? "").toLowerCase().includes(qlc));
+  }, [letterTypes]);
+
+  // form submit handlers
+  const onSubmitCall = async (data: any) => {
+    try {
+
+      // normalize call_date to ISO if present
+      if (data?.call_date) {
+        const iso = localToISOString(data.call_date);
+        if (iso) data.call_date = iso;
+      }
+
+      const file = data?.recorded_call instanceof File ? data.recorded_call as File : null;
+
+      // If file present validate extension
+      if (file) {
+        const ext = fileExt(file);
+        if (!AUDIO_EXTS.includes(ext)) {
+          toast.error(`Recorded call must be audio. Allowed: ${AUDIO_EXTS.join(", ")}`);
+          return;
+        }
+
+        // Use upload strategy service. We pass the call endpoint as the 'audio' endpoint
+        // so sendFile will post multipart with meta (other fields) to that endpoint.
+        const sendRes = await sendFile(file, {
+          endpoints: { audio: API_ENDPOINTS.createCall, doc: API_ENDPOINTS.createCall },
+          meta: { ...data }, // include other fields; sendFile will include as extraData or in JSON depending on strategy
+        });
+
+        if (!sendRes.ok) {
+          console.error("call file upload failed", sendRes.error ?? sendRes);
+          toast.error("Failed to upload recorded call");
+          return;
+        }
+
+        // If the upload endpoint created the record, we're done.
+        if (sendRes.data && (sendRes.data.id || sendRes.data.created)) {
+          toast.success(editingCall?.id ? "Call updated" : "Call created");
+        } else {
+          // Otherwise, try to extract a file reference and post the record normally.
+          const fileRef = extractFileRefFromSendResult(sendRes);
+          if (fileRef) data.recorded_call = fileRef;
+          else data.recorded_call = sendRes.data ?? null;
+
+          if (editingCall?.id) {
+            await PhoneService.updateCallRecord(editingCall.id, data);
+            toast.success("Call updated");
+          } else {
+            await PhoneService.createCallRecord(data);
+            toast.success("Call created");
+          }
+        }
+      } else {
+        // No file -> send JSON via existing service
+        if (editingCall?.id) {
+          await PhoneService.updateCallRecord(editingCall.id, data);
+          toast.success("Call updated");
+        } else {
+          await PhoneService.createCallRecord(data);
+          toast.success("Call created");
+        }
+      }
+
+      setCallDialogOpen(false);
+      // trigger DataTable refetch + refresh totals
+      setFiltersReloadKey(k => k + 1);
+      fetchCallsTotal();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save call");
+    }
+  };
+
+  const onSubmitLetter = async (data: any) => {
+    try {
+
+      // normalize call_date to ISO if present
+      if (data?.call_date) {
+        const iso = localToISOString(data.call_date);
+        if (iso) data.call_date = iso;
+      }
+
+      const file = data?.letter_document instanceof File ? data.letter_document as File : null;
+  
+      if (file) {
+        const ext = fileExt(file);
+        if (!LETTER_ALLOWED_EXTS.includes(ext)) {
+          toast.error(`Letter document must be one of: ${LETTER_ALLOWED_EXTS.join(", ")}`);
+          return;
+        }
+  
+        // Use upload strategy service:
+        // - for non-audio files sendFile will perform base64 JSON post to the doc endpoint
+        // - meta contains the other fields so the server can create the letter in one call if it accepts that shape
+        const sendRes = await sendFile(file, {
+          // endpoints: { audio: API_ENDPOINTS.createCall, doc: API_ENDPOINTS.createLetter },
+          endpoints: { doc: API_ENDPOINTS.createLetter },
+          meta: { ...data },
+        });
+  
+        if (!sendRes.ok) {
+          console.error("letter file upload failed", sendRes.error ?? sendRes);
+          toast.error("Failed to upload letter document");
+          return;
+        }
+  
+        // If endpoint returned created resource, done.
+        if (sendRes.data && (sendRes.data.id || sendRes.data.letter_document)) {
+          toast.success(editingLetter?.id ? "Letter updated" : "Letter created");
+        } else {
+          // Otherwise extract file ref and include in JSON create call.
+          const fileRef = extractFileRefFromSendResult(sendRes);
+          if (fileRef) data.letter_document = fileRef;
+          else data.letter_document = sendRes.data ?? null;
+  
+          if (editingLetter?.id) {
+            await LetterService.updateLetter(editingLetter.id, data);
+            toast.success("Letter updated");
+          } else {
+            await LetterService.createLetter(data);
+            toast.success("Letter created");
+          }
+        }
+      } else {
+        // No file -> send JSON as before
+        if (editingLetter?.id) {
+          await LetterService.updateLetter(editingLetter.id, data);
+          toast.success("Letter updated");
+        } else {
+          await LetterService.createLetter(data);
+          toast.success("Letter created");
+        }
+      }
+  
+      setLetterDialogOpen(false);
+      // trigger DataTable refetch + refresh totals
+      setFiltersReloadKey(k => k + 1);
+      fetchLettersTotal();
+    } catch (err) {
+      console.error(err);
+      toast.error("Failed to save letter");
+    }
+  };
+  
+
+  // confirm dialog state & holder for dynamic confirm action
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const confirmActionRef = useRef<null | { title?: string; description?: string; onConfirm: () => Promise<void> }>(null);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-[#650000]">Letters & Phone Calls</h1>
+        <p className="text-muted-foreground">Manage prisoner communications and correspondence</p>
+      </div>
+
+      <div className="flex gap-4 items-center">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder={`Search ${activeTab === "calls" ? "calls" : "letters"}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+        </div>
+        <Button className="bg-primary" 
+          onClick={() => { 
+            if (activeTab === "calls") { 
+              setEditingCall(null); callForm.reset({}); setCallDialogOpen(true); 
+            } else { 
+              setEditingLetter(null); letterForm.reset({}); setLetterDialogOpen(true); 
+            } 
+          }}><Plus className="h-4 w-4 mr-2" />
+          {activeTab === "calls" ? "Add Call Record" : "Add Letter"}
+        </Button>
+      </div>
+
+      {/* Restored original-style tabs with counts (icons + label + count). */}
+      <Tabs value={activeTab} onValueChange={(v: Tab) => setActiveTab(v)}>
+        <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
+          <TabsTrigger value="calls" className="flex items-center gap-2">
+            <Phone className="h-4 w-4" />
+            Phone Calls ({callsTotal ?? 0})
+          </TabsTrigger>
+          <TabsTrigger value="letters" className="flex items-center gap-2">
+            <Mail className="h-4 w-4" />
+            Letters ({lettersTotal ?? 0})
+          </TabsTrigger>
+        </TabsList>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>{activeTab === "calls" ? "Call Records" : "Letters"}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            {activeTab === "calls" ? (
+              <DataTable
+                key={`calls-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                url={`/rehabilitation/call-records/?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                externalSearch={debouncedSearch}
+                title="Call Records"
+                columns={callsColumns}
+                onSearch={onSearch}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+                onSort={onSort}
+                page={page}
+                pageSize={pageSize}
+              />
+            ) : (
+              <DataTable
+                key={`letters-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                url={`/rehabilitation/eletters/?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                externalSearch={debouncedSearch}
+                title="Letters"
+                columns={lettersColumns}
+                onSearch={onSearch}
+                onPageChange={onPageChange}
+                onPageSizeChange={onPageSizeChange}
+                onSort={onSort}
+                page={page}
+                pageSize={pageSize}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </Tabs>
+
+      {/* Call dialog */}
+      <Dialog open={callDialogOpen} onOpenChange={setCallDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editingCall ? "Edit Call Record" : "Add Call Record"}</DialogTitle></DialogHeader>
+          <form onSubmit={callForm.handleSubmit(onSubmitCall)} className="space-y-4 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Prisoner Selection (required) */}
+              <div>
+                <Label htmlFor="prisoner">
+                  Prisoner <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="prisoner"
+                  control={callForm.control}
+                  rules={requiredValidation("Prisoner")}
+                  render={({ field }) => (
+                    <CustomPrisonerSearch
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      onSelectItem={(p: any) => {
+                        // ensure form gets the selected id/object per your backend shape
+                        field.onChange(p?.id ?? p ?? null);
+                        // cache the selected prisoner locally to avoid refetch flicker
+                        setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                      }}
+                      placeholder="Select prisoner"
+                      idField="id"
+                      labelField="full_name"
+                      initialItems={prisoners}
+                      pageSize={25}
+                    />
+                  )}
+                />
+                {callForm.formState.errors.prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.prisoner as any).message}</p>
+                )}
+              </div>
+
+              {/* Caller Name (required) */}
+              <div>
+                <Label htmlFor="caller">
+                  Caller Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="caller"
+                  {...callForm.register("caller", { required: "Caller name is required" })}
+                  placeholder="Enter caller name"
+                />
+                {callForm.formState.errors.caller && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.caller as any).message}</p>
+                )}
+              </div>
+
+              {/* Phone Number (required) */}
+              <div>
+                <Label htmlFor="phone_number">
+                  Phone Number <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="phone_number"
+                  {...callForm.register("phone_number", { ...phoneNumberValidation, required: "Phone number is required" })}
+                  placeholder="+256700000000"
+                />
+                {callForm.formState.errors.phone_number && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.phone_number as any).message}</p>
+                )}
+              </div>
+
+              {/* Call Type (required) */}
+              <div>
+                <Label htmlFor="call_type">
+                  Call Type <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="call_type"
+                  control={callForm.control}
+                  rules={requiredValidation("Call type")}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={(id) => field.onChange(id)}
+                      fetchOptions={fetchCallTypes}
+                      placeholder="Select call type"
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {callForm.formState.errors.call_type && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.call_type as any).message}</p>
+                )}
+              </div>
+
+              {/* Relationship to Prisoner (required) */}
+              <div>
+                <Label htmlFor="relation_to_prisoner">
+                  Relationship to Prisoner <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="relation_to_prisoner"
+                  control={callForm.control}
+                  rules={requiredValidation("Relationship")}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={(id) => field.onChange(id)}
+                      fetchOptions={fetchRelationshipsLocal}
+                      placeholder="Select relationship"
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {callForm.formState.errors.relation_to_prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.relation_to_prisoner as any).message}</p>
+                )}
+              </div>
+
+              {/* Welfare Officer (required) */}
+              <div>
+                <Label htmlFor="welfare_officer">
+                  Welfare Officer <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="welfare_officer"
+                  control={callForm.control}
+                  rules={requiredValidation("Welfare officer")}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={field.value}
+                      onChange={(forceNumber) => field.onChange(forceNumber)}
+                      placeholder="Select welfare officer"
+                    />
+                  )}
+                />
+                {callForm.formState.errors.welfare_officer && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.welfare_officer as any).message}</p>
+                )}
+              </div>
+
+              {/* Call Date & Time (required) */}
+              <div>
+                <Label htmlFor="call_date">
+                  Call Date & Time <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="call_date"
+                  type="datetime-local"
+                  {...callForm.register("call_date", { required: "Call date is required" })}
+                />
+                {callForm.formState.errors.call_date && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.call_date as any).message}</p>
+                )}
+              </div>
+
+              {/* Call Duration (required) */}
+              <div>
+                <Label htmlFor="call_duration">
+                  Call Duration (minutes) <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="call_duration"
+                  type="number"
+                  {...callForm.register("call_duration", {
+                    required: "Call duration is required",
+                    valueAsNumber: true,
+                  })}
+                  placeholder="Enter duration in minutes"
+                />
+                {callForm.formState.errors.call_duration && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.call_duration as any).message}</p>
+                )}
+              </div>
+
+              {/* Recorded Call (optional upload) */}
+              <div>
+                <Label htmlFor="recorded_call">Recorded Call (Optional)</Label>
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-600 mb-2">Upload audio recording (optional)</p>
+                  {/* FileUploader provides client-side validation + UX.
+                      For recorded calls we allow common audio formats; change list below if needed. */}
+                  <FileUploader
+                    id="recorded_call"
+                    accept={AUDIO_UPLOAD_ACCEPT}
+                    allowedExts={AUDIO_EXTS}
+                    maxSizeBytes={10 * 1024 * 1024} // 10 MB
+                    onChange={(files) => {
+                      if (files && files.length) callForm.setValue("recorded_call", files[0]);
+                      else callForm.setValue("recorded_call", null);
+                    }}
+                  />
+                </div>
+              </div>
+              {/* Call Notes */}
+              <div>
+                <Label htmlFor="call_notes">Call Notes</Label>
+                <Textarea
+                  id="call_notes"
+                  {...callForm.register("call_notes")}
+                  placeholder="Enter any notes about the call"
+                  rows={6}
+                />
+              </div>
+            </div>
+            
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCallDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-primary">{editingCall ? "Update" : "Create"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+       </Dialog>
+
+      {/* Letter dialog */}
+      <Dialog open={letterDialogOpen} onOpenChange={setLetterDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{editingLetter ? "Edit Letter" : "Add Letter"}</DialogTitle></DialogHeader>
+          <form onSubmit={letterForm.handleSubmit(onSubmitLetter)} className="space-y-4 p-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Prisoner Selection (required) */}
+              <div>
+                <Label htmlFor="prisoner">
+                  Prisoner <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="prisoner"
+                  control={letterForm.control}
+                  rules={requiredValidation("Prisoner")}
+                  render={({ field }) => (
+                    <CustomPrisonerSearch
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      onSelectItem={(p: any) => {
+                        field.onChange(p?.id ?? p ?? null);
+                        setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                      }}
+                      placeholder="Select prisoner"
+                      idField="id"
+                      labelField="full_name"
+                      initialItems={prisoners}
+                      pageSize={25}
+                    />
+                  )}
+                />
+                {letterForm.formState.errors.prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.prisoner as any).message}</p>
+                )}
+              </div>
+
+              {/* Letter Type (required) */}
+              <div>
+                <Label htmlFor="letter_type">
+                  Letter Type <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="letter_type"
+                  control={letterForm.control}
+                  rules={requiredValidation("Letter type")}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={(id) => field.onChange(id)}
+                      items={letterTypes}
+                      placeholder="Select letter type"
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {letterForm.formState.errors.letter_type && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_type as any).message}</p>
+                )}
+              </div>
+
+              {/* Subject (required) */}
+              <div className="md:col-span-2">
+                <Label htmlFor="subject">
+                  Subject <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="subject"
+                  {...letterForm.register("subject", { required: "Subject is required" })}
+                  placeholder="Enter letter subject"
+                />
+                {letterForm.formState.errors.subject && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.subject as any).message}</p>
+                )}
+              </div>
+
+              {/* Letter Date (required) */}
+              <div>
+                <Label htmlFor="letter_date">
+                  Letter Date <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="letter_date"
+                  type="datetime-local"
+                  {...letterForm.register("letter_date", { required: "Letter date is required" })}
+                />
+                {letterForm.formState.errors.letter_date && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_date as any).message}</p>
+                )}
+              </div>
+
+              {/* Relationship to Prisoner (required) */}
+              <div>
+                <Label htmlFor="letter_relation">
+                  Relationship to Prisoner <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="relation_to_prisoner"
+                  control={letterForm.control}
+                  rules={requiredValidation("Relationship")}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      value={field.value}
+                      onChange={(id) => field.onChange(id)}
+                      fetchOptions={fetchRelationshipsLocal}
+                      placeholder="Select relationship"
+                      idField="id"
+                      labelField="name"
+                    />
+                  )}
+                />
+                {letterForm.formState.errors.relation_to_prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.relation_to_prisoner as any).message}</p>
+                )}
+              </div>
+
+              {/* Welfare Officer */}
+              <div>
+                <Label htmlFor="welfare_officer">Welfare Officer</Label>
+                <Controller
+                  name="welfare_officer"
+                  control={letterForm.control}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={field.value}
+                      onChange={(forceNumber) => field.onChange(forceNumber)}
+                      placeholder="Select welfare officer"
+                    />
+                  )}
+                />
+              </div>
+
+              {/* Sender Name */}
+              <div>
+                <Label htmlFor="sender_name">Sender Name</Label>
+                <Input
+                  id="sender_name"
+                  {...letterForm.register("sender_name")}
+                  placeholder="Enter sender name"
+                />
+              </div>
+
+              {/* Sender Email */}
+              <div>
+                <Label htmlFor="sender_email">Sender Email</Label>
+                <Input
+                  id="sender_email"
+                  type="email"
+                  {...letterForm.register("sender_email", emailValidation)}
+                  placeholder="sender@example.com"
+                />
+                {letterForm.formState.errors.sender_email && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {(letterForm.formState.errors.sender_email as any).message || "Invalid email"}
+                  </p>
+                )}
+              </div>
+
+              {/* Recipient Name */}
+              <div>
+                <Label htmlFor="recipient_name">Recipient Name</Label>
+                <Input
+                  id="recipient_name"
+                  {...letterForm.register("recipient_name")}
+                  placeholder="Enter recipient name"
+                />
+              </div>
+
+              {/* Recipient Email */}
+              <div>
+                <Label htmlFor="recipient_email">Recipient Email</Label>
+                <Input
+                  id="recipient_email"
+                  type="email"
+                  {...letterForm.register("recipient_email", emailValidation)}
+                  placeholder="recipient@example.com"
+                />
+                {letterForm.formState.errors.recipient_email && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {(letterForm.formState.errors.recipient_email as any).message || "Invalid email"}
+                  </p>
+                )}
+              </div>
+
+            </div>
+
+            {/* Letter Content */}
+            <div>
+              <Label htmlFor="letter_content">Letter Content</Label>
+              <Textarea
+                id="letter_content"
+                {...letterForm.register("letter_content")}
+                placeholder="Enter letter content"
+                rows={6}
+              />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+              {/* Letter Document */}
+              <div>
+                <Label htmlFor="letter_document">Letter Document (Optional)</Label>
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                  <p className="text-sm text-gray-600">Upload scanned letter or PDF (optional)</p>
+
+                  {/* Reusable FileUploader with the centralized allowed extensions constant.
+                      onChange updates react-hook-form value to the selected File (or null). */}
+                  <FileUploader
+                    id="letter_document"
+                    accept={LETTER_UPLOAD_ACCEPT}
+                    allowedExts={LETTER_ALLOWED_EXTS}
+                    maxSizeBytes={15 * 1024 * 1024} // 15 MB, adjust as needed
+                    onChange={(files) => {
+                      if (files && files.length) letterForm.setValue("letter_document", files[0]);
+                      else letterForm.setValue("letter_document", null);
+                      // clear previous validation errors if any
+                      letterForm.clearErrors("letter_document");
+                    }}
+                  />
+                  {/* still show react-hook-form validation error if present */}
+                  {letterForm.formState.errors.letter_document && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {(letterForm.formState.errors.letter_document as any).message ||
+                        (letterForm.formState.errors.letter_document as any)}
+                    </p>
+                  )}
+
+                   {/* UX hint listing allowed formats */}
+                   <p className="text-xs text-muted-foreground mt-2">
+                     Allowed formats: {LETTER_ALLOWED_EXTS.join(", ")}. You can change the allowed list in code if needed.
+                   </p>
+                 </div>
+               </div>
+
+               {/* Comment */}
+               <div>
+                 <Label htmlFor="comment">Censor Comments</Label>
+                 <Textarea
+                   id="comment"
+                   {...letterForm.register("comment")}
+                   placeholder="Enter censor comments or notes"
+                   rows={9}
+                 />
+               </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setLetterDialogOpen(false)}>Cancel</Button>
+              <Button type="submit" className="bg-primary">{editingLetter ? "Update" : "Create"}</Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm dialog - rendered once per screen */}
+      <ConfirmDialog
+        open={confirmOpen}
+        onOpenChange={(v) => {
+          setConfirmOpen(v);
+          if (!v) confirmActionRef.current = null;
+        }}
+        title={confirmActionRef.current?.title}
+        description={confirmActionRef.current?.description}
+        onConfirm={async () => {
+          if (confirmActionRef.current?.onConfirm) {
+            await confirmActionRef.current.onConfirm();
+          }
+        }}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+      />
+    </div>
+  );
+}

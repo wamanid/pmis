@@ -31,10 +31,11 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
-import { getAdmissionDashboard } from '../../services/admission';
+import { admissionService } from '../../services/admissionService';
 import { DashboardResponse, DashboardFilters } from '../../models/admission';
 import { toast } from 'sonner';
 import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
 
 // Transform API response to chart data format
 interface CategoryData {
@@ -45,6 +46,7 @@ interface CategoryData {
 
 export function AdmissionDashboard() {
   const navigate = useNavigate();
+  const { region, district, station } = useFilters();
   const [dashboardData, setDashboardData] = useState<DashboardResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState<DashboardFilters>({
@@ -54,7 +56,14 @@ export function AdmissionDashboard() {
   const loadData = async () => {
     setLoading(true);
     try {
-      const data = await getAdmissionDashboard(filters);
+      // Include global filter context in API call
+      const apiFilters: DashboardFilters = {
+        ...filters,
+        ...(region && { region: parseInt(region) }),
+        ...(district && { district: parseInt(district) }),
+        ...(station && { station: parseInt(station) }),
+      };
+      const data = await admissionService.getAdmissionDashboard(apiFilters);
       setDashboardData(data);
     } catch (error) {
       console.error('Error loading admission dashboard:', error);
@@ -64,8 +73,8 @@ export function AdmissionDashboard() {
     }
   };
 
-  // Load data on mount, when filters change, and when location filters change
-  useFilterRefresh(loadData, [filters]);
+  // Load data on mount and when filters change (including global filters)
+  useFilterRefresh(loadData, [filters, region, district, station]);
 
   // Transform category data from API response
   const getCategoryData = (): CategoryData[] => {
