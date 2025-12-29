@@ -143,3 +143,21 @@ export const addAllowance = async (allowance: SubsistenceAllowance) : Promise<Su
   return response.data;
 }
 
+export const updateAllowance = async (allowance: SubsistenceAllowance, id: string) : Promise<SubsistenceAllowanceResponse> => {
+  const response = await axiosInstance.put(`/discharge-management/subsistence-allowances/${id}/`, allowance);
+  return response.data;
+}
+
+export const deleteAllowance = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/discharge-management/subsistence-allowances/${id}/`);
+
+    return { message: "subsistence allowance deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to delete subsistence allowance."
+    };
+  }
+}
+

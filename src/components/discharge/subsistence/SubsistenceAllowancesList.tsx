@@ -10,10 +10,10 @@ import { SubsistenceAllowancesForm } from './SubsistenceAllowancesForm';
 import {Loader} from "../ViewDischargeDetails";
 import {
   addAllowance,
-  Allowance,
+  Allowance, deleteAllowance,
   DischargeType,
   getAllowances,
-  SubsistenceAllowance
+  SubsistenceAllowance, updateAllowance
 } from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
@@ -67,9 +67,13 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
   async function handleFormSubmit(data: SubsistenceAllowance) {
     try {
-      const response = await addAllowance(data);
-
-      // centralised API error handler
+      let response: any
+      if (selectedRecord){
+        response = await updateAllowance(data, selectedRecord.id);
+      }
+      else {
+        response = await addAllowance(data);
+      }
       if (handleResponseError(response)) return;
 
       if (!('id' in response)) {
@@ -77,13 +81,37 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
         return;
       }
 
-      setRecords(prev => [response, ...prev]);
-      toast.success('Created');
+      if (selectedRecord){
+        setRecords(prev => (
+            prev.map(rec => (rec.id === response.id ? response : rec))
+        ));
+        toast.success('updated');
+      }
+      else {
+        setRecords(prev => [response, ...prev]);
+        toast.success('Created');
+      }
 
       setIsFormOpen(false);
       setSelectedRecord(null);
     } catch (error) {
       handleCatchError(error);
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedRecord) return
+
+    try {
+      await deleteAllowance(selectedRecord.id)
+      setRecords(prev => prev.filter(rec => rec.id !== selectedRecord.id))
+      toast.success('Subsistence allowance record deleted successfully');
+
+      setIsDeleteOpen(false);
+      setSelectedRecord(null);
+
+    }catch (error) {
+      handleCatchError(error)
     }
   }
 
@@ -215,14 +243,7 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
           <p>Are you sure you want to delete this subsistence allowance record? This action cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => {
-              if (selectedRecord) {
-                setRecords(records.filter((r) => r.id !== selectedRecord.id));
-                toast.success('Subsistence allowance record deleted successfully');
-              }
-              setIsDeleteOpen(false);
-              setSelectedRecord(null);
-            }}>Delete</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
