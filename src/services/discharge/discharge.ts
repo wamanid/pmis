@@ -98,3 +98,48 @@ export const getRequests = async <T = DischargeRequest>() : Promise<RequestRespo
   const response = await axiosInstance.get<Paginated<T>>('/discharge-management/requests/');
   return response.data;
 }
+
+// Subsistence Allowance
+export interface Allowance {
+  id: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  is_active: boolean;
+  allowance_amount: string;
+  creditor_details: string;
+  disposal_date: string;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number | null;
+  prisoner: string;
+}
+
+export interface SubsistenceAllowance {
+  is_active: boolean;
+  deleted_datetime: string | null;
+  allowance_amount: string;
+  creditor_details: string;
+  disposal_date: string;
+  remarks: string;
+  deleted_by: number | null;
+  prisoner: string;
+}
+
+
+export type AllowanceResponse<T> = Paginated<T> | ErrorResponse
+export type SubsistenceAllowanceResponse = Allowance | ErrorResponse
+
+export const getAllowances = async <T = Allowance>() : Promise<AllowanceResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/discharge-management/subsistence-allowances/');
+  return response.data;
+}
+
+export const addAllowance = async (allowance: SubsistenceAllowance) : Promise<SubsistenceAllowanceResponse> => {
+  const response = await axiosInstance.post('/discharge-management/subsistence-allowances/', allowance);
+  return response.data;
+}
+

@@ -27,6 +27,7 @@ import {Loader} from "../ViewDischargeDetails";
 import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 import {DischargeRequest, DischargeType, getRequests} from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 
 interface ChildProps {
   loading: Loader
@@ -35,6 +36,8 @@ interface ChildProps {
   setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
   reasons: Unit
   setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
 }
 
 interface DischargeItem {
@@ -72,7 +75,7 @@ interface DischargeItem {
 //   officer_in_charge: string;
 // }
 
-export const DischargeRequestList: React.FC = ({ loading, setLoading, types, reasons, setTypes, setReasons }) => {
+export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading, types, reasons, setTypes, setReasons, setPrisoners, prisoners }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -112,12 +115,11 @@ export const DischargeRequestList: React.FC = ({ loading, setLoading, types, rea
       if (handleServerError2(response)) return
       if ("results" in response) {
         const data = response.results
-        if (!data.length) (
-            toast.error("There are no discharge requests")
-        )
+        if (!data.length) {
+          toast.error("There are no discharge requests")
+        }
         setDischargeRequests(data)
-        console.log(data)
-
+        // console.log(data)
       }
     }catch (error) {
       handleCatchError(error)
@@ -441,7 +443,7 @@ export const DischargeRequestList: React.FC = ({ loading, setLoading, types, rea
             </DialogTitle>
           </DialogHeader>
           <DischargeRequestForm
-            types={types} reasons={reasons} setTypes={setTypes} setReasons={setReasons}
+            types={types} reasons={reasons} setTypes={setTypes} setReasons={setReasons} prisoners={prisoners} setPrisoners={setPrisoners}
             initialData={selectedRequest}
             onSubmit={handleFormSubmit}
             onCancel={() => {

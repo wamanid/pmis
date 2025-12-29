@@ -111,10 +111,10 @@ interface Property {
 //   properties?: Property[];
 // }
 
-export const PrisonerDischargeList: React.FC = ({ loading, setLoading, types, setTypes, reasons, setReasons }) => {
+export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoading, types, setTypes, reasons, setReasons }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterReason, setFilterReason] = useState('all');
+  const [filterType, setFilterType] = useState('All');
+  const [filterReason, setFilterReason] = useState('All');
   const [filterDate, setFilterDate] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -149,8 +149,8 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading, types, se
     const matchesSearch =
       record.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.prisoner_number.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || record.discharge_type_name === filterType;
-    const matchesReason = filterReason === 'all' || record.discharge_reason_name === filterReason;
+    const matchesType = filterType === 'All' || record.discharge_type_name === filterType;
+    const matchesReason = filterReason === 'All' || record.discharge_reason_name === filterReason;
     const matchesDate = !filterDate || record.discharge_datetime.startsWith(filterDate);
 
     return matchesSearch && matchesType && matchesReason && matchesDate;
@@ -256,8 +256,8 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading, types, se
 
   const handleResetFilters = () => {
     setSearchQuery('');
-    setFilterType('all');
-    setFilterReason('all');
+    setFilterType('All');
+    setFilterReason('All');
     setFilterDate('');
     setCurrentPage(1);
   };

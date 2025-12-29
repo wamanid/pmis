@@ -157,6 +157,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
       try {
         const response = await addNextOfKin(formData1)
         if (handleResponseError(response)) return
+
          setNextOfKins(prev => ([response, ...prev]))
         resetForm();
         toast.success('Next of Kin added successfully');

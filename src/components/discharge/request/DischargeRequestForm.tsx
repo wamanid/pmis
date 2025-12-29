@@ -51,6 +51,8 @@ interface DischargeRequestFormProps {
   onSubmit: (data: any) => void;
   onCancel: () => void;
   mode?: 'create' | 'edit';
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
 }
 
 interface DischargeItem {
@@ -115,7 +117,7 @@ interface DischargeItem {
 // ];
 
 export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
-  types, reasons, setTypes, setReasons,
+  types, reasons, setTypes, setReasons, prisoners, setPrisoners,
   initialData,
   onSubmit,
   onCancel,
@@ -161,7 +163,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
 
   // API Integration
   const [loader, setLoader] = useState(true)
-  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
+
   const [staff, setStaff] = useState<StaffItem[]>([]);
 
   useEffect(() => {
@@ -196,8 +198,11 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
 
   async function fetchData() {
     try {
-        const response1 = await getPrisoners()
-        returnedValue(populateList(response1, "There are no prisoners", setPrisoners))
+        if (!prisoners.length){
+          const response1 = await getPrisoners()
+          returnedValue(populateList(response1, "There are no prisoners", setPrisoners))
+        }
+
         const response2 = await getStaffProfile()
         returnedValue(populateList(response2, "There are no staff officers", setStaff))
 

@@ -54,10 +54,10 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import {
-  getPropertyTypeUtil,
-  handleCatchError,
-  handleEmptyList,
-  handleServerError
+    getPropertyTypeUtil,
+    handleCatchError,
+    handleEmptyList, handleResponseError,
+    handleServerError
 } from "../../services/stationServices/utils";
 
 interface ChildProps {
@@ -165,6 +165,8 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         try {
           if (selectedProperty === null) {
              const response = await addProperty(property)
+              if (handleResponseError(response)) return
+
              setProperties(prev => ([response, ...prev]))
              toast.success("Property created successfully");
           }
