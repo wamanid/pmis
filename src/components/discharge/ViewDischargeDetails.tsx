@@ -11,7 +11,9 @@ import { DischargeByExecutionList } from './DischargeByExecutionList';
 import { DischargeOfficersList } from './DischargeOfficersList';
 import { SubsistenceAllowancesList } from './SubsistenceAllowancesList';
 import { DischargeSuspendedSentenceList } from './DischargeSuspendedSentenceList';
-import { DischargeRequestList } from './DischargeRequestList';
+import { DischargeRequestList } from './request/DischargeRequestList';
+import {DischargeType} from "../../services/discharge/discharge";
+import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
 
 // Mock data for discharge details
 const mockDischargeData = {
@@ -93,6 +95,8 @@ export default function ViewDischargeDetails() {
 
   // API integration
   const [loading, setLoading] = useState<Loader>({ discharge: true, request: true })
+  const [types, setTypes] = useState<DischargeType[]>([])
+  const [reasons, setReasons] = useState<Unit[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -101,9 +105,9 @@ export default function ViewDischargeDetails() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'requests':
-        return <DischargeRequestList loading={loading} setLoading={setLoading}/>;
+        return <DischargeRequestList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}/>;
       case 'discharge-detail':
-        return <PrisonerDischargeList loading={loading} setLoading={setLoading}/>;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}/>;
       case 'child-handovers':
         return <DischargeChildHandoverList />;
       case 'subsistence':

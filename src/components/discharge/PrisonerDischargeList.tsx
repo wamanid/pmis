@@ -64,6 +64,10 @@ import {Unit} from "../../services/stationServices/visitorsServices/visitorItem"
 interface ChildProps {
   loading: Loader
   setLoading: React.Dispatch<React.SetStateAction<Loader>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
 interface PropertyAccount {
@@ -107,7 +111,7 @@ interface Property {
 //   properties?: Property[];
 // }
 
-export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
+export const PrisonerDischargeList: React.FC = ({ loading, setLoading, types, setTypes, reasons, setReasons }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all');
   const [filterReason, setFilterReason] = useState('all');
@@ -158,9 +162,6 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
   const currentRecords = filteredRecords.slice(startIndex, startIndex + recordsPerPage);
 
   // API Integration
-  const [types, setTypes] = useState<DischargeType[]>([])
-  const [reasons, setReasons] = useState<Unit[]>([])
-
   useEffect(() => {
     if (loading.discharge) {
       fetchData()
@@ -172,9 +173,9 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
 
     if ("results" in response) {
       const data = response.results
-      if (msg && !data.length) (
-          toast.error(msg)
-      )
+      if (msg && !data.length) {
+        toast.error(msg)
+      }
       setData(data)
       console.log(data)
 
@@ -191,14 +192,14 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
 
   async function fetchData () {
     try {
-      const response1 = await getDischarges()
-      returnedValue(populateList(response1, "There are no prisoner discharge records", setDischargeRecords))
-
       const response2 = await getTypes()
       returnedValue(populateList(response2, "", setTypes))
 
       const response3 = await getReasons()
       returnedValue(populateList(response3, "", setReasons))
+
+      const response1 = await getDischarges()
+      returnedValue(populateList(response1, "There are no prisoner discharge records", setDischargeRecords))
 
     }catch (error) {
       handleCatchError(error)
@@ -235,6 +236,7 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
   };
 
   const handleFormSubmit = (data: any) => {
+
     if (selectedRecord) {
       setDischargeRecords(
         dischargeRecords.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
@@ -386,17 +388,17 @@ export const PrisonerDischargeList: React.FC = ({ loading, setLoading }) => {
             <>
                {/* Header */}
                <div className="flex items-center justify-between">
-        <div>
-          <h1>Prisoner Discharges</h1>
-          <p className="text-muted-foreground">
-            Manage prisoner discharge records and documentation
-          </p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Discharge
-        </Button>
-      </div>
+                <div>
+                  <h1>Prisoner Discharges</h1>
+                  <p className="text-muted-foreground">
+                    Manage prisoner discharge records and documentation
+                  </p>
+                </div>
+                <Button onClick={() => setIsFormOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Discharge
+                </Button>
+              </div>
 
                {/* Filters and Search */}
                 <Card>

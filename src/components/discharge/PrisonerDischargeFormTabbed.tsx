@@ -48,7 +48,7 @@ import { cn } from '../ui/utils';
 import  NextOfKinForm  from '../admission/NextOfKinForm';
 import { toast } from 'sonner';
 import BiometricCapture from '../common/BiometricCapture';
-import { DischargeRequestForm } from './DischargeRequestForm';
+import { DischargeRequestForm } from './request/DischargeRequestForm';
 
 interface PrisonerDischargeFormProps {
   initialData?: any;

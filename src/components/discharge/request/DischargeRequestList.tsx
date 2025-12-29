@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
+} from '../../ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,18 +18,23 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../ui/dialog';
 import { Search, Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { DischargeRequestForm } from './DischargeRequestForm';
-import { Badge } from '../ui/badge';
-import {Loader} from "./ViewDischargeDetails";
-import {handleCatchError, handleServerError2} from "../../services/stationServices/utils";
-import {DischargeRequest, getRequests} from "../../services/discharge/discharge";
+import { Badge } from '../../ui/badge';
+import {Loader} from "../ViewDischargeDetails";
+import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
+import {DischargeRequest, DischargeType, getRequests} from "../../../services/discharge/discharge";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
 interface ChildProps {
   loading: Loader
   setLoading: React.Dispatch<React.SetStateAction<Loader>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
 interface DischargeItem {
@@ -67,7 +72,7 @@ interface DischargeItem {
 //   officer_in_charge: string;
 // }
 
-export const DischargeRequestList: React.FC = ({ loading, setLoading }) => {
+export const DischargeRequestList: React.FC = ({ loading, setLoading, types, reasons, setTypes, setReasons }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -94,6 +99,7 @@ export const DischargeRequestList: React.FC = ({ loading, setLoading }) => {
   const startIndex = (currentPage - 1) * recordsPerPage;
   const currentRecords = filteredRequests.slice(startIndex, startIndex + recordsPerPage);
 
+  // API Integration
   useEffect(() => {
     if (loading.request) {
       fetchData()
@@ -148,28 +154,30 @@ export const DischargeRequestList: React.FC = ({ loading, setLoading }) => {
   };
 
   const handleFormSubmit = (data: any) => {
-    if (selectedRequest) {
-      setDischargeRequests(
-        dischargeRequests.map((r) =>
-          r.id === selectedRequest.id ? { ...r, ...data } : r
-        )
-      );
-      toast.success('Discharge request updated successfully');
-    } else {
-      const newRequest = {
-        id: Date.now().toString(),
-        request_number: `DRQ-2025-${String(dischargeRequests.length + 1).padStart(6, '0')}`,
-        in_charge_approved: false,
-        in_charge_remark: '',
-        officer_in_charge_approved: false,
-        officer_in_charge_remark: '',
-        ...data,
-      };
-      setDischargeRequests([...dischargeRequests, newRequest]);
-      toast.success('Discharge request created successfully');
-    }
-    setIsFormOpen(false);
-    setSelectedRequest(null);
+    console.log(data)
+
+    // if (selectedRequest) {
+    //   setDischargeRequests(
+    //     dischargeRequests.map((r) =>
+    //       r.id === selectedRequest.id ? { ...r, ...data } : r
+    //     )
+    //   );
+    //   toast.success('Discharge request updated successfully');
+    // } else {
+    //   const newRequest = {
+    //     id: Date.now().toString(),
+    //     request_number: `DRQ-2025-${String(dischargeRequests.length + 1).padStart(6, '0')}`,
+    //     in_charge_approved: false,
+    //     in_charge_remark: '',
+    //     officer_in_charge_approved: false,
+    //     officer_in_charge_remark: '',
+    //     ...data,
+    //   };
+    //   setDischargeRequests([...dischargeRequests, newRequest]);
+    //   toast.success('Discharge request created successfully');
+    // }
+    // setIsFormOpen(false);
+    // setSelectedRequest(null);
   };
 
   const getApprovalStatus = (request: DischargeRequest) => {
@@ -433,6 +441,7 @@ export const DischargeRequestList: React.FC = ({ loading, setLoading }) => {
             </DialogTitle>
           </DialogHeader>
           <DischargeRequestForm
+            types={types} reasons={reasons} setTypes={setTypes} setReasons={setReasons}
             initialData={selectedRequest}
             onSubmit={handleFormSubmit}
             onCancel={() => {
