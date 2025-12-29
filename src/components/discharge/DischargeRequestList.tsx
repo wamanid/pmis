@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -23,6 +23,14 @@ import { Search, Plus, Edit, Trash2, Eye, FileText, CheckCircle, XCircle, Clock 
 import { toast } from 'sonner';
 import { DischargeRequestForm } from './DischargeRequestForm';
 import { Badge } from '../ui/badge';
+import {Loader} from "./ViewDischargeDetails";
+import {handleCatchError, handleServerError2} from "../../services/stationServices/utils";
+import {DischargeRequest, getRequests} from "../../services/discharge/discharge";
+
+interface ChildProps {
+  loading: Loader
+  setLoading: React.Dispatch<React.SetStateAction<Loader>>
+}
 
 interface DischargeItem {
   id: string;
@@ -40,26 +48,26 @@ interface DischargeItem {
   discharge_reason: string;
 }
 
-interface DischargeRequest {
-  id: string;
-  request_number: string;
-  in_charge_name: string;
-  in_charge_force_number: string;
-  in_charge_rank: string;
-  officer_in_charge_name: string;
-  officer_in_charge_force_number: string;
-  officer_in_charge_rank: string;
-  comment: string;
-  in_charge_approved: boolean;
-  in_charge_remark: string;
-  officer_in_charge_approved: boolean;
-  officer_in_charge_remark: string;
-  discharges: DischargeItem[];
-  in_charge: string;
-  officer_in_charge: string;
-}
+// interface DischargeRequest {
+//   id: string;
+//   request_number: string;
+//   in_charge_name: string;
+//   in_charge_force_number: string;
+//   in_charge_rank: string;
+//   officer_in_charge_name: string;
+//   officer_in_charge_force_number: string;
+//   officer_in_charge_rank: string;
+//   comment: string;
+//   in_charge_approved: boolean;
+//   in_charge_remark: string;
+//   officer_in_charge_approved: boolean;
+//   officer_in_charge_remark: string;
+//   discharges: DischargeItem[];
+//   in_charge: string;
+//   officer_in_charge: string;
+// }
 
-export const DischargeRequestList: React.FC = () => {
+export const DischargeRequestList: React.FC = ({ loading, setLoading }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -69,91 +77,7 @@ export const DischargeRequestList: React.FC = () => {
   const recordsPerPage = 10;
 
   // Mock data
-  const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c4',
-      request_number: 'DRQ-2025-000001',
-      in_charge_name: 'Robinson Okello',
-      in_charge_force_number: 'UPS/001/2020',
-      in_charge_rank: 'Assistant Commissioner',
-      officer_in_charge_name: 'Robinson Okello',
-      officer_in_charge_force_number: 'UPS/001/2020',
-      officer_in_charge_rank: 'Assistant Commissioner',
-      comment: 'Scheduled discharge for sentence completion',
-      in_charge_approved: true,
-      in_charge_remark: 'Approved',
-      officer_in_charge_approved: false,
-      officer_in_charge_remark: '',
-      in_charge: 'staff-001',
-      officer_in_charge: 'staff-001',
-      discharges: [
-        {
-          id: '94d4b3d4-e61f-4580-9bac-01a414950104',
-          prisoner_name: 'Rebecca Adams',
-          prisoner_number: 'ARPC0000000013/25',
-          discharge_type_name: 'Sentence Completion',
-          discharge_reason_name: 'Sentence Completed',
-          discharge_number: 'DSC-2025-000001',
-          discharge_datetime: '2025-12-19T22:01:58+03:00',
-          remarks: '',
-          intended_place_of_stay: 'Kampala, Uganda',
-          request: '337133a2-e8ff-4d0f-a6dd-91ae981d21c4',
-          prisoner: 'prisoner-001',
-          discharge_type: 'type-001',
-          discharge_reason: 'reason-001',
-        },
-        {
-          id: '94d4b3d4-e61f-4580-9bac-01a414950105',
-          prisoner_name: 'John Doe',
-          prisoner_number: 'P-2024-001',
-          discharge_type_name: 'Sentence Completion',
-          discharge_reason_name: 'Sentence Completed',
-          discharge_number: 'DSC-2025-000002',
-          discharge_datetime: '2025-12-19T22:01:58+03:00',
-          remarks: 'Good behavior',
-          intended_place_of_stay: 'Entebbe, Uganda',
-          request: '337133a2-e8ff-4d0f-a6dd-91ae981d21c4',
-          prisoner: 'prisoner-002',
-          discharge_type: 'type-001',
-          discharge_reason: 'reason-001',
-        },
-      ],
-    },
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c5',
-      request_number: 'DRQ-2025-000002',
-      in_charge_name: 'Sarah Namuli',
-      in_charge_force_number: 'UPS/002/2019',
-      in_charge_rank: 'Senior Superintendent',
-      officer_in_charge_name: 'Michael Kizito',
-      officer_in_charge_force_number: 'UPS/003/2018',
-      officer_in_charge_rank: 'Superintendent',
-      comment: 'Transfer request for overcrowding management',
-      in_charge_approved: true,
-      in_charge_remark: 'Approved for transfer',
-      officer_in_charge_approved: true,
-      officer_in_charge_remark: 'Confirmed',
-      in_charge: 'staff-002',
-      officer_in_charge: 'staff-003',
-      discharges: [
-        {
-          id: '94d4b3d4-e61f-4580-9bac-01a414950106',
-          prisoner_name: 'Jane Smith',
-          prisoner_number: 'P-2024-002',
-          discharge_type_name: 'Transfer',
-          discharge_reason_name: 'Inter-Prison Transfer',
-          discharge_number: 'DSC-2025-000003',
-          discharge_datetime: '2025-12-20T10:00:00+03:00',
-          remarks: 'Transfer to Kitalya Prison',
-          intended_place_of_stay: 'Kitalya Maximum Security Prison',
-          request: '337133a2-e8ff-4d0f-a6dd-91ae981d21c5',
-          prisoner: 'prisoner-003',
-          discharge_type: 'type-002',
-          discharge_reason: 'reason-002',
-        },
-      ],
-    },
-  ]);
+  const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
 
   // Filter records
   const filteredRequests = dischargeRequests.filter((request) => {
@@ -169,6 +93,35 @@ export const DischargeRequestList: React.FC = () => {
   const totalPages = Math.ceil(filteredRequests.length / recordsPerPage);
   const startIndex = (currentPage - 1) * recordsPerPage;
   const currentRecords = filteredRequests.slice(startIndex, startIndex + recordsPerPage);
+
+  useEffect(() => {
+    if (loading.request) {
+      fetchData()
+    }
+  }, [loading.request]);
+
+  async function fetchData() {
+    try{
+      const response = await getRequests()
+      if (handleServerError2(response)) return
+      if ("results" in response) {
+        const data = response.results
+        if (!data.length) (
+            toast.error("There are no discharge requests")
+        )
+        setDischargeRequests(data)
+        console.log(data)
+
+      }
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoading(prev => ({
+        ...prev,
+        request: false
+      }))
+    }
+  }
 
   const handleView = (request: DischargeRequest) => {
     setSelectedRequest(request);
@@ -241,219 +194,235 @@ export const DischargeRequestList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1>Discharge Requests</h1>
-          <p className="text-muted-foreground">
-            Manage discharge requests and approvals
-          </p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Discharge Request
-        </Button>
-      </div>
-
-      {/* Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-4">
-            <div className="flex-1">
-              <Label>Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by request number or officer name..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+      {
+        loading.request ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Prisoner Discharge Information, Please wait...
+                    </p>
               </div>
             </div>
-            <div className="flex items-end">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setSearchQuery('');
-                  setCurrentPage(1);
-                }}
-              >
-                Reset
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+        ) : (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1>Discharge Requests</h1>
+                  <p className="text-muted-foreground">
+                    Manage discharge requests and approvals
+                  </p>
+                </div>
+                <Button onClick={() => setIsFormOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create Discharge Request
+                </Button>
+              </div>
 
-      {/* Summary Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Total Requests</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">{filteredRequests.length}</div>
-          </CardContent>
-        </Card>
+              {/* Search */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="flex gap-4">
+                    <div className="flex-1">
+                      <Label>Search</Label>
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search by request number or officer name..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-end">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setSearchQuery('');
+                          setCurrentPage(1);
+                        }}
+                      >
+                        Reset
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Fully Approved</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-green-600">
-              {
-                filteredRequests.filter(
-                  (r) => r.in_charge_approved && r.officer_in_charge_approved
-                ).length
-              }
-            </div>
-          </CardContent>
-        </Card>
+              {/* Summary Stats */}
+              <div className="grid gap-4 md:grid-cols-4">
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Total Requests</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl">{filteredRequests.length}</div>
+                  </CardContent>
+                </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Pending</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl text-yellow-600">
-              {
-                filteredRequests.filter(
-                  (r) => !r.in_charge_approved || !r.officer_in_charge_approved
-                ).length
-              }
-            </div>
-          </CardContent>
-        </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Fully Approved</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl text-green-600">
+                      {
+                        filteredRequests.filter(
+                          (r) => r.in_charge_approved && r.officer_in_charge_approved
+                        ).length
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
 
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Total Discharges</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">
-              {filteredRequests.reduce((sum, r) => sum + r.discharges.length, 0)}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Pending</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl text-yellow-600">
+                      {
+                        filteredRequests.filter(
+                          (r) => !r.in_charge_approved || !r.officer_in_charge_approved
+                        ).length
+                      }
+                    </div>
+                  </CardContent>
+                </Card>
 
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-primary hover:bg-primary">
-                  <TableHead className="text-white font-bold">Request Number</TableHead>
-                  <TableHead className="text-white font-bold">In Charge</TableHead>
-                  <TableHead className="text-white font-bold">Officer In Charge</TableHead>
-                  <TableHead className="text-white font-bold">Discharges</TableHead>
-                  <TableHead className="text-white font-bold">Approval Status</TableHead>
-                  <TableHead className="text-white font-bold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      No discharge requests found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentRecords.map((request) => {
-                    const status = getApprovalStatus(request);
-                    const StatusIcon = status.icon;
-                    return (
-                      <TableRow key={request.id}>
-                        <TableCell className="font-medium">{request.request_number}</TableCell>
-                        <TableCell>
-                          <div>
-                            <div>{request.in_charge_name}</div>
-                            <div className="text-sm text-gray-500">{request.in_charge_rank}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div>
-                            <div>{request.officer_in_charge_name}</div>
-                            <div className="text-sm text-gray-500">
-                              {request.officer_in_charge_rank}
-                            </div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">{request.discharges.length} Discharge(s)</Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge className={status.color}>
-                            <StatusIcon className="h-3 w-3 mr-1" />
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleView(request)}
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEdit(request)}
-                            >
-                              <Edit className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDelete(request)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-sm">Total Discharges</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="text-2xl">
+                      {filteredRequests.reduce((sum, r) => sum + r.discharges.length, 0)}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to{' '}
-            {Math.min(startIndex + recordsPerPage, filteredRequests.length)} of{' '}
-            {filteredRequests.length} records
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+              {/* Table */}
+              <Card>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="bg-primary hover:bg-primary">
+                          <TableHead className="text-white font-bold">Request Number</TableHead>
+                          <TableHead className="text-white font-bold">In Charge</TableHead>
+                          <TableHead className="text-white font-bold">Officer In Charge</TableHead>
+                          <TableHead className="text-white font-bold">Discharges</TableHead>
+                          <TableHead className="text-white font-bold">Approval Status</TableHead>
+                          <TableHead className="text-white font-bold text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {currentRecords.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
+                              No discharge requests found
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          currentRecords.map((request) => {
+                            const status = getApprovalStatus(request);
+                            const StatusIcon = status.icon;
+                            return (
+                              <TableRow key={request.id}>
+                                <TableCell className="font-medium">{request.request_number}</TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div>{request.in_charge_name}</div>
+                                    <div className="text-sm text-gray-500">{request.in_charge_rank}</div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <div>
+                                    <div>{request.officer_in_charge_name}</div>
+                                    <div className="text-sm text-gray-500">
+                                      {request.officer_in_charge_rank}
+                                    </div>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="outline">{request.discharges.length} Discharge(s)</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge className={status.color}>
+                                    <StatusIcon className="h-3 w-3 mr-1" />
+                                    {status.label}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleView(request)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(request)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDelete(request)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to{' '}
+                    {Math.min(startIndex + recordsPerPage, filteredRequests.length)} of{' '}
+                    {filteredRequests.length} records
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+        )
+      }
+
 
       {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>

@@ -246,6 +246,14 @@ export function handleServerError (response: any, setLoading: any) {
   return false
 }
 
+export function handleServerError2 (response: any) {
+  if ('error' in response){
+        toast.error(response.error);
+        return true
+  }
+  return false
+}
+
 export function handleEmptyList (data: any, msg: string, setLoading: any) {
   if (!data.length){
         setLoading(false);

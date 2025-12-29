@@ -82,9 +82,17 @@ type TabType =
   | 'subsistence'
   | 'suspended';
 
+export interface Loader {
+  discharge: boolean
+  request: boolean
+}
+
 export default function ViewDischargeDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabType>('discharge-detail');
+
+  // API integration
+  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true })
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -93,9 +101,9 @@ export default function ViewDischargeDetails() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'requests':
-        return <DischargeRequestList />;
+        return <DischargeRequestList loading={loading} setLoading={setLoading}/>;
       case 'discharge-detail':
-        return <PrisonerDischargeList />;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading}/>;
       case 'child-handovers':
         return <DischargeChildHandoverList />;
       case 'subsistence':
@@ -342,6 +350,9 @@ export default function ViewDischargeDetails() {
           <div className="p-6">{renderTabContent()}</div>
         </CardContent>
       </Card>
+
+
+
     </div>
   );
 }
