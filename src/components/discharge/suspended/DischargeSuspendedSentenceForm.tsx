@@ -4,11 +4,10 @@ import { Input } from '../../ui/input';
 import { Label } from '../../ui/label';
 import { Textarea } from '../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
-import {Loader} from "../ViewDischargeDetails";
 import {getPrisoners, PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 import {toast} from "sonner";
-import {SubsistenceAllowance} from "../../../services/discharge/discharge";
+import {Court, getCourts, Sentence} from "../../../services/discharge/discharge";
 
 interface ChildProps {
   initialData?: any;
@@ -18,28 +17,32 @@ interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
 }
 
-export const SubsistenceAllowancesForm: React.FC<ChildProps> = ({
+export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
   prisoners, setPrisoners,
   initialData,
   onSubmit,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState<SubsistenceAllowance>({
-    is_active: true,
-    deleted_datetime: null,
-    allowance_amount: "",
-    creditor_details: "",
-    disposal_date: "",
+  const [formData, setFormData] = useState<Sentence>({
+    discharge_datetime: "",
+    conviction_date: "",
+    duration_of_suspension: 0,
+    conditions_for_suspension: "",
+    intended_place_of_stay: "",
     remarks: "",
-    deleted_by: null,
+    request: "",
     prisoner: "",
+    discharge_type: "",
+    discharge_reason: "",
+    court_details: "",
   });
 
   // API Integration
   const [loader, setLoader] = useState(true)
+  const [courts, setCourts] = useState<Court[]>([])
 
   useEffect(() => {
-    if(loader && !prisoners.length) {
+    if(loader && !prisoners.length && !courts.length) {
       fetchData()
     }
     else {
@@ -47,22 +50,39 @@ export const SubsistenceAllowancesForm: React.FC<ChildProps> = ({
     }
   }, [loader]);
 
+  function populateList(response: any, msg: string, setData: any){
+    if (handleServerError2(response)) {
+      onCancel()
+      return true
+    }
+    if ("results" in response) {
+      const data = response.results
+      if (!data.length) {
+        toast.error(msg)
+        onCancel()
+        return true
+      }
+      else {
+        setData(data)
+      }
+    }
+
+    return false
+  }
+
+  function returnedValue(value: boolean) {
+    if(value) {
+      return
+    }
+  }
+
   async function fetchData() {
     try{
       const response = await getPrisoners()
-      if (handleServerError2(response)) {
-        onCancel()
-      }
-      if ("results" in response) {
-        const data = response.results
-        if (!data.length) {
-          toast.error("There are no prisoners")
-          onCancel()
-        }
-        else {
-          setPrisoners(data)
-        }
-      }
+      returnedValue(populateList(response, "There are no prisoners", setPrisoners))
+
+      const response2 = await getCourts()
+      returnedValue(populateList(response2, "There are no courts", setCourts))
 
     }catch (error) {
       handleCatchError(error)
@@ -111,16 +131,40 @@ export const SubsistenceAllowancesForm: React.FC<ChildProps> = ({
                   </Select>
                 </div>
                 <div>
-                  <Label>Allowance Amount (UGX) *</Label>
-                  <Input type="number" step="0.01" value={formData.allowance_amount} onChange={(e) => setFormData({...formData, allowance_amount: e.target.value})} required />
-                </div>
-                <div className="col-span-2">
-                  <Label>Creditor Details *</Label>
-                  <Input value={formData.creditor_details} onChange={(e) => setFormData({...formData, creditor_details: e.target.value})} required />
+                  <Label>Court *</Label>
+                  <Select value={formData.court_details} onValueChange={(v) => {
+                      const selectedCourt = courts.find(p => p.id === v);
+                      if (!selectedCourt) return;
+                      setFormData(prev => ({
+                        ...prev,
+                        court_details: selectedCourt.id,
+                      }));
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Select court" /></SelectTrigger>
+                    <SelectContent>
+                      {
+                        courts.map(court => (
+                            <SelectItem key={court.id} value={court.id}>{court.name}</SelectItem>
+                        ))
+                      }
+                    </SelectContent>
+                  </Select>
                 </div>
                 <div>
-                  <Label>Disposal Date *</Label>
-                  <Input type="date" value={formData.disposal_date} onChange={(e) => setFormData({...formData, disposal_date: e.target.value})} required />
+                  <Label>Duration of Suspension (months) *</Label>
+                  <Input type="number" value={formData.duration_of_suspension} onChange={(e) => setFormData({...formData, duration_of_suspension: parseInt(e.target.value)})} required />
+                </div>
+                <div>
+                  <Label>Conviction Date *</Label>
+                  <Input type="date" value={formData.conviction_date} onChange={(e) => setFormData({...formData, conviction_date: e.target.value})} required />
+                </div>
+                <div>
+                  <Label>Discharge Date & Time *</Label>
+                  <Input type="datetime-local" value={formData.discharge_datetime.slice(0, 16)} onChange={(e) => setFormData({...formData, discharge_datetime: e.target.value + ':00Z'})} required />
+                </div>
+                <div className="col-span-2">
+                  <Label>Conditions for Suspension</Label>
+                  <Textarea value={formData.conditions_for_suspension} onChange={(e) => setFormData({...formData, conditions_for_suspension: e.target.value})} rows={3} />
                 </div>
                 <div className="col-span-2">
                   <Label>Remarks</Label>

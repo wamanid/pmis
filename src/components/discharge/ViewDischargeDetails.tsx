@@ -10,7 +10,7 @@ import { DischargeDocumentList } from './DischargeDocumentList';
 import { DischargeByExecutionList } from './DischargeByExecutionList';
 import { DischargeOfficersList } from './DischargeOfficersList';
 import { SubsistenceAllowancesList } from './subsistence/SubsistenceAllowancesList';
-import { DischargeSuspendedSentenceList } from './DischargeSuspendedSentenceList';
+import { DischargeSuspendedSentenceList } from './suspended/DischargeSuspendedSentenceList';
 import { DischargeRequestList } from './request/DischargeRequestList';
 import {DischargeType} from "../../services/discharge/discharge";
 import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
@@ -89,6 +89,7 @@ export interface Loader {
   discharge: boolean
   request: boolean
   subsistence: boolean
+  suspended: boolean
 }
 
 export default function ViewDischargeDetails() {
@@ -96,7 +97,7 @@ export default function ViewDischargeDetails() {
   const [activeTab, setActiveTab] = useState<TabType>('discharge-detail');
 
   // API integration
-  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true })
+  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true, suspended: true })
   const [types, setTypes] = useState<DischargeType[]>([])
   const [reasons, setReasons] = useState<Unit[]>([])
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
@@ -116,7 +117,7 @@ export default function ViewDischargeDetails() {
       case 'subsistence':
         return <SubsistenceAllowancesList loading={loading} setLoading={setLoading} prisoners={prisoners} setPrisoners={setPrisoners}/>;
       case 'suspended':
-        return <DischargeSuspendedSentenceList />;
+        return <DischargeSuspendedSentenceList loading={loading} setLoading={setLoading} prisoners={prisoners} setPrisoners={setPrisoners}/>;
       default:
         return <PrisonerDischargeList />;
     }

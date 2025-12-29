@@ -6,17 +6,17 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../../ui/dialog';
 import { Search, Plus, Edit, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { SubsistenceAllowancesForm } from './SubsistenceAllowancesForm';
+import { DischargeSuspendedSentenceForm } from './DischargeSuspendedSentenceForm';
 import {Loader} from "../ViewDischargeDetails";
-import {
-  addAllowance,
-  Allowance, deleteAllowance,
-  DischargeType,
-  getAllowances,
-  SubsistenceAllowance, updateAllowance
-} from "../../../services/discharge/discharge";
-import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {
+  addAllowance, addSentence,
+  getAllowances,
+  getSuspendedSentences,
+  Sentence,
+  SuspendedSentence,
+  updateAllowance, updateSentences
+} from "../../../services/discharge/discharge";
 import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
 
 interface ChildProps {
@@ -26,29 +26,29 @@ interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
 }
 
-export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners }) => {
+export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
 
-  const [records, setRecords] = useState<Allowance[]>([]);
+  const [records, setRecords] = useState<SuspendedSentence[]>([]);
 
   // API Integration
   useEffect(() => {
-    if (loading.subsistence) {
+    if(loading.suspended) {
       fetchData()
     }
-  }, [loading.subsistence]);
+  }, [loading.suspended]);
 
   async function fetchData() {
     try {
-      const response = await getAllowances()
+      const response = await getSuspendedSentences()
       if (handleServerError2(response)) return
       if ("results" in response) {
         const data = response.results
         if (!data.length) {
-          toast.error("There are no subsistence allowances")
+          toast.error("There are no suspended sentences")
         }
         setRecords(data)
         // console.log(data)
@@ -59,25 +59,25 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
     }finally {
       setLoading(prev => ({
         ...prev,
-        subsistence: false
+        suspended: false
       }))
     }
   }
 
-
-  async function handleFormSubmit(data: SubsistenceAllowance) {
+  async function handleFormSubmit(data: Sentence) {
+    // console.log(data)
     try {
       let response: any
       if (selectedRecord){
-        response = await updateAllowance(data, selectedRecord.id);
+        response = await updateSentences(data, selectedRecord.id);
       }
       else {
-        response = await addAllowance(data);
+        response = await addSentence(data);
       }
       if (handleResponseError(response)) return;
 
       if (!('id' in response)) {
-        toast.error("Failed to update the allowances table");
+        toast.error("Failed to update the suspended sentences table");
         return;
       }
 
@@ -94,29 +94,10 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
       setIsFormOpen(false);
       setSelectedRecord(null);
-    } catch (error) {
-      handleCatchError(error);
-    }
-  }
-
-  async function handleDelete() {
-    if (!selectedRecord) return
-
-    try {
-      await deleteAllowance(selectedRecord.id)
-      setRecords(prev => prev.filter(rec => rec.id !== selectedRecord.id))
-      toast.success('Subsistence allowance record deleted successfully');
-
-      setIsDeleteOpen(false);
-      setSelectedRecord(null);
-
     }catch (error) {
       handleCatchError(error)
     }
-  }
-
-
-  //  if (selectedRecord) {
+    // if (selectedRecord) {
     //   setRecords(records.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r)));
     //   toast.success('Updated');
     // } else {
@@ -125,6 +106,7 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
     // }
     // setIsFormOpen(false);
     // setSelectedRecord(null);
+  }
 
   const filteredRecords = records.filter((r) =>
     r.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -133,13 +115,13 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
   return (
     <div className="space-y-6">
-      {
-        loading.subsistence ? (
+       {
+        loading.suspended ? (
             <div className="size-full flex items-center justify-center">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                     <p className="text-muted-foreground text-sm">
-                      Fetching subsistence allowances Information, Please wait...
+                      Fetching suspended sentences Information, Please wait...
                     </p>
               </div>
             </div>
@@ -147,8 +129,8 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h1>Subsistence Allowances</h1>
-                  <p className="text-muted-foreground">Manage subsistence allowance disposal records</p>
+                  <h1>Suspended Sentence Discharges</h1>
+                  <p className="text-muted-foreground">Manage suspended sentence discharge records</p>
                 </div>
                 <Button onClick={() => setIsFormOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
@@ -177,9 +159,9 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
                       <TableRow className="bg-primary hover:bg-primary">
                         <TableHead className="text-white font-bold">Prisoner Name</TableHead>
                         <TableHead className="text-white font-bold">Prisoner Number</TableHead>
-                        <TableHead className="text-white font-bold">Amount (UGX)</TableHead>
-                        <TableHead className="text-white font-bold">Creditor Details</TableHead>
-                        <TableHead className="text-white font-bold">Disposal Date</TableHead>
+                        <TableHead className="text-white font-bold">Court</TableHead>
+                        <TableHead className="text-white font-bold">Suspension Duration</TableHead>
+                        <TableHead className="text-white font-bold">Discharge Date</TableHead>
                         <TableHead className="text-white font-bold text-right">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -188,29 +170,29 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
                         !filteredRecords.length ? (
                             <TableRow>
                               <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                                No subsistence allowances found
+                                No suspended sentences found
                               </TableCell>
                             </TableRow>
                         ) : (
                             filteredRecords.map((record) => (
-                              <TableRow key={record.id}>
-                                <TableCell>{record.prisoner_name}</TableCell>
-                                <TableCell>{record.prisoner_number}</TableCell>
-                                <TableCell>{parseFloat(record.allowance_amount).toLocaleString()}</TableCell>
-                                <TableCell>{record.creditor_details}</TableCell>
-                                <TableCell>{new Date(record.disposal_date).toLocaleDateString()}</TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2">
-                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsFormOpen(true); }}>
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsDeleteOpen(true); }}>
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
+                        <TableRow key={record.id}>
+                          <TableCell>{record.prisoner_name}</TableCell>
+                          <TableCell>{record.prisoner_number}</TableCell>
+                          <TableCell>{record.court_name}</TableCell>
+                          <TableCell>{record.duration_of_suspension} months</TableCell>
+                          <TableCell>{new Date(record.discharge_datetime).toLocaleDateString()}</TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsFormOpen(true); }}>
+                                <Edit className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsDeleteOpen(true); }}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
                         )
                       }
                     </TableBody>
@@ -219,14 +201,14 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
               </Card>
             </>
         )
-      }
+       }
 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Allowance Record</DialogTitle>
+            <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Suspended Sentence</DialogTitle>
           </DialogHeader>
-          <SubsistenceAllowancesForm
+          <DischargeSuspendedSentenceForm
             prisoners={prisoners} setPrisoners={setPrisoners}
             initialData={selectedRecord}
             onSubmit={handleFormSubmit}
@@ -235,15 +217,22 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
         </DialogContent>
       </Dialog>
 
-      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen} aria-describedby={undefined}>
-        <DialogContent>
+      <Dialog open={isDeleteOpen} onOpenChange={setIsDeleteOpen}>
+        <DialogContent aria-describedby={undefined}>
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
           </DialogHeader>
-          <p>Are you sure you want to delete this subsistence allowance record? This action cannot be undone.</p>
+          <p>Are you sure you want to delete this suspended sentence record? This action cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
+            <Button variant="destructive" onClick={() => {
+              if (selectedRecord) {
+                setRecords(records.filter((r) => r.id !== selectedRecord.id));
+                toast.success('Suspended sentence record deleted successfully');
+              }
+              setIsDeleteOpen(false);
+              setSelectedRecord(null);
+            }}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
