@@ -139,12 +139,12 @@ export const getAllowances = async <T = Allowance>() : Promise<AllowanceResponse
 }
 
 export const addAllowance = async (allowance: SubsistenceAllowance) : Promise<SubsistenceAllowanceResponse> => {
-  const response = await axiosInstance.post('/discharge-management/subsistence-allowances/', allowance);
+  const response = await axiosInstance.post<SubsistenceAllowanceResponse>('/discharge-management/subsistence-allowances/', allowance);
   return response.data;
 }
 
 export const updateAllowance = async (allowance: SubsistenceAllowance, id: string) : Promise<SubsistenceAllowanceResponse> => {
-  const response = await axiosInstance.put(`/discharge-management/subsistence-allowances/${id}/`, allowance);
+  const response = await axiosInstance.put<SubsistenceAllowanceResponse>(`/discharge-management/subsistence-allowances/${id}/`, allowance);
   return response.data;
 }
 
@@ -240,12 +240,12 @@ export const getSuspendedSentences = async <T = SuspendedSentence>() : Promise<S
 }
 
 export const addSentence = async (sentence: Sentence) : Promise<SentenceResponse> => {
-  const response = await axiosInstance.post('/discharge-management/suspended-sentences/', sentence);
+  const response = await axiosInstance.post<SentenceResponse>('/discharge-management/suspended-sentences/', sentence);
   return response.data;
 }
 
 export const updateSentences = async (sentence: Sentence, id: string) : Promise<SentenceResponse> => {
-  const response = await axiosInstance.put(`/discharge-management/suspended-sentences/${id}/`, sentence);
+  const response = await axiosInstance.put<SentenceResponse>(`/discharge-management/suspended-sentences/${id}/`, sentence);
   return response.data;
 }
 
@@ -314,9 +314,27 @@ export interface ChildHandover {
   custodian_relation_to_prisoner:string;
 }
 
+export interface Handover {
+  is_active:boolean;
+  deleted_datetime:string|null;
+  custodian:string;
+  contact_of_custodian:string;
+  datetime_of_handover:string;
+  reason_for_handover:string;
+  physical_condition:string;
+  probation_report:string;
+  age_at_handover:number;
+  remarks:string;
+  deleted_by:number|null;
+  child:string;
+  custodian_relation_to_prisoner:string;
+}
+
+
 
 export type ChildResponse<T> = Paginated<T> | ErrorResponse
 export type ChildHandoverResponse<T> = Paginated<T> | ErrorResponse
+export type HandoverResponse = ChildHandover | ErrorResponse
 
 export const getChildren = async <T = ChildItem>(min_age?: number) : Promise<ChildResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/admission/children-records/', {
@@ -327,5 +345,10 @@ export const getChildren = async <T = ChildItem>(min_age?: number) : Promise<Chi
 
 export const getChildHandover = async <T = ChildHandover>() : Promise<ChildHandoverResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/discharge-management/child-handovers/');
+  return response.data;
+}
+
+export const addHandover = async (handover: Handover) : Promise<HandoverResponse> => {
+  const response = await axiosInstance.post<HandoverResponse>('/discharge-management/child-handovers/', handover);
   return response.data;
 }

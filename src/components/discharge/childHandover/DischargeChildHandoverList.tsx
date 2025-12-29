@@ -17,7 +17,7 @@ import {
   ChildItem,
   getAllowances,
   getChildHandover,
-  getChildren
+  getChildren, Handover
 } from "../../../services/discharge/discharge";
 import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 
@@ -79,7 +79,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<ChildHandover | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<Handover | null>(null);
   const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
   const [isChildViewOpen, setIsChildViewOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -163,22 +163,21 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
 
   const handleHandoverChild = (child: ChildItem) => {
     // Pre-populate the handover form with child data
-    // setSelectedRecord({
-    //   id: '',
-    //   child_name: child.name,
-    //   mother_name: child.mothers_name,
-    //   relationship_name: '',
-    //   custodian: '',
-    //   contact_of_custodian: '',
-    //   datetime_of_handover: new Date().toISOString(),
-    //   reason_for_handover: '',
-    //   physical_condition: child.physical_condition,
-    //   probation_report: child.probation_report,
-    //   age_at_handover: child.age_value,
-    //   remarks: '',
-    //   child: child.id,
-    //   custodian_relation_to_prisoner: '',
-    // });
+    setSelectedRecord({
+      is_active: true,
+      deleted_datetime: null,
+      custodian: "",
+      contact_of_custodian: "",
+      datetime_of_handover: new Date().toISOString(),
+      reason_for_handover: "",
+      physical_condition: child.physical_condition,
+      probation_report: "",
+      age_at_handover: 0,
+      remarks: "",
+      deleted_by: null,
+      child: child.id,
+      custodian_relation_to_prisoner: "",
+    });
     setIsFormOpen(true);
   };
 
@@ -198,26 +197,26 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   };
 
   const confirmDelete = () => {
-    if (selectedRecord) {
-      setHandovers(handovers.filter((r) => r.id !== selectedRecord.id));
-      toast.success('Child handover record deleted successfully');
-    }
-    setIsDeleteOpen(false);
-    setSelectedRecord(null);
+    // if (selectedRecord) {
+    //   setHandovers(handovers.filter((r) => r.id !== selectedRecord.id));
+    //   toast.success('Child handover record deleted successfully');
+    // }
+    // setIsDeleteOpen(false);
+    // setSelectedRecord(null);
   };
 
   const handleFormSubmit = (data: any) => {
-    if (selectedRecord?.id) {
-      setHandovers(
-        handovers.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
-      );
-      toast.success('Child handover record updated successfully');
-    } else {
-      setHandovers([...handovers, { id: Date.now().toString(), ...data }]);
-      toast.success('Child handover record created successfully');
-    }
-    setIsFormOpen(false);
-    setSelectedRecord(null);
+    // if (selectedRecord?.id) {
+    //   setHandovers(
+    //     handovers.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
+    //   );
+    //   toast.success('Child handover record updated successfully');
+    // } else {
+    //   setHandovers([...handovers, { id: Date.now().toString(), ...data }]);
+    //   toast.success('Child handover record created successfully');
+    // }
+    // setIsFormOpen(false);
+    // setSelectedRecord(null);
   };
 
   const formatDateTime = (dateString: string) => {
@@ -717,7 +716,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>{selectedRecord?.id ? 'Edit' : 'Add'} Child Handover</DialogTitle>
+            <DialogTitle>{selectedRecord?.child ? 'Edit' : 'Add'} Child Handover</DialogTitle>
           </DialogHeader>
           <DischargeChildHandoverForm
             initialData={selectedRecord}
