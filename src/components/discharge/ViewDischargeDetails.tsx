@@ -4,7 +4,7 @@ import { LogOut, Wallet, Package, Info } from 'lucide-react';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
 import { PrisonerDischargeList } from './PrisonerDischargeList';
 import { DischargeChecklistItemList } from './DischargeChecklistItemList';
-import { DischargeChildHandoverList } from './DischargeChildHandoverList';
+import { DischargeChildHandoverList } from './childHandover/DischargeChildHandoverList';
 import { DischargeDeceasedList } from './DischargeDeceasedList';
 import { DischargeDocumentList } from './DischargeDocumentList';
 import { DischargeByExecutionList } from './DischargeByExecutionList';
@@ -113,7 +113,7 @@ export default function ViewDischargeDetails() {
       case 'discharge-detail':
         return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}/>;
       case 'child-handovers':
-        return <DischargeChildHandoverList />;
+        return <DischargeChildHandoverList loading={loading} setLoading={setLoading}/>;
       case 'subsistence':
         return <SubsistenceAllowancesList loading={loading} setLoading={setLoading} prisoners={prisoners} setPrisoners={setPrisoners}/>;
       case 'suspended':
