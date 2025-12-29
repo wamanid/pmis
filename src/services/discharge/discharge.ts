@@ -253,3 +253,79 @@ export const getCourts = async <T = Court>() : Promise<CourtResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/system-administration/court-details/');
   return response.data;
 }
+
+// Child Handover
+export interface ChildItem {
+  id:string;
+  prisoner_name:string;
+  prisoner_number:number;
+  prisoner_number_value:string;
+  sex_name:string;
+  age_value:number;
+  hospital_name:string;
+  district_name:string;
+  created_datetime:string;
+  is_active:boolean;
+  updated_datetime:string;
+  deleted_datetime:string|null;
+  name:string;
+  date_of_birth:string;
+  fathers_name:string;
+  mothers_name:string;
+  photo:string;
+  physical_condition:string;
+  child_record:string;
+  medical_condition:string;
+  medical_report:string;
+  probation_report:string;
+  description:string;
+  age_on_admission:number;
+  created_by:number;
+  updated_by:number;
+  deleted_by:number|null;
+  prisoner:string;
+  relation:string;
+  hospital_of_birth:string;
+  district_of_birth:string;
+  sex:string;
+}
+
+export interface ChildHandover {
+  id:string;
+  child_name:string;
+  mother_name:string;
+  relationship_name:string;
+  created_datetime:string;
+  is_active:boolean;
+  updated_datetime:string;
+  deleted_datetime:string|null;
+  custodian:string;
+  contact_of_custodian:string;
+  datetime_of_handover:string;
+  reason_for_handover:string;
+  physical_condition:string;
+  probation_report:string;
+  age_at_handover:number;
+  remarks:string;
+  created_by:number;
+  updated_by:number;
+  deleted_by:number|null;
+  child:string;
+  custodian_relation_to_prisoner:string;
+}
+
+
+export type ChildResponse<T> = Paginated<T> | ErrorResponse
+export type ChildHandoverResponse<T> = Paginated<T> | ErrorResponse
+
+export const getChildren = async <T = ChildItem>(min_age?: number) : Promise<ChildResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/admission/children-records/', {
+    params: min_age? { min_age } : undefined
+  });
+  return response.data;
+}
+
+export const getChildHandover = async <T = ChildHandover>() : Promise<ChildHandoverResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/discharge-management/child-handovers/');
+  return response.data;
+}

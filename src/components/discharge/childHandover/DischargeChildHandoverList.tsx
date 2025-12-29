@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';
 import { Input } from '../../ui/input';
@@ -10,145 +10,124 @@ import { Search, Plus, Edit, Trash2, Eye, Baby, Users } from 'lucide-react';
 import { toast } from 'sonner';
 import { DischargeChildHandoverForm } from './DischargeChildHandoverForm';
 import { Badge } from '../../ui/badge';
+import {Loader} from "../ViewDischargeDetails";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {
+  ChildHandover,
+  ChildItem,
+  getAllowances,
+  getChildHandover,
+  getChildren
+} from "../../../services/discharge/discharge";
+import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 
-interface DischargeChildHandover {
-  id: string;
-  child_name: string;
-  mother_name: string;
-  relationship_name: string;
-  custodian: string;
-  contact_of_custodian: string;
-  datetime_of_handover: string;
-  reason_for_handover: string;
-  physical_condition: string;
-  probation_report: string;
-  age_at_handover: number;
-  remarks: string;
-  child: string;
-  custodian_relation_to_prisoner: string;
+interface ChildProps {
+  loading: Loader
+  setLoading: React.Dispatch<React.SetStateAction<Loader>>
 }
 
-interface ChildRecord {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  prisoner_number_value: string;
-  sex_name: string;
-  age_value: number;
-  hospital_name: string;
-  district_name: string;
-  name: string;
-  date_of_birth: string;
-  fathers_name: string;
-  mothers_name: string;
-  photo: string;
-  physical_condition: string;
-  child_record: string;
-  medical_condition: string;
-  medical_report: string;
-  probation_report: string;
-  description: string;
-  age_on_admission: number;
-  prisoner: string;
-  relation: string;
-  hospital_of_birth: string;
-  district_of_birth: string;
-  sex: string;
-}
+// interface DischargeChildHandover {
+//   id: string;
+//   child_name: string;
+//   mother_name: string;
+//   relationship_name: string;
+//   custodian: string;
+//   contact_of_custodian: string;
+//   datetime_of_handover: string;
+//   reason_for_handover: string;
+//   physical_condition: string;
+//   probation_report: string;
+//   age_at_handover: number;
+//   remarks: string;
+//   child: string;
+//   custodian_relation_to_prisoner: string;
+// }
+//
+// interface ChildRecord {
+//   id: string;
+//   prisoner_name: string;
+//   prisoner_number: string;
+//   prisoner_number_value: string;
+//   sex_name: string;
+//   age_value: number;
+//   hospital_name: string;
+//   district_name: string;
+//   name: string;
+//   date_of_birth: string;
+//   fathers_name: string;
+//   mothers_name: string;
+//   photo: string;
+//   physical_condition: string;
+//   child_record: string;
+//   medical_condition: string;
+//   medical_report: string;
+//   probation_report: string;
+//   description: string;
+//   age_on_admission: number;
+//   prisoner: string;
+//   relation: string;
+//   hospital_of_birth: string;
+//   district_of_birth: string;
+//   sex: string;
+// }
 
 type TabType = 'due-for-handover' | 'handover-records';
 
-export const DischargeChildHandoverList: React.FC = () => {
+export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setLoading }) => {
   const [activeTab, setActiveTab] = useState<TabType>('due-for-handover');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<DischargeChildHandover | null>(null);
-  const [selectedChild, setSelectedChild] = useState<ChildRecord | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<ChildHandover | null>(null);
+  const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
   const [isChildViewOpen, setIsChildViewOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const recordsPerPage = 10;
 
-  // Mock data for children due for handover (from /api/admission/children-records/?min_age=0&max_age=2)
-  const [childrenDueForHandover, setChildrenDueForHandover] = useState<ChildRecord[]>([
-    {
-      id: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      prisoner_number_value: 'ARPC0000000013/25',
-      sex_name: 'Male',
-      age_value: 18,
-      hospital_name: 'Mulago Hospital',
-      district_name: 'Kampala',
-      name: 'Baby John Smith',
-      date_of_birth: '2023-11-15',
-      fathers_name: 'John Doe',
-      mothers_name: 'Jane Smith',
-      photo: '',
-      physical_condition: 'Good health, normal development',
-      child_record: 'CR-2023-001',
-      medical_condition: 'Healthy',
-      medical_report: 'Normal checkup, up to date with vaccinations',
-      probation_report: 'Child is ready for handover to family',
-      description: 'Healthy baby boy, 18 months old',
-      age_on_admission: 1,
-      prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      relation: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      hospital_of_birth: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      district_of_birth: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-      sex: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    },
-    {
-      id: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      prisoner_name: 'Mary Johnson',
-      prisoner_number: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      prisoner_number_value: 'ARPC0000000014/25',
-      sex_name: 'Female',
-      age_value: 22,
-      hospital_name: 'Nsambya Hospital',
-      district_name: 'Kampala',
-      name: 'Baby Sarah Johnson',
-      date_of_birth: '2023-07-20',
-      fathers_name: 'Unknown',
-      mothers_name: 'Mary Johnson',
-      photo: '',
-      physical_condition: 'Excellent health',
-      child_record: 'CR-2023-002',
-      medical_condition: 'Healthy',
-      medical_report: 'All vaccinations complete, regular growth',
-      probation_report: 'Approved for handover to grandmother',
-      description: 'Healthy baby girl, 22 months old',
-      age_on_admission: 2,
-      prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      relation: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      hospital_of_birth: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      district_of_birth: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-      sex: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    },
-  ]);
+  // API Integration
+  const [children, setChildren] = useState<ChildItem[]>([])
+  const [handovers, setHandovers] = useState<ChildHandover[]>([])
 
-  // Mock data for child handover records
-  const [handovers, setHandovers] = useState<DischargeChildHandover[]>([
-    {
-      id: '1',
-      child_name: 'Baby Jane',
-      mother_name: 'Jane Smith',
-      relationship_name: 'Mother',
-      custodian: 'Mary Johnson',
-      contact_of_custodian: '+256700123456',
-      datetime_of_handover: '2025-11-29T10:00:00Z',
-      reason_for_handover: 'Mother discharge',
-      physical_condition: 'Good health',
-      probation_report: 'Approved for handover',
-      age_at_handover: 6,
-      remarks: 'Routine handover',
-      child: 'child-001',
-      custodian_relation_to_prisoner: 'rel-001',
-    },
-  ]);
+  useEffect(() => {
+    if (loading.child) {
+      fetchData()
+    }
+  }, [loading.child]);
 
-  const filteredChildren = childrenDueForHandover.filter(
+  function populateList(response: any, msg: string, setData: any){
+    if (handleServerError2(response)) return
+
+    if ("results" in response) {
+      const data = response.results
+      if (!data.length) {
+        toast.error(msg)
+      }
+      setData(data)
+      // console.log(data)
+    }
+
+  }
+
+  async function fetchData() {
+    try {
+      const response1 = await getChildHandover()
+      populateList(response1, "There are no child handovers", setHandovers)
+
+      const response2 = await getChildren(2)
+      populateList(response2, "There are no child 2 years and above", setChildren)
+
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoading(prev => ({
+        ...prev,
+        child: false
+      }))
+    }
+  }
+
+  const filteredChildren = children.filter(
     (child) =>
       child.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       child.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -177,43 +156,43 @@ export const DischargeChildHandoverList: React.FC = () => {
     startIndex + recordsPerPage
   );
 
-  const handleViewChild = (child: ChildRecord) => {
+  const handleViewChild = (child: ChildItem) => {
     setSelectedChild(child);
     setIsChildViewOpen(true);
   };
 
-  const handleHandoverChild = (child: ChildRecord) => {
+  const handleHandoverChild = (child: ChildItem) => {
     // Pre-populate the handover form with child data
-    setSelectedRecord({
-      id: '',
-      child_name: child.name,
-      mother_name: child.mothers_name,
-      relationship_name: '',
-      custodian: '',
-      contact_of_custodian: '',
-      datetime_of_handover: new Date().toISOString(),
-      reason_for_handover: '',
-      physical_condition: child.physical_condition,
-      probation_report: child.probation_report,
-      age_at_handover: child.age_value,
-      remarks: '',
-      child: child.id,
-      custodian_relation_to_prisoner: '',
-    });
+    // setSelectedRecord({
+    //   id: '',
+    //   child_name: child.name,
+    //   mother_name: child.mothers_name,
+    //   relationship_name: '',
+    //   custodian: '',
+    //   contact_of_custodian: '',
+    //   datetime_of_handover: new Date().toISOString(),
+    //   reason_for_handover: '',
+    //   physical_condition: child.physical_condition,
+    //   probation_report: child.probation_report,
+    //   age_at_handover: child.age_value,
+    //   remarks: '',
+    //   child: child.id,
+    //   custodian_relation_to_prisoner: '',
+    // });
     setIsFormOpen(true);
   };
 
-  const handleView = (record: DischargeChildHandover) => {
+  const handleView = (record: ChildHandover) => {
     setSelectedRecord(record);
     setIsViewOpen(true);
   };
 
-  const handleEdit = (record: DischargeChildHandover) => {
+  const handleEdit = (record: ChildHandover) => {
     setSelectedRecord(record);
     setIsFormOpen(true);
   };
 
-  const handleDelete = (record: DischargeChildHandover) => {
+  const handleDelete = (record: ChildHandover) => {
     setSelectedRecord(record);
     setIsDeleteOpen(true);
   };
@@ -271,295 +250,311 @@ export const DischargeChildHandoverList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1>Child Handovers</h1>
-          <p className="text-muted-foreground">
-            Manage children due for handover and handover records
-          </p>
-        </div>
-        {activeTab === 'handover-records' && (
-          <Button onClick={() => setIsFormOpen(true)}>
-            <Plus className="h-4 w-4 mr-2" />
-            Add Handover
-          </Button>
-        )}
-      </div>
-
-      {/* Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder={
-                activeTab === 'due-for-handover'
-                  ? 'Search by child name or mother name...'
-                  : 'Search by child or mother name...'
-              }
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Tabs */}
-      <Card>
-        <CardContent className="p-0">
-          {/* Custom Tabs Navigation */}
-          <div className="flex gap-2 p-4 bg-gray-100 border-b">
-            <button
-              onClick={() => {
-                setActiveTab('due-for-handover');
-                setCurrentPage(1);
-                setSearchQuery('');
-              }}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
-                activeTab === 'due-for-handover'
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor:
-                  activeTab === 'due-for-handover' ? '#650000' : undefined,
-              }}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Baby className="h-4 w-4" />
-                Children Due for Handover
-                <Badge
-                  variant="outline"
-                  className={
-                    activeTab === 'due-for-handover'
-                      ? 'bg-white text-gray-900'
-                      : 'bg-gray-100'
-                  }
-                >
-                  {filteredChildren.length}
-                </Badge>
+      {
+        loading.child ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching subsistence allowances Information, Please wait...
+                    </p>
               </div>
-            </button>
-            <button
-              onClick={() => {
-                setActiveTab('handover-records');
-                setCurrentPage(1);
-                setSearchQuery('');
-              }}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
-                activeTab === 'handover-records'
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor:
-                  activeTab === 'handover-records' ? '#650000' : undefined,
-              }}
-            >
-              <div className="flex items-center justify-center gap-2">
-                <Users className="h-4 w-4" />
-                Child Handovers
-                <Badge
-                  variant="outline"
-                  className={
-                    activeTab === 'handover-records'
-                      ? 'bg-white text-gray-900'
-                      : 'bg-gray-100'
-                  }
-                >
-                  {filteredHandovers.length}
-                </Badge>
+            </div>
+        ) : (
+            <>
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h1>Child Handovers</h1>
+                  <p className="text-muted-foreground">
+                    Manage children due for handover and handover records
+                  </p>
+                </div>
+                {activeTab === 'handover-records' && (
+                  <Button onClick={() => setIsFormOpen(true)}>
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Handover
+                  </Button>
+                )}
               </div>
-            </button>
-          </div>
 
-          {/* Tab Content */}
-          <div className="p-0">
-            {activeTab === 'due-for-handover' ? (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-primary hover:bg-primary">
-                      <TableHead className="text-white font-bold">Child Name</TableHead>
-                      <TableHead className="text-white font-bold">Mother Name</TableHead>
-                      <TableHead className="text-white font-bold">
-                        Prisoner Number
-                      </TableHead>
-                      <TableHead className="text-white font-bold">Date of Birth</TableHead>
-                      <TableHead className="text-white font-bold">Age (Months)</TableHead>
-                      <TableHead className="text-white font-bold">
-                        Physical Condition
-                      </TableHead>
-                      <TableHead className="text-white font-bold text-right">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentChildren.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center py-8 text-muted-foreground"
+              {/* Search */}
+              <Card>
+                <CardContent className="pt-6">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder={
+                        activeTab === 'due-for-handover'
+                          ? 'Search by child name or mother name...'
+                          : 'Search by child or mother name...'
+                      }
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Tabs */}
+              <Card>
+                <CardContent className="p-0">
+                  {/* Custom Tabs Navigation */}
+                  <div className="flex gap-2 p-4 bg-gray-100 border-b">
+                    <button
+                      onClick={() => {
+                        setActiveTab('due-for-handover');
+                        setCurrentPage(1);
+                        setSearchQuery('');
+                      }}
+                      className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
+                        activeTab === 'due-for-handover'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor:
+                          activeTab === 'due-for-handover' ? '#650000' : undefined,
+                      }}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Baby className="h-4 w-4" />
+                        Children Due for Handover
+                        <Badge
+                          variant="outline"
+                          className={
+                            activeTab === 'due-for-handover'
+                              ? 'bg-white text-gray-900'
+                              : 'bg-gray-100'
+                          }
                         >
-                          No children due for handover found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      currentChildren.map((child) => (
-                        <TableRow key={child.id}>
-                          <TableCell className="font-medium">{child.name}</TableCell>
-                          <TableCell>{child.mothers_name}</TableCell>
-                          <TableCell>{child.prisoner_number_value}</TableCell>
-                          <TableCell>{formatDate(child.date_of_birth)}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">
-                              {calculateAge(child.date_of_birth)} months
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <div className="max-w-xs truncate" title={child.physical_condition}>
-                              {child.physical_condition}
-                            </div>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleViewChild(child)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                onClick={() => handleHandoverChild(child)}
-                                style={{ backgroundColor: '#34D399' }}
-                                className="hover:opacity-90"
-                              >
-                                <Plus className="h-4 w-4 mr-1" />
-                                Handover
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-primary hover:bg-primary">
-                      <TableHead className="text-white font-bold">Child Name</TableHead>
-                      <TableHead className="text-white font-bold">Mother Name</TableHead>
-                      <TableHead className="text-white font-bold">Custodian</TableHead>
-                      <TableHead className="text-white font-bold">Contact</TableHead>
-                      <TableHead className="text-white font-bold">Age</TableHead>
-                      <TableHead className="text-white font-bold">Handover Date</TableHead>
-                      <TableHead className="text-white font-bold text-right">
-                        Actions
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {currentHandovers.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center py-8 text-muted-foreground"
-                        >
-                          No child handover records found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      currentHandovers.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell>{record.child_name}</TableCell>
-                          <TableCell>{record.mother_name}</TableCell>
-                          <TableCell>{record.custodian}</TableCell>
-                          <TableCell>{record.contact_of_custodian}</TableCell>
-                          <TableCell>{record.age_at_handover} months</TableCell>
-                          <TableCell>
-                            {formatDateTime(record.datetime_of_handover)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleView(record)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(record)}
-                              >
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(record)}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+                          {filteredChildren.length}
+                        </Badge>
+                      </div>
+                    </button>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to{' '}
-            {Math.min(
-              startIndex + recordsPerPage,
-              activeTab === 'due-for-handover'
-                ? filteredChildren.length
-                : filteredHandovers.length
-            )}{' '}
-            of{' '}
-            {activeTab === 'due-for-handover'
-              ? filteredChildren.length
-              : filteredHandovers.length}{' '}
-            records
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+                    <button
+                      onClick={() => {
+                        setActiveTab('handover-records');
+                        setCurrentPage(1);
+                        setSearchQuery('');
+                      }}
+                      className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
+                        activeTab === 'handover-records'
+                          ? 'text-white'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                      }`}
+                      style={{
+                        backgroundColor:
+                          activeTab === 'handover-records' ? '#650000' : undefined,
+                      }}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Child Handovers
+                        <Badge
+                          variant="outline"
+                          className={
+                            activeTab === 'handover-records'
+                              ? 'bg-white text-gray-900'
+                              : 'bg-gray-100'
+                          }
+                        >
+                          {filteredHandovers.length}
+                        </Badge>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Tab Content */}
+                  <div className="p-0">
+                    {activeTab === 'due-for-handover' ? (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-primary hover:bg-primary">
+                              <TableHead className="text-white font-bold">Child Name</TableHead>
+                              <TableHead className="text-white font-bold">Mother Name</TableHead>
+                              <TableHead className="text-white font-bold">
+                                Prisoner Number
+                              </TableHead>
+                              <TableHead className="text-white font-bold">Date of Birth</TableHead>
+                              <TableHead className="text-white font-bold">Age (Months)</TableHead>
+                              <TableHead className="text-white font-bold">
+                                Physical Condition
+                              </TableHead>
+                              <TableHead className="text-white font-bold text-right">
+                                Actions
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {currentChildren.length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={7}
+                                  className="text-center py-8 text-muted-foreground"
+                                >
+                                  No children due for handover found
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              currentChildren.map((child) => (
+                                <TableRow key={child.id}>
+                                  <TableCell className="font-medium">{child.name}</TableCell>
+                                  <TableCell>{child.mothers_name}</TableCell>
+                                  <TableCell>{child.prisoner_number_value}</TableCell>
+                                  <TableCell>{formatDate(child.date_of_birth)}</TableCell>
+                                  <TableCell>
+                                    <Badge variant="outline">
+                                      {calculateAge(child.date_of_birth)} months
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell>
+                                    <div className="max-w-xs truncate" title={child.physical_condition}>
+                                      {child.physical_condition}
+                                    </div>
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleViewChild(child)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleHandoverChild(child)}
+                                        style={{ backgroundColor: '#34D399' }}
+                                        className="hover:opacity-90"
+                                      >
+                                        <Plus className="h-4 w-4 mr-1" />
+                                        Handover
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <Table>
+                          <TableHeader>
+                            <TableRow className="bg-primary hover:bg-primary">
+                              <TableHead className="text-white font-bold">Child Name</TableHead>
+                              <TableHead className="text-white font-bold">Mother Name</TableHead>
+                              <TableHead className="text-white font-bold">Custodian</TableHead>
+                              <TableHead className="text-white font-bold">Contact</TableHead>
+                              <TableHead className="text-white font-bold">Age</TableHead>
+                              <TableHead className="text-white font-bold">Handover Date</TableHead>
+                              <TableHead className="text-white font-bold text-right">
+                                Actions
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {currentHandovers.length === 0 ? (
+                              <TableRow>
+                                <TableCell
+                                  colSpan={7}
+                                  className="text-center py-8 text-muted-foreground"
+                                >
+                                  No child handover records found
+                                </TableCell>
+                              </TableRow>
+                            ) : (
+                              currentHandovers.map((record) => (
+                                <TableRow key={record.id}>
+                                  <TableCell>{record.child_name}</TableCell>
+                                  <TableCell>{record.mother_name}</TableCell>
+                                  <TableCell>{record.custodian}</TableCell>
+                                  <TableCell>{record.contact_of_custodian}</TableCell>
+                                  <TableCell>{record.age_at_handover} months</TableCell>
+                                  <TableCell>
+                                    {formatDateTime(record.datetime_of_handover)}
+                                  </TableCell>
+                                  <TableCell className="text-right">
+                                    <div className="flex items-center justify-end gap-2">
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleView(record)}
+                                      >
+                                        <Eye className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleEdit(record)}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => handleDelete(record)}
+                                      >
+                                        <Trash2 className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </TableCell>
+                                </TableRow>
+                              ))
+                            )}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Showing {startIndex + 1} to{' '}
+                    {Math.min(
+                      startIndex + recordsPerPage,
+                      activeTab === 'due-for-handover'
+                        ? filteredChildren.length
+                        : filteredHandovers.length
+                    )}{' '}
+                    of{' '}
+                    {activeTab === 'due-for-handover'
+                      ? filteredChildren.length
+                      : filteredHandovers.length}{' '}
+                    records
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                      disabled={currentPage === totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </>
+        )
+      }
 
       {/* Child View Dialog */}
       <Dialog open={isChildViewOpen} onOpenChange={setIsChildViewOpen}>

@@ -64,7 +64,6 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
     }
   }
 
-
   async function handleFormSubmit(data: SubsistenceAllowance) {
     try {
       let response: any

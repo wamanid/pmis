@@ -90,6 +90,7 @@ export interface Loader {
   request: boolean
   subsistence: boolean
   suspended: boolean
+  child: boolean
 }
 
 export default function ViewDischargeDetails() {
@@ -97,7 +98,7 @@ export default function ViewDischargeDetails() {
   const [activeTab, setActiveTab] = useState<TabType>('discharge-detail');
 
   // API integration
-  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true, suspended: true })
+  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true, suspended: true, child: true })
   const [types, setTypes] = useState<DischargeType[]>([])
   const [reasons, setReasons] = useState<Unit[]>([])
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
