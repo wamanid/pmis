@@ -92,7 +92,7 @@ export const SubsistenceAllowancesForm: React.FC<ChildProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Prisoner *</Label>
-                  <Select value={formData.prisoner} onValueChange={(v) =>{
+                  <Select value={formData.prisoner} disabled={initialData} onValueChange={(v) =>{
                       const selectedPrisoner = prisoners.find(p => p.id === v);
                       if (!selectedPrisoner) return;
                       setFormData(prev => ({

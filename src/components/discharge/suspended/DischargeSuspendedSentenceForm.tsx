@@ -42,12 +42,7 @@ export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
   const [courts, setCourts] = useState<Court[]>([])
 
   useEffect(() => {
-    if(loader && !prisoners.length && !courts.length) {
-      fetchData()
-    }
-    else {
-      setLoader(false)
-    }
+    fetchData()
   }, [loader]);
 
   function populateList(response: any, msg: string, setData: any){
@@ -78,8 +73,10 @@ export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
 
   async function fetchData() {
     try{
-      const response = await getPrisoners()
-      returnedValue(populateList(response, "There are no prisoners", setPrisoners))
+      if (!prisoners.length){
+        const response = await getPrisoners()
+        returnedValue(populateList(response, "There are no prisoners", setPrisoners))
+      }
 
       const response2 = await getCourts()
       returnedValue(populateList(response2, "There are no courts", setCourts))
@@ -112,7 +109,7 @@ export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Prisoner *</Label>
-                  <Select value={formData.prisoner} onValueChange={(v) =>{
+                  <Select value={formData.prisoner} disabled={initialData} onValueChange={(v) =>{
                       const selectedPrisoner = prisoners.find(p => p.id === v);
                       if (!selectedPrisoner) return;
                       setFormData(prev => ({
@@ -132,14 +129,17 @@ export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
                 </div>
                 <div>
                   <Label>Court *</Label>
-                  <Select value={formData.court_details} onValueChange={(v) => {
-                      const selectedCourt = courts.find(p => p.id === v);
-                      if (!selectedCourt) return;
-                      setFormData(prev => ({
-                        ...prev,
-                        court_details: selectedCourt.id,
-                      }));
-                  }}>
+                  <Select value={formData.court_details}
+                          onValueChange={(v) => {
+                              const selectedCourt = courts.find(p => p.id === v);
+                              if (!selectedCourt) return;
+                              setFormData(prev => ({
+                                ...prev,
+                                court_details: selectedCourt.id,
+                              }));
+                          }}
+                          disabled={initialData}
+                  >
                     <SelectTrigger><SelectValue placeholder="Select court" /></SelectTrigger>
                     <SelectContent>
                       {
