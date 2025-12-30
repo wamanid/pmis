@@ -331,7 +331,6 @@ export interface Handover {
 }
 
 
-
 export type ChildResponse<T> = Paginated<T> | ErrorResponse
 export type ChildHandoverResponse<T> = Paginated<T> | ErrorResponse
 export type HandoverResponse = ChildHandover | ErrorResponse

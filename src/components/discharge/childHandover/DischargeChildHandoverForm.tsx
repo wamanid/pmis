@@ -65,7 +65,7 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="child">Child *</Label>
-          <Select value={formData.child} onValueChange={(value) => {
+          <Select value={formData.child} disabled={initialData} onValueChange={(value) => {
             handleChange('child', value);
           }}>
             <SelectTrigger><SelectValue placeholder="Select child" /></SelectTrigger>
