@@ -9,6 +9,7 @@ import {RelationShipItem} from "../../../services/stationServices/visitorsServic
 import {toast} from "sonner";
 
 interface DischargeChildHandoverFormProps {
+  childSelected: boolean
   children: ChildItem
   relationships: RelationShipItem
   initialData?: any;
@@ -17,7 +18,7 @@ interface DischargeChildHandoverFormProps {
 }
 
 export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProps> = ({
-  children, relationships,
+  children, relationships, childSelected,
   initialData,
   onSubmit,
   onCancel,
@@ -55,7 +56,8 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
   const handleChange = (field: string, value: any) => {
     if (field === 'child'){
       const condition = children.find(child => child.id === value)?.physical_condition
-      setFormData((prev) => ({ ...prev,
+      setFormData((prev) => ({
+        ...prev,
         [field]: value,
         physical_condition: condition
       }));
@@ -63,6 +65,8 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
     else {
       setFormData((prev) => ({ ...prev, [field]: value }));
     }
+
+    // setFormData((prev) => ({ ...prev, [field]: value }));
 
   };
 
@@ -76,7 +80,7 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="child">Child *</Label>
-          <Select value={formData.child} onValueChange={(value) => {
+          <Select value={formData.child} disabled={initialData} onValueChange={(value) => {
             handleChange('child', value);
           }}>
             <SelectTrigger><SelectValue placeholder="Select child" /></SelectTrigger>
@@ -192,7 +196,10 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{initialData ? 'Update' : 'Create'} Handover</Button>
+        <Button type="submit">{
+              initialData && !childSelected ? 'Update'
+              : 'Create'
+            } Handover</Button>
       </div>
     </form>
   );

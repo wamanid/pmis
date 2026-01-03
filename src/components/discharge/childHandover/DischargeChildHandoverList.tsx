@@ -93,9 +93,11 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
 
   // API Integration
   const [children, setChildren] = useState<ChildItem[]>([])
+  const [originalChildren, setOriginalChildren] = useState<ChildItem[]>([])
   const [handovers, setHandovers] = useState<ChildHandover[]>([])
   const [relationships, setRelationships] = useState<RelationShipItem[]>([])
   const [selectedId, setSelectedId] = useState("")
+  const [childSelected, setChildSelected] = useState(false)
 
   useEffect(() => {
     if (loading.child || !relationships.length) {
@@ -142,6 +144,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
     // console.log(idsInHandovers)
     const filtered = ch.filter(c => !idsInHandovers.has(c.id))
     setChildren(filtered)
+    setOriginalChildren(ch)
   }
 
   async function fetchData() {
@@ -217,7 +220,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
       child: child.id,
       custodian_relation_to_prisoner: "",
     });
-    // setChildSelected(true)
+    setChildSelected(true)
     setIsFormOpen(true);
   };
 
@@ -228,6 +231,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
 
   const handleEdit = (record: ChildHandover) => {
     setSelectedRecord(record);
+    setChildSelected(false)
     setIsFormOpen(true);
   };
 
@@ -258,20 +262,20 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
     try {
 
       let response: any
-      if (selectedRecord){
-      response = await updateHandover(data, selectedRecord.id);
+      if (selectedRecord && !childSelected){
+        response = await updateHandover(data, selectedRecord.id);
       }
       else {
-      response = await addHandover(data);
+        response = await addHandover(data);
       }
       if (handleResponseError(response)) return;
 
       if (!('id' in response)) {
-      toast.error("Failed to update the handover table");
-      return;
+        toast.error("Failed to update the handover table");
+        return;
       }
 
-      if (selectedRecord){
+      if (selectedRecord && !childSelected){
         setHandovers(prev => (
           prev.map(rec => (rec.id === response.id ? response : rec))
         ));
@@ -280,8 +284,10 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
       else {
         setHandovers(prev => [response, ...prev]);
         toast.success('Child handover record created successfully');
+        setChildren(children.filter((r) => r.id !== data.child));
       }
 
+      setChildSelected(false)
       setIsFormOpen(false);
       setSelectedRecord(null);
     }catch (error) {
@@ -336,7 +342,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                     <p className="text-muted-foreground text-sm">
-                      Fetching subsistence allowances Information, Please wait...
+                      Fetching children handover Information, Please wait...
                     </p>
               </div>
             </div>
@@ -353,7 +359,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
                 {activeTab === 'handover-records' && (
                   <Button onClick={() => {
                     setSelectedRecord(null)
-                    // setChildSelected(false)
+                    setChildSelected(false)
                     setIsFormOpen(true)
                   }}>
                     <Plus className="h-4 w-4 mr-2" />
@@ -801,11 +807,14 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto" aria-describedby={undefined}>
           <DialogHeader>
-            <DialogTitle>{selectedRecord?.child ? 'Edit' : 'Add'} Child Handover</DialogTitle>
+            <DialogTitle>{
+              selectedRecord?.child && !childSelected ? 'Edit'
+              : 'Add'
+            } Child Handover</DialogTitle>
           </DialogHeader>
           <DischargeChildHandoverForm
-            // childSeleted={childSelected}
-            children={children}
+            childSelected={childSelected}
+            children={originalChildren}
             relationships={relationships}
             initialData={selectedRecord}
             onSubmit={handleFormSubmit}
