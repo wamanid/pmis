@@ -351,3 +351,21 @@ export const addHandover = async (handover: Handover) : Promise<HandoverResponse
   const response = await axiosInstance.post<HandoverResponse>('/discharge-management/child-handovers/', handover);
   return response.data;
 }
+
+export const updateHandover = async (handover: Handover, id: string) : Promise<HandoverResponse> => {
+  const response = await axiosInstance.put<HandoverResponse>(`/discharge-management/child-handovers/${id}/`, handover);
+  return response.data;
+}
+
+export const deleteHandover = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/discharge-management/child-handovers/${id}/`);
+
+    return { message: "Child handovers deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to Child handovers allowance."
+    };
+  }
+}

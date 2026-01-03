@@ -49,10 +49,21 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
     if (initialData) {
       setFormData(initialData);
     }
+    console.log(children)
   }, [initialData]);
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'child'){
+      const condition = children.find(child => child.id === value)?.physical_condition
+      setFormData((prev) => ({ ...prev,
+        [field]: value,
+        physical_condition: condition
+      }));
+    }
+    else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
+
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -65,7 +76,7 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="child">Child *</Label>
-          <Select value={formData.child} disabled={initialData} onValueChange={(value) => {
+          <Select value={formData.child} onValueChange={(value) => {
             handleChange('child', value);
           }}>
             <SelectTrigger><SelectValue placeholder="Select child" /></SelectTrigger>

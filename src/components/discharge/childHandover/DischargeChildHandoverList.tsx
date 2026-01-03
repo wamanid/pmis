@@ -17,14 +17,15 @@ import {
   RelationShipItem
 } from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {
+  addAllowance,
   addHandover,
   ChildHandover,
-  ChildItem,
+  ChildItem, deleteHandover,
   getAllowances,
   getChildHandover,
-  getChildren, Handover
+  getChildren, Handover, updateAllowance, updateHandover
 } from "../../../services/discharge/discharge";
-import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
+import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
 
 interface ChildProps {
   loading: Loader
@@ -84,7 +85,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<Handover | null>(null);
+  const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [selectedChild, setSelectedChild] = useState<ChildItem | null>(null);
   const [isChildViewOpen, setIsChildViewOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
@@ -94,12 +95,17 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   const [children, setChildren] = useState<ChildItem[]>([])
   const [handovers, setHandovers] = useState<ChildHandover[]>([])
   const [relationships, setRelationships] = useState<RelationShipItem[]>([])
+  const [selectedId, setSelectedId] = useState("")
 
   useEffect(() => {
-    if (loading.child) {
+    if (loading.child || !relationships.length) {
+      setLoading(prev => ({
+        ...prev,
+        child: true
+      }))
       fetchData()
     }
-  }, [loading.child]);
+  }, [loading.child, relationships]);
 
   function populateList(response: any, msg: string, setData: any){
     if (handleServerError2(response)) return
@@ -115,13 +121,37 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
 
   }
 
+  function populateList2(response: any, msg: string){
+    if (handleServerError2(response)) return []
+
+    if ("results" in response) {
+      const data = response.results
+      if (!data.length && msg) {
+        toast.error(msg)
+      }
+      return data
+      // console.log(data)
+    }
+
+    return []
+  }
+
+  function updateList (ch: any, hos: any) {
+    // console.log(hos)
+    const idsInHandovers = new Set(hos.map(ho => ho.child))
+    // console.log(idsInHandovers)
+    const filtered = ch.filter(c => !idsInHandovers.has(c.id))
+    setChildren(filtered)
+  }
+
   async function fetchData() {
     try {
       const response1 = await getChildHandover()
-      populateList(response1, "There are no child handovers", setHandovers)
+      const hos = populateList2(response1, "There are no child handovers")
+      setHandovers(hos)
 
       const response2 = await getChildren(2)
-      populateList(response2, "There are no child 2 years and above", setChildren)
+      updateList(populateList2(response2, "There are no child 2 years and above"), hos)
 
       const response3 = await getRelationships()
       populateList(response3, "", setRelationships)
@@ -187,6 +217,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
       child: child.id,
       custodian_relation_to_prisoner: "",
     });
+    // setChildSelected(true)
     setIsFormOpen(true);
   };
 
@@ -201,38 +232,56 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   };
 
   const handleDelete = (record: ChildHandover) => {
-    setSelectedRecord(record);
+    // setSelectedRecord(record);
+    setSelectedId(record.id)
     setIsDeleteOpen(true);
   };
 
-  const confirmDelete = () => {
-    // if (selectedRecord) {
-    //   setHandovers(handovers.filter((r) => r.id !== selectedRecord.id));
-    //   toast.success('Child handover record deleted successfully');
-    // }
-    // setIsDeleteOpen(false);
-    // setSelectedRecord(null);
+  const confirmDelete = async () => {
+     if (!selectedId) return
+
+    try {
+      await deleteHandover(selectedId)
+      setHandovers(handovers.filter((r) => r.id !== selectedId));
+      toast.success('Child handover record deleted successfully');
+
+      setIsDeleteOpen(false);
+      setSelectedId("");
+
+    }catch (error) {
+      handleCatchError(error)
+    }
   };
 
   const handleFormSubmit = async (data: Handover) => {
     // console.log(data)
     try {
-      const response = await addHandover(data)
-      if (!('id' in response)) {
-        toast.error("Failed to update the allowances table");
-        return;
+
+      let response: any
+      if (selectedRecord){
+      response = await updateHandover(data, selectedRecord.id);
       }
-      setHandovers(prev => ([response, ...prev]))
-      toast.success('Child handover record created successfully');
-      // if (selectedRecord?.id) {
-      //   setHandovers(
-      //     handovers.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
-      //   );
-      //   toast.success('Child handover record updated successfully');
-      // } else {
-      //   setHandovers([...handovers, { id: Date.now().toString(), ...data }]);
-      //   toast.success('Child handover record created successfully');
-      // }
+      else {
+      response = await addHandover(data);
+      }
+      if (handleResponseError(response)) return;
+
+      if (!('id' in response)) {
+      toast.error("Failed to update the handover table");
+      return;
+      }
+
+      if (selectedRecord){
+        setHandovers(prev => (
+          prev.map(rec => (rec.id === response.id ? response : rec))
+        ));
+        toast.success('Child handover record updated successfully');
+      }
+      else {
+        setHandovers(prev => [response, ...prev]);
+        toast.success('Child handover record created successfully');
+      }
+
       setIsFormOpen(false);
       setSelectedRecord(null);
     }catch (error) {
@@ -302,7 +351,11 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
                   </p>
                 </div>
                 {activeTab === 'handover-records' && (
-                  <Button onClick={() => setIsFormOpen(true)}>
+                  <Button onClick={() => {
+                    setSelectedRecord(null)
+                    // setChildSelected(false)
+                    setIsFormOpen(true)
+                  }}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Handover
                   </Button>
@@ -751,6 +804,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
             <DialogTitle>{selectedRecord?.child ? 'Edit' : 'Add'} Child Handover</DialogTitle>
           </DialogHeader>
           <DischargeChildHandoverForm
+            // childSeleted={childSelected}
             children={children}
             relationships={relationships}
             initialData={selectedRecord}
