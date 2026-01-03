@@ -24,17 +24,20 @@ export const DischargeSuspendedSentenceForm: React.FC<ChildProps> = ({
   onCancel,
 }) => {
   const [formData, setFormData] = useState<Sentence>({
+    is_active: true,
+    deleted_datetime: null,
     discharge_datetime: "",
-    conviction_date: "",
+    remarks: "",
+    intended_place_of_stay: "",
     duration_of_suspension: 0,
     conditions_for_suspension: "",
-    intended_place_of_stay: "",
-    remarks: "",
+    conviction_date: "",
+    deleted_by: null,
     request: "",
     prisoner: "",
     discharge_type: "",
     discharge_reason: "",
-    court_details: "",
+    court_details: ""
   });
 
   // API Integration

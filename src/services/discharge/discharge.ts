@@ -190,12 +190,15 @@ export interface SuspendedSentence {
 }
 
 export interface Sentence {
+  is_active: boolean;
+  deleted_datetime: string | null;
   discharge_datetime: string;
-  conviction_date: string;
+  remarks: string;
+  intended_place_of_stay: string;
   duration_of_suspension: number;
   conditions_for_suspension: string;
-  intended_place_of_stay: string;
-  remarks: string;
+  conviction_date: string;
+  deleted_by: number | null;
   request: string;
   prisoner: string;
   discharge_type: string;
