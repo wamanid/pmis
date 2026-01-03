@@ -36,7 +36,11 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
   // API Integration
   useEffect(() => {
-    if (loading.subsistence) {
+    if (loading.subsistence || !records.length) {
+      setLoading(prev => ({
+        ...prev,
+        subsistence: true
+      }))
       fetchData()
     }
   }, [loading.subsistence]);

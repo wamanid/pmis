@@ -36,7 +36,7 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
 
   // API Integration
   useEffect(() => {
-    if(loading.suspended) {
+    if(loading.suspended || !records.length) {
       fetchData()
     }
   }, [loading.suspended]);
