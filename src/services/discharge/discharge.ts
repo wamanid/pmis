@@ -65,6 +65,25 @@ export const getDischarges = async <T = PrisonerDischarge>() : Promise<PrisonerD
 }
 
 // Discharge Request
+export interface DischargeItem {
+  prisoner: string;
+  discharge_type: string;
+  discharge_reason: string;
+  discharge_datetime: string;
+  remarks: string;
+  intended_place_of_stay: string;
+}
+
+export interface BatchDischargeRequest {
+  comment: string;
+  in_charge: string;
+  in_charge_approved: boolean;
+  in_charge_remark: string;
+  officer_in_charge: string;
+  officer_in_charge_approved: boolean;
+  officer_in_charge_remark: string;
+  discharges: DischargeItem[];
+}
 
 export interface DischargeRequest {
   id: string;
@@ -93,11 +112,18 @@ export interface DischargeRequest {
 }
 
 export type RequestResponse<T> = Paginated<T> | ErrorResponse
+export type DischargeRequestResponse = DischargeRequest | ErrorResponse
 
 export const getRequests = async <T = DischargeRequest>() : Promise<RequestResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/discharge-management/requests/');
   return response.data;
 }
+
+export const addBulkRequest = async (request: BatchDischargeRequest) : Promise<DischargeRequestResponse> => {
+  const response = await axiosInstance.post<DischargeRequestResponse>('/discharge-management/requests/bulk/', request);
+  return response.data;
+}
+
 
 // Subsistence Allowance
 export interface Allowance {

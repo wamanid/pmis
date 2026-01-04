@@ -36,9 +36,22 @@ import {
 } from '../../ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../../ui/utils';
-import {DischargeType, getReasons, getTypes} from "../../../services/discharge/discharge";
+import {
+  BatchDischargeRequest,
+  DischargeItem,
+  DischargeRequest,
+  DischargeType,
+  getReasons,
+  getTypes
+} from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
-import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
+import {
+  getLabel,
+  getPrisonerLabel, getPrisonerLabel2,
+  getStaffLabel,
+  handleCatchError,
+  handleServerError2
+} from "../../../services/stationServices/utils";
 import {getPrisoners, Prisoner, PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {getStaffProfile, StaffItem} from "../../../services/stationServices/staffDeploymentService";
 
@@ -55,19 +68,19 @@ interface DischargeRequestFormProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
 }
 
-interface DischargeItem {
-  id?: string;
-  prisoner: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  discharge_type: string;
-  discharge_type_name: string;
-  discharge_reason: string;
-  discharge_reason_name: string;
-  discharge_datetime: string;
-  remarks: string;
-  intended_place_of_stay: string;
-}
+// export interface DischargeItem {
+//   id?: string;
+//   prisoner: string;
+//   // prisoner_name: string;
+//   // prisoner_number: string;
+//   discharge_type: string;
+//   // discharge_type_name: string;
+//   discharge_reason: string;
+//   // discharge_reason_name: string;
+//   discharge_datetime: string;
+//   remarks: string;
+//   intended_place_of_stay: string;
+// }
 
 // Mock data
 // const mockPrisoners = [
@@ -126,13 +139,17 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
   const [formData, setFormData] = useState({
     comment: initialData?.comment || '',
     in_charge: initialData?.in_charge || '',
-    in_charge_name: initialData?.in_charge_name || '',
-    in_charge_force_number: initialData?.in_charge_force_number || '',
-    in_charge_rank: initialData?.in_charge_rank || '',
+    in_charge_approved: true,
+    in_charge_remark: "",
+    officer_in_charge_approved: true,
+    officer_in_charge_remark: "",
+    // in_charge_name: initialData?.in_charge_name || '',
+    // in_charge_force_number: initialData?.in_charge_force_number || '',
+    // in_charge_rank: initialData?.in_charge_rank || '',
     officer_in_charge: initialData?.officer_in_charge || '',
-    officer_in_charge_name: initialData?.officer_in_charge_name || '',
-    officer_in_charge_force_number: initialData?.officer_in_charge_force_number || '',
-    officer_in_charge_rank: initialData?.officer_in_charge_rank || '',
+    // officer_in_charge_name: initialData?.officer_in_charge_name || '',
+    // officer_in_charge_force_number: initialData?.officer_in_charge_force_number || '',
+    // officer_in_charge_rank: initialData?.officer_in_charge_rank || '',
   });
 
   const [discharges, setDischarges] = useState<DischargeItem[]>(
@@ -146,12 +163,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
   const [editingIndex, setEditingIndex] = useState<number | null>(null);
   const [editingDischarge, setEditingDischarge] = useState<DischargeItem>({
     prisoner: '',
-    prisoner_name: '',
-    prisoner_number: '',
+    // prisoner_name: '',
+    // prisoner_number: '',
     discharge_type: '',
-    discharge_type_name: '',
+    // discharge_type_name: '',
     discharge_reason: '',
-    discharge_reason_name: '',
+    // discharge_reason_name: '',
     discharge_datetime: '',
     remarks: '',
     intended_place_of_stay: '',
@@ -224,6 +241,10 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
     }
   }
 
+  const inChargeLabel = getStaffLabel(staff, "Select in charge...", formData.in_charge);
+  const officerInChargeLabel = getStaffLabel(staff, "Select officer in charge...", formData.officer_in_charge);
+  // const prisonerLabel = getPrisonerLabel(prisoners, "Select prisoner...", )
+
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -260,12 +281,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
     setEditingIndex(discharges.length);
     setEditingDischarge({
       prisoner: '',
-      prisoner_name: '',
-      prisoner_number: '',
+      // prisoner_name: '',
+      // prisoner_number: '',
       discharge_type: '',
-      discharge_type_name: '',
+      // discharge_type_name: '',
       discharge_reason: '',
-      discharge_reason_name: '',
+      // discharge_reason_name: '',
       discharge_datetime: new Date().toISOString().slice(0, 16) + ':00Z',
       remarks: '',
       intended_place_of_stay: '',
@@ -293,12 +314,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
       setEditingIndex(null);
       setEditingDischarge({
         prisoner: '',
-        prisoner_name: '',
-        prisoner_number: '',
+        // prisoner_name: '',
+        // prisoner_number: '',
         discharge_type: '',
-        discharge_type_name: '',
+        // discharge_type_name: '',
         discharge_reason: '',
-        discharge_reason_name: '',
+        // discharge_reason_name: '',
         discharge_datetime: '',
         remarks: '',
         intended_place_of_stay: '',
@@ -310,12 +331,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
     setEditingIndex(null);
     setEditingDischarge({
       prisoner: '',
-      prisoner_name: '',
-      prisoner_number: '',
+      // prisoner_name: '',
+      // prisoner_number: '',
       discharge_type: '',
-      discharge_type_name: '',
+      // discharge_type_name: '',
       discharge_reason: '',
-      discharge_reason_name: '',
+      // discharge_reason_name: '',
       discharge_datetime: '',
       remarks: '',
       intended_place_of_stay: '',
@@ -340,7 +361,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
       return;
     }
 
-    const submitData = {
+    const submitData: BatchDischargeRequest = {
       ...formData,
       discharges,
     };
@@ -385,9 +406,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                           className="w-full justify-between"
                           type="button"
                         >
-                          {formData.in_charge
-                            ? formData.in_charge_name
-                            : 'Select in charge...'}
+                          {inChargeLabel}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
@@ -401,7 +420,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                 <CommandItem
                                   key={staff.id}
                                   value={`${staff.first_name} ${staff.last_name}`}
-                                  onSelect={() => handleInChargeSelect(staff.id)}
+                                  onSelect={() => handleChange("in_charge", staff.id)}
                                 >
                                   <Check
                                     className={cn(
@@ -435,9 +454,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                           className="w-full justify-between"
                           type="button"
                         >
-                          {formData.officer_in_charge
-                            ? formData.officer_in_charge_name
-                            : 'Select officer in charge...'}
+                          {officerInChargeLabel}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </PopoverTrigger>
@@ -451,7 +468,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                 <CommandItem
                                   key={staff.id}
                                   value={`${staff.first_name} ${staff.last_name}`}
-                                  onSelect={() => handleOfficerInChargeSelect(staff.id)}
+                                  onSelect={() => handleChange("officer_in_charge", staff.id)}
                                 >
                                   <Check
                                     className={cn(
@@ -525,9 +542,9 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                 className="w-full justify-between"
                                 type="button"
                               >
-                                {editingDischarge.prisoner
-                                  ? `${editingDischarge.prisoner_name} (${editingDischarge.prisoner_number})`
-                                  : 'Select prisoner...'}
+                                {
+                                  getPrisonerLabel(prisoners, "Select prisoner...", editingDischarge.prisoner)
+                                }
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
                             </PopoverTrigger>
@@ -545,8 +562,6 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                           setEditingDischarge((prev) => ({
                                             ...prev,
                                             prisoner: prisoner.id,
-                                            prisoner_name: prisoner.full_name,
-                                            prisoner_number: prisoner.prisoner_number_value,
                                           }));
                                           setPrisonerOpen(false);
                                         }}
@@ -582,7 +597,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                 type="button"
                               >
                                 {editingDischarge.discharge_type
-                                  ? editingDischarge.discharge_type_name
+                                  ? (() => {
+                                      const selected = types.find(pr => pr.id === editingDischarge.discharge_type)
+                                      return selected
+                                        ? `${selected.name}`
+                                        : 'Select discharge type...'
+                                    })()
                                   : 'Select discharge type...'}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -634,7 +654,12 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                 type="button"
                               >
                                 {editingDischarge.discharge_reason
-                                  ? editingDischarge.discharge_reason_name
+                                  ? (() => {
+                                      const selected = reasons.find(pr => pr.id === editingDischarge.discharge_reason)
+                                      return selected
+                                        ? `${selected.name}`
+                                        : 'Select discharge type...'
+                                    })()
                                   : 'Select discharge reason...'}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -752,13 +777,18 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                       {discharges.map((discharge, index) => (
                         <TableRow key={index}>
                           <TableCell>
-                            <div>
-                              <div className="font-medium">{discharge.prisoner_name}</div>
-                              <div className="text-sm text-gray-500">{discharge.prisoner_number}</div>
-                            </div>
+                            {(() => {
+                              const label = getPrisonerLabel2(prisoners, discharge.prisoner)
+                              return (
+                                  <div>
+                                    <div className="font-medium">{label ? label.name : ""}</div>
+                                    <div className="text-sm text-gray-500">{label ? label.number : ""}</div>
+                                  </div>
+                              )
+                            })()}
                           </TableCell>
-                          <TableCell>{discharge.discharge_type_name}</TableCell>
-                          <TableCell>{discharge.discharge_reason_name}</TableCell>
+                          <TableCell>{getLabel(types, discharge.discharge_type)}</TableCell>
+                          <TableCell>{getLabel(reasons, discharge.discharge_reason)}</TableCell>
                           <TableCell>
                             {new Date(discharge.discharge_datetime).toLocaleString('en-US', {
                               year: 'numeric',

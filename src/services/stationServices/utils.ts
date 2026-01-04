@@ -1,8 +1,10 @@
 import {ManualLockUpItem} from "./manualLockupIntegration";
-import {StaffDeploymentResponse, Station} from "./staffDeploymentService"
+import {StaffDeploymentResponse, StaffItem, Station} from "./staffDeploymentService"
 import {toast} from "sonner";
 import {getCounties, getDistricts, getParishes, getSubCounties, getVillages} from "../admission/nextOfKinService";
 import {Unit} from "./visitorsServices/visitorItem";
+import {PrisonerItem} from "./visitorsServices/VisitorsService";
+import {DischargeType} from "../discharge/discharge";
 
 export interface Paginated<T> {
   count: number;
@@ -382,4 +384,57 @@ export function getCurrentDate() {
   const day = String(today.getDate()).padStart(2, "0");
 
   return `${year}-${month}-${day}`;
+}
+
+export function getStaffLabel(
+  staff: StaffItem[],
+  fallback: string,
+  staffId?: string,
+): string {
+  if (!staffId) return fallback;
+
+  const selected = staff.find(st => st.id === staffId);
+  return selected
+    ? `${selected.first_name} ${selected.last_name}`
+    : fallback;
+}
+
+export function getPrisonerLabel(
+  prisoners: PrisonerItem[],
+  fallback?: string,
+  prisonerId?: string,
+): string {
+  if (!prisonerId) return fallback;
+
+  const selected = prisoners.find(st => st.id === prisonerId);
+  return selected
+    ? `${selected.full_name} (${selected.prisoner_number_value})`
+    : fallback;
+}
+
+export function getPrisonerLabel2(
+  prisoners: PrisonerItem[],
+  prisonerId?: string,
+): { name: string, number: string } | null {
+  if (!prisonerId) return null;
+
+  const selected = prisoners.find(st => st.id === prisonerId);
+  return selected
+    ? {
+        name: selected.full_name,
+        number: selected.prisoner_number_value
+      }
+    : null;
+}
+
+export function getLabel(
+  list: DischargeType[] | Unit[],
+  id?: string,
+): string {
+  if (!id) return "";
+
+  const selected = list.find(st => st.id === id);
+  return selected
+    ? selected.name
+    : "";
 }

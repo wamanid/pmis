@@ -24,8 +24,14 @@ import { toast } from 'sonner';
 import { DischargeRequestForm } from './DischargeRequestForm';
 import { Badge } from '../../ui/badge';
 import {Loader} from "../ViewDischargeDetails";
-import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
-import {DischargeRequest, DischargeType, getRequests} from "../../../services/discharge/discharge";
+import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
+import {
+  addBulkRequest,
+  BatchDischargeRequest,
+  DischargeRequest,
+  DischargeType,
+  getRequests
+} from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 
@@ -155,8 +161,25 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     setSelectedRequest(null);
   };
 
-  const handleFormSubmit = (data: any) => {
-    console.log(data)
+  const handleFormSubmit = async (data: BatchDischargeRequest) => {
+    // console.log(data)
+
+    try {
+      const response = await addBulkRequest(data)
+      if (handleResponseError(response)) return;
+      if (!('id' in response)) {
+        toast.error("Failed to update the requests table");
+        return;
+      }
+
+      setDischargeRequests([response, ...dischargeRequests]);
+      toast.success('Discharge request created successfully');
+      setIsFormOpen(false);
+      setSelectedRequest(null);
+
+    }catch (error) {
+      handleCatchError(error)
+    }
 
     // if (selectedRequest) {
     //   setDischargeRequests(
@@ -178,8 +201,8 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     //   setDischargeRequests([...dischargeRequests, newRequest]);
     //   toast.success('Discharge request created successfully');
     // }
-    // setIsFormOpen(false);
-    // setSelectedRequest(null);
+    setIsFormOpen(false);
+    setSelectedRequest(null);
   };
 
   const getApprovalStatus = (request: DischargeRequest) => {
