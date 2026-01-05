@@ -39,7 +39,7 @@ import { format} from 'date-fns';
 import { toast } from 'sonner';
 import { PrisonerRecord } from '../../models/gate/Index';
 import { getprisoners } from '../../services/gateService';
-import { getStages, submitStageData } from '../../services/stageService';
+import { getStages, submitStageData, updateStageData } from '../../services/stageService';
 import { Prisoner } from '../../models/gate/Prisoner';
 import { Stage, StageAssignmentPost } from '../../models/StageClassification';
 
@@ -95,14 +95,16 @@ export function StageAssignForm({
   // Populate form when editing
   useEffect(() => {
     if (stageAssignment && open) {
+
+     // alert(new Date(stageAssignment.start_date)).;
       setSelectedPrisoners([{
         id: stageAssignment.prisoner,
         prisoner_number: stageAssignment.prisoner_number,
         prisoner_name: stageAssignment.prisoner_name,
       }]);
       setSelectedStage(stageAssignment.stage);
-     // setStartDate(new Date(stageAssignment.start_date));
-      //setEndDate(stageAssignment.end_date ? new Date(stageAssignment.end_date) : undefined);
+     setStartDate(stageAssignment.start_date);
+     setEndDate(stageAssignment.end_date ? stageAssignment.end_date : undefined);
       setRemark(stageAssignment.remark);
     } else if (open) {
       resetForm();
@@ -234,9 +236,16 @@ export function StageAssignForm({
           start_date: startDate!,
           end_date: endDate ,
           remark: remark,
+          id:stageAssignment.id
         };
-   // await new Promise((resolve) => setTimeout(resolve, 500));
-        toast.success('Stage assignment updated successfully');
+      updateStageData(payload).then((data) => {
+     toast.success('Stage assignment updated successfully');
+    onOpenChange(false);
+      }).catch((error) => {
+        alert(error);
+
+      });
+       
       } else {
         // Create new stage assignments (multiple prisoners)
         const assignments = selectedPrisoners.map((prisoner) => ({
@@ -254,11 +263,11 @@ export function StageAssignForm({
           prisoner:assignments[0].id,
           status:"0996439c-24cc-453e-87e4-1936a3e52820"
         };
-        alert(JSON.stringify(dataToPost));
-      submitStageData(dataToPost).then((data) => {
-       alert(JSON.stringify(data));
-      toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
-     onOpenChange(false);
+       //alert(JSON.stringify(dataToPost));
+     submitStageData(dataToPost).then((data) => {
+      // alert(JSON.stringify(data));
+    toast.success(`Stage assigned to ${selectedPrisoners.length} prisoner(s) successfully`);
+    onOpenChange(false);
       }).catch((error) => {
         alert(error);
 
@@ -415,7 +424,9 @@ export function StageAssignForm({
                       >
                         <div className="pr-6">
                           <p className="font-medium text-sm truncate" title={prisoner.full_name}>
-                            {prisoner.full_name}
+                            {prisoner.full_name===""?"N/A":prisoner.full_name}
+                             {prisoner.prisoner_name}
+                           
                           </p>
                           <p className="text-xs text-muted-foreground truncate" title={prisoner.prisoner_number}>
                             {prisoner.prisoner_number}
@@ -450,7 +461,7 @@ export function StageAssignForm({
               <SelectContent>
                 {stages.map((stage) => (
                   <SelectItem key={stage.id} value={stage.id}>
-                    {stage.stage}
+                    {stage.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -459,7 +470,7 @@ export function StageAssignForm({
 
           {/* Date Fields */}
           <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
+<div className="space-y-2">
           <Label>
             Start Date <span className="text-red-500">*</span>
           </Label>
@@ -467,11 +478,13 @@ export function StageAssignForm({
             type="date"
             value={startDate}
             onChange={(e) => {
-            setStartDate(e.target.value);
+               setStartDate(e.target.value);
             }}
+            
           />
         </div>
-        <div className="space-y-2">
+
+<div className="space-y-2">
           <Label>
             End Date <span className="text-red-500">*</span>
           </Label>
@@ -479,14 +492,16 @@ export function StageAssignForm({
             type="date"
             value={endDate}
             onChange={(e) => {
-             setEndDate(e.target.value);
+               setEndDate(e.target.value);
             }}
-         
+            
           />
-      
         </div>
+ 
 
-          
+
+
+
           </div>
 
           {/* Remark */}

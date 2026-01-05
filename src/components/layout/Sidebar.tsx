@@ -137,6 +137,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
     try {
       setMenusLoading(true);
       const response = await fetchMenus();
+
+    //alert(JSON.stringify(response.results));
       const menus = buildMenuTree(response.results);
       setMenuItems(menus);
     } catch (error) {
@@ -202,6 +204,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
     const isActive = location.pathname === item.path;
     const isTopLevel = level === 0;
 
+    //alert(hasChildren);
+
     return (
       <div key={item.id}>
         <button
@@ -217,8 +221,8 @@ export function Sidebar({ isOpen }: SidebarProps) {
               ? 'bg-primary text-white'
               : 'hover:bg-muted text-foreground'
           }`}
-          style={{ paddingLeft: `${level * 12 + 12}px` }}
-        >
+          style={{ paddingLeft: `${level * 12 + 12}px` }}>
+            
           <Icon className="h-4 w-4 shrink-0" />
           <span className="flex-1 text-left text-sm">{item.label}</span>
           {hasChildren &&

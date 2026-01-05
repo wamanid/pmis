@@ -28,6 +28,7 @@ export const getpasstypes = async (): Promise<WorkingPartyResponse[]> => {
 
 //get prisoners
 export const getprisoners = async (): Promise<WorkingPartyResponse[]> => {
+  //filters region,district
   const response = await axiosInstance.get<WorkingPartyResponse[]>('/admission/prisoners/');
   return response.data;
 };
@@ -105,3 +106,13 @@ export const editgatePass = async (pass: GatePass): Promise<VisitorPass> => {
   //console.log(visitorPassData.id);
   return response.data;
 };
+
+//entry exit records
+
+export const entryexit = async (): Promise<WorkingPartyResponse[]> => {
+  const response = await axiosInstance.get<WorkingPartyResponse[]>('/gate-management/gate-pass-prisoners/');
+  return response.data;
+};
+
+
+

@@ -9,4 +9,11 @@ export const stageRoutes: RouteObject[] = [
     path: '/classification-progressive/stage-assignments',
     element: <StageAssignList />,
   },
+    {
+    path: '/classification-progressive/overview',
+    element: <StageAssignList />,
+  },
+
+
+  
 ];

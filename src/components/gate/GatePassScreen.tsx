@@ -163,13 +163,12 @@ setVisitorPasses(visitorPassesDefault);
 
 
 getvisitors().then((data) => {
+  //alert(JSON.stringify(data.results));
   mockVisitors=data.results;
   setVisitors(data.results);
 }).catch((error) => {
   alert(error);
 });
-
-
 
   getgatepasses().then((data) => {
   mockGatePasses = data.results;
@@ -400,7 +399,7 @@ getworkingparty().then((data) => {
   const handleViewGatePass = (gatePass: GatePass) => {
 
 
-    alert()
+
     setSelectedGatePass(gatePass);
     setIsViewDialogOpen(true);
   };
@@ -514,8 +513,7 @@ getworkingparty().then((data) => {
 
 
 
-
-alert(JSON.stringify(newGatePass2));
+//alert(JSON.stringify(newGatePass2));
 editgatePass(newGatePass2).then((data) => {
   toast.success('Gate pass updated successfully');
   setIsLoading(false);
@@ -632,7 +630,7 @@ editgatePass(newGatePass2).then((data) => {
   visitor: data.visitor,
   is_active:data.is_active
       };
-      alert(JSON.stringify(passtosend));
+     // alert(JSON.stringify(passtosend));
       editVisitorPass(passtosend).then((data) => {
       toast.success('Visitor pass updated successfully');
       setIsVisitorPassDialogOpen(false);
@@ -694,7 +692,7 @@ editgatePass(newGatePass2).then((data) => {
       <div className="size-full flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading API data</p>
+          <p className="text-muted-foreground">Loading</p>
         </div>
       </div>
     );
