@@ -85,31 +85,57 @@ export interface BatchDischargeRequest {
   discharges: DischargeItem[];
 }
 
-export interface DischargeRequest {
+export interface DischargeRecord {
   id: string;
-  in_charge_name: string;
-  in_charge_force_number: string;
-  in_charge_rank: string;
-  officer_in_charge_name: string;
-  officer_in_charge_force_number: string;
-  officer_in_charge_rank: string;
-  discharges: string;
+  discharge_number: string;
+  discharge_datetime: string;
+  discharge_type: string;
+  discharge_type_name: string;
+  discharge_reason: string;
+  discharge_reason_name: string;
+  prisoner: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  intended_place_of_stay: string;
+  remarks: string;
+  request: string;
+  request_number: string;
+  is_active: boolean;
   created_datetime: string;
   updated_datetime: string;
   deleted_datetime: string | null;
-  is_active: boolean;
+  created_by: number | null;
+  updated_by: number | null;
+  deleted_by: number | null;
+}
+
+export interface DischargeRequest {
+  id: string;
   request_number: string;
   comment: string;
+  discharges: DischargeRecord[];
+  in_charge: string;
+  in_charge_name: string;
+  in_charge_rank: string;
+  in_charge_force_number: string;
   in_charge_approved: boolean;
   in_charge_remark: string;
+  officer_in_charge: string;
+  officer_in_charge_name: string;
+  officer_in_charge_rank: string;
+  officer_in_charge_force_number: string;
   officer_in_charge_approved: boolean;
   officer_in_charge_remark: string;
-  created_by: number;
-  updated_by: number;
+  is_active: boolean;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  created_by: number | null;
+  updated_by: number | null;
   deleted_by: number | null;
-  in_charge: string;
-  officer_in_charge: string;
 }
+
+
 
 export type RequestResponse<T> = Paginated<T> | ErrorResponse
 export type DischargeRequestResponse = DischargeRequest | ErrorResponse

@@ -166,16 +166,18 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
 
     try {
       const response = await addBulkRequest(data)
+      console.log(response)
       if (handleResponseError(response)) return;
       if (!('id' in response)) {
         toast.error("Failed to update the requests table");
+        setIsFormOpen(false);
+        setSelectedRequest(null);
         return;
       }
 
       setDischargeRequests([response, ...dischargeRequests]);
       toast.success('Discharge request created successfully');
-      setIsFormOpen(false);
-      setSelectedRequest(null);
+
 
     }catch (error) {
       handleCatchError(error)
@@ -201,8 +203,8 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     //   setDischargeRequests([...dischargeRequests, newRequest]);
     //   toast.success('Discharge request created successfully');
     // }
-    setIsFormOpen(false);
-    setSelectedRequest(null);
+    // setIsFormOpen(false);
+    // setSelectedRequest(null);
   };
 
   const getApprovalStatus = (request: DischargeRequest) => {

@@ -620,8 +620,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                         onSelect={() => {
                                           setEditingDischarge((prev) => ({
                                             ...prev,
-                                            discharge_type: type.id,
-                                            discharge_type_name: type.name,
+                                            discharge_type: type.id
                                           }));
                                           setDischargeTypeOpen(false);
                                         }}
@@ -678,7 +677,6 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                                           setEditingDischarge((prev) => ({
                                             ...prev,
                                             discharge_reason: reason.id,
-                                            discharge_reason_name: reason.name,
                                           }));
                                           setDischargeReasonOpen(false);
                                         }}
