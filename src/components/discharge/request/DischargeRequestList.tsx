@@ -34,6 +34,7 @@ import {
 } from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../../services/stationServices/staffDeploymentService";
 
 interface ChildProps {
   loading: Loader
@@ -44,6 +45,10 @@ interface ChildProps {
   setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
   prisoners: PrisonerItem
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
+  staff: StaffItem
+  setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
 }
 
 interface DischargeItem {
@@ -81,7 +86,8 @@ interface DischargeItem {
 //   officer_in_charge: string;
 // }
 
-export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading, types, reasons, setTypes, setReasons, setPrisoners, prisoners }) => {
+export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading, types, reasons, setTypes, setReasons,
+                                                             setPrisoners, prisoners, dischargeRequests, setDischargeRequests, staff, setStaff }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -91,7 +97,7 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
   const recordsPerPage = 10;
 
   // Mock data
-  const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
+  // const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
 
   // Filter records
   const filteredRequests = dischargeRequests.filter((request) => {
@@ -109,6 +115,8 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
   const currentRecords = filteredRequests.slice(startIndex, startIndex + recordsPerPage);
 
   // API Integration
+  // const [staff, setStaff] = useState<StaffItem[]>([]);
+
   useEffect(() => {
     if (loading.request || !dischargeRequests.length) {
       setLoading(prev => ({
@@ -208,29 +216,6 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     }catch (error) {
       handleCatchError(error)
     }
-
-    // if (selectedRequest) {
-    //   setDischargeRequests(
-    //     dischargeRequests.map((r) =>
-    //       r.id === selectedRequest.id ? { ...r, ...data } : r
-    //     )
-    //   );
-    //   toast.success('Discharge request updated successfully');
-    // } else {
-    //   const newRequest = {
-    //     id: Date.now().toString(),
-    //     request_number: `DRQ-2025-${String(dischargeRequests.length + 1).padStart(6, '0')}`,
-    //     in_charge_approved: false,
-    //     in_charge_remark: '',
-    //     officer_in_charge_approved: false,
-    //     officer_in_charge_remark: '',
-    //     ...data,
-    //   };
-    //   setDischargeRequests([...dischargeRequests, newRequest]);
-    //   toast.success('Discharge request created successfully');
-    // }
-    // setIsFormOpen(false);
-    // setSelectedRequest(null);
   };
 
   const getApprovalStatus = (request: DischargeRequest) => {
@@ -494,7 +479,7 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
             </DialogTitle>
           </DialogHeader>
           <DischargeRequestForm
-            types={types} reasons={reasons} setTypes={setTypes} setReasons={setReasons} prisoners={prisoners} setPrisoners={setPrisoners}
+            types={types} reasons={reasons} setTypes={setTypes} setReasons={setReasons} prisoners={prisoners} setPrisoners={setPrisoners} staff={staff} setStaff={setStaff}
             initialData={selectedRequest}
             onSubmit={handleFormSubmit}
             onCancel={() => {

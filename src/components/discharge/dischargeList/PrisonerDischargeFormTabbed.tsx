@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from '../../ui/select';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../ui/dialog';
 import {
   Table,
   TableBody,
@@ -25,16 +25,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
-import { Card, CardContent } from '../ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+} from '../../ui/table';
+import { Card, CardContent } from '../../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ArrowRightLeft, Skull, Building, User, FileText, Upload, Plus, Trash2, Fingerprint, Shield, X, Eye, Download } from 'lucide-react';
-import { Checkbox } from '../ui/checkbox';
+import { Checkbox } from '../../ui/checkbox';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '../ui/popover';
+} from '../../ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -42,13 +42,24 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '../ui/command';
+} from '../../ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '../ui/utils';
-import  NextOfKinForm  from '../admission/NextOfKinForm';
+import { cn } from '../../ui/utils';
+import  NextOfKinForm  from '../../admission/NextOfKinForm';
 import { toast } from 'sonner';
-import BiometricCapture from '../common/BiometricCapture';
-import { DischargeRequestForm } from './request/DischargeRequestForm';
+import BiometricCapture from '../../common/BiometricCapture';
+import { DischargeRequestForm } from '../request/DischargeRequestForm';
+import {
+  DischargeRequest,
+  DischargeType,
+  getReasons,
+  getRequests,
+  getTypes
+} from "../../../services/discharge/discharge";
+import {getPrisoners, PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {getStaffProfile, StaffItem} from "../../../services/stationServices/staffDeploymentService";
+import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
 interface PrisonerDischargeFormProps {
   initialData?: any;
@@ -56,6 +67,16 @@ interface PrisonerDischargeFormProps {
   onCancel: () => void;
   onTransferRedirect?: (prisonerData: { prisoner: string; prisoner_name: string; prisoner_number: string; original_station: string }) => void;
   mode?: 'create' | 'edit';
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  staff: StaffItem
+  setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
 type TabType = 'basic-info' | 'biometric' | 'officers' | 'documents';
@@ -202,6 +223,7 @@ interface DischargeDocument {
 }
 
 export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> = ({
+    dischargeRequests, setDischargeRequests, setPrisoners, prisoners, setStaff, staff, setReasons, setTypes, types, reasons,
   initialData,
   onSubmit,
   onCancel,
@@ -210,10 +232,6 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('basic-info');
   const [formData, setFormData] = useState({
-    prisoner_name: '',
-    prisoner_number: '',
-    discharge_type_name: '',
-    discharge_reason_name: '',
     discharge_datetime: '',
     remarks: '',
     intended_place_of_stay: '',
@@ -257,19 +275,74 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   const [dischargeRequestOpen, setDischargeRequestOpen] = useState(false);
   const [showDischargeRequestDialog, setShowDischargeRequestDialog] = useState(false);
 
-  // Mock discharge requests
-  const mockDischargeRequests = [
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c4',
-      request_number: 'DRQ-2025-000001',
-      in_charge_name: 'Robinson Okello',
-    },
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c5',
-      request_number: 'DRQ-2025-000002',
-      in_charge_name: 'Sarah Namuli',
-    },
-  ];
+  //API integration
+  const [loader, setLoader] = useState(true)
+  useEffect(() => {
+    if(loader) {
+      fetchData()
+    }
+  }, [loader]);
+
+  function populateList(response: any, msg: string, setData: any) {
+    if (handleServerError2(response)) return true
+
+    if ("results" in response) {
+      const data = response.results
+      if (!data.length) {
+        toast.error(msg)
+        return true
+      }
+      setData(data)
+      // console.log(data)
+    }
+
+    return false
+  }
+
+  function returnedValue (value: boolean){
+    if (value){
+      onCancel()
+      return
+    }
+  }
+
+  async function fetchData() {
+    try {
+        if (!dischargeRequests.length){
+          const response0 = await getRequests()
+          returnedValue(populateList(response0, "There are no discharge requests", setDischargeRequests))
+        }
+
+        if (!prisoners.length){
+          const response1 = await getPrisoners()
+          returnedValue(populateList(response1, "There are no prisoners", setPrisoners))
+        }
+
+        if (!staff.length) {
+            const response2 = await getStaffProfile()
+            returnedValue(populateList(response2, "There are no staff officers", setStaff))
+        }
+
+        if (!types.length) {
+          const response3 = await getTypes()
+          returnedValue(populateList(response3, "There are no discharge types", setTypes))
+
+        }
+
+        if (!reasons.length) {
+          const response4 = await getReasons()
+          returnedValue(populateList(response4, "There are no discharge reasons", setReasons))
+        }
+
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoader(false)
+    }
+  }
+
+
+
 
   useEffect(() => {
     if (initialData) {
@@ -356,15 +429,15 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   };
 
   const selectStaffForOfficer = (index: number, staffId: string) => {
-    const staff = mockStaffProfiles.find((s) => s.id === staffId);
-    if (staff) {
+    const st = staff.find((s) => s.id === staffId);
+    if (st) {
       const updated = [...dischargeOfficers];
       updated[index] = {
         ...updated[index],
         staff: staffId,
-        staff_name: `${staff.first_name} ${staff.middle_name} ${staff.last_name}`,
-        force_number: staff.force_number,
-        rank: staff.rank,
+        staff_name: `${st.first_name} ${st.middle_name} ${st.last_name}`,
+        force_number: st.force_number,
+        rank: st.rank_name,
       };
       setDischargeOfficers(updated);
       setStaffOpen(false);
@@ -440,7 +513,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                   >
                     {formData.request
                       ? (() => {
-                          const selected = mockDischargeRequests.find((req) => req.id === formData.request);
+                          const selected = dischargeRequests.find((req) => req.id === formData.request);
                           return selected ? selected.request_number : 'Select discharge request...';
                         })()
                       : 'Select discharge request...'}
@@ -453,7 +526,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                     <CommandList>
                       <CommandEmpty>No discharge request found.</CommandEmpty>
                       <CommandGroup>
-                        {mockDischargeRequests.map((req) => (
+                        {dischargeRequests.map((req) => (
                           <CommandItem
                             key={req.id}
                             value={req.request_number}
@@ -503,25 +576,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             value={formData.prisoner}
             onValueChange={(value) => {
               handleChange('prisoner', value);
-              if (value === 'prisoner-001') {
-                handleChange('prisoner_name', 'John Doe');
-                handleChange('prisoner_number', 'P-2024-001');
-              } else if (value === 'prisoner-002') {
-                handleChange('prisoner_name', 'Jane Smith');
-                handleChange('prisoner_number', 'P-2024-002');
-              } else if (value === 'prisoner-003') {
-                handleChange('prisoner_name', 'Michael Johnson');
-                handleChange('prisoner_number', 'P-2024-003');
-              }
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select prisoner" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="prisoner-001">John Doe (P-2024-001)</SelectItem>
-              <SelectItem value="prisoner-002">Jane Smith (P-2024-002)</SelectItem>
-              <SelectItem value="prisoner-003">Michael Johnson (P-2024-003)</SelectItem>
+              {
+                prisoners.map(pr => (
+                    <SelectItem key={pr.id} value={pr.id}>{pr.full_name} ({pr.prisoner_number_value})</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -532,27 +597,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             value={formData.discharge_type}
             onValueChange={(value) => {
               handleChange('discharge_type', value);
-              const types: Record<string, string> = {
-                'type-001': 'Completion of Sentence',
-                'type-002': 'Transfer',
-                'type-003': 'Death',
-                'type-004': 'Court Order',
-                'type-005': 'Deportation',
-                'type-006': 'Execution',
-              };
-              handleChange('discharge_type_name', types[value] || '');
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select discharge type" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="type-001">Completion of Sentence</SelectItem>
-              <SelectItem value="type-002">Transfer</SelectItem>
-              <SelectItem value="type-003">Death</SelectItem>
-              <SelectItem value="type-004">Court Order</SelectItem>
-              <SelectItem value="type-005">Deportation</SelectItem>
-              <SelectItem value="type-006">Execution</SelectItem>
+              {
+                types.map(ty => (
+                    <SelectItem key={ty.id} value={ty.id}>{ty.name}</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -563,25 +618,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             value={formData.discharge_reason}
             onValueChange={(value) => {
               handleChange('discharge_reason', value);
-              const reasons: Record<string, string> = {
-                'reason-001': 'Sentence Completed',
-                'reason-002': 'Inter-Prison Transfer',
-                'reason-003': 'Medical Grounds',
-                'reason-004': 'Presidential Pardon',
-                'reason-005': 'Court Order',
-              };
-              handleChange('discharge_reason_name', reasons[value] || '');
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select discharge reason" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="reason-001">Sentence Completed</SelectItem>
-              <SelectItem value="reason-002">Inter-Prison Transfer</SelectItem>
-              <SelectItem value="reason-003">Medical Grounds</SelectItem>
-              <SelectItem value="reason-004">Presidential Pardon</SelectItem>
-              <SelectItem value="reason-005">Court Order</SelectItem>
+              {
+                reasons.map(rs => (
+                    <SelectItem key={rs.id} value={rs.id}>{rs.name}</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -882,37 +929,37 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
     </div>
   );
 
-  const renderBiometricTab = () => (
-    <div className="space-y-6">
-      <div 
-        className="px-4 py-3 rounded-lg"
-        style={{ backgroundColor: '#faebd7', color: '#650000' }}
-      >
-        <h3 className="flex items-center gap-2">
-          <Fingerprint className="h-5 w-5" />
-          Biometric Verification
-        </h3>
-      </div>
-
-      <div className="max-w-2xl mx-auto">
-        <BiometricCapture
-          value={formData.biometric_data}
-          onChange={(value) => setFormData((prev) => ({ ...prev, biometric_data: value }))}
-          label="Officer Fingerprint Verification"
-        />
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Ensure the biometric scanner is properly connected</li>
-          <li>• Clean your finger before placing it on the scanner</li>
-          <li>• Press firmly but gently on the scanner</li>
-          <li>• Hold still until the capture is complete</li>
-        </ul>
-      </div>
-    </div>
-  );
+  // const renderBiometricTab = () => (
+  //   <div className="space-y-6">
+  //     <div
+  //       className="px-4 py-3 rounded-lg"
+  //       style={{ backgroundColor: '#faebd7', color: '#650000' }}
+  //     >
+  //       <h3 className="flex items-center gap-2">
+  //         <Fingerprint className="h-5 w-5" />
+  //         Biometric Verification
+  //       </h3>
+  //     </div>
+  //
+  //     <div className="max-w-2xl mx-auto">
+  //       <BiometricCapture
+  //         value={formData.biometric_data}
+  //         onChange={(value) => setFormData((prev) => ({ ...prev, biometric_data: value }))}
+  //         label="Officer Fingerprint Verification"
+  //       />
+  //     </div>
+  //
+  //     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+  //       <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
+  //       <ul className="text-sm text-blue-800 space-y-1">
+  //         <li>• Ensure the biometric scanner is properly connected</li>
+  //         <li>• Clean your finger before placing it on the scanner</li>
+  //         <li>• Press firmly but gently on the scanner</li>
+  //         <li>• Hold still until the capture is complete</li>
+  //       </ul>
+  //     </div>
+  //   </div>
+  // );
 
   const renderOfficersTab = () => (
     <div className="space-y-6">
@@ -983,22 +1030,22 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                           <CommandList>
                             <CommandEmpty>No staff found.</CommandEmpty>
                             <CommandGroup>
-                              {mockStaffProfiles.map((staff) => (
+                              {staff.map((st) => (
                                 <CommandItem
-                                  key={staff.id}
-                                  value={`${staff.first_name} ${staff.last_name}`}
-                                  onSelect={() => selectStaffForOfficer(index, staff.id)}
+                                  key={st.id}
+                                  value={`${st.first_name} ${st.last_name}`}
+                                  onSelect={() => selectStaffForOfficer(index, st.id)}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      officer.staff === staff.id ? "opacity-100" : "opacity-0"
+                                      officer.staff === st.id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   <div className="flex flex-col">
-                                    <span>{`${staff.first_name} ${staff.middle_name} ${staff.last_name}`}</span>
+                                    <span>{`${st.first_name} ${st.middle_name} ${st.last_name}`}</span>
                                     <span className="text-xs text-gray-500">
-                                      {staff.rank} • {staff.force_number}
+                                      {st.rank_name} • {st.force_number}
                                     </span>
                                   </div>
                                 </CommandItem>
@@ -1141,47 +1188,62 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Tab Navigation using shadcn Tabs */}
-        <Tabs defaultValue="basic-info" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic-info">Basic Information</TabsTrigger>
-            <TabsTrigger value="biometric">Biometric Capture</TabsTrigger>
-            <TabsTrigger value="officers">Discharge Officers</TabsTrigger>
-            <TabsTrigger value="documents">Discharge Documents</TabsTrigger>
-          </TabsList>
+      {
+        loader ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Prisoners and Staff Information, Please wait...
+                    </p>
+              </div>
+            </div>
+        ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Tab Navigation using shadcn Tabs */}
+              <Tabs defaultValue="basic-info" className="w-full">
+                {/*<TabsList className="grid w-full grid-cols-4">*/}
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="basic-info">Basic Information</TabsTrigger>
+                  {/*<TabsTrigger value="biometric">Biometric Capture</TabsTrigger>*/}
+                  <TabsTrigger value="officers">Discharge Officers</TabsTrigger>
+                  <TabsTrigger value="documents">Discharge Documents</TabsTrigger>
+                </TabsList>
 
-          {/* Basic Information Tab */}
-          <TabsContent value="basic-info" className="space-y-4 mt-4">
-            {renderBasicInfoTab()}
-          </TabsContent>
+                {/* Basic Information Tab */}
+                <TabsContent value="basic-info" className="space-y-4 mt-4">
+                  {renderBasicInfoTab()}
+                </TabsContent>
 
-          {/* Biometric Capture Tab */}
-          <TabsContent value="biometric" className="space-y-4 mt-4">
-            {renderBiometricTab()}
-          </TabsContent>
+                {/* Biometric Capture Tab */}
+                {/*<TabsContent value="biometric" className="space-y-4 mt-4">*/}
+                {/*  {renderBiometricTab()}*/}
+                {/*</TabsContent>*/}
 
-          {/* Discharge Officers Tab */}
-          <TabsContent value="officers" className="space-y-4 mt-4">
-            {renderOfficersTab()}
-          </TabsContent>
+                {/* Discharge Officers Tab */}
+                <TabsContent value="officers" className="space-y-4 mt-4">
+                  {renderOfficersTab()}
+                </TabsContent>
 
-          {/* Discharge Documents Tab */}
-          <TabsContent value="documents" className="space-y-4 mt-4">
-            {renderDocumentsTab()}
-          </TabsContent>
-        </Tabs>
+                {/* Discharge Documents Tab */}
+                <TabsContent value="documents" className="space-y-4 mt-4">
+                  {renderDocumentsTab()}
+                </TabsContent>
+              </Tabs>
 
-        {/* Form Actions */}
-        <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
-            {mode === 'edit' ? 'Update' : 'Create'} Discharge
-          </Button>
-        </div>
-      </form>
+              {/* Form Actions */}
+              <div className="flex justify-end gap-3 pt-6 border-t">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
+                  {mode === 'edit' ? 'Update' : 'Create'} Discharge
+                </Button>
+              </div>
+            </form>
+        )
+      }
+
 
       {/* Transfer Confirmation Dialog */}
       <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { LogOut, Wallet, Package, Info } from 'lucide-react';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import { PrisonerDischargeList } from './PrisonerDischargeList';
+import { PrisonerDischargeList } from './dischargeList/PrisonerDischargeList';
 import { DischargeChecklistItemList } from './DischargeChecklistItemList';
 import { DischargeChildHandoverList } from './childHandover/DischargeChildHandoverList';
 import { DischargeDeceasedList } from './DischargeDeceasedList';
@@ -12,9 +12,10 @@ import { DischargeOfficersList } from './DischargeOfficersList';
 import { SubsistenceAllowancesList } from './subsistence/SubsistenceAllowancesList';
 import { DischargeSuspendedSentenceList } from './suspended/DischargeSuspendedSentenceList';
 import { DischargeRequestList } from './request/DischargeRequestList';
-import {DischargeType} from "../../services/discharge/discharge";
+import {DischargeRequest, DischargeType} from "../../services/discharge/discharge";
 import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../services/stationServices/staffDeploymentService";
 
 // Mock data for discharge details
 const mockDischargeData = {
@@ -102,6 +103,8 @@ export default function ViewDischargeDetails() {
   const [types, setTypes] = useState<DischargeType[]>([])
   const [reasons, setReasons] = useState<Unit[]>([])
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
+  const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
+  const [staff, setStaff] = useState<StaffItem[]>([]);
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -110,9 +113,13 @@ export default function ViewDischargeDetails() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'requests':
-        return <DischargeRequestList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons} prisoners={prisoners} setPrisoners={setPrisoners}/>;
+        return <DischargeRequestList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes}
+                                     reasons={reasons} setReasons={setReasons} prisoners={prisoners} staff={staff} setStaff={setStaff}
+                                     setPrisoners={setPrisoners} dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests}/>;
       case 'discharge-detail':
-        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}/>;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
+                                      dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
+                                      prisoners={prisoners} setPrisoners={setPrisoners}/>;
       case 'child-handovers':
         return <DischargeChildHandoverList loading={loading} setLoading={setLoading}/>;
       case 'subsistence':

@@ -1,8 +1,8 @@
 import React, {useEffect, useState} from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
+} from '../../ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,14 +18,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from '../../ui/select';
 import {
   Search,
   Plus,
@@ -41,25 +41,28 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { PrisonerDischargeForm } from './PrisonerDischargeForm';
+import { PrisonerDischargeForm } from '../PrisonerDischargeForm';
 import { PrisonerDischargeFormTabbed } from './PrisonerDischargeFormTabbed';
-import TransferRequestList from '../transfer/TransferRequestList';
-import TransferRequestForm from '../transfer/TransferRequestForm';
-import {Loader} from "./ViewDischargeDetails";
+import TransferRequestList from '../../transfer/TransferRequestList';
+import TransferRequestForm from '../../transfer/TransferRequestForm';
+import {Loader} from "../ViewDischargeDetails";
 import {
   handleCatchError,
   handleEmptyList,
   handleServerError,
   handleServerError2
-} from "../../services/stationServices/utils";
+} from "../../../services/stationServices/utils";
 import {
+  DischargeRequest,
   DischargeType,
   getDischarges,
   getReasons,
   getTypes,
   PrisonerDischarge
-} from "../../services/discharge/discharge";
-import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
+} from "../../../services/discharge/discharge";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../../services/stationServices/staffDeploymentService";
 
 interface ChildProps {
   loading: Loader
@@ -68,6 +71,12 @@ interface ChildProps {
   setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
   reasons: Unit
   setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  staff: StaffItem
+  setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
 }
 
 interface PropertyAccount {
@@ -111,7 +120,8 @@ interface Property {
 //   properties?: Property[];
 // }
 
-export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoading, types, setTypes, reasons, setReasons }) => {
+export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoading, types, setTypes, reasons, setReasons, dischargeRequests,
+                                                              setDischargeRequests, setPrisoners, prisoners, setStaff, staff, }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterReason, setFilterReason] = useState('All');
@@ -163,7 +173,11 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
 
   // API Integration
   useEffect(() => {
-    if (loading.discharge) {
+    if (loading.discharge || !dischargeRecords.length) {
+      setLoading(prev => ({
+        ...prev,
+        discharge: true
+      }))
       fetchData()
     }
   }, [loading.discharge]);
@@ -613,6 +627,10 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
             <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Discharge Record</DialogTitle>
           </DialogHeader>
           <PrisonerDischargeFormTabbed
+            prisoners={prisoners} setPrisoners={setPrisoners} staff={staff} setStaff={setStaff}
+            types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
+            dischargeRequests={dischargeRequests}
+            setDischargeRequests={setDischargeRequests}
             initialData={selectedRecord}
             onSubmit={handleFormSubmit}
             onCancel={() => {
