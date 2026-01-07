@@ -12,9 +12,16 @@ import { DischargeOfficersList } from './DischargeOfficersList';
 import { SubsistenceAllowancesList } from './subsistence/SubsistenceAllowancesList';
 import { DischargeSuspendedSentenceList } from './suspended/DischargeSuspendedSentenceList';
 import { DischargeRequestList } from './request/DischargeRequestList';
-import {DischargeRequest, DischargeType, DocumentType} from "../../services/discharge/discharge";
+import {
+  Allowance,
+  ChildHandover,
+  ChildItem,
+  DischargeRequest,
+  DischargeType,
+  DocumentType
+} from "../../services/discharge/discharge";
 import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
-import {PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {PrisonerItem, RelationShipItem} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {StaffItem} from "../../services/stationServices/staffDeploymentService";
 
 // Mock data for discharge details
@@ -102,10 +109,16 @@ export default function ViewDischargeDetails() {
   const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true, suspended: true, child: true })
   const [types, setTypes] = useState<DischargeType[]>([])
   const [reasons, setReasons] = useState<Unit[]>([])
+
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
   const [staff, setStaff] = useState<StaffItem[]>([]);
   const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
+
+  const [originalChildren, setOriginalChildren] = useState<ChildItem[]>([])
+  const [handovers, setHandovers] = useState<ChildHandover[]>([])
+  const [relationships, setRelationships] = useState<RelationShipItem[]>([])
+  const [allowances, setAllowances] = useState<Allowance[]>([]);
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -115,20 +128,36 @@ export default function ViewDischargeDetails() {
     switch (activeTab) {
       case 'requests':
         return <DischargeRequestList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes}
-                                     reasons={reasons} setReasons={setReasons} prisoners={prisoners} staff={staff} setStaff={setStaff}
-                                     setPrisoners={setPrisoners} dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests}/>;
+                                     reasons={reasons} setReasons={setReasons} prisoners={prisoners} staff={staff}
+                                     setStaff={setStaff} setPrisoners={setPrisoners} dischargeRequests={dischargeRequests}
+                                     setDischargeRequests={setDischargeRequests}
+        />;
       case 'discharge-detail':
-        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
-                                      dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
-                                      prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}/>;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes}
+                                      reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
+                                      setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
+                                      prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes}
+                                      setDocumentTypes={setDocumentTypes}
+        />;
       case 'child-handovers':
-        return <DischargeChildHandoverList loading={loading} setLoading={setLoading}/>;
+        return <DischargeChildHandoverList loading={loading} setLoading={setLoading}
+               originalChildren={originalChildren} setOriginalChildren={setOriginalChildren}
+               handovers={handovers} setHandovers={setHandovers}
+               relationships={relationships} setRelationships={setRelationships}
+        />;
       case 'subsistence':
-        return <SubsistenceAllowancesList loading={loading} setLoading={setLoading} prisoners={prisoners} setPrisoners={setPrisoners}/>;
+        return <SubsistenceAllowancesList loading={loading} setLoading={setLoading} prisoners={prisoners}
+                setPrisoners={setPrisoners} allowances={allowances} setAllowances={setAllowances}/>;
       case 'suspended':
-        return <DischargeSuspendedSentenceList loading={loading} setLoading={setLoading} prisoners={prisoners} setPrisoners={setPrisoners}/>;
+        return <DischargeSuspendedSentenceList loading={loading} setLoading={setLoading}
+                prisoners={prisoners} setPrisoners={setPrisoners} types={types} setTypes={setTypes}
+                reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests}
+        />;
       default:
-        return <PrisonerDischargeList />;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
+                dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
+                prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}
+        />;
     }
   };
 

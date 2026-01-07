@@ -30,6 +30,12 @@ import {handleCatchError, handleResponseError, handleServerError2} from "../../.
 interface ChildProps {
   loading: Loader
   setLoading: React.Dispatch<React.SetStateAction<Loader>>
+  relationships: RelationShipItem
+  setRelationships: React.Dispatch<React.SetStateAction<RelationShipItem[]>>
+  originalChildren: ChildItem
+  setOriginalChildren: React.Dispatch<React.SetStateAction<ChildItem[]>>
+  handovers: ChildHandover
+  setHandovers: React.Dispatch<React.SetStateAction<ChildHandover[]>>
 }
 
 // interface DischargeChildHandover {
@@ -79,7 +85,7 @@ interface ChildProps {
 
 type TabType = 'due-for-handover' | 'handover-records';
 
-export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setLoading }) => {
+export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setLoading, originalChildren, setOriginalChildren, handovers, setHandovers, relationships, setRelationships }) => {
   const [activeTab, setActiveTab] = useState<TabType>('due-for-handover');
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -93,9 +99,9 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
 
   // API Integration
   const [children, setChildren] = useState<ChildItem[]>([])
-  const [originalChildren, setOriginalChildren] = useState<ChildItem[]>([])
-  const [handovers, setHandovers] = useState<ChildHandover[]>([])
-  const [relationships, setRelationships] = useState<RelationShipItem[]>([])
+  // const [originalChildren, setOriginalChildren] = useState<ChildItem[]>([])
+  // const [handovers, setHandovers] = useState<ChildHandover[]>([])
+  // const [relationships, setRelationships] = useState<RelationShipItem[]>([])
   const [selectedId, setSelectedId] = useState("")
   const [childSelected, setChildSelected] = useState(false)
 

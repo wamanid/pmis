@@ -163,8 +163,6 @@ export interface DocumentType {
 }
 
 
-
-
 export type RequestResponse<T> = Paginated<T> | ErrorResponse
 export type DocumentTypeResponse<T> = Paginated<T> | ErrorResponse
 export type DischargeRequestResponse = DischargeRequest | ErrorResponse
@@ -341,6 +339,19 @@ export const getSuspendedSentences = async <T = SuspendedSentence>() : Promise<S
 export const addSentence = async (sentence: Sentence) : Promise<SentenceResponse> => {
   const response = await axiosInstance.post<SentenceResponse>('/discharge-management/suspended-sentences/', sentence);
   return response.data;
+}
+
+export const deleteSentence = async (id: string) : Promise<{ message: string } | { error: string }> => {
+  try {
+    await axiosInstance.delete(`/discharge-management/suspended-sentences/${id}/`);
+
+    return { message: "Suspended Sentence deleted successfully" }
+
+  } catch (error: any) {
+    return {
+      error: "Failed to Child handovers allowance."
+    };
+  }
 }
 
 export const updateSentences = async (sentence: Sentence, id: string) : Promise<SentenceResponse> => {

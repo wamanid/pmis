@@ -60,6 +60,7 @@ import {getPrisoners, PrisonerItem} from "../../../services/stationServices/visi
 import {getStaffProfile, StaffItem} from "../../../services/stationServices/staffDeploymentService";
 import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {NextOfKinResponse} from "../../../services/admission/nextOfKinService";
 
 interface PrisonerDischargeFormProps {
   initialData?: any;
@@ -279,6 +280,8 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 
   //API integration
   const [loader, setLoader] = useState(true)
+  const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
+
   useEffect(() => {
     if(loader) {
       fetchData()
@@ -504,8 +507,8 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 
   const renderBasicInfoTab = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-3">
           <Label htmlFor="discharge_request">Discharge Request *</Label>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -599,27 +602,6 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
         </div>
 
         <div>
-          <Label htmlFor="discharge_type">Discharge Type *</Label>
-          <Select
-            value={formData.discharge_type}
-            onValueChange={(value) => {
-              handleChange('discharge_type', value);
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select discharge type" />
-            </SelectTrigger>
-            <SelectContent>
-              {
-                types.map(ty => (
-                    <SelectItem key={ty.id} value={ty.id}>{ty.name}</SelectItem>
-                ))
-              }
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
           <Label htmlFor="discharge_reason">Discharge Reason *</Label>
           <Select
             value={formData.discharge_reason}
@@ -653,6 +635,291 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
       </div>
 
       <div>
+        <Label htmlFor="discharge_type">Discharge Type *</Label>
+        <Select
+          value={formData.discharge_type}
+          onValueChange={(value) => {
+            handleChange('discharge_type', value);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select discharge type" />
+          </SelectTrigger>
+          <SelectContent>
+            {
+              types.map(ty => (
+                  <SelectItem key={ty.id} value={ty.id}>{ty.name}</SelectItem>
+              ))
+            }
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Deceased Fields */}
+      {
+        (types.find(t => t.id === formData.discharge_type)?.name) === "Death" &&  (
+          <div className="border-t pt-6 mt-6">
+            <div
+              className="px-4 py-3 rounded-lg mb-6"
+              style={{ backgroundColor: '#faebd7', color: '#650000' }}
+            >
+              <h3 className="flex items-center gap-2">
+                <Skull className="h-5 w-5" />
+                Deceased Information
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="date_of_death">Date of Death *</Label>
+                <Input
+                  id="date_of_death"
+                  type="date"
+                  value={formData.date_of_death}
+                  onChange={(e) => handleChange('date_of_death', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="morgue_details" className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  Morgue Details
+                </Label>
+                <Input
+                  id="morgue_details"
+                  value={formData.morgue_details}
+                  onChange={(e) => handleChange('morgue_details', e.target.value)}
+                  placeholder="e.g., City Morgue, Section A, Shelf 12"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="next_of_kin_available"
+                  checked={formData.next_of_kin_available}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
+                  }
+                />
+                <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
+                  <User className="h-4 w-4" />
+                  Next of Kin Available
+                </Label>
+              </div>
+            </div>
+
+            {formData.next_of_kin_available && (
+              <div className="mt-4">
+                <Label htmlFor="next_of_kin" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Next of Kin *
+                </Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Popover open={nextOfKinOpen} onOpenChange={setNextOfKinOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={nextOfKinOpen}
+                          className="w-full justify-between"
+                          type="button"
+                          onClick={handleNextOfKinOpen}
+                        >
+                          {formData.next_of_kin
+                            ? (() => {
+                                const selected = nextOfKinList.find((nok) => nok.id === formData.next_of_kin);
+                                return selected
+                                  ? `${selected.full_name} (${selected.relationship})`
+                                  : "Select next of kin...";
+                              })()
+                            : "Select next of kin..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search next of kin..." />
+                          <CommandList>
+                            <CommandEmpty>No next of kin found.</CommandEmpty>
+                            <CommandGroup>
+                              {nextOfKinList.map((nok) => (
+                                <CommandItem
+                                  key={nok.id}
+                                  value={nok.full_name}
+                                  onSelect={() => handleNextOfKinSelect(nok.id)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.next_of_kin === nok.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{nok.full_name}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {nok.relationship} • {nok.phone}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setShowNextOfKinDialog(true)}
+                    className="shrink-0"
+                    style={{ borderColor: '#34D399' }}
+                  >
+                    <Plus className="h-4 w-4" style={{ color: '#34D399' }} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Label htmlFor="post_mortem_report" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Post Mortem Report
+              </Label>
+              <div className="mt-2">
+                <label
+                  htmlFor="post_mortem_report"
+                  className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
+                >
+                  <Upload className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">
+                    {postMortemFileName || 'Click to upload PDF file'}
+                  </span>
+                </label>
+                <Input
+                  id="post_mortem_report"
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handlePostMortemChange}
+                  className="hidden"
+                />
+                {postMortemFileName && (
+                  <p className="text-sm text-green-600 mt-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Selected: {postMortemFileName}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Execution Fields */}
+      {
+         (types.find(t => t.id === formData.discharge_type)?.name) === "Execution" &&  (
+            <div className="border-t pt-6 mt-6">
+              <div
+                className="px-4 py-3 rounded-lg mb-6"
+                style={{ backgroundColor: '#faebd7', color: '#650000' }}
+              >
+                <h3 className="flex items-center gap-2">
+                  <Skull className="h-5 w-5" />
+                  Execution Information
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="datetime_of_execution">Date & Time of Execution *</Label>
+                  <Input
+                    id="datetime_of_execution"
+                    type="datetime-local"
+                    value={formData.datetime_of_execution.slice(0, 16)}
+                    onChange={(e) => handleChange('datetime_of_execution', e.target.value + ':00Z')}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="approving_authority" className="flex items-center gap-2">
+                    <Building className="h-4 w-4" />
+                    Approving Authority
+                  </Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Popover open={approvingAuthorityOpen} onOpenChange={setApprovingAuthorityOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={approvingAuthorityOpen}
+                            className="w-full justify-between"
+                            type="button"
+                          >
+                            {formData.approving_authority
+                              ? (() => {
+                                  const selected = mockApprovingAuthorities.find((auth) => auth.id === formData.approving_authority);
+                                  return selected ? selected.full_name : "Select approving authority...";
+                                })()
+                              : "Select approving authority..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search approving authority..." />
+                            <CommandList>
+                              <CommandEmpty>No approving authority found.</CommandEmpty>
+                              <CommandGroup>
+                                {mockApprovingAuthorities.map((auth) => (
+                                  <CommandItem
+                                    key={auth.id}
+                                    value={auth.full_name}
+                                    onSelect={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        approving_authority: auth.id,
+                                        approving_authority_name: auth.full_name,
+                                        approving_authority_force_number: auth.force_number,
+                                        approving_authority_rank: auth.rank,
+                                      }));
+                                      setApprovingAuthorityOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.approving_authority === auth.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span>{auth.full_name}</span>
+                                      <span className="text-xs text-gray-500">
+                                        {auth.rank} • {auth.force_number}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+         )
+      }
+
+      <div>
         <Label htmlFor="remarks">Remarks</Label>
         <Textarea
           id="remarks"
@@ -674,265 +941,6 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
         />
       </div>
 
-      {/* Deceased Fields */}
-      {formData.discharge_type_name === 'Death' && (
-        <div className="border-t pt-6 mt-6">
-          <div 
-            className="px-4 py-3 rounded-lg mb-6"
-            style={{ backgroundColor: '#faebd7', color: '#650000' }}
-          >
-            <h3 className="flex items-center gap-2">
-              <Skull className="h-5 w-5" />
-              Deceased Information
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date_of_death">Date of Death *</Label>
-              <Input
-                id="date_of_death"
-                type="date"
-                value={formData.date_of_death}
-                onChange={(e) => handleChange('date_of_death', e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="morgue_details" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Morgue Details
-              </Label>
-              <Input
-                id="morgue_details"
-                value={formData.morgue_details}
-                onChange={(e) => handleChange('morgue_details', e.target.value)}
-                placeholder="e.g., City Morgue, Section A, Shelf 12"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="next_of_kin_available"
-                checked={formData.next_of_kin_available}
-                onCheckedChange={(checked) => 
-                  setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
-                }
-              />
-              <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
-                <User className="h-4 w-4" />
-                Next of Kin Available
-              </Label>
-            </div>
-          </div>
-
-          {formData.next_of_kin_available && (
-            <div className="mt-4">
-              <Label htmlFor="next_of_kin" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Next of Kin *
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Popover open={nextOfKinOpen} onOpenChange={setNextOfKinOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={nextOfKinOpen}
-                        className="w-full justify-between"
-                        type="button"
-                        onClick={handleNextOfKinOpen}
-                      >
-                        {formData.next_of_kin
-                          ? (() => {
-                              const selected = nextOfKinList.find((nok) => nok.id === formData.next_of_kin);
-                              return selected
-                                ? `${selected.full_name} (${selected.relationship})`
-                                : "Select next of kin...";
-                            })()
-                          : "Select next of kin..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search next of kin..." />
-                        <CommandList>
-                          <CommandEmpty>No next of kin found.</CommandEmpty>
-                          <CommandGroup>
-                            {nextOfKinList.map((nok) => (
-                              <CommandItem
-                                key={nok.id}
-                                value={nok.full_name}
-                                onSelect={() => handleNextOfKinSelect(nok.id)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formData.next_of_kin === nok.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{nok.full_name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    {nok.relationship} • {nok.phone}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setShowNextOfKinDialog(true)}
-                  className="shrink-0"
-                  style={{ borderColor: '#34D399' }}
-                >
-                  <Plus className="h-4 w-4" style={{ color: '#34D399' }} />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <Label htmlFor="post_mortem_report" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Post Mortem Report
-            </Label>
-            <div className="mt-2">
-              <label 
-                htmlFor="post_mortem_report"
-                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
-              >
-                <Upload className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">
-                  {postMortemFileName || 'Click to upload PDF file'}
-                </span>
-              </label>
-              <Input
-                id="post_mortem_report"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handlePostMortemChange}
-                className="hidden"
-              />
-              {postMortemFileName && (
-                <p className="text-sm text-green-600 mt-2 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Selected: {postMortemFileName}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Execution Fields */}
-      {formData.discharge_type_name === 'Execution' && (
-        <div className="border-t pt-6 mt-6">
-          <div 
-            className="px-4 py-3 rounded-lg mb-6"
-            style={{ backgroundColor: '#faebd7', color: '#650000' }}
-          >
-            <h3 className="flex items-center gap-2">
-              <Skull className="h-5 w-5" />
-              Execution Information
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="datetime_of_execution">Date & Time of Execution *</Label>
-              <Input
-                id="datetime_of_execution"
-                type="datetime-local"
-                value={formData.datetime_of_execution.slice(0, 16)}
-                onChange={(e) => handleChange('datetime_of_execution', e.target.value + ':00Z')}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="approving_authority" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Approving Authority
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Popover open={approvingAuthorityOpen} onOpenChange={setApprovingAuthorityOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={approvingAuthorityOpen}
-                        className="w-full justify-between"
-                        type="button"
-                      >
-                        {formData.approving_authority
-                          ? (() => {
-                              const selected = mockApprovingAuthorities.find((auth) => auth.id === formData.approving_authority);
-                              return selected ? selected.full_name : "Select approving authority...";
-                            })()
-                          : "Select approving authority..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search approving authority..." />
-                        <CommandList>
-                          <CommandEmpty>No approving authority found.</CommandEmpty>
-                          <CommandGroup>
-                            {mockApprovingAuthorities.map((auth) => (
-                              <CommandItem
-                                key={auth.id}
-                                value={auth.full_name}
-                                onSelect={() => {
-                                  setFormData((prev) => ({ 
-                                    ...prev, 
-                                    approving_authority: auth.id,
-                                    approving_authority_name: auth.full_name,
-                                    approving_authority_force_number: auth.force_number,
-                                    approving_authority_rank: auth.rank,
-                                  }));
-                                  setApprovingAuthorityOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formData.approving_authority === auth.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{auth.full_name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    {auth.rank} • {auth.force_number}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -1305,26 +1313,26 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
-            <NextOfKinForm
-              prisonerId={formData.prisoner}
-              onSubmit={(nokData) => {
-                const newNok = {
-                  id: `nok-${Date.now()}`,
-                  full_name: `${nokData.first_name} ${nokData.surname}`,
-                  relationship: nokData.relationship_type === '1' ? 'Spouse' : 
-                               nokData.relationship_type === '2' ? 'Parent' : 
-                               nokData.relationship_type === '3' ? 'Sibling' : 'Other',
-                  phone: nokData.phone_number,
-                  ...nokData
-                };
-                setNextOfKinList([...nextOfKinList, newNok]);
-                setFormData((prev) => ({ ...prev, next_of_kin: newNok.id }));
-                setShowNextOfKinDialog(false);
-                toast.success('Next of Kin added successfully!');
-              }}
-              onCancel={() => setShowNextOfKinDialog(false)}
-              hideFooter={false}
-            />
+            {/*<NextOfKinForm*/}
+            {/*  prisonerId={formData.prisoner}*/}
+            {/*  onSubmit={(nokData) => {*/}
+            {/*    const newNok = {*/}
+            {/*      id: `nok-${Date.now()}`,*/}
+            {/*      full_name: `${nokData.first_name} ${nokData.surname}`,*/}
+            {/*      relationship: nokData.relationship_type === '1' ? 'Spouse' : */}
+            {/*                   nokData.relationship_type === '2' ? 'Parent' : */}
+            {/*                   nokData.relationship_type === '3' ? 'Sibling' : 'Other',*/}
+            {/*      phone: nokData.phone_number,*/}
+            {/*      ...nokData*/}
+            {/*    };*/}
+            {/*    setNextOfKinList([...nextOfKinList, newNok]);*/}
+            {/*    setFormData((prev) => ({ ...prev, next_of_kin: newNok.id }));*/}
+            {/*    setShowNextOfKinDialog(false);*/}
+            {/*    toast.success('Next of Kin added successfully!');*/}
+            {/*  }}*/}
+            {/*  onCancel={() => setShowNextOfKinDialog(false)}*/}
+            {/*  hideFooter={false}*/}
+            {/*/>*/}
           </div>
         </DialogContent>
       </Dialog>

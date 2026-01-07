@@ -10,7 +10,7 @@ import { DischargeSuspendedSentenceForm } from './DischargeSuspendedSentenceForm
 import {Loader} from "../ViewDischargeDetails";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {
-  addAllowance, addSentence,
+  addAllowance, addSentence, Court, deleteAllowance, deleteSentence, DischargeRequest, DischargeType,
   getAllowances,
   getSuspendedSentences,
   Sentence,
@@ -18,15 +18,24 @@ import {
   updateAllowance, updateSentences
 } from "../../../services/discharge/discharge";
 import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
 interface ChildProps {
   loading: Loader
   setLoading: React.Dispatch<React.SetStateAction<Loader>>
   prisoners: PrisonerItem
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
 }
 
-export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners }) => {
+export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners,
+                                                                       types, reasons, setTypes, setReasons, dischargeRequests,
+                                                                       setDischargeRequests }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
@@ -35,6 +44,8 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
   const [records, setRecords] = useState<SuspendedSentence[]>([]);
 
   // API Integration
+  const [courts, setCourts] = useState<Court[]>([])
+
   useEffect(() => {
     if(loading.suspended || !records.length) {
       fetchData()
@@ -61,6 +72,22 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
         ...prev,
         suspended: false
       }))
+    }
+  }
+
+  async function handleDelete() {
+    if (!selectedRecord) return
+
+    try {
+      await deleteSentence(selectedRecord.id)
+      setRecords(prev => prev.filter(rec => rec.id !== selectedRecord.id))
+      toast.success('Suspended sentence record deleted successfully');
+
+      setIsDeleteOpen(false);
+      setSelectedRecord(null);
+
+    }catch (error) {
+      handleCatchError(error)
     }
   }
 
@@ -209,8 +236,12 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
             <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Suspended Sentence</DialogTitle>
           </DialogHeader>
           <DischargeSuspendedSentenceForm
+            types={types} setTypes={setTypes}
+            reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
+            setDischargeRequests={setDischargeRequests}
             prisoners={prisoners} setPrisoners={setPrisoners}
             initialData={selectedRecord}
+            courts={courts} setCourts={setCourts}
             onSubmit={handleFormSubmit}
             onCancel={() => { setIsFormOpen(false); setSelectedRecord(null); }}
           />
@@ -225,14 +256,7 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
           <p>Are you sure you want to delete this suspended sentence record? This action cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
-            <Button variant="destructive" onClick={() => {
-              if (selectedRecord) {
-                setRecords(records.filter((r) => r.id !== selectedRecord.id));
-                toast.success('Suspended sentence record deleted successfully');
-              }
-              setIsDeleteOpen(false);
-              setSelectedRecord(null);
-            }}>Delete</Button>
+            <Button variant="destructive" onClick={handleDelete}>Delete</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

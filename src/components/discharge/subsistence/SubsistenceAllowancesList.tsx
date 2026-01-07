@@ -24,19 +24,21 @@ interface ChildProps {
   setLoading: React.Dispatch<React.SetStateAction<Loader>>
   prisoners: PrisonerItem
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  allowances: Allowance
+  setAllowances: React.Dispatch<React.SetStateAction<Allowance[]>>
 }
 
-export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners }) => {
+export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners, setAllowances, allowances }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
 
-  const [records, setRecords] = useState<Allowance[]>([]);
+  // const [records, setAllowances] = useState<Allowance[]>([]);
 
   // API Integration
   useEffect(() => {
-    if (loading.subsistence || !records.length) {
+    if (loading.subsistence || !allowances.length) {
       setLoading(prev => ({
         ...prev,
         subsistence: true
@@ -54,7 +56,7 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
         if (!data.length) {
           toast.error("There are no subsistence allowances")
         }
-        setRecords(data)
+        setAllowances(data)
         // console.log(data)
       }
 
@@ -85,13 +87,13 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
       }
 
       if (selectedRecord){
-        setRecords(prev => (
+        setAllowances(prev => (
             prev.map(rec => (rec.id === response.id ? response : rec))
         ));
         toast.success('updated');
       }
       else {
-        setRecords(prev => [response, ...prev]);
+        setAllowances(prev => [response, ...prev]);
         toast.success('Created');
       }
 
@@ -107,7 +109,7 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
     try {
       await deleteAllowance(selectedRecord.id)
-      setRecords(prev => prev.filter(rec => rec.id !== selectedRecord.id))
+      setAllowances(prev => prev.filter(rec => rec.id !== selectedRecord.id))
       toast.success('Subsistence allowance record deleted successfully');
 
       setIsDeleteOpen(false);
@@ -120,16 +122,16 @@ export const SubsistenceAllowancesList: React.FC<ChildProps> = ({ loading, setLo
 
 
   //  if (selectedRecord) {
-    //   setRecords(records.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r)));
+    //   setAllowances(records.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r)));
     //   toast.success('Updated');
     // } else {
-    //   setRecords([...records, { id: Date.now().toString(), ...data }]);
+    //   setAllowances([...records, { id: Date.now().toString(), ...data }]);
     //   toast.success('Created');
     // }
     // setIsFormOpen(false);
     // setSelectedRecord(null);
 
-  const filteredRecords = records.filter((r) =>
+  const filteredRecords = allowances.filter((r) =>
     r.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     r.prisoner_number.toLowerCase().includes(searchQuery.toLowerCase())
   );

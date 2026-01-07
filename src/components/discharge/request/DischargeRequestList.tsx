@@ -87,7 +87,8 @@ interface DischargeItem {
 // }
 
 export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading, types, reasons, setTypes, setReasons,
-                                                             setPrisoners, prisoners, dischargeRequests, setDischargeRequests, staff, setStaff }) => {
+                                                             setPrisoners, prisoners, dischargeRequests, setDischargeRequests,
+                                                             staff, setStaff }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -129,6 +130,7 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
 
   async function fetchData() {
     try{
+
       const response = await getRequests()
       if (handleServerError2(response)) return
       if ("results" in response) {

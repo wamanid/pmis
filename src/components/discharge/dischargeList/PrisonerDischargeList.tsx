@@ -193,7 +193,7 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
         toast.error(msg)
       }
       setData(data)
-      console.log(data)
+      // console.log(data)
 
     }
 
