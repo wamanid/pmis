@@ -148,13 +148,34 @@ export interface DischargeRequest {
   deleted_by: number | null;
 }
 
+export interface DocumentType {
+  id: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  is_active: boolean;
+  name: string;
+  description: string;
+  base_path: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number | null;
+}
+
+
 
 
 export type RequestResponse<T> = Paginated<T> | ErrorResponse
+export type DocumentTypeResponse<T> = Paginated<T> | ErrorResponse
 export type DischargeRequestResponse = DischargeRequest | ErrorResponse
 
 export const getRequests = async <T = DischargeRequest>() : Promise<RequestResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/discharge-management/requests/');
+  return response.data;
+}
+
+export const getDocumentTypes = async <T = DocumentType>() : Promise<DocumentTypeResponse<T>> => {
+  const response = await axiosInstance.get<Paginated<T>>('/system-administration/document-types/');
   return response.data;
 }
 

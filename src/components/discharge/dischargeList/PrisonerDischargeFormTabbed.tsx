@@ -51,7 +51,7 @@ import BiometricCapture from '../../common/BiometricCapture';
 import { DischargeRequestForm } from '../request/DischargeRequestForm';
 import {
   DischargeRequest,
-  DischargeType,
+  DischargeType, getDocumentTypes,
   getReasons,
   getRequests,
   getTypes
@@ -77,6 +77,8 @@ interface PrisonerDischargeFormProps {
   setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
   reasons: Unit
   setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  setDocumentTypes: React.Dispatch<React.SetStateAction<DocumentType[]>>
+  documentTypes: DocumentType
 }
 
 type TabType = 'basic-info' | 'biometric' | 'officers' | 'documents';
@@ -223,7 +225,7 @@ interface DischargeDocument {
 }
 
 export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> = ({
-    dischargeRequests, setDischargeRequests, setPrisoners, prisoners, setStaff, staff, setReasons, setTypes, types, reasons,
+    dischargeRequests, setDischargeRequests, setPrisoners, prisoners, setStaff, staff, setReasons, setTypes, types, reasons, documentTypes, setDocumentTypes,
   initialData,
   onSubmit,
   onCancel,
@@ -332,6 +334,11 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
         if (!reasons.length) {
           const response4 = await getReasons()
           returnedValue(populateList(response4, "There are no discharge reasons", setReasons))
+        }
+
+        if (!documentTypes.length) {
+          const response5 = await getDocumentTypes()
+          returnedValue(populateList(response5, "There are no document types", setDocumentTypes))
         }
 
     }catch (error) {
@@ -1128,11 +1135,11 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                         <SelectValue placeholder="Select document type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="release-order">Release Order</SelectItem>
-                        <SelectItem value="court-order">Court Order</SelectItem>
-                        <SelectItem value="medical-report">Medical Report</SelectItem>
-                        <SelectItem value="transfer-letter">Transfer Letter</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {
+                          documentTypes.map(dt => (
+                              <SelectItem key={dt.id} value={dt.id}>{dt.name}</SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                   </div>

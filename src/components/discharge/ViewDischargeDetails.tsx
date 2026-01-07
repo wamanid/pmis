@@ -12,7 +12,7 @@ import { DischargeOfficersList } from './DischargeOfficersList';
 import { SubsistenceAllowancesList } from './subsistence/SubsistenceAllowancesList';
 import { DischargeSuspendedSentenceList } from './suspended/DischargeSuspendedSentenceList';
 import { DischargeRequestList } from './request/DischargeRequestList';
-import {DischargeRequest, DischargeType} from "../../services/discharge/discharge";
+import {DischargeRequest, DischargeType, DocumentType} from "../../services/discharge/discharge";
 import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {StaffItem} from "../../services/stationServices/staffDeploymentService";
@@ -105,6 +105,7 @@ export default function ViewDischargeDetails() {
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
   const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -119,7 +120,7 @@ export default function ViewDischargeDetails() {
       case 'discharge-detail':
         return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
                                       dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
-                                      prisoners={prisoners} setPrisoners={setPrisoners}/>;
+                                      prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}/>;
       case 'child-handovers':
         return <DischargeChildHandoverList loading={loading} setLoading={setLoading}/>;
       case 'subsistence':

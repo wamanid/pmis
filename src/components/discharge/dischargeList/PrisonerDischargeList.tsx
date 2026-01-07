@@ -77,6 +77,8 @@ interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   staff: StaffItem
   setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
+  setDocumentTypes: React.Dispatch<React.SetStateAction<DocumentType[]>>
+  documentTypes: DocumentType
 }
 
 interface PropertyAccount {
@@ -121,7 +123,7 @@ interface Property {
 // }
 
 export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoading, types, setTypes, reasons, setReasons, dischargeRequests,
-                                                              setDischargeRequests, setPrisoners, prisoners, setStaff, staff, }) => {
+                                                              setDischargeRequests, setPrisoners, prisoners, setStaff, staff, documentTypes, setDocumentTypes }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterReason, setFilterReason] = useState('All');
@@ -629,7 +631,7 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
           <PrisonerDischargeFormTabbed
             prisoners={prisoners} setPrisoners={setPrisoners} staff={staff} setStaff={setStaff}
             types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
-            dischargeRequests={dischargeRequests}
+            dischargeRequests={dischargeRequests} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}
             setDischargeRequests={setDischargeRequests}
             initialData={selectedRecord}
             onSubmit={handleFormSubmit}
