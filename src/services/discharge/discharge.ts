@@ -74,6 +74,19 @@ export interface DischargeItem {
   intended_place_of_stay: string;
 }
 
+export interface SingleDischargeRequest {
+  comment: string;
+  in_charge: string;
+  in_charge_approved: boolean;
+  in_charge_remark: string;
+  officer_in_charge: string;
+  officer_in_charge_approved: boolean;
+  officer_in_charge_remark: string;
+  deleted_datetime: string | null;
+  deleted_by: number | null;
+  is_active: boolean;
+}
+
 export interface BatchDischargeRequest {
   comment: string;
   in_charge: string;
@@ -147,6 +160,16 @@ export const getRequests = async <T = DischargeRequest>() : Promise<RequestRespo
 
 export const addBulkRequest = async (request: BatchDischargeRequest) : Promise<DischargeRequestResponse> => {
   const response = await axiosInstance.post<DischargeRequestResponse>('/discharge-management/requests/bulk/', request);
+  return response.data;
+}
+
+export const addRequest = async (request: SingleDischargeRequest) : Promise<DischargeRequestResponse> => {
+  const response = await axiosInstance.post<DischargeRequestResponse>('/discharge-management/requests/', request);
+  return response.data;
+}
+
+export const updateRequest = async (request: SingleDischargeRequest, id: string) : Promise<DischargeRequestResponse> => {
+  const response = await axiosInstance.put<DischargeRequestResponse>(`/discharge-management/requests/${id}/`, request);
   return response.data;
 }
 

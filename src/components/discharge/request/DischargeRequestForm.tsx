@@ -42,7 +42,7 @@ import {
   DischargeRequest,
   DischargeType,
   getReasons,
-  getTypes
+  getTypes, SingleDischargeRequest
 } from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {
@@ -139,9 +139,9 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
   const [formData, setFormData] = useState({
     comment: initialData?.comment || '',
     in_charge: initialData?.in_charge || '',
-    in_charge_approved: true,
+    in_charge_approved: false,
     in_charge_remark: "",
-    officer_in_charge_approved: true,
+    officer_in_charge_approved: false,
     officer_in_charge_remark: "",
     // in_charge_name: initialData?.in_charge_name || '',
     // in_charge_force_number: initialData?.in_charge_force_number || '',
@@ -357,15 +357,21 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
     e.preventDefault();
     
     if (discharges.length === 0) {
-      toast.error('Please add at least one discharge');
-      return;
+       const submitData: SingleDischargeRequest = {
+        ...formData,
+        deleted_datetime: null,
+        deleted_by: null,
+        is_active: true,
+      };
+      onSubmit(submitData);
     }
-
-    const submitData: BatchDischargeRequest = {
-      ...formData,
-      discharges,
-    };
-    onSubmit(submitData);
+    else {
+      const submitData: BatchDischargeRequest = {
+        ...formData,
+        discharges,
+      };
+      onSubmit(submitData);
+    }
   };
 
   return (
@@ -504,6 +510,7 @@ export const DischargeRequestForm: React.FC<DischargeRequestFormProps> = ({
                 </div>
 
                 {/* Discharges */}
+                <p className="text-black-500 mb-4">This is optional, you can create your request without discharges</p>
                 <div
                   className="px-4 py-3 rounded-lg flex items-center justify-between"
                   style={{ backgroundColor: '#faebd7', color: '#650000' }}

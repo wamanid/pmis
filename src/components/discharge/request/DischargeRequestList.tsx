@@ -26,11 +26,11 @@ import { Badge } from '../../ui/badge';
 import {Loader} from "../ViewDischargeDetails";
 import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
 import {
-  addBulkRequest,
+  addBulkRequest, addRequest,
   BatchDischargeRequest,
   DischargeRequest,
   DischargeType,
-  getRequests
+  getRequests, SingleDischargeRequest, updateRequest
 } from "../../../services/discharge/discharge";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
@@ -110,7 +110,11 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
 
   // API Integration
   useEffect(() => {
-    if (loading.request) {
+    if (loading.request || !dischargeRequests.length) {
+      setLoading(prev => ({
+        ...prev,
+        request: true
+      }))
       fetchData()
     }
   }, [loading.request]);
@@ -161,24 +165,46 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     setSelectedRequest(null);
   };
 
-  const handleFormSubmit = async (data: BatchDischargeRequest) => {
+  const handleFormSubmit = async (data: BatchDischargeRequest | SingleDischargeRequest) => {
     // console.log(data)
 
     try {
-      const response = await addBulkRequest(data)
-      console.log(response)
+      let response: any
+
+      if (selectedRequest) {
+        if (!('discharges' in data)) {
+          response = await updateRequest(data, selectedRequest.id)
+        }
+        else {
+          toast.error("Editing the request by adding discharges is not yet available");
+          return;
+        }
+      }
+      else {
+        if ('discharges' in data){
+          response = await addBulkRequest(data)
+        }
+        else {
+          response = await addRequest(data)
+        }
+      }
+
       if (handleResponseError(response)) return;
       if (!('id' in response)) {
         toast.error("Failed to update the requests table");
-        setIsFormOpen(false);
-        setSelectedRequest(null);
-        return;
       }
 
-      setDischargeRequests([response, ...dischargeRequests]);
-      toast.success('Discharge request created successfully');
+      if (selectedRequest) {
+        setDischargeRequests(prev => prev.map(r => r.id === selectedRequest.id ? response : r))
+        toast.success('Discharge request updated successfully');
+      }
+      else {
+        setDischargeRequests([response, ...dischargeRequests]);
+        toast.success('Discharge request created successfully');
+      }
 
-
+      setIsFormOpen(false);
+      setSelectedRequest(null);
     }catch (error) {
       handleCatchError(error)
     }
