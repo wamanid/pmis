@@ -103,6 +103,7 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   // const [handovers, setHandovers] = useState<ChildHandover[]>([])
   // const [relationships, setRelationships] = useState<RelationShipItem[]>([])
   const [selectedId, setSelectedId] = useState("")
+  const [child, setChild] = useState("")
   const [childSelected, setChildSelected] = useState(false)
 
   useEffect(() => {
@@ -244,16 +245,22 @@ export const DischargeChildHandoverList: React.FC<ChildProps> = ({ loading, setL
   const handleDelete = (record: ChildHandover) => {
     // setSelectedRecord(record);
     setSelectedId(record.id)
+    setChild(record.child)
     setIsDeleteOpen(true);
   };
 
   const confirmDelete = async () => {
-     if (!selectedId) return
+     if (!selectedId && !child) return
 
     try {
       await deleteHandover(selectedId)
       setHandovers(handovers.filter((r) => r.id !== selectedId));
       toast.success('Child handover record deleted successfully');
+
+      const obj = originalChildren.find(ch => ch.id === child)
+      if (obj) {
+        setChildren(prev => ([obj, ...prev]))
+      }
 
       setIsDeleteOpen(false);
       setSelectedId("");

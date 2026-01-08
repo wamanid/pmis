@@ -31,23 +31,25 @@ interface ChildProps {
   setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
   setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
   dischargeRequests: DischargeRequest
+  sentences: Sentence
+  setSentences: React.Dispatch<React.SetStateAction<Sentence[]>>
 }
 
 export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, setLoading, prisoners, setPrisoners,
                                                                        types, reasons, setTypes, setReasons, dischargeRequests,
-                                                                       setDischargeRequests }) => {
+                                                                       setDischargeRequests, sentences, setSentences }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
-  const [selectedRecord, setSelectedRecord] = useState<any>(null);
+  const [selectedsentence, setSelectedsentence] = useState<any>(null);
 
-  const [records, setRecords] = useState<SuspendedSentence[]>([]);
+  // const [sentences, setSentences] = useState<SuspendedSentence[]>([]);
 
   // API Integration
   const [courts, setCourts] = useState<Court[]>([])
 
   useEffect(() => {
-    if(loading.suspended || !records.length) {
+    if(loading.suspended || !sentences.length) {
       fetchData()
     }
   }, [loading.suspended]);
@@ -61,7 +63,7 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
         if (!data.length) {
           toast.error("There are no suspended sentences")
         }
-        setRecords(data)
+        setSentences(data)
         // console.log(data)
       }
 
@@ -76,15 +78,15 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
   }
 
   async function handleDelete() {
-    if (!selectedRecord) return
+    if (!selectedsentence) return
 
     try {
-      await deleteSentence(selectedRecord.id)
-      setRecords(prev => prev.filter(rec => rec.id !== selectedRecord.id))
-      toast.success('Suspended sentence record deleted successfully');
+      await deleteSentence(selectedsentence.id)
+      setSentences(prev => prev.filter(rec => rec.id !== selectedsentence.id))
+      toast.success('Suspended sentence sentence deleted successfully');
 
       setIsDeleteOpen(false);
-      setSelectedRecord(null);
+      setSelectedsentence(null);
 
     }catch (error) {
       handleCatchError(error)
@@ -95,8 +97,8 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
     // console.log(data)
     try {
       let response: any
-      if (selectedRecord){
-        response = await updateSentences(data, selectedRecord.id);
+      if (selectedsentence){
+        response = await updateSentences(data, selectedsentence.id);
       }
       else {
         response = await addSentence(data);
@@ -108,34 +110,34 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
         return;
       }
 
-      if (selectedRecord){
-        setRecords(prev => (
+      if (selectedsentence){
+        setSentences(prev => (
             prev.map(rec => (rec.id === response.id ? response : rec))
         ));
         toast.success('updated');
       }
       else {
-        setRecords(prev => [response, ...prev]);
+        setSentences(prev => [response, ...prev]);
         toast.success('Created');
       }
 
       setIsFormOpen(false);
-      setSelectedRecord(null);
+      setSelectedsentence(null);
     }catch (error) {
       handleCatchError(error)
     }
-    // if (selectedRecord) {
-    //   setRecords(records.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r)));
+    // if (selectedsentence) {
+    //   setSentences(sentences.map((r) => (r.id === selectedsentence.id ? { ...r, ...data } : r)));
     //   toast.success('Updated');
     // } else {
-    //   setRecords([...records, { id: Date.now().toString(), ...data }]);
+    //   setSentences([...sentences, { id: Date.now().toString(), ...data }]);
     //   toast.success('Created');
     // }
     // setIsFormOpen(false);
-    // setSelectedRecord(null);
+    // setSelectedsentence(null);
   }
 
-  const filteredRecords = records.filter((r) =>
+  const filteredsentences = sentences.filter((r) =>
     r.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     r.prisoner_number.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -157,11 +159,11 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
               <div className="flex items-center justify-between">
                 <div>
                   <h1>Suspended Sentence Discharges</h1>
-                  <p className="text-muted-foreground">Manage suspended sentence discharge records</p>
+                  <p className="text-muted-foreground">Manage suspended sentence discharge sentences</p>
                 </div>
                 <Button onClick={() => setIsFormOpen(true)}>
                   <Plus className="h-4 w-4 mr-2" />
-                  Add Record
+                  Add sentence
                 </Button>
               </div>
 
@@ -194,26 +196,26 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
                     </TableHeader>
                     <TableBody>
                       {
-                        !filteredRecords.length ? (
+                        !filteredsentences.length ? (
                             <TableRow>
                               <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
                                 No suspended sentences found
                               </TableCell>
                             </TableRow>
                         ) : (
-                            filteredRecords.map((record) => (
-                        <TableRow key={record.id}>
-                          <TableCell>{record.prisoner_name}</TableCell>
-                          <TableCell>{record.prisoner_number}</TableCell>
-                          <TableCell>{record.court_name}</TableCell>
-                          <TableCell>{record.duration_of_suspension} months</TableCell>
-                          <TableCell>{new Date(record.discharge_datetime).toLocaleDateString()}</TableCell>
+                            filteredsentences.map((sentence) => (
+                        <TableRow key={sentence.id}>
+                          <TableCell>{sentence.prisoner_name}</TableCell>
+                          <TableCell>{sentence.prisoner_number}</TableCell>
+                          <TableCell>{sentence.court_name}</TableCell>
+                          <TableCell>{sentence.duration_of_suspension} months</TableCell>
+                          <TableCell>{new Date(sentence.discharge_datetime).toLocaleDateString()}</TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
-                              <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsFormOpen(true); }}>
+                              <Button variant="ghost" size="sm" onClick={() => { setSelectedsentence(sentence); setIsFormOpen(true); }}>
                                 <Edit className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="sm" onClick={() => { setSelectedRecord(record); setIsDeleteOpen(true); }}>
+                              <Button variant="ghost" size="sm" onClick={() => { setSelectedsentence(sentence); setIsDeleteOpen(true); }}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
@@ -233,17 +235,17 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Suspended Sentence</DialogTitle>
+            <DialogTitle>{selectedsentence ? 'Edit' : 'Add'} Suspended Sentence</DialogTitle>
           </DialogHeader>
           <DischargeSuspendedSentenceForm
             types={types} setTypes={setTypes}
             reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
             setDischargeRequests={setDischargeRequests}
             prisoners={prisoners} setPrisoners={setPrisoners}
-            initialData={selectedRecord}
+            initialData={selectedsentence}
             courts={courts} setCourts={setCourts}
             onSubmit={handleFormSubmit}
-            onCancel={() => { setIsFormOpen(false); setSelectedRecord(null); }}
+            onCancel={() => { setIsFormOpen(false); setSelectedsentence(null); }}
           />
         </DialogContent>
       </Dialog>
@@ -253,7 +255,7 @@ export const DischargeSuspendedSentenceList: React.FC<ChildProps> = ({ loading, 
           <DialogHeader>
             <DialogTitle>Confirm Deletion</DialogTitle>
           </DialogHeader>
-          <p>Are you sure you want to delete this suspended sentence record? This action cannot be undone.</p>
+          <p>Are you sure you want to delete this suspended sentence sentence? This action cannot be undone.</p>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsDeleteOpen(false)}>Cancel</Button>
             <Button variant="destructive" onClick={handleDelete}>Delete</Button>

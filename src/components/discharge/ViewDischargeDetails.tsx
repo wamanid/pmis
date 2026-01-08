@@ -18,7 +18,7 @@ import {
   ChildItem,
   DischargeRequest,
   DischargeType,
-  DocumentType
+  DocumentType, SuspendedSentence
 } from "../../services/discharge/discharge";
 import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem, RelationShipItem} from "../../services/stationServices/visitorsServices/VisitorsService";
@@ -119,6 +119,7 @@ export default function ViewDischargeDetails() {
   const [handovers, setHandovers] = useState<ChildHandover[]>([])
   const [relationships, setRelationships] = useState<RelationShipItem[]>([])
   const [allowances, setAllowances] = useState<Allowance[]>([]);
+  const [sentences, setSentences] = useState<SuspendedSentence[]>([]);
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -151,7 +152,8 @@ export default function ViewDischargeDetails() {
       case 'suspended':
         return <DischargeSuspendedSentenceList loading={loading} setLoading={setLoading}
                 prisoners={prisoners} setPrisoners={setPrisoners} types={types} setTypes={setTypes}
-                reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests}
+                reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
+                 setDischargeRequests={setDischargeRequests} sentences={sentences} setSentences={setSentences}
         />;
       default:
         return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}

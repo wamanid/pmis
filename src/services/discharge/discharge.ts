@@ -192,6 +192,10 @@ export const updateRequest = async (request: SingleDischargeRequest, id: string)
   return response.data;
 }
 
+export const deleteRequest = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/discharge-management/requests/${id}/`);
+};
+
 
 // Subsistence Allowance
 export interface Allowance {
@@ -242,17 +246,8 @@ export const updateAllowance = async (allowance: SubsistenceAllowance, id: strin
   return response.data;
 }
 
-export const deleteAllowance = async (id: string) : Promise<{ message: string } | { error: string }> => {
-  try {
-    await axiosInstance.delete(`/discharge-management/subsistence-allowances/${id}/`);
-
-    return { message: "subsistence allowance deleted successfully" }
-
-  } catch (error: any) {
-    return {
-      error: "Failed to delete subsistence allowance."
-    };
-  }
+export const deleteAllowance = async (id: string) : Promise<void> => {
+  await axiosInstance.delete(`/discharge-management/subsistence-allowances/${id}/`);
 }
 
 // Suspended sentences
@@ -341,17 +336,8 @@ export const addSentence = async (sentence: Sentence) : Promise<SentenceResponse
   return response.data;
 }
 
-export const deleteSentence = async (id: string) : Promise<{ message: string } | { error: string }> => {
-  try {
-    await axiosInstance.delete(`/discharge-management/suspended-sentences/${id}/`);
-
-    return { message: "Suspended Sentence deleted successfully" }
-
-  } catch (error: any) {
-    return {
-      error: "Failed to Child handovers allowance."
-    };
-  }
+export const deleteSentence = async (id: string) : Promise<void> => {
+  await axiosInstance.delete(`/discharge-management/suspended-sentences/${id}/`);
 }
 
 export const updateSentences = async (sentence: Sentence, id: string) : Promise<SentenceResponse> => {
@@ -467,15 +453,6 @@ export const updateHandover = async (handover: Handover, id: string) : Promise<H
   return response.data;
 }
 
-export const deleteHandover = async (id: string) : Promise<{ message: string } | { error: string }> => {
-  try {
-    await axiosInstance.delete(`/discharge-management/child-handovers/${id}/`);
-
-    return { message: "Child handovers deleted successfully" }
-
-  } catch (error: any) {
-    return {
-      error: "Failed to Child handovers allowance."
-    };
-  }
+export const deleteHandover = async (id: string) : Promise<void> => {
+  await axiosInstance.delete(`/discharge-management/child-handovers/${id}/`);
 }

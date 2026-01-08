@@ -27,7 +27,7 @@ import {Loader} from "../ViewDischargeDetails";
 import {handleCatchError, handleResponseError, handleServerError2} from "../../../services/stationServices/utils";
 import {
   addBulkRequest, addRequest,
-  BatchDischargeRequest,
+  BatchDischargeRequest, deleteAllowance, deleteRequest,
   DischargeRequest,
   DischargeType,
   getRequests, SingleDischargeRequest, updateRequest
@@ -161,16 +161,22 @@ export const DischargeRequestList: React.FC<ChildProps> = ({ loading, setLoading
     setIsFormOpen(true);
   };
 
-  const handleDelete = (request: DischargeRequest) => {
+  const handleDelete = async (request: DischargeRequest) => {
     setSelectedRequest(request);
     setIsDeleteOpen(true);
   };
 
-  const confirmDelete = () => {
-    if (selectedRequest) {
-      setDischargeRequests(dischargeRequests.filter((r) => r.id !== selectedRequest.id));
-      toast.success('Discharge request deleted successfully');
+  const confirmDelete = async () => {
+    if(!selectedRequest) return
+
+    try {
+       await deleteRequest(selectedRequest.id)
+       setDischargeRequests(prev => prev.filter(rec => rec.id !== selectedRequest.id))
+       toast.success('Discharge request deleted successfully');
+    }catch (error) {
+      handleCatchError(error)
     }
+
     setIsDeleteOpen(false);
     setSelectedRequest(null);
   };
