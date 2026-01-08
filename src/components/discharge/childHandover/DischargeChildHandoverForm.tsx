@@ -1,45 +1,73 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import {ChildItem, Handover} from "../../../services/discharge/discharge";
+import {RelationShipItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {toast} from "sonner";
 
 interface DischargeChildHandoverFormProps {
+  childSelected: boolean
+  children: ChildItem
+  relationships: RelationShipItem
   initialData?: any;
   onSubmit: (data: any) => void;
   onCancel: () => void;
 }
 
 export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProps> = ({
+  children, relationships, childSelected,
   initialData,
   onSubmit,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState({
-    child_name: '',
-    mother_name: '',
-    relationship_name: '',
-    custodian: '',
-    contact_of_custodian: '',
-    datetime_of_handover: '',
-    reason_for_handover: '',
-    physical_condition: '',
-    probation_report: '',
+  const [formData, setFormData] = useState<Handover>({
+    is_active: true,
+    deleted_datetime: null,
+    custodian: "",
+    contact_of_custodian: "",
+    datetime_of_handover: new Date().toISOString(),
+    reason_for_handover: "",
+    physical_condition: "",
+    probation_report: "",
     age_at_handover: 0,
-    remarks: '',
-    child: '',
-    custodian_relation_to_prisoner: '',
+    remarks: "",
+    deleted_by: null,
+    child: "",
+    custodian_relation_to_prisoner: "",
   });
+
+  useEffect(() => {
+    if (!relationships.length){
+      toast.error("There are no relationships, please first add the relationship types to continue")
+      onCancel()
+    }
+  }, [relationships]);
 
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
     }
+    console.log(children)
   }, [initialData]);
 
   const handleChange = (field: string, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    if (field === 'child'){
+      const condition = children.find(child => child.id === value)?.physical_condition
+      setFormData((prev) => ({
+        ...prev,
+        [field]: value,
+        physical_condition: condition
+      }));
+    }
+    else {
+      setFormData((prev) => ({ ...prev, [field]: value }));
+    }
+
+    // setFormData((prev) => ({ ...prev, [field]: value }));
+
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -52,15 +80,16 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <Label htmlFor="child">Child *</Label>
-          <Select value={formData.child} onValueChange={(value) => {
+          <Select value={formData.child} disabled={initialData} onValueChange={(value) => {
             handleChange('child', value);
-            handleChange('child_name', 'Baby Jane');
-            handleChange('mother_name', 'Jane Smith');
           }}>
             <SelectTrigger><SelectValue placeholder="Select child" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="child-001">Baby Jane (Mother: Jane Smith)</SelectItem>
-              <SelectItem value="child-002">Baby John (Mother: Mary Doe)</SelectItem>
+              {
+                children.map(child => (
+                    <SelectItem key={child.id} value={child.id}>{child.name} (Mother: {child.mothers_name})</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -90,18 +119,14 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
           <Label htmlFor="custodian_relation_to_prisoner">Relationship to Prisoner *</Label>
           <Select value={formData.custodian_relation_to_prisoner} onValueChange={(value) => {
             handleChange('custodian_relation_to_prisoner', value);
-            const relations: Record<string, string> = {
-              'rel-001': 'Grandmother',
-              'rel-002': 'Aunt',
-              'rel-003': 'Sister',
-            };
-            handleChange('relationship_name', relations[value] || '');
           }}>
             <SelectTrigger><SelectValue placeholder="Select relationship" /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="rel-001">Grandmother</SelectItem>
-              <SelectItem value="rel-002">Aunt</SelectItem>
-              <SelectItem value="rel-003">Sister</SelectItem>
+              {
+                relationships.map(rel => (
+                    <SelectItem key={rel.id} value={rel.id}>{rel.name}</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -171,7 +196,10 @@ export const DischargeChildHandoverForm: React.FC<DischargeChildHandoverFormProp
 
       <div className="flex justify-end gap-3">
         <Button type="button" variant="outline" onClick={onCancel}>Cancel</Button>
-        <Button type="submit">{initialData ? 'Update' : 'Create'} Handover</Button>
+        <Button type="submit">{
+              initialData && !childSelected ? 'Update'
+              : 'Create'
+            } Handover</Button>
       </div>
     </form>
   );

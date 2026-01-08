@@ -2,16 +2,27 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { LogOut, Wallet, Package, Info } from 'lucide-react';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import { PrisonerDischargeList } from './PrisonerDischargeList';
+import { PrisonerDischargeList } from './dischargeList/PrisonerDischargeList';
 import { DischargeChecklistItemList } from './DischargeChecklistItemList';
-import { DischargeChildHandoverList } from './DischargeChildHandoverList';
+import { DischargeChildHandoverList } from './childHandover/DischargeChildHandoverList';
 import { DischargeDeceasedList } from './DischargeDeceasedList';
 import { DischargeDocumentList } from './DischargeDocumentList';
 import { DischargeByExecutionList } from './DischargeByExecutionList';
 import { DischargeOfficersList } from './DischargeOfficersList';
-import { SubsistenceAllowancesList } from './SubsistenceAllowancesList';
-import { DischargeSuspendedSentenceList } from './DischargeSuspendedSentenceList';
-import { DischargeRequestList } from './DischargeRequestList';
+import { SubsistenceAllowancesList } from './subsistence/SubsistenceAllowancesList';
+import { DischargeSuspendedSentenceList } from './suspended/DischargeSuspendedSentenceList';
+import { DischargeRequestList } from './request/DischargeRequestList';
+import {
+  Allowance,
+  ChildHandover,
+  ChildItem,
+  DischargeRequest,
+  DischargeType,
+  DocumentType, SuspendedSentence
+} from "../../services/discharge/discharge";
+import {Unit} from "../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem, RelationShipItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../services/stationServices/staffDeploymentService";
 
 // Mock data for discharge details
 const mockDischargeData = {
@@ -82,9 +93,33 @@ type TabType =
   | 'subsistence'
   | 'suspended';
 
+export interface Loader {
+  discharge: boolean
+  request: boolean
+  subsistence: boolean
+  suspended: boolean
+  child: boolean
+}
+
 export default function ViewDischargeDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<TabType>('discharge-detail');
+
+  // API integration
+  const [loading, setLoading] = useState<Loader>({ discharge: true, request: true, subsistence: true, suspended: true, child: true })
+  const [types, setTypes] = useState<DischargeType[]>([])
+  const [reasons, setReasons] = useState<Unit[]>([])
+
+  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
+  const [dischargeRequests, setDischargeRequests] = useState<DischargeRequest[]>([]);
+  const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
+
+  const [originalChildren, setOriginalChildren] = useState<ChildItem[]>([])
+  const [handovers, setHandovers] = useState<ChildHandover[]>([])
+  const [relationships, setRelationships] = useState<RelationShipItem[]>([])
+  const [allowances, setAllowances] = useState<Allowance[]>([]);
+  const [sentences, setSentences] = useState<SuspendedSentence[]>([]);
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -93,17 +128,38 @@ export default function ViewDischargeDetails() {
   const renderTabContent = () => {
     switch (activeTab) {
       case 'requests':
-        return <DischargeRequestList />;
+        return <DischargeRequestList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes}
+                                     reasons={reasons} setReasons={setReasons} prisoners={prisoners} staff={staff}
+                                     setStaff={setStaff} setPrisoners={setPrisoners} dischargeRequests={dischargeRequests}
+                                     setDischargeRequests={setDischargeRequests}
+        />;
       case 'discharge-detail':
-        return <PrisonerDischargeList />;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes}
+                                      reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
+                                      setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
+                                      prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes}
+                                      setDocumentTypes={setDocumentTypes}
+        />;
       case 'child-handovers':
-        return <DischargeChildHandoverList />;
+        return <DischargeChildHandoverList loading={loading} setLoading={setLoading}
+               originalChildren={originalChildren} setOriginalChildren={setOriginalChildren}
+               handovers={handovers} setHandovers={setHandovers}
+               relationships={relationships} setRelationships={setRelationships}
+        />;
       case 'subsistence':
-        return <SubsistenceAllowancesList />;
+        return <SubsistenceAllowancesList loading={loading} setLoading={setLoading} prisoners={prisoners}
+                setPrisoners={setPrisoners} allowances={allowances} setAllowances={setAllowances}/>;
       case 'suspended':
-        return <DischargeSuspendedSentenceList />;
+        return <DischargeSuspendedSentenceList loading={loading} setLoading={setLoading}
+                prisoners={prisoners} setPrisoners={setPrisoners} types={types} setTypes={setTypes}
+                reasons={reasons} setReasons={setReasons} dischargeRequests={dischargeRequests}
+                 setDischargeRequests={setDischargeRequests} sentences={sentences} setSentences={setSentences}
+        />;
       default:
-        return <PrisonerDischargeList />;
+        return <PrisonerDischargeList loading={loading} setLoading={setLoading} types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
+                dischargeRequests={dischargeRequests} setDischargeRequests={setDischargeRequests} staff={staff} setStaff={setStaff}
+                prisoners={prisoners} setPrisoners={setPrisoners} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}
+        />;
     }
   };
 
@@ -342,6 +398,9 @@ export default function ViewDischargeDetails() {
           <div className="p-6">{renderTabContent()}</div>
         </CardContent>
       </Card>
+
+
+
     </div>
   );
 }

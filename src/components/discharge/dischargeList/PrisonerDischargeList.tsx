@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
+import React, {useEffect, useState} from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
 import {
   Table,
   TableBody,
@@ -10,7 +10,7 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
+} from '../../ui/table';
 import {
   Dialog,
   DialogContent,
@@ -18,14 +18,14 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from '../../ui/select';
 import {
   Search,
   Plus,
@@ -41,10 +41,45 @@ import {
   CreditCard,
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { PrisonerDischargeForm } from './PrisonerDischargeForm';
+import { PrisonerDischargeForm } from '../PrisonerDischargeForm';
 import { PrisonerDischargeFormTabbed } from './PrisonerDischargeFormTabbed';
-import TransferRequestList from '../transfer/TransferRequestList';
-import TransferRequestForm from '../transfer/TransferRequestForm';
+import TransferRequestList from '../../transfer/TransferRequestList';
+import TransferRequestForm from '../../transfer/TransferRequestForm';
+import {Loader} from "../ViewDischargeDetails";
+import {
+  handleCatchError,
+  handleEmptyList,
+  handleServerError,
+  handleServerError2
+} from "../../../services/stationServices/utils";
+import {
+  DischargeRequest,
+  DischargeType,
+  getDischarges,
+  getReasons,
+  getTypes,
+  PrisonerDischarge
+} from "../../../services/discharge/discharge";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../../services/stationServices/staffDeploymentService";
+
+interface ChildProps {
+  loading: Loader
+  setLoading: React.Dispatch<React.SetStateAction<Loader>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  staff: StaffItem
+  setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
+  setDocumentTypes: React.Dispatch<React.SetStateAction<DocumentType[]>>
+  documentTypes: DocumentType
+}
 
 interface PropertyAccount {
   id: string;
@@ -71,26 +106,27 @@ interface Property {
   destination: string;
 }
 
-interface PrisonerDischarge {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  discharge_type_name: string;
-  discharge_reason_name: string;
-  discharge_datetime: string;
-  remarks: string;
-  prisoner: string;
-  discharge_type: string;
-  discharge_reason: string;
-  intended_place_of_stay?: string;
-  property_accounts?: PropertyAccount[];
-  properties?: Property[];
-}
+// interface PrisonerDischarge {
+//   id: string;
+//   prisoner_name: string;
+//   prisoner_number: string;
+//   discharge_type_name: string;
+//   discharge_reason_name: string;
+//   discharge_datetime: string;
+//   remarks: string;
+//   prisoner: string;
+//   discharge_type: string;
+//   discharge_reason: string;
+//   intended_place_of_stay?: string;
+//   property_accounts?: PropertyAccount[];
+//   properties?: Property[];
+// }
 
-export const PrisonerDischargeList: React.FC = () => {
+export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoading, types, setTypes, reasons, setReasons, dischargeRequests,
+                                                              setDischargeRequests, setPrisoners, prisoners, setStaff, staff, documentTypes, setDocumentTypes }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterType, setFilterType] = useState('all');
-  const [filterReason, setFilterReason] = useState('all');
+  const [filterType, setFilterType] = useState('All');
+  const [filterReason, setFilterReason] = useState('All');
   const [filterDate, setFilterDate] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
@@ -109,144 +145,24 @@ export const PrisonerDischargeList: React.FC = () => {
   const [gatePassPrisonerData, setGatePassPrisonerData] = useState<any>(null);
 
   // Mock discharge types with on_premise flag
-  const mockDischargeTypes: Record<string, { on_premise: boolean }> = {
-    'type-001': { on_premise: true }, // Completion of Sentence
-    'type-002': { on_premise: false }, // Transfer
-    'type-003': { on_premise: false }, // Death
-    'type-004': { on_premise: true }, // Court Order
-    'type-005': { on_premise: true }, // Deportation
-  };
+  // const mockDischargeTypes: Record<string, { on_premise: boolean }> = {
+  //   'type-001': { on_premise: true }, // Completion of Sentence
+  //   'type-002': { on_premise: false }, // Transfer
+  //   'type-003': { on_premise: false }, // Death
+  //   'type-004': { on_premise: true }, // Court Order
+  //   'type-005': { on_premise: true }, // Deportation
+  // };
 
   // Mock data
-  const [dischargeRecords, setDischargeRecords] = useState<PrisonerDischarge[]>([
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'P-2024-001',
-      discharge_type_name: 'Completion of Sentence',
-      discharge_reason_name: 'Sentence Completed',
-      discharge_datetime: '2025-11-29T10:00:00Z',
-      remarks: 'Good behavior throughout incarceration',
-      prisoner: 'prisoner-001',
-      discharge_type: 'type-001',
-      discharge_reason: 'reason-001',
-      intended_place_of_stay: '123 Main Street, Kampala, Uganda',
-      property_accounts: [
-        {
-          id: 'acc-001',
-          account_type: 'type-001',
-          account_type_name: 'PP Account',
-          balance: '250000.00',
-          currency: 'UGX',
-        },
-        {
-          id: 'acc-002',
-          account_type: 'type-002',
-          account_type_name: 'Savings Account',
-          balance: '125000.00',
-          currency: 'UGX',
-        },
-      ],
-      properties: [
-        {
-          id: 'prop-001',
-          property_type: 'incoming-001',
-          property_type_name: 'Incoming',
-          property_item: 'item-001',
-          property_item_name: 'Mobile Phone',
-          quantity: '1.00',
-          measurement_unit: 'unit-001',
-          measurement_unit_name: 'Piece',
-          amount: null,
-          property_status: 'status-001',
-          property_status_name: 'In Store',
-          bag_number: 'UUPCSH2025000001',
-          note: 'Samsung Galaxy S21 - Black',
-          destination: '',
-        },
-        {
-          id: 'prop-002',
-          property_type: 'incoming-001',
-          property_type_name: 'Incoming',
-          property_item: 'item-002',
-          property_item_name: 'Clothing',
-          quantity: '3.00',
-          measurement_unit: 'unit-001',
-          measurement_unit_name: 'Piece',
-          amount: null,
-          property_status: 'status-001',
-          property_status_name: 'In Store',
-          bag_number: 'UUPCSH2025000001',
-          note: '2 shirts, 1 trouser',
-          destination: '',
-        },
-        {
-          id: 'prop-003',
-          property_type: 'incoming-001',
-          property_type_name: 'Incoming',
-          property_item: 'item-003',
-          property_item_name: 'Watch',
-          quantity: '1.00',
-          measurement_unit: 'unit-001',
-          measurement_unit_name: 'Piece',
-          amount: null,
-          property_status: 'status-001',
-          property_status_name: 'In Store',
-          bag_number: 'UUPCSH2025000001',
-          note: 'Casio Digital Watch',
-          destination: '',
-        },
-      ],
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'P-2024-002',
-      discharge_type_name: 'Transfer',
-      discharge_reason_name: 'Inter-Prison Transfer',
-      discharge_datetime: '2025-11-28T14:30:00Z',
-      remarks: 'Transfer to Kitalya Prison',
-      prisoner: 'prisoner-002',
-      discharge_type: 'type-002',
-      discharge_reason: 'reason-002',
-      intended_place_of_stay: 'Kitalya Maximum Security Prison',
-      property_accounts: [
-        {
-          id: 'acc-003',
-          account_type: 'type-001',
-          account_type_name: 'PP Account',
-          balance: '50000.00',
-          currency: 'UGX',
-        },
-      ],
-      properties: [
-        {
-          id: 'prop-004',
-          property_type: 'incoming-001',
-          property_type_name: 'Incoming',
-          property_item: 'item-004',
-          property_item_name: 'Books',
-          quantity: '5.00',
-          measurement_unit: 'unit-001',
-          measurement_unit_name: 'Piece',
-          amount: null,
-          property_status: 'status-002',
-          property_status_name: 'Ready for Transfer',
-          bag_number: 'UUPCSH2025000002',
-          note: 'Educational materials',
-          destination: 'Kitalya Prison',
-        },
-      ],
-    },
-  ]);
+  const [dischargeRecords, setDischargeRecords] = useState<PrisonerDischarge[]>([]);
 
   // Filter records
   const filteredRecords = dischargeRecords.filter((record) => {
     const matchesSearch =
       record.prisoner_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       record.prisoner_number.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = filterType === 'all' || record.discharge_type_name === filterType;
-    const matchesReason = filterReason === 'all' || record.discharge_reason_name === filterReason;
+    const matchesType = filterType === 'All' || record.discharge_type_name === filterType;
+    const matchesReason = filterReason === 'All' || record.discharge_reason_name === filterReason;
     const matchesDate = !filterDate || record.discharge_datetime.startsWith(filterDate);
 
     return matchesSearch && matchesType && matchesReason && matchesDate;
@@ -256,6 +172,60 @@ export const PrisonerDischargeList: React.FC = () => {
   const totalPages = Math.ceil(filteredRecords.length / recordsPerPage);
   const startIndex = (currentPage - 1) * recordsPerPage;
   const currentRecords = filteredRecords.slice(startIndex, startIndex + recordsPerPage);
+
+  // API Integration
+  useEffect(() => {
+    if (loading.discharge || !dischargeRecords.length) {
+      setLoading(prev => ({
+        ...prev,
+        discharge: true
+      }))
+      fetchData()
+    }
+  }, [loading.discharge]);
+
+  function populateList(response: any, msg: string, setData: any) {
+    if (handleServerError2(response)) return true
+
+    if ("results" in response) {
+      const data = response.results
+      if (msg && !data.length) {
+        toast.error(msg)
+      }
+      setData(data)
+      // console.log(data)
+
+    }
+
+    return false
+  }
+
+  function returnedValue (value: boolean){
+    if (value){
+      return
+    }
+  }
+
+  async function fetchData () {
+    try {
+      const response2 = await getTypes()
+      returnedValue(populateList(response2, "", setTypes))
+
+      const response3 = await getReasons()
+      returnedValue(populateList(response3, "", setReasons))
+
+      const response1 = await getDischarges()
+      returnedValue(populateList(response1, "There are no prisoner discharge records", setDischargeRecords))
+
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoading(prev => ({
+        ...prev,
+        discharge: false
+      }))
+    }
+  }
 
   const handleView = (record: PrisonerDischarge) => {
     setSelectedRecord(record);
@@ -282,6 +252,7 @@ export const PrisonerDischargeList: React.FC = () => {
   };
 
   const handleFormSubmit = (data: any) => {
+
     if (selectedRecord) {
       setDischargeRecords(
         dischargeRecords.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
@@ -301,8 +272,8 @@ export const PrisonerDischargeList: React.FC = () => {
 
   const handleResetFilters = () => {
     setSearchQuery('');
-    setFilterType('all');
-    setFilterReason('all');
+    setFilterType('All');
+    setFilterReason('All');
     setFilterDate('');
     setCurrentPage(1);
   };
@@ -418,220 +389,238 @@ export const PrisonerDischargeList: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1>Prisoner Discharges</h1>
-          <p className="text-muted-foreground">
-            Manage prisoner discharge records and documentation
-          </p>
-        </div>
-        <Button onClick={() => setIsFormOpen(true)}>
-          <Plus className="h-4 w-4 mr-2" />
-          Add Discharge
-        </Button>
-      </div>
-
-      {/* Filters and Search */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-            <div className="lg:col-span-2">
-              <Label>Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search by prisoner name or number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
+      <>
+      {
+        loading.discharge ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Prisoner Discharge Information, Please wait...
+                    </p>
               </div>
             </div>
+        ) : (
+            <>
+               {/* Header */}
+               <div className="flex items-center justify-between">
+                <div>
+                  <h1>Prisoner Discharges</h1>
+                  <p className="text-muted-foreground">
+                    Manage prisoner discharge records and documentation
+                  </p>
+                </div>
+                <Button onClick={() => setIsFormOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Discharge
+                </Button>
+              </div>
 
-            <div>
-              <Label>Discharge Type</Label>
-              <Select value={filterType} onValueChange={setFilterType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Types</SelectItem>
-                  <SelectItem value="Completion of Sentence">Completion of Sentence</SelectItem>
-                  <SelectItem value="Transfer">Transfer</SelectItem>
-                  <SelectItem value="Death">Death</SelectItem>
-                  <SelectItem value="Court Order">Court Order</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Discharge Reason</Label>
-              <Select value={filterReason} onValueChange={setFilterReason}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Reasons</SelectItem>
-                  <SelectItem value="Sentence Completed">Sentence Completed</SelectItem>
-                  <SelectItem value="Inter-Prison Transfer">Inter-Prison Transfer</SelectItem>
-                  <SelectItem value="Medical Grounds">Medical Grounds</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div>
-              <Label>Date</Label>
-              <Input
-                type="date"
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 mt-4">
-            <Button variant="outline" onClick={handleResetFilters}>
-              Reset Filters
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Summary Stats */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Total Discharges</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">{filteredRecords.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">This Month</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">
-              {filteredRecords.filter((r) => {
-                const date = new Date(r.discharge_datetime);
-                const now = new Date();
-                return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
-              }).length}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Today</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl">
-              {filteredRecords.filter((r) => {
-                const date = new Date(r.discharge_datetime);
-                const now = new Date();
-                return date.toDateString() === now.toDateString();
-              }).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-primary hover:bg-primary">
-                  <TableHead className="text-white font-bold">Prisoner Name</TableHead>
-                  <TableHead className="text-white font-bold">Prisoner Number</TableHead>
-                  <TableHead className="text-white font-bold">Discharge Type</TableHead>
-                  <TableHead className="text-white font-bold">Reason</TableHead>
-                  <TableHead className="text-white font-bold">Date & Time</TableHead>
-                  <TableHead className="text-white font-bold">Remarks</TableHead>
-                  <TableHead className="text-white font-bold text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
-                      No discharge records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentRecords.map((record) => (
-                    <TableRow key={record.id}>
-                      <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell>{record.prisoner_number}</TableCell>
-                      <TableCell>{record.discharge_type_name}</TableCell>
-                      <TableCell>{record.discharge_reason_name}</TableCell>
-                      <TableCell>{formatDateTime(record.discharge_datetime)}</TableCell>
-                      <TableCell className="max-w-xs truncate">{record.remarks}</TableCell>
-                      <TableCell className="text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleView(record)}
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(record)}
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleDelete(record)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+               {/* Filters and Search */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+                      <div className="lg:col-span-2">
+                        <Label>Search</Label>
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                          <Input
+                            placeholder="Search by prisoner name or number..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10"
+                          />
                         </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                      </div>
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, filteredRecords.length)} of {filteredRecords.length} records
-          </p>
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-            >
-              Previous
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+                      <div>
+                        <Label>Discharge Type</Label>
+                        <Select value={filterType} onValueChange={setFilterType}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {
+                              types.map(type => (
+                                  <SelectItem key={type.id} value={type.name}>{type.name}</SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Discharge Reason</Label>
+                        <Select value={filterReason} onValueChange={setFilterReason}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {
+                              reasons.map(reason => (
+                                  <SelectItem key={reason.id} value={reason.name}>{reason.name}</SelectItem>
+                              ))
+                            }
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div>
+                        <Label>Date</Label>
+                        <Input
+                          type="date"
+                          value={filterDate}
+                          onChange={(e) => setFilterDate(e.target.value)}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 mt-4">
+                      <Button variant="outline" onClick={handleResetFilters}>
+                        Reset Filters
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+               {/* Summary Stats */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Total Discharges</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl">{filteredRecords.length}</div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">This Month</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl">
+                        {filteredRecords.filter((r) => {
+                          const date = new Date(r.discharge_datetime);
+                          const now = new Date();
+                          return date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+                        }).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card>
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-sm">Today</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-2xl">
+                        {filteredRecords.filter((r) => {
+                          const date = new Date(r.discharge_datetime);
+                          const now = new Date();
+                          return date.toDateString() === now.toDateString();
+                        }).length}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Table */}
+                <Card>
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-primary hover:bg-primary">
+                            <TableHead className="text-white font-bold">Prisoner Name</TableHead>
+                            <TableHead className="text-white font-bold">Prisoner Number</TableHead>
+                            <TableHead className="text-white font-bold">Discharge Type</TableHead>
+                            <TableHead className="text-white font-bold">Reason</TableHead>
+                            <TableHead className="text-white font-bold">Date & Time</TableHead>
+                            <TableHead className="text-white font-bold">Remarks</TableHead>
+                            <TableHead className="text-white font-bold text-right">Actions</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {currentRecords.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
+                                No discharge records found
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            currentRecords.map((record) => (
+                              <TableRow key={record.id}>
+                                <TableCell>{record.prisoner_name}</TableCell>
+                                <TableCell>{record.prisoner_number}</TableCell>
+                                <TableCell>{record.discharge_type_name}</TableCell>
+                                <TableCell>{record.discharge_reason_name}</TableCell>
+                                <TableCell>{formatDateTime(record.discharge_datetime)}</TableCell>
+                                <TableCell className="max-w-xs truncate">{record.remarks}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleView(record)}
+                                    >
+                                      <Eye className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleEdit(record)}
+                                    >
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDelete(record)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm text-muted-foreground">
+                      Showing {startIndex + 1} to {Math.min(startIndex + recordsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+                    </p>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                        disabled={currentPage === 1}
+                      >
+                        Previous
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                        disabled={currentPage === totalPages}
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  </div>
+                )}
+            </>
+        )
+      }
+      </>
 
       {/* Form Dialog */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
@@ -640,6 +629,10 @@ export const PrisonerDischargeList: React.FC = () => {
             <DialogTitle>{selectedRecord ? 'Edit' : 'Add'} Discharge Record</DialogTitle>
           </DialogHeader>
           <PrisonerDischargeFormTabbed
+            prisoners={prisoners} setPrisoners={setPrisoners} staff={staff} setStaff={setStaff}
+            types={types} setTypes={setTypes} reasons={reasons} setReasons={setReasons}
+            dischargeRequests={dischargeRequests} documentTypes={documentTypes} setDocumentTypes={setDocumentTypes}
+            setDischargeRequests={setDischargeRequests}
             initialData={selectedRecord}
             onSubmit={handleFormSubmit}
             onCancel={() => {

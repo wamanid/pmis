@@ -1,15 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../ui/select';
+} from '../../ui/select';
 import {
   Dialog,
   DialogContent,
@@ -17,7 +17,7 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from '../ui/dialog';
+} from '../../ui/dialog';
 import {
   Table,
   TableBody,
@@ -25,16 +25,16 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from '../ui/table';
-import { Card, CardContent } from '../ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+} from '../../ui/table';
+import { Card, CardContent } from '../../ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { ArrowRightLeft, Skull, Building, User, FileText, Upload, Plus, Trash2, Fingerprint, Shield, X, Eye, Download } from 'lucide-react';
-import { Checkbox } from '../ui/checkbox';
+import { Checkbox } from '../../ui/checkbox';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from '../ui/popover';
+} from '../../ui/popover';
 import {
   Command,
   CommandEmpty,
@@ -42,13 +42,25 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-} from '../ui/command';
+} from '../../ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
-import { cn } from '../ui/utils';
-import  NextOfKinForm  from '../admission/NextOfKinForm';
+import { cn } from '../../ui/utils';
+import  NextOfKinForm  from '../../admission/NextOfKinForm';
 import { toast } from 'sonner';
-import BiometricCapture from '../common/BiometricCapture';
-import { DischargeRequestForm } from './DischargeRequestForm';
+import BiometricCapture from '../../common/BiometricCapture';
+import { DischargeRequestForm } from '../request/DischargeRequestForm';
+import {
+  DischargeRequest,
+  DischargeType, getDocumentTypes,
+  getReasons,
+  getRequests,
+  getTypes
+} from "../../../services/discharge/discharge";
+import {getPrisoners, PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {getStaffProfile, StaffItem} from "../../../services/stationServices/staffDeploymentService";
+import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {NextOfKinResponse} from "../../../services/admission/nextOfKinService";
 
 interface PrisonerDischargeFormProps {
   initialData?: any;
@@ -56,6 +68,18 @@ interface PrisonerDischargeFormProps {
   onCancel: () => void;
   onTransferRedirect?: (prisonerData: { prisoner: string; prisoner_name: string; prisoner_number: string; original_station: string }) => void;
   mode?: 'create' | 'edit';
+  setDischargeRequests: React.Dispatch<React.SetStateAction<DischargeRequest[]>>
+  dischargeRequests: DischargeRequest
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  staff: StaffItem
+  setStaff: React.Dispatch<React.SetStateAction<StaffItem[]>>
+  types: DischargeType
+  setTypes: React.Dispatch<React.SetStateAction<DischargeType[]>>
+  reasons: Unit
+  setReasons: React.Dispatch<React.SetStateAction<Unit[]>>
+  setDocumentTypes: React.Dispatch<React.SetStateAction<DocumentType[]>>
+  documentTypes: DocumentType
 }
 
 type TabType = 'basic-info' | 'biometric' | 'officers' | 'documents';
@@ -202,6 +226,7 @@ interface DischargeDocument {
 }
 
 export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> = ({
+    dischargeRequests, setDischargeRequests, setPrisoners, prisoners, setStaff, staff, setReasons, setTypes, types, reasons, documentTypes, setDocumentTypes,
   initialData,
   onSubmit,
   onCancel,
@@ -210,10 +235,6 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 }) => {
   const [activeTab, setActiveTab] = useState<TabType>('basic-info');
   const [formData, setFormData] = useState({
-    prisoner_name: '',
-    prisoner_number: '',
-    discharge_type_name: '',
-    discharge_reason_name: '',
     discharge_datetime: '',
     remarks: '',
     intended_place_of_stay: '',
@@ -257,19 +278,81 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   const [dischargeRequestOpen, setDischargeRequestOpen] = useState(false);
   const [showDischargeRequestDialog, setShowDischargeRequestDialog] = useState(false);
 
-  // Mock discharge requests
-  const mockDischargeRequests = [
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c4',
-      request_number: 'DRQ-2025-000001',
-      in_charge_name: 'Robinson Okello',
-    },
-    {
-      id: '337133a2-e8ff-4d0f-a6dd-91ae981d21c5',
-      request_number: 'DRQ-2025-000002',
-      in_charge_name: 'Sarah Namuli',
-    },
-  ];
+  //API integration
+  const [loader, setLoader] = useState(true)
+  const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
+
+  useEffect(() => {
+    if(loader) {
+      fetchData()
+    }
+  }, [loader]);
+
+  function populateList(response: any, msg: string, setData: any) {
+    if (handleServerError2(response)) return true
+
+    if ("results" in response) {
+      const data = response.results
+      if (!data.length) {
+        toast.error(msg)
+        return true
+      }
+      setData(data)
+      // console.log(data)
+    }
+
+    return false
+  }
+
+  function returnedValue (value: boolean){
+    if (value){
+      onCancel()
+      return
+    }
+  }
+
+  async function fetchData() {
+    try {
+        if (!dischargeRequests.length){
+          const response0 = await getRequests()
+          returnedValue(populateList(response0, "There are no discharge requests", setDischargeRequests))
+        }
+
+        if (!prisoners.length){
+          const response1 = await getPrisoners()
+          returnedValue(populateList(response1, "There are no prisoners", setPrisoners))
+        }
+
+        if (!staff.length) {
+            const response2 = await getStaffProfile()
+            returnedValue(populateList(response2, "There are no staff officers", setStaff))
+        }
+
+        if (!types.length) {
+          const response3 = await getTypes()
+          returnedValue(populateList(response3, "There are no discharge types", setTypes))
+
+        }
+
+        if (!reasons.length) {
+          const response4 = await getReasons()
+          returnedValue(populateList(response4, "There are no discharge reasons", setReasons))
+        }
+
+        if (!documentTypes.length) {
+          const response5 = await getDocumentTypes()
+          returnedValue(populateList(response5, "There are no document types", setDocumentTypes))
+        }
+
+    }catch (error) {
+      handleCatchError(error)
+    }finally {
+      setLoader(false)
+    }
+  }
+
+
+
 
   useEffect(() => {
     if (initialData) {
@@ -356,15 +439,15 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   };
 
   const selectStaffForOfficer = (index: number, staffId: string) => {
-    const staff = mockStaffProfiles.find((s) => s.id === staffId);
-    if (staff) {
+    const st = staff.find((s) => s.id === staffId);
+    if (st) {
       const updated = [...dischargeOfficers];
       updated[index] = {
         ...updated[index],
         staff: staffId,
-        staff_name: `${staff.first_name} ${staff.middle_name} ${staff.last_name}`,
-        force_number: staff.force_number,
-        rank: staff.rank,
+        staff_name: `${st.first_name} ${st.middle_name} ${st.last_name}`,
+        force_number: st.force_number,
+        rank: st.rank_name,
       };
       setDischargeOfficers(updated);
       setStaffOpen(false);
@@ -424,8 +507,8 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 
   const renderBasicInfoTab = () => (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="md:col-span-3">
           <Label htmlFor="discharge_request">Discharge Request *</Label>
           <div className="flex gap-2">
             <div className="flex-1">
@@ -440,7 +523,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                   >
                     {formData.request
                       ? (() => {
-                          const selected = mockDischargeRequests.find((req) => req.id === formData.request);
+                          const selected = dischargeRequests.find((req) => req.id === formData.request);
                           return selected ? selected.request_number : 'Select discharge request...';
                         })()
                       : 'Select discharge request...'}
@@ -453,7 +536,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                     <CommandList>
                       <CommandEmpty>No discharge request found.</CommandEmpty>
                       <CommandGroup>
-                        {mockDischargeRequests.map((req) => (
+                        {dischargeRequests.map((req) => (
                           <CommandItem
                             key={req.id}
                             value={req.request_number}
@@ -503,56 +586,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             value={formData.prisoner}
             onValueChange={(value) => {
               handleChange('prisoner', value);
-              if (value === 'prisoner-001') {
-                handleChange('prisoner_name', 'John Doe');
-                handleChange('prisoner_number', 'P-2024-001');
-              } else if (value === 'prisoner-002') {
-                handleChange('prisoner_name', 'Jane Smith');
-                handleChange('prisoner_number', 'P-2024-002');
-              } else if (value === 'prisoner-003') {
-                handleChange('prisoner_name', 'Michael Johnson');
-                handleChange('prisoner_number', 'P-2024-003');
-              }
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select prisoner" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="prisoner-001">John Doe (P-2024-001)</SelectItem>
-              <SelectItem value="prisoner-002">Jane Smith (P-2024-002)</SelectItem>
-              <SelectItem value="prisoner-003">Michael Johnson (P-2024-003)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div>
-          <Label htmlFor="discharge_type">Discharge Type *</Label>
-          <Select
-            value={formData.discharge_type}
-            onValueChange={(value) => {
-              handleChange('discharge_type', value);
-              const types: Record<string, string> = {
-                'type-001': 'Completion of Sentence',
-                'type-002': 'Transfer',
-                'type-003': 'Death',
-                'type-004': 'Court Order',
-                'type-005': 'Deportation',
-                'type-006': 'Execution',
-              };
-              handleChange('discharge_type_name', types[value] || '');
-            }}
-          >
-            <SelectTrigger>
-              <SelectValue placeholder="Select discharge type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="type-001">Completion of Sentence</SelectItem>
-              <SelectItem value="type-002">Transfer</SelectItem>
-              <SelectItem value="type-003">Death</SelectItem>
-              <SelectItem value="type-004">Court Order</SelectItem>
-              <SelectItem value="type-005">Deportation</SelectItem>
-              <SelectItem value="type-006">Execution</SelectItem>
+              {
+                prisoners.map(pr => (
+                    <SelectItem key={pr.id} value={pr.id}>{pr.full_name} ({pr.prisoner_number_value})</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -563,25 +607,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             value={formData.discharge_reason}
             onValueChange={(value) => {
               handleChange('discharge_reason', value);
-              const reasons: Record<string, string> = {
-                'reason-001': 'Sentence Completed',
-                'reason-002': 'Inter-Prison Transfer',
-                'reason-003': 'Medical Grounds',
-                'reason-004': 'Presidential Pardon',
-                'reason-005': 'Court Order',
-              };
-              handleChange('discharge_reason_name', reasons[value] || '');
             }}
           >
             <SelectTrigger>
               <SelectValue placeholder="Select discharge reason" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="reason-001">Sentence Completed</SelectItem>
-              <SelectItem value="reason-002">Inter-Prison Transfer</SelectItem>
-              <SelectItem value="reason-003">Medical Grounds</SelectItem>
-              <SelectItem value="reason-004">Presidential Pardon</SelectItem>
-              <SelectItem value="reason-005">Court Order</SelectItem>
+              {
+                reasons.map(rs => (
+                    <SelectItem key={rs.id} value={rs.id}>{rs.name}</SelectItem>
+                ))
+              }
             </SelectContent>
           </Select>
         </div>
@@ -597,6 +633,291 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
           />
         </div>
       </div>
+
+      <div>
+        <Label htmlFor="discharge_type">Discharge Type *</Label>
+        <Select
+          value={formData.discharge_type}
+          onValueChange={(value) => {
+            handleChange('discharge_type', value);
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select discharge type" />
+          </SelectTrigger>
+          <SelectContent>
+            {
+              types.map(ty => (
+                  <SelectItem key={ty.id} value={ty.id}>{ty.name}</SelectItem>
+              ))
+            }
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Deceased Fields */}
+      {
+        (types.find(t => t.id === formData.discharge_type)?.name) === "Death" &&  (
+          <div className="border-t pt-6 mt-6">
+            <div
+              className="px-4 py-3 rounded-lg mb-6"
+              style={{ backgroundColor: '#faebd7', color: '#650000' }}
+            >
+              <h3 className="flex items-center gap-2">
+                <Skull className="h-5 w-5" />
+                Deceased Information
+              </h3>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="date_of_death">Date of Death *</Label>
+                <Input
+                  id="date_of_death"
+                  type="date"
+                  value={formData.date_of_death}
+                  onChange={(e) => handleChange('date_of_death', e.target.value)}
+                  required
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="morgue_details" className="flex items-center gap-2">
+                  <Building className="h-4 w-4" />
+                  Morgue Details
+                </Label>
+                <Input
+                  id="morgue_details"
+                  value={formData.morgue_details}
+                  onChange={(e) => handleChange('morgue_details', e.target.value)}
+                  placeholder="e.g., City Morgue, Section A, Shelf 12"
+                />
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="next_of_kin_available"
+                  checked={formData.next_of_kin_available}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
+                  }
+                />
+                <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
+                  <User className="h-4 w-4" />
+                  Next of Kin Available
+                </Label>
+              </div>
+            </div>
+
+            {formData.next_of_kin_available && (
+              <div className="mt-4">
+                <Label htmlFor="next_of_kin" className="flex items-center gap-2">
+                  <User className="h-4 w-4" />
+                  Next of Kin *
+                </Label>
+                <div className="flex gap-2">
+                  <div className="flex-1">
+                    <Popover open={nextOfKinOpen} onOpenChange={setNextOfKinOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          role="combobox"
+                          aria-expanded={nextOfKinOpen}
+                          className="w-full justify-between"
+                          type="button"
+                          onClick={handleNextOfKinOpen}
+                        >
+                          {formData.next_of_kin
+                            ? (() => {
+                                const selected = nextOfKinList.find((nok) => nok.id === formData.next_of_kin);
+                                return selected
+                                  ? `${selected.full_name} (${selected.relationship})`
+                                  : "Select next of kin...";
+                              })()
+                            : "Select next of kin..."}
+                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-full p-0">
+                        <Command>
+                          <CommandInput placeholder="Search next of kin..." />
+                          <CommandList>
+                            <CommandEmpty>No next of kin found.</CommandEmpty>
+                            <CommandGroup>
+                              {nextOfKinList.map((nok) => (
+                                <CommandItem
+                                  key={nok.id}
+                                  value={nok.full_name}
+                                  onSelect={() => handleNextOfKinSelect(nok.id)}
+                                >
+                                  <Check
+                                    className={cn(
+                                      "mr-2 h-4 w-4",
+                                      formData.next_of_kin === nok.id ? "opacity-100" : "opacity-0"
+                                    )}
+                                  />
+                                  <div className="flex flex-col">
+                                    <span>{nok.full_name}</span>
+                                    <span className="text-xs text-gray-500">
+                                      {nok.relationship} • {nok.phone}
+                                    </span>
+                                  </div>
+                                </CommandItem>
+                              ))}
+                            </CommandGroup>
+                          </CommandList>
+                        </Command>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  <Button
+                    type="button"
+                    size="icon"
+                    variant="outline"
+                    onClick={() => setShowNextOfKinDialog(true)}
+                    className="shrink-0"
+                    style={{ borderColor: '#34D399' }}
+                  >
+                    <Plus className="h-4 w-4" style={{ color: '#34D399' }} />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <Label htmlFor="post_mortem_report" className="flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                Post Mortem Report
+              </Label>
+              <div className="mt-2">
+                <label
+                  htmlFor="post_mortem_report"
+                  className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
+                >
+                  <Upload className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">
+                    {postMortemFileName || 'Click to upload PDF file'}
+                  </span>
+                </label>
+                <Input
+                  id="post_mortem_report"
+                  type="file"
+                  accept=".pdf,.doc,.docx"
+                  onChange={handlePostMortemChange}
+                  className="hidden"
+                />
+                {postMortemFileName && (
+                  <p className="text-sm text-green-600 mt-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Selected: {postMortemFileName}
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Execution Fields */}
+      {
+         (types.find(t => t.id === formData.discharge_type)?.name) === "Execution" &&  (
+            <div className="border-t pt-6 mt-6">
+              <div
+                className="px-4 py-3 rounded-lg mb-6"
+                style={{ backgroundColor: '#faebd7', color: '#650000' }}
+              >
+                <h3 className="flex items-center gap-2">
+                  <Skull className="h-5 w-5" />
+                  Execution Information
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="datetime_of_execution">Date & Time of Execution *</Label>
+                  <Input
+                    id="datetime_of_execution"
+                    type="datetime-local"
+                    value={formData.datetime_of_execution.slice(0, 16)}
+                    onChange={(e) => handleChange('datetime_of_execution', e.target.value + ':00Z')}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="approving_authority" className="flex items-center gap-2">
+                    <Building className="h-4 w-4" />
+                    Approving Authority
+                  </Label>
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <Popover open={approvingAuthorityOpen} onOpenChange={setApprovingAuthorityOpen}>
+                        <PopoverTrigger asChild>
+                          <Button
+                            variant="outline"
+                            role="combobox"
+                            aria-expanded={approvingAuthorityOpen}
+                            className="w-full justify-between"
+                            type="button"
+                          >
+                            {formData.approving_authority
+                              ? (() => {
+                                  const selected = mockApprovingAuthorities.find((auth) => auth.id === formData.approving_authority);
+                                  return selected ? selected.full_name : "Select approving authority...";
+                                })()
+                              : "Select approving authority..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-full p-0">
+                          <Command>
+                            <CommandInput placeholder="Search approving authority..." />
+                            <CommandList>
+                              <CommandEmpty>No approving authority found.</CommandEmpty>
+                              <CommandGroup>
+                                {mockApprovingAuthorities.map((auth) => (
+                                  <CommandItem
+                                    key={auth.id}
+                                    value={auth.full_name}
+                                    onSelect={() => {
+                                      setFormData((prev) => ({
+                                        ...prev,
+                                        approving_authority: auth.id,
+                                        approving_authority_name: auth.full_name,
+                                        approving_authority_force_number: auth.force_number,
+                                        approving_authority_rank: auth.rank,
+                                      }));
+                                      setApprovingAuthorityOpen(false);
+                                    }}
+                                  >
+                                    <Check
+                                      className={cn(
+                                        "mr-2 h-4 w-4",
+                                        formData.approving_authority === auth.id ? "opacity-100" : "opacity-0"
+                                      )}
+                                    />
+                                    <div className="flex flex-col">
+                                      <span>{auth.full_name}</span>
+                                      <span className="text-xs text-gray-500">
+                                        {auth.rank} • {auth.force_number}
+                                      </span>
+                                    </div>
+                                  </CommandItem>
+                                ))}
+                              </CommandGroup>
+                            </CommandList>
+                          </Command>
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+         )
+      }
 
       <div>
         <Label htmlFor="remarks">Remarks</Label>
@@ -620,299 +941,40 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
         />
       </div>
 
-      {/* Deceased Fields */}
-      {formData.discharge_type_name === 'Death' && (
-        <div className="border-t pt-6 mt-6">
-          <div 
-            className="px-4 py-3 rounded-lg mb-6"
-            style={{ backgroundColor: '#faebd7', color: '#650000' }}
-          >
-            <h3 className="flex items-center gap-2">
-              <Skull className="h-5 w-5" />
-              Deceased Information
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="date_of_death">Date of Death *</Label>
-              <Input
-                id="date_of_death"
-                type="date"
-                value={formData.date_of_death}
-                onChange={(e) => handleChange('date_of_death', e.target.value)}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="morgue_details" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Morgue Details
-              </Label>
-              <Input
-                id="morgue_details"
-                value={formData.morgue_details}
-                onChange={(e) => handleChange('morgue_details', e.target.value)}
-                placeholder="e.g., City Morgue, Section A, Shelf 12"
-              />
-            </div>
-          </div>
-
-          <div className="mt-4">
-            <div className="flex items-center space-x-2">
-              <Checkbox
-                id="next_of_kin_available"
-                checked={formData.next_of_kin_available}
-                onCheckedChange={(checked) => 
-                  setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
-                }
-              />
-              <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
-                <User className="h-4 w-4" />
-                Next of Kin Available
-              </Label>
-            </div>
-          </div>
-
-          {formData.next_of_kin_available && (
-            <div className="mt-4">
-              <Label htmlFor="next_of_kin" className="flex items-center gap-2">
-                <User className="h-4 w-4" />
-                Next of Kin *
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Popover open={nextOfKinOpen} onOpenChange={setNextOfKinOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={nextOfKinOpen}
-                        className="w-full justify-between"
-                        type="button"
-                        onClick={handleNextOfKinOpen}
-                      >
-                        {formData.next_of_kin
-                          ? (() => {
-                              const selected = nextOfKinList.find((nok) => nok.id === formData.next_of_kin);
-                              return selected
-                                ? `${selected.full_name} (${selected.relationship})`
-                                : "Select next of kin...";
-                            })()
-                          : "Select next of kin..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search next of kin..." />
-                        <CommandList>
-                          <CommandEmpty>No next of kin found.</CommandEmpty>
-                          <CommandGroup>
-                            {nextOfKinList.map((nok) => (
-                              <CommandItem
-                                key={nok.id}
-                                value={nok.full_name}
-                                onSelect={() => handleNextOfKinSelect(nok.id)}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formData.next_of_kin === nok.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{nok.full_name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    {nok.relationship} • {nok.phone}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={() => setShowNextOfKinDialog(true)}
-                  className="shrink-0"
-                  style={{ borderColor: '#34D399' }}
-                >
-                  <Plus className="h-4 w-4" style={{ color: '#34D399' }} />
-                </Button>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-4">
-            <Label htmlFor="post_mortem_report" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Post Mortem Report
-            </Label>
-            <div className="mt-2">
-              <label 
-                htmlFor="post_mortem_report"
-                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
-              >
-                <Upload className="h-4 w-4 text-gray-500" />
-                <span className="text-sm text-gray-600">
-                  {postMortemFileName || 'Click to upload PDF file'}
-                </span>
-              </label>
-              <Input
-                id="post_mortem_report"
-                type="file"
-                accept=".pdf,.doc,.docx"
-                onChange={handlePostMortemChange}
-                className="hidden"
-              />
-              {postMortemFileName && (
-                <p className="text-sm text-green-600 mt-2 flex items-center gap-2">
-                  <FileText className="h-4 w-4" />
-                  Selected: {postMortemFileName}
-                </p>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Execution Fields */}
-      {formData.discharge_type_name === 'Execution' && (
-        <div className="border-t pt-6 mt-6">
-          <div 
-            className="px-4 py-3 rounded-lg mb-6"
-            style={{ backgroundColor: '#faebd7', color: '#650000' }}
-          >
-            <h3 className="flex items-center gap-2">
-              <Skull className="h-5 w-5" />
-              Execution Information
-            </h3>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="datetime_of_execution">Date & Time of Execution *</Label>
-              <Input
-                id="datetime_of_execution"
-                type="datetime-local"
-                value={formData.datetime_of_execution.slice(0, 16)}
-                onChange={(e) => handleChange('datetime_of_execution', e.target.value + ':00Z')}
-                required
-              />
-            </div>
-
-            <div>
-              <Label htmlFor="approving_authority" className="flex items-center gap-2">
-                <Building className="h-4 w-4" />
-                Approving Authority
-              </Label>
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <Popover open={approvingAuthorityOpen} onOpenChange={setApprovingAuthorityOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={approvingAuthorityOpen}
-                        className="w-full justify-between"
-                        type="button"
-                      >
-                        {formData.approving_authority
-                          ? (() => {
-                              const selected = mockApprovingAuthorities.find((auth) => auth.id === formData.approving_authority);
-                              return selected ? selected.full_name : "Select approving authority...";
-                            })()
-                          : "Select approving authority..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search approving authority..." />
-                        <CommandList>
-                          <CommandEmpty>No approving authority found.</CommandEmpty>
-                          <CommandGroup>
-                            {mockApprovingAuthorities.map((auth) => (
-                              <CommandItem
-                                key={auth.id}
-                                value={auth.full_name}
-                                onSelect={() => {
-                                  setFormData((prev) => ({ 
-                                    ...prev, 
-                                    approving_authority: auth.id,
-                                    approving_authority_name: auth.full_name,
-                                    approving_authority_force_number: auth.force_number,
-                                    approving_authority_rank: auth.rank,
-                                  }));
-                                  setApprovingAuthorityOpen(false);
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    formData.approving_authority === auth.id ? "opacity-100" : "opacity-0"
-                                  )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{auth.full_name}</span>
-                                  <span className="text-xs text-gray-500">
-                                    {auth.rank} • {auth.force_number}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 
-  const renderBiometricTab = () => (
-    <div className="space-y-6">
-      <div 
-        className="px-4 py-3 rounded-lg"
-        style={{ backgroundColor: '#faebd7', color: '#650000' }}
-      >
-        <h3 className="flex items-center gap-2">
-          <Fingerprint className="h-5 w-5" />
-          Biometric Verification
-        </h3>
-      </div>
-
-      <div className="max-w-2xl mx-auto">
-        <BiometricCapture
-          value={formData.biometric_data}
-          onChange={(value) => setFormData((prev) => ({ ...prev, biometric_data: value }))}
-          label="Officer Fingerprint Verification"
-        />
-      </div>
-
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Ensure the biometric scanner is properly connected</li>
-          <li>• Clean your finger before placing it on the scanner</li>
-          <li>• Press firmly but gently on the scanner</li>
-          <li>• Hold still until the capture is complete</li>
-        </ul>
-      </div>
-    </div>
-  );
+  // const renderBiometricTab = () => (
+  //   <div className="space-y-6">
+  //     <div
+  //       className="px-4 py-3 rounded-lg"
+  //       style={{ backgroundColor: '#faebd7', color: '#650000' }}
+  //     >
+  //       <h3 className="flex items-center gap-2">
+  //         <Fingerprint className="h-5 w-5" />
+  //         Biometric Verification
+  //       </h3>
+  //     </div>
+  //
+  //     <div className="max-w-2xl mx-auto">
+  //       <BiometricCapture
+  //         value={formData.biometric_data}
+  //         onChange={(value) => setFormData((prev) => ({ ...prev, biometric_data: value }))}
+  //         label="Officer Fingerprint Verification"
+  //       />
+  //     </div>
+  //
+  //     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+  //       <h4 className="font-medium text-blue-900 mb-2">Instructions</h4>
+  //       <ul className="text-sm text-blue-800 space-y-1">
+  //         <li>• Ensure the biometric scanner is properly connected</li>
+  //         <li>• Clean your finger before placing it on the scanner</li>
+  //         <li>• Press firmly but gently on the scanner</li>
+  //         <li>• Hold still until the capture is complete</li>
+  //       </ul>
+  //     </div>
+  //   </div>
+  // );
 
   const renderOfficersTab = () => (
     <div className="space-y-6">
@@ -983,22 +1045,22 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                           <CommandList>
                             <CommandEmpty>No staff found.</CommandEmpty>
                             <CommandGroup>
-                              {mockStaffProfiles.map((staff) => (
+                              {staff.map((st) => (
                                 <CommandItem
-                                  key={staff.id}
-                                  value={`${staff.first_name} ${staff.last_name}`}
-                                  onSelect={() => selectStaffForOfficer(index, staff.id)}
+                                  key={st.id}
+                                  value={`${st.first_name} ${st.last_name}`}
+                                  onSelect={() => selectStaffForOfficer(index, st.id)}
                                 >
                                   <Check
                                     className={cn(
                                       "mr-2 h-4 w-4",
-                                      officer.staff === staff.id ? "opacity-100" : "opacity-0"
+                                      officer.staff === st.id ? "opacity-100" : "opacity-0"
                                     )}
                                   />
                                   <div className="flex flex-col">
-                                    <span>{`${staff.first_name} ${staff.middle_name} ${staff.last_name}`}</span>
+                                    <span>{`${st.first_name} ${st.middle_name} ${st.last_name}`}</span>
                                     <span className="text-xs text-gray-500">
-                                      {staff.rank} • {staff.force_number}
+                                      {st.rank_name} • {st.force_number}
                                     </span>
                                   </div>
                                 </CommandItem>
@@ -1081,11 +1143,11 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                         <SelectValue placeholder="Select document type" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="release-order">Release Order</SelectItem>
-                        <SelectItem value="court-order">Court Order</SelectItem>
-                        <SelectItem value="medical-report">Medical Report</SelectItem>
-                        <SelectItem value="transfer-letter">Transfer Letter</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
+                        {
+                          documentTypes.map(dt => (
+                              <SelectItem key={dt.id} value={dt.id}>{dt.name}</SelectItem>
+                          ))
+                        }
                       </SelectContent>
                     </Select>
                   </div>
@@ -1141,47 +1203,62 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Tab Navigation using shadcn Tabs */}
-        <Tabs defaultValue="basic-info" className="w-full">
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="basic-info">Basic Information</TabsTrigger>
-            <TabsTrigger value="biometric">Biometric Capture</TabsTrigger>
-            <TabsTrigger value="officers">Discharge Officers</TabsTrigger>
-            <TabsTrigger value="documents">Discharge Documents</TabsTrigger>
-          </TabsList>
+      {
+        loader ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Prisoners and Staff Information, Please wait...
+                    </p>
+              </div>
+            </div>
+        ) : (
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Tab Navigation using shadcn Tabs */}
+              <Tabs defaultValue="basic-info" className="w-full">
+                {/*<TabsList className="grid w-full grid-cols-4">*/}
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="basic-info">Basic Information</TabsTrigger>
+                  {/*<TabsTrigger value="biometric">Biometric Capture</TabsTrigger>*/}
+                  <TabsTrigger value="officers">Discharge Officers</TabsTrigger>
+                  <TabsTrigger value="documents">Discharge Documents</TabsTrigger>
+                </TabsList>
 
-          {/* Basic Information Tab */}
-          <TabsContent value="basic-info" className="space-y-4 mt-4">
-            {renderBasicInfoTab()}
-          </TabsContent>
+                {/* Basic Information Tab */}
+                <TabsContent value="basic-info" className="space-y-4 mt-4">
+                  {renderBasicInfoTab()}
+                </TabsContent>
 
-          {/* Biometric Capture Tab */}
-          <TabsContent value="biometric" className="space-y-4 mt-4">
-            {renderBiometricTab()}
-          </TabsContent>
+                {/* Biometric Capture Tab */}
+                {/*<TabsContent value="biometric" className="space-y-4 mt-4">*/}
+                {/*  {renderBiometricTab()}*/}
+                {/*</TabsContent>*/}
 
-          {/* Discharge Officers Tab */}
-          <TabsContent value="officers" className="space-y-4 mt-4">
-            {renderOfficersTab()}
-          </TabsContent>
+                {/* Discharge Officers Tab */}
+                <TabsContent value="officers" className="space-y-4 mt-4">
+                  {renderOfficersTab()}
+                </TabsContent>
 
-          {/* Discharge Documents Tab */}
-          <TabsContent value="documents" className="space-y-4 mt-4">
-            {renderDocumentsTab()}
-          </TabsContent>
-        </Tabs>
+                {/* Discharge Documents Tab */}
+                <TabsContent value="documents" className="space-y-4 mt-4">
+                  {renderDocumentsTab()}
+                </TabsContent>
+              </Tabs>
 
-        {/* Form Actions */}
-        <div className="flex justify-end gap-3 pt-6 border-t">
-          <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
-            {mode === 'edit' ? 'Update' : 'Create'} Discharge
-          </Button>
-        </div>
-      </form>
+              {/* Form Actions */}
+              <div className="flex justify-end gap-3 pt-6 border-t">
+                <Button type="button" variant="outline" onClick={onCancel}>
+                  Cancel
+                </Button>
+                <Button type="submit" style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
+                  {mode === 'edit' ? 'Update' : 'Create'} Discharge
+                </Button>
+              </div>
+            </form>
+        )
+      }
+
 
       {/* Transfer Confirmation Dialog */}
       <Dialog open={showTransferDialog} onOpenChange={setShowTransferDialog}>
@@ -1236,26 +1313,26 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
-            <NextOfKinForm
-              prisonerId={formData.prisoner}
-              onSubmit={(nokData) => {
-                const newNok = {
-                  id: `nok-${Date.now()}`,
-                  full_name: `${nokData.first_name} ${nokData.surname}`,
-                  relationship: nokData.relationship_type === '1' ? 'Spouse' : 
-                               nokData.relationship_type === '2' ? 'Parent' : 
-                               nokData.relationship_type === '3' ? 'Sibling' : 'Other',
-                  phone: nokData.phone_number,
-                  ...nokData
-                };
-                setNextOfKinList([...nextOfKinList, newNok]);
-                setFormData((prev) => ({ ...prev, next_of_kin: newNok.id }));
-                setShowNextOfKinDialog(false);
-                toast.success('Next of Kin added successfully!');
-              }}
-              onCancel={() => setShowNextOfKinDialog(false)}
-              hideFooter={false}
-            />
+            {/*<NextOfKinForm*/}
+            {/*  prisonerId={formData.prisoner}*/}
+            {/*  onSubmit={(nokData) => {*/}
+            {/*    const newNok = {*/}
+            {/*      id: `nok-${Date.now()}`,*/}
+            {/*      full_name: `${nokData.first_name} ${nokData.surname}`,*/}
+            {/*      relationship: nokData.relationship_type === '1' ? 'Spouse' : */}
+            {/*                   nokData.relationship_type === '2' ? 'Parent' : */}
+            {/*                   nokData.relationship_type === '3' ? 'Sibling' : 'Other',*/}
+            {/*      phone: nokData.phone_number,*/}
+            {/*      ...nokData*/}
+            {/*    };*/}
+            {/*    setNextOfKinList([...nextOfKinList, newNok]);*/}
+            {/*    setFormData((prev) => ({ ...prev, next_of_kin: newNok.id }));*/}
+            {/*    setShowNextOfKinDialog(false);*/}
+            {/*    toast.success('Next of Kin added successfully!');*/}
+            {/*  }}*/}
+            {/*  onCancel={() => setShowNextOfKinDialog(false)}*/}
+            {/*  hideFooter={false}*/}
+            {/*/>*/}
           </div>
         </DialogContent>
       </Dialog>
