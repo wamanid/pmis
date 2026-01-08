@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchStatusOfWomen } from '../../services/system_administration';
+import { fetchStatusOfWomen } from '../../services/system_administration/statusOfWomanService';
 import type { StatusOfWoman } from '../../models/system_administration';
 
 export interface StatusOfWomanSelectProps {

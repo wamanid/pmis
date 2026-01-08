@@ -8,7 +8,8 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../ui/dialog';
-import { Badge } from '../ui/badge';
+import { Badge, badgeVariants } from '../ui/badge';
+import type { VariantProps } from 'class-variance-authority';
 import { Separator } from '../ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Checkbox } from '../ui/checkbox';
@@ -38,7 +39,7 @@ import SearchableSelect from '../common/SearchableSelect';
 import StaffProfileSelect from '../common/StaffProfileSelect';
 import AmountInput from '../common/AmountInput';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { fetchPrisoners } from '../../services/customPrisonersService';
+import CustomPrisonerSearch from '../common/CustomPrisonerSearch';
 import * as accountsSvc from '../../services/propertyServices/accountsService';
 import * as txSvc from '../../services/propertyServices/transactionService';
 import { useFilterRefresh } from "../../hooks/useFilterRefresh";
@@ -55,6 +56,9 @@ import {
 } from '../../utils/validation';
 import { useForm, Controller } from 'react-hook-form';
 import ConfirmDialog from '../common/ConfirmDialog';
+import DateTime, { formatDateTime } from '../common/DateTime';
+
+type BadgeVariant = VariantProps<typeof badgeVariants>['variant'];
 
 interface Account {
   id: string;
@@ -356,22 +360,35 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     }
   };
 
-  // helper to map backend status to badge variant
-  const getStatusVariant = (status: string) => {
-    if (!status) return 'warning';
-    switch (String(status).toLowerCase()) {
-      case 'pending':
-        return 'secondary';
-      case 'approved':
-      case 'completed':
-      case 'success':
-        return 'success';
-      case 'failed':
-      case 'rejected':
-        return 'danger';
-      default:
-        return 'warning';
-    }
+  // small wrapper to ensure success shows green background + white text and to centralize debug
+  const StatusBadge: React.FC<{ status?: string | null; className?:string }> = ({ status, className }) => {
+    const variant = getStatusVariant(status);
+    // debug: uncomment if you need to see mapping in console
+    // console.debug('StatusBadge', { status, variant });
+    // Force the green bg for success in case styles are being overridden elsewhere
+    const forceSuccess = variant === 'success' ? 'bg-green-500 text-white hover:bg-green-600' : '';
+    return (
+      <Badge variant={variant} className={cn(forceSuccess, className)}>
+        {status || 'N/A'}
+      </Badge>
+    );
+  };
+
+  const getStatusVariant = (status?: string | null): BadgeVariant => {
+    const sRaw = status ?? '';
+    const s = String(sRaw).toLowerCase().trim();
+    if (!s || s === 'n/a' || s === 'unknown') return 'outline';
+
+    // Use the badge variants that match your theme / existing visuals.
+    if (/(pending|awaiting|waiting)/i.test(s)) return 'secondary';
+    if (/(approved|completed|success|paid|settled|done)/i.test(s)) return 'default';
+    if (/(failed|rejected|declined|error|cancelled|canceled)/i.test(s)) return 'destructive';
+    if (/(processing|in[_\s-]?progress|on[-\s]?going|ongoing)/i.test(s)) return 'info';
+    if (/(hold|on[_\s-]?hold|warning)/i.test(s)) return 'warning';
+
+    // fallback
+    console.debug('getStatusVariant: unknown status string, falling back to outline', { status: sRaw });
+    return 'outline';
   };
 
   const handleUpdateAccount = async (dataOrEvent: any) => {
@@ -587,16 +604,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     {
       key: "transaction_datetime",
       label: "Date & Time",
-      render: (value: any) => {
-        let v = '';
-        try { v = value ? new Date(value).toLocaleString() : ''; } catch { v = String(value); }
-        return (
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <span>{v}</span>
-          </div>
-        );
-      },
+      render: (value: any) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-4 w-4 text-gray-400" />
+          <DateTime value={value} format="dMY" />
+        </div>
+      ),
     },
     { key: 'prisoner_name', label: 'Prisoner' },
     // { key: 'account_type_name', label: 'Account Type' },
@@ -706,38 +719,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     const [balanceEditable, setBalanceEditable] = useState(false);
     const [errors, setErrors] = useState<Record<string,string>>({});
 
-    // load prisoners (debounced, abortable)
-    useEffect(() => {
-      if (prisonerAbortRef.current) {
-        prisonerAbortRef.current.abort();
-        prisonerAbortRef.current = null;
-      }
-      const t = window.setTimeout(() => {
-        const ctrl = new AbortController();
-        prisonerAbortRef.current = ctrl;
-        setPrisonerLoading(true);
-        fetchPrisoners({
-          search: prisonerQuery || '',
-          station: globalStation || null,
-          district: globalDistrict || null,
-          region: globalRegion || null,
-          page_size: 50,
-          useCache: true,
-        }, ctrl.signal).then(res => {
-          setPrisonerResults(res.items || []);
-        }).catch(err => {
-          // ignore aborts; surface only real errors
-          if ((err as any).name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
-          console.error('fetchPrisoners error', err);
-        }).finally(() => {
-          setPrisonerLoading(false);
-        });
-      }, 300);
-      return () => {
-        window.clearTimeout(t);
-        if (prisonerAbortRef.current) { prisonerAbortRef.current.abort(); prisonerAbortRef.current = null; }
-      };
-    }, [prisonerQuery, globalStation, globalDistrict, globalRegion]);
+    // removed local prisoner search — using CustomPrisonerSearch (reusable) which handles searching/fetching
 
     const validateLocal = () => {
       const e: Record<string,string> = {};
@@ -765,60 +747,24 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         <div className="grid grid-cols-1 gap-4">
           {/* prisoner picker (same UI as before) */}
           <div className="space-y-2">
-            <Label htmlFor="prisoner">Prisoner *</Label>
-            <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
-              <PopoverTrigger asChild>
-                <Button variant="outline" role="combobox" aria-expanded={openPrisoner} className="w-full justify-between text-left" type="button">
-                  {local.prisoner
-                    ? (selectedPrisonerName
-                        || prisoners.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
-                        || prisonerResults.find((p:any) => String(p.id) === String(local.prisoner))?.full_name
-                        || local.prisoner)
-                    : <span className="text-gray-500 text-sm">Search prisoner...</span>}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-full p-0">
-                <Command shouldFilter={false}>
-                  <CommandInput placeholder="Search prisoners..." value={prisonerQuery} onValueChange={(v) => setPrisonerQuery(v)} />
-                  <CommandList>
-                    {prisonerLoading ? (
-                      <div className="flex items-center justify-center py-4">
-                        <span className="text-sm text-gray-500">Loading prisoners...</span>
-                      </div>
-                    ) : (
-                      <>
-                        <CommandEmpty>No prisoner found.</CommandEmpty>
-                        <CommandGroup>
-                          {prisonerResults.map((p:any) => (
-                            <CommandItem key={p.id} value={String(p.id)}
-                              onSelect={() => {
-                                setLocal(prev => ({ ...prev, prisoner: String(p.id) }));
-                                setSelectedPrisonerName(p.full_name);
-                                setOpenPrisoner(false);
-                              }}
-                              className="cursor-pointer"
-                            >
-                              <Check className={cn("mr-2 h-4 w-4", String(local.prisoner) === String(p.id) ? "opacity-100" : "opacity-0")} style={{ color: '#650000' }} />
-                              <div className="flex flex-col text-sm">
-                                <span>{p.full_name}</span>
-                                <span className="text-xs text-gray-500">{p.prisoner_number_value || p.prisoner_number || ''}</span>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </>
-                    )}
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <Label htmlFor="prisoner">Prisoner <span className="text-red-500">*</span></Label>
+            <CustomPrisonerSearch
+              value={local.prisoner || null}
+              onChange={(val) => setLocal(prev => ({ ...prev, prisoner: String(val ?? '') }))}
+              onSelectItem={(item:any) => {
+                setSelectedPrisonerName(item.full_name ?? item.name ?? '');
+                setLocal(prev => ({ ...prev, prisoner: String(item.id) }));
+              }}
+              placeholder="Search prisoner..."
+              pageSize={50}
+              initialItems={prisoners}
+            />
             {errors.prisoner && <div className="text-red-600 text-sm mt-1">{errors.prisoner}</div>}
           </div>
 
           {/* account type */}
           <div className="space-y-2">
-            <Label htmlFor="account_type">Account Type *</Label>
+            <Label htmlFor="account_type">Account Type <span className="text-red-500">*</span></Label>
             <Select value={local.account_type} onValueChange={(v)=> setLocal(prev => ({ ...prev, account_type: v }))} required>
               <SelectTrigger><SelectValue placeholder="Select account type..." /></SelectTrigger>
               <SelectContent>
@@ -831,7 +777,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
           {/* Currency (searchable select) */}
           <div className="space-y-2">
-            <Label htmlFor="currency">Currency *</Label>
+            <Label htmlFor="currency">Currency <span className="text-red-500">*</span></Label>
             <Select value={selectedCurrencyId} onValueChange={(v)=> setLocal(prev => ({ ...prev, currency: v }))} required>
               <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
               <SelectContent>
@@ -967,7 +913,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       <form onSubmit={handleSubmit(onSubmitForm)} className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label>Account *</Label>
+            <Label>Account <span className="text-red-500">*</span></Label>
             <Controller control={control} name="property_prisoner_account" render={({ field }) => (
               <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
                 <SelectTrigger><SelectValue placeholder="Select account..." /></SelectTrigger>
@@ -992,7 +938,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Transaction Type *</Label>
+            <Label>Transaction Type <span className="text-red-500">*</span></Label>
             <Controller control={control} name="transaction_type" render={({ field }) => (
               <Select value={field.value} onValueChange={(v) => field.onChange(v)}>
                 <SelectTrigger><SelectValue placeholder="Select transaction type..." /></SelectTrigger>
@@ -1017,13 +963,14 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Amount *</Label>
+            <Label>Amount <span className="text-red-500">*</span></Label>
             <Controller control={control} name="amount" rules={{ required: true, pattern: /^-?\d+(\.\d+)?$/ }} render={({ field }) => {
               const selAcc = accounts.find(a => String(a.id) === String(watch('property_prisoner_account')));
               const selCurrency = selAcc?.currency ?? 'UGX';
               return (
                 <AmountInput
                   value={field.value ?? ''}
+                  className="disabled:opacity-25 input-invalid file:text-foreground dark:bg-input/30 w-full min-w-0 rounded-md px-3 py-1 bg-input-background transition-[color,box-shadow] outline-none"
                   onChange={(v) => field.onChange(v)}
                   currency={selCurrency}
                   placeholder="Enter amount"
@@ -1079,7 +1026,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           </div>
 
           <div className="space-y-2">
-            <Label>Checked By *</Label>
+            <Label>Checked By <span className="text-red-500">*</span></Label>
             <Controller control={control} name="checked_by_oc" rules={{ required: true }} render={({ field }) => (
               <StaffProfileSelect value={field.value} onChange={(v:any) => field.onChange(v)} placeholder="Select staff..." />
             )} />
@@ -1111,8 +1058,13 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   // update transactionColumns Checked By render to use helper
   // find the column object for checked_by_name and replace its render:
   const updatedTransactionColumns = transactionColumns.map(col => {
+    // if col.key === 'checked_by_name') {
+    //   // prefer API-provided checked_by_name (v). fallback to staff lookup (checked_by_oc) or fallback value
+    //   return { ...col, render: (v:any, r:any) => <span>{v || getCheckedByName(r.checked_by_oc, r.checked_by_name)}</span> };
+    // }
     if (col.key === 'checked_by_name') {
-      return { ...col, render: (v:any, r:any) => <span>{getCheckedByName(r.checked_by_oc ?? r.checked_by_name, v)}</span> };
+      // prefer API-provided checked_by_name (v). fallback to staff lookup (checked_by_oc) or fallback value
+      return { ...col, render: (v:any, r:any) => <span>{v || getCheckedByName(r.checked_by_oc, r.checked_by_name)}</span> };
     }
     return col;
   });
@@ -1267,7 +1219,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                             <TableCell>
                               <div className="flex items-center gap-2">
                                 <Calendar className="h-4 w-4 text-gray-400" />
-                                {new Date(t.transaction_datetime).toLocaleString()}
+                                <DateTime value={t.transaction_datetime} format="dMY" />
                               </div>
                             </TableCell>
                             <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
@@ -1277,7 +1229,10 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                               </span>
                             </TableCell>
                             <TableCell>
-                              <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                              {/* <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                                {t.transaction_status_name}
+                              </Badge> */}
+                              <Badge variant={getStatusVariant(t.transaction_status_name)}>
                                 {t.transaction_status_name}
                               </Badge>
                             </TableCell>
@@ -1451,7 +1406,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
       {/* Create / Edit / View Dialogs (reuse forms) */}
       <Dialog open={isCreateAccountDialogOpen} onOpenChange={setIsCreateAccountDialogOpen}>
-        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
             <DialogHeader className="mb-4">
               <DialogTitle>Create New Account</DialogTitle>
@@ -1463,7 +1418,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       </Dialog>
 
       <Dialog open={isEditAccountDialogOpen} onOpenChange={setIsEditAccountDialogOpen}>
-        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
             <DialogHeader className="mb-4">
               <DialogTitle>Edit Account</DialogTitle>
@@ -1475,7 +1430,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       </Dialog>
 
       <Dialog open={isViewAccountDialogOpen} onOpenChange={setIsViewAccountDialogOpen}>
-        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
             <DialogHeader className="mb-4">
               <DialogTitle>Account Details</DialogTitle>
@@ -1513,9 +1468,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       </Dialog>
 
       <Dialog open={isCreateTransactionDialogOpen} onOpenChange={setIsCreateTransactionDialogOpen}>
-        <DialogContent className="max-w-lg max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
           <div className="flex-1 overflow-y-auto p-6">
-            <DialogHeader>
+            <DialogHeader className="mb-4">
               <DialogTitle>Create New Transaction</DialogTitle>
               <DialogDescription>Add a new transaction</DialogDescription>
             </DialogHeader>
@@ -1561,8 +1516,11 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-gray-500">Status</Label>
-                    <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
+                    {/* <Badge variant={selectedTransaction.transaction_status_name === 'Approved' ? 'default' : selectedTransaction.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
                       {selectedTransaction.transaction_status_name}
+                    </Badge> */}
+                    <Badge variant={getStatusVariant(selectedTransaction.transaction_status_name)}>
+                      {selectedTransaction.transaction_status_name || 'N/A'}
                     </Badge>
                   </div>
                   <div>
@@ -1573,7 +1531,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-gray-500">Date & Time</Label>
-                    <p>{new Date(selectedTransaction.transaction_datetime).toLocaleString()}</p>
+                    <p><DateTime value={selectedTransaction.transaction_datetime} format="dMY" /></p>
                   </div>
                   <div>
                     <Label className="text-gray-500">Balance Before</Label>
@@ -1605,7 +1563,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
             </DialogFooter>
           </div>
         </DialogContent>
-           </Dialog>
+      </Dialog>
 
       {/* Delete confirmations */}
       <ConfirmDialog

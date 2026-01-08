@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchTribes } from '../../services/system_administration';
+import { fetchTribes } from '../../services/system_administration/tribeService';
 import type { Tribe } from '../../models/system_administration';
 
 export interface TribeSelectProps {

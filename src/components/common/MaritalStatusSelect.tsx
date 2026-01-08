@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchMaritalStatuses } from '../../services/system_administration';
+import { fetchMaritalStatuses } from '../../services/system_administration/maritalStatusService';
 import type { MaritalStatus } from '../../models/system_administration';
 
 export interface MaritalStatusSelectProps {

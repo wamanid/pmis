@@ -157,6 +157,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
       try {
         const response = await addNextOfKin(formData1)
         if (handleResponseError(response)) return
+
          setNextOfKins(prev => ([response, ...prev]))
         resetForm();
         toast.success('Next of Kin added successfully');
@@ -212,7 +213,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="first_name">First Name *</Label>
+              <Label htmlFor="first_name">First Name <span className="text-red-500">*</span></Label>
               <Input
                 id="first_name"
                 value={formData1.first_name}
@@ -233,7 +234,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="surname">Surname *</Label>
+              <Label htmlFor="surname">Surname <span className="text-red-500">*</span></Label>
               <Input
                 id="surname"
                 value={formData1.surname}
@@ -246,7 +247,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="sex_type">Sex *</Label>
+              <Label htmlFor="sex_type">Sex <span className="text-red-500">*</span></Label>
               <Popover open={openSex} onOpenChange={setOpenSex}>
                 <PopoverTrigger asChild>
                   <Button
@@ -293,7 +294,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="relationship_type">Relationship *</Label>
+              <Label htmlFor="relationship_type">Relationship <span className="text-red-500">*</span></Label>
               <Popover open={openRelationship} onOpenChange={setOpenRelationship}>
                 <PopoverTrigger asChild>
                   <Button
@@ -348,7 +349,7 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="phone_number">Phone Number *</Label>
+              <Label htmlFor="phone_number">Phone Number <span className="text-red-500">*</span></Label>
               <Input
                 id="phone_number"
                 value={formData1.phone_number}

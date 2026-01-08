@@ -1,121 +1,182 @@
-import React from "react";
-import SearchableSelect from "./SearchableSelect";
-import { fetchStaffProfiles } from "../../services/staffProfilesService";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { Input } from "../ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
+import * as StaffEntryService from "../../services/stationServices/staffEntryService";
 
-export interface StaffProfileSelectProps {
-  value?: string | null; // force_number value
-  onChange: (forceNumber: string | null) => void;
+interface StaffProfile {
+  id: string;
+  first_name?: string;
+  last_name?: string;
+  staff_name?: string;
+  force_number?: string;
+  rank?: string;
+  rank_name?: string;
+  [k: string]: any;
+}
+
+interface Props {
+  value: string;
+  onChange: (id: string | null) => void;
   placeholder?: string;
+  initialItems?: StaffProfile[];
   className?: string;
 }
 
-// export default function StaffProfileSelect({ value, onChange, placeholder = "Select staff...", className }: StaffProfileSelectProps) {
-//     return (
-//         <SearchableSelect
-//         value={value}
-//         onChange={(v) => onChange(v)}
-//         fetchOptions={async (q: string, signal?: AbortSignal) => {
-//             const items = await fetchStaffProfiles(q, signal);
-//             // normalize so each item has force_number and a display label if needed
-//             return items.map((it: any) => ({
-//             ...it,
-//             force_number: it.force_number ?? it.force_number_value ?? it.forceNumber ?? "",
-//             }));
-//         }}
-//         placeholder={placeholder}
-//         idField="force_number"
-//         labelField="force_number"
-//         // renderItem={(it: any) => {
-//         //     const name = [it.rank_name, it.first_name, it.middle_name, it.last_name].filter(Boolean).join(" ").trim();
-//         //     const fn = it.force_number ?? "";
-//         //     const station = it.station_name ?? it.current_station_name ?? "";
-//         //     return `${name}${fn ? ` (${fn})` : ""}${station ? ` — ${station}` : ""}`;
-//         // }}
-
-//         renderItem={(it: any) => {
-//             const firstName = it.first_name ?? "";
-//             const lastName = it.last_name ?? "";
-//             const forceNumber = it.force_number ?? "";
-//             const rank = it.rank_name ?? "";
-
-//             return `${firstName} ${lastName}${forceNumber ? ` [${forceNumber}]` : ""}${rank ? ` - ${rank}` : ""}`;
-//         }}
-
-//         className={className}
-//         />
-//     );
-// }
-
-// export default function StaffProfileSelect({ value, onChange, placeholder = "Select staff...", className }: StaffProfileSelectProps) {
-//     return (
-//         <SearchableSelect
-//             value={value ?? null}
-//             onChange={(v) => onChange(v)}
-//             fetchOptions={async (q: string, signal?: AbortSignal) => {
-//             const items = await fetchStaffProfiles(q, signal);
-//             // normalize so each item has force_number for display but keep id as identifier
-//             const normalized = (items ?? []).map((it: any) => ({
-//                 ...it,
-//                 force_number: it.force_number ?? it.forceNumber ?? it.force_number_value ?? "",
-//             }));
-//             // filter out entries without a usable UUID id
-//             return normalized.filter((it: any) => it && it.id && String(it.id).trim() !== "");
-//             }}
-//             placeholder={placeholder}
-//             idField="id"            // use UUID as the select value
-//             labelField="force_number"
-//             renderItem={(it: any) => {
-//             const name = [it.rank_name, it.first_name, it.middle_name, it.last_name].filter(Boolean).join(" ").trim();
-//             const fn = it.force_number ?? "";
-//             const rank = it.rank_name ?? "";
-//             const station = it.station_name ?? "";
-//             // label shows readable info (name + [force] - rank / station)
-//             return `${name}${fn ? ` [${fn}]` : ""}${rank ? ` - ${rank}` : ""}${station ? ` — ${station}` : ""}`;
-//             }}
-//             className={className}
-//         />
-//     );
-// }
-
-
 export default function StaffProfileSelect({
-    value,
-    onChange,
-    placeholder = "Select staff...",
-    className,
-    }: StaffProfileSelectProps) {
-    return (
-        <SearchableSelect
-        value={value ?? null}
-        onChange={(v) => onChange(v)}
-        fetchOptions={async (q: string, signal?: AbortSignal) => {
-            const items = await fetchStaffProfiles(q, signal);
-            // normalize so each item has force_number for display but keep id as identifier
-            const normalized = (items ?? []).map((it: any) => ({
-            ...it,
-            force_number:
-                it.force_number ?? it.forceNumber ?? it.force_number_value ?? "",
-            }));
-            // filter out entries without a usable UUID id
-            return normalized.filter(
-            (it: any) => it && it.id && String(it.id).trim() !== ""
-            );
-        }}
-        placeholder={placeholder}
-        idField="id" // use UUID as the select value
-        labelField="force_number"
-        renderItem={(it: any) => {
-            const firstName = it.first_name ?? "";
-            const lastName = it.last_name ?? "";
-            const fn = it.force_number ?? "";
-            const rank = it.rank_name ?? "";
+  value,
+  onChange,
+  placeholder = "Search staff...",
+  initialItems = [],
+  className,
+}: Props) {
+  const [items, setItems] = useState<StaffProfile[]>(initialItems || []);
+  const [query, setQuery] = useState("");
+  const debounceRef = useRef<number | null>(null);
+  const mountedRef = useRef(true);
 
-            // label shows: FirstName LastName [ForceNumber] - Rank
-            return `${firstName} ${lastName}${fn ? ` [${fn}]` : ""}${
-            rank ? ` - ${rank}` : ""
-            }`;
-        }}
-        className={className}
-        />
-    );
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // merge incoming initialItems when they change
+  useEffect(() => {
+    if (!initialItems || initialItems.length === 0) return;
+    setItems((prev) => {
+      const map = new Map(prev.map((i) => [i.id, i]));
+      for (const it of initialItems) map.set(it.id, it);
+      return Array.from(map.values());
+    });
+  }, [initialItems]);
+
+  // on mount: if no items, fetch a small initial page so the dropdown shows entries immediately
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if ((items || []).length > 0) return;
+      try {
+        const res = await StaffEntryService.fetchStaffProfiles({ page_size: 10 });
+        if (cancelled) return;
+        const list = Array.isArray(res) ? res : (res?.results ?? []);
+        if (list && list.length) {
+          setItems((prev) => {
+            const map = new Map(prev.map((i) => [i.id, i]));
+            for (const it of list) map.set(it.id, it);
+            return Array.from(map.values());
+          });
+        }
+      } catch (err) {
+        // ignore
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []); // run once
+
+  // if a value is set but not in items, fetch it so the SelectValue label renders
+  useEffect(() => {
+    if (!value) return;
+    if (items.some((i) => i.id === value)) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const profiles = await StaffEntryService.fetchStaffProfiles({ id: value });
+        const p = profiles?.[0] ?? null;
+        if (p && !cancelled) {
+          setItems((prev) => {
+            if (prev.some((i) => i.id === p.id)) return prev;
+            return [p, ...prev];
+          });
+        }
+      } catch (e) {
+        // ignore silently
+        console.debug("prefetch staff profile failed", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [value, items]);
+
+  const labelFor = useMemo(() => {
+    return (it?: StaffProfile | null) => {
+      if (!it) return "";
+      const name = (it.first_name || it.last_name)
+        ? `${it.first_name ?? ""} ${it.last_name ?? ""}`.trim()
+        : (it.staff_name ?? "");
+      const force = it.force_number ?? it.staff_force_number ?? "";
+      if (name && force) return `${name} [${force}]`;
+      if (name) return name;
+      if (force) return force;
+      return it.id;
+    };
+  }, []);
+
+  // debounced remote search
+  useEffect(() => {
+    if (debounceRef.current) {
+      window.clearTimeout(debounceRef.current);
+      debounceRef.current = null;
+    }
+    if (!query) return;
+    debounceRef.current = window.setTimeout(async () => {
+      try {
+        const res = await StaffEntryService.fetchStaffProfiles({ search: query, page_size: 10 });
+        if (!mountedRef.current) return;
+        const list = Array.isArray(res) ? res : (res?.results ?? []);
+        setItems((prev) => {
+          const map = new Map(prev.map((i) => [i.id, i]));
+          for (const it of list) map.set(it.id, it);
+          return Array.from(map.values());
+        });
+      } catch (err) {
+        console.debug("staff search error", err);
+      }
+    }, 250);
+    return () => {
+      if (debounceRef.current) {
+        window.clearTimeout(debounceRef.current);
+        debounceRef.current = null;
+      }
+    };
+  }, [query]);
+
+  return (
+    <Select value={value} onValueChange={(v) => onChange(v || null)}>
+      <SelectTrigger className={className}>
+        {/* Render selected label explicitly so closed trigger shows correct text immediately */}
+        <SelectValue placeholder={placeholder}>
+          {labelFor(items.find(i => i.id === value) ?? null)}
+        </SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <div className="px-3 py-2">
+          <Input
+            placeholder="Search staff..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="mb-2"
+            onMouseDown={(e) => e.stopPropagation()}
+            onKeyDown={(e) => e.stopPropagation()}
+          />
+        </div>
+
+        {items.length === 0 ? (
+          <div className="px-3 py-2 text-sm text-muted-foreground">No staff found</div>
+        ) : (
+          items.map((it) => (
+            <SelectItem key={it.id} value={it.id}>
+              <div className="flex flex-col">
+                <div className="text-sm">{labelFor(it)}</div>
+                <div className="text-xs text-muted-foreground">
+                  {it.rank_name ?? it.rank ?? ""} {it.station_name ? `• ${it.station_name}` : ""}
+                </div>
+              </div>
+            </SelectItem>
+          ))
+        )}
+      </SelectContent>
+    </Select>
+  );
 }

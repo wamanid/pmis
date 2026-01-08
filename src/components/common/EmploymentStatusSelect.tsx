@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchEmploymentStatuses } from '../../services/system_administration';
+import { fetchEmploymentStatuses } from '../../services/system_administration/employmentStatusService';
 import type { EmploymentStatus } from '../../models/system_administration';
 
 export interface EmploymentStatusSelectProps {

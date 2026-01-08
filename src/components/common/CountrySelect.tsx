@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchCountries } from '../../services/system_administration';
+import { fetchCountries } from '../../services/system_administration/countryService';
 import type { Country } from '../../models/system_administration';
 
 export interface CountrySelectProps {

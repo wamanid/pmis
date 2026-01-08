@@ -8,6 +8,7 @@ import { propertyRoutes } from './property.routes'
 import { transferRoutes } from './transfer.routes';
 import { gateRoutes } from './gate.routes';
 import { stageRoutes } from './stage.routes';
+import { dischargeRoutes } from './discharge.routes';
 
 /**
  * Application Routes Configuration
@@ -43,6 +44,8 @@ export const routes: RouteObject[] = [
 
   // Stage Classification Routes
   ...stageRoutes,
+  // Discharge Management Routes
+  ...dischargeRoutes,
 
   // Default/Fallback Route
   {

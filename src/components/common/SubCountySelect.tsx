@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchSubCounties } from '../../services/system_administration';
+import { fetchSubCounties } from '../../services/system_administration/subCountyService';
 import type { SubCounty } from '../../models/system_administration';
 
 export interface SubCountySelectProps {

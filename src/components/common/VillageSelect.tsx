@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchVillages } from '../../services/system_administration';
+import { fetchVillages } from '../../services/system_administration/villageService';
 import type { Village } from '../../models/system_administration';
 
 export interface VillageSelectProps {

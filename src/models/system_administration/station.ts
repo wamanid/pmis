@@ -3,18 +3,6 @@
  * Represents a prison station in the system
  */
 
-export interface District {
-  id: string;
-  name: string;
-  description: string;
-}
-
-export interface Region {
-  id: string;
-  name: string;
-  description: string;
-}
-
 export interface Station {
   id: string;
   district_name: string;
@@ -22,12 +10,12 @@ export interface Station {
   security_level_name: string;
   category_name: string;
   station_type_name: string;
-  gender_name?: string;
+  gender_name: string;
   jurisdiction_area_name: string;
-  capacity: number;
-  occupancy: number;
-  congestion: number;
-  is_overcrowded: boolean;
+  capacity: string;
+  occupancy: string;
+  congestion: string;
+  is_overcrowded: string;
   created_datetime: string;
   is_active: boolean;
   updated_datetime: string;
@@ -36,24 +24,24 @@ export interface Station {
   station_code: string;
   manual_capacity: number;
   date_opened: string;
-  physical_address: string | null;
-  postal_address: string | null;
-  gps_location: string | null;
-  phone_number: string | null;
-  fax_number: string | null;
-  email: string | null;
-  alternate_email: string | null;
+  physical_address: string;
+  postal_address: string;
+  gps_location: string;
+  phone_number: string;
+  fax_number: string;
+  email: string;
+  alternate_email: string;
   pmis_available: boolean;
-  created_by: number | null;
-  updated_by: number | null;
+  created_by: number;
+  updated_by: number;
   deleted_by: number | null;
-  district: District;
-  region: Region;
+  district: string;
+  region: string;
   security_level: string;
   category: string;
   station_type: string;
   jurisdiction_area: string;
-  gender: string | null;
+  gender: string;
 }
 
 export interface StationListResponse {

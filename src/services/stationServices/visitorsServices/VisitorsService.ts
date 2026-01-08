@@ -274,13 +274,15 @@ export const getGates= async () : Promise<GateResponse> => {
   return response.data;
 }
 
-export const getPrisoners= async () : Promise<PrisonerResponse> => {
-  const response = await axiosInstance.get<PrisonerResponse>('/admission/prisoners/');
+export const getPrisoners= async (station?: String) : Promise<PrisonerResponse> => {
+  const response = await axiosInstance.get<PrisonerResponse>('/admission/prisoners/', {
+    params: station? {station} : undefined
+  });
   return response.data;
 }
 
 export const getVisitorTypes= async () : Promise<VisitorTypeResponse> => {
-  const response = await axiosInstance.get<VisitorTypeResponse>('/system-administration/visitor-types/');
+  const response = await axiosInstance.get<VisitorTypeResponse>('/system-administration/visitor-types/')
   return response.data;
 }
 

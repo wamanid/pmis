@@ -43,7 +43,7 @@ import {
 } from '../ui/command';
 import { Check, ChevronsUpDown } from 'lucide-react';
 import { cn } from '../ui/utils';
-import { NextOfKinForm } from '../admission/NextOfKinForm';
+import  NextOfKinForm  from '../admission/NextOfKinForm';
 import { toast } from 'sonner';
 import BiometricCapture from '../common/BiometricCapture';
 

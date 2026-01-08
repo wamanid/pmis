@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchParishes } from '../../services/system_administration';
+import { fetchParishes } from '../../services/system_administration/parishService';
 import type { Parish } from '../../models/system_administration';
 
 export interface ParishSelectProps {

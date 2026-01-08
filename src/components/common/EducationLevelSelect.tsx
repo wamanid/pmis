@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchEducationLevels } from '../../services/system_administration';
+import { fetchEducationLevels } from '../../services/system_administration/educationLevelService';
 import type { EducationLevel } from '../../models/system_administration';
 
 export interface EducationLevelSelectProps {

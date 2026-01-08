@@ -9,10 +9,12 @@ import { Plus, Search, Scan, CheckCircle2, XCircle, Clock, User, Loader2, Trash2
 import { toast } from 'sonner';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select';
 import { Textarea } from '../ui/textarea';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogDescription } from '../ui/alert-dialog';
+import ConfirmDialog from '../common/ConfirmDialog';
 import { DataTable } from '../common/DataTable';
 import type { DataTableColumn } from '../common/DataTable.types';
 import * as StaffEntryService from '../../services/stationServices/staffEntryService';
+import { useFilters } from '../../contexts/FilterContext';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
 interface StaffEntryRow {
   id: string;
@@ -63,6 +65,14 @@ export function StaffEntryExitScreen() {
   const [submitLoading, setSubmitLoading] = useState(false);
   const [scanningMode, setScanningMode] = useState(false);
   const [forceInput, setForceInput] = useState('');
+  // autocomplete state + refs
+  const [suggestions, setSuggestions] = useState<StaffEntryService.StaffProfile[]>([]);
+  const [suggestOpen, setSuggestOpen] = useState(false);
+  const [highlightIndex, setHighlightIndex] = useState<number>(-1);
+  const suggestionsAbortRef = useRef<AbortController | null>(null);
+  const suggestTimerRef = useRef<number | null>(null);
+  const MIN_SUGGEST = 3;
+  const SUGGEST_DEBOUNCE_MS = 350;
   const [staffDetails, setStaffDetails] = useState<StaffEntryService.StaffProfile | null>(null);
   const [stationOptions, setStationOptions] = useState<any[]>([]);
   const [attendanceType, setAttendanceType] = useState<'PRESENT' | 'ABSENT'>('PRESENT');
@@ -70,6 +80,7 @@ export function StaffEntryExitScreen() {
   const [remark, setRemark] = useState('');
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
+  const [recordToDeleteObj, setRecordToDeleteObj] = useState<StaffEntryRow | null>(null);
   // Edit modal state (required by Edit button / dialog)
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<StaffEntryRow | null>(null);
@@ -106,6 +117,82 @@ export function StaffEntryExitScreen() {
   const presentCount = tableData.filter((t) => t.attendance_type === 'PRESENT').length;
   const absentCount = tableData.filter((t) => t.attendance_type === 'ABSENT').length;
   const onDutyCount = tableData.filter((t) => !t.time_out || t.time_out === '').length;
+
+  // keep DataTable in URL-driven mode: track page/pageSize/sort for DataTable props
+  // const [page, setPage] = useState(1);
+  // const [pageSize, setPageSize] = useState(10);
+  // const [sortField, setSortField] = useState<string | undefined>(undefined);
+  // const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+
+  // global filters
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
+  // reload key driven by useFilterRefresh (will bump when global filters change)
+  const [tableReloadKey, setTableReloadKey] = useState(0);
+  // useFilterRefresh registers filter changes and triggers the callback - mirror complaints pattern
+  useFilterRefresh(() => {
+    setTableReloadKey((k) => k + 1);
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // Summary counts (separate fetch so cards update even if DataTable doesn't call onLoaded)
+  const [summaryTotal, setSummaryTotal] = useState(0);
+  const [summaryPresent, setSummaryPresent] = useState(0);
+  const [summaryAbsent, setSummaryAbsent] = useState(0);
+  const [summaryOnDuty, setSummaryOnDuty] = useState(0);
+  const summaryAbortRef = useRef<AbortController | null>(null);
+
+  const fetchSummary = useCallback(async () => {
+    if (summaryAbortRef.current) {
+      try { summaryAbortRef.current.abort(); } catch {}
+    }
+    const controller = new AbortController();
+    summaryAbortRef.current = controller;
+    try {
+      // quick offline check
+      if (typeof window !== 'undefined' && !window.navigator.onLine) {
+        setLoadError('No network connection');
+        return;
+      }
+
+      const params: Record<string, any> = { page_size: 1000 };
+      if (globalRegion) params.region = globalRegion;
+      if (globalDistrict) params.district = globalDistrict;
+      if (globalStation) params.station = globalStation;
+      if (search) params.search = search;
+      params._t = tableReloadKey;
+
+      // call service without passing the raw AbortSignal (some service wrappers expect a different API)
+      const res = await StaffEntryService.fetchEntries(params);
+      const items = res?.results ?? res ?? [];
+      const count = Number(res?.count ?? items.length ?? 0);
+
+      const present = (items || []).filter((it: any) => it.attendance_type === 'PRESENT').length;
+      const absent = (items || []).filter((it: any) => it.attendance_type === 'ABSENT').length;
+      const onDuty = (items || []).filter((it: any) => !it.time_out || String(it.time_out).trim() === '').length;
+
+      setSummaryTotal(count);
+      setSummaryPresent(present);
+      setSummaryAbsent(absent);
+      setSummaryOnDuty(onDuty);
+      console.debug('Attendance summary fetched', { count, present, absent, onDuty });
+      setLoadError(null);
+    } catch (err: any) {
+      // suppress noisy axios/XHR "Network Error" logs and surface friendly message
+      const isNetwork = String(err?.message ?? '').toLowerCase().includes('network') || err?.request?.readyState === 0;
+      if (isNetwork) {
+        console.warn('fetchSummary network error (suppressed)', err);
+        setLoadError('Network error while fetching summary (check API/CORS)');
+        return;
+      }
+      if (err?.name === 'AbortError' || err?.message === 'canceled') return;
+      console.error('fetchSummary error', err?.response ?? err);
+      setLoadError('Failed to load summary');
+    }
+  }, [globalRegion, globalDistrict, globalStation, search, tableReloadKey]);
+
+  useEffect(() => {
+    fetchSummary();
+    return () => { if (summaryAbortRef.current) try { summaryAbortRef.current.abort(); } catch {} };
+  }, [fetchSummary]);
 
   const loadStations = useCallback(async () => {
     const s = await StaffEntryService.fetchStations();
@@ -159,88 +246,38 @@ export function StaffEntryExitScreen() {
     }
   };
 
-  // load table data from backend
-// load table data: abort previous requests, debounce handled by effect, safe page handling
-  const abortRef = useRef<AbortController | null>(null);
-  const loadTable = useCallback(async (p = page, ps = pageSize, sf?: string, sd?: string, q?: string) => {
-    // cancel previous
-    if (abortRef.current) {
-      try { abortRef.current.abort(); } catch {}
-    }
-    const controller = new AbortController();
-    abortRef.current = controller;
-
-    setTableLoading(true);
-    setLoadError(null);
-    try {
-      const params: Record<string, any> = {};
-      if (ps !== -1) {
-        params.page = Math.max(1, Number(p) || 1);
-        params.page_size = Number(ps) || 10;
-      }
-      if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
-      if (q) params.search = q;
-
-      const res = await StaffEntryService.fetchEntries(params, controller.signal);
-      const items = res.results ?? res ?? [];
-      const totalCount = Number(res.count ?? (items.length || 0));
-
-      const mapped = (items || []).map((it: any): StaffEntryRow => ({
-        id: it.id,
-        created_datetime: it.created_datetime ?? null,
-        staff_name: it.staff_name ?? '',
-        staff_force_number: it.staff_force_number ?? '',
-        senior: typeof it.senior === 'boolean' ? it.senior : null,
-        staff_rank_name: it.staff_rank_name ?? it.staff_rank ?? '',
-        station_name: it.station_name ?? it.station ?? '',
-        time_in: it.time_in ?? null,
-        time_out: it.time_out ?? null,
-        attendance_type: it.attendance_type ?? null,
-        remark: it.remark ?? '',
-      }));
-
-      // compute total pages and guard against invalid page requests
-      const effectivePageSize = ps === -1 ? totalCount || mapped.length : ps;
-      const totalPages = effectivePageSize > 0 ? Math.max(1, Math.ceil(totalCount / effectivePageSize)) : 1;
-      if (ps !== -1 && params.page && params.page > totalPages) {
-        setPage(totalPages);
-        return; // effect will re-run and fetch safe page
-      }
-
-      setTableData(mapped);
-      setTotal(totalCount);
-      setPage(params.page ?? 1);
-    } catch (err: any) {
-      if (err?.name === 'AbortError' || err?.message === 'canceled') return;
-      console.error('loadTable error:', err?.response ?? err);
-      const status = err?.response?.status;
-      const detail = String(err?.response?.data?.detail ?? '').toLowerCase();
-      if (status === 404 && detail.includes('invalid page')) {
-        setPage(1); // safe fallback
-        return;
-      }
-      setLoadError(status ? `Failed to load records (status ${status}).` : 'Failed to load records (network error).');
-    } finally {
-      setTableLoading(false);
-    }
-  }, []);
-
   // load stations once
   useEffect(() => { loadStations(); }, [loadStations]);
 
-  // debounced / single effect to fetch table whenever page/pageSize/sort/search change
-  const searchDebounceRef = useRef<number | null>(null);
-  useEffect(() => {
-    if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
-    // 300ms debounce for search + avoid double calls during quick UI interactions
-    searchDebounceRef.current = window.setTimeout(() => {
-      const usePage = Math.max(1, page || 1);
-      loadTable(usePage, pageSize, sortField, sortDir, search || undefined);
-    }, 300);
-    return () => {
-      if (searchDebounceRef.current) window.clearTimeout(searchDebounceRef.current);
-    };
-  }, [page, pageSize, sortField, sortDir, search, loadTable]);
+  // resilient handler when DataTable calls onLoaded (normalize different shapes)
+  const handleDataTableLoaded = useCallback((rowsOrResp: any, meta?: any) => {
+    // normalize to rows array and meta.total
+    let rows: any[] = [];
+    let responseMeta: any = meta ?? {};
+    if (Array.isArray(rowsOrResp)) rows = rowsOrResp;
+    else if (rowsOrResp && typeof rowsOrResp === 'object') {
+      rows = Array.isArray(rowsOrResp.results) ? rowsOrResp.results : (Array.isArray(rowsOrResp.data) ? rowsOrResp.data : []);
+      responseMeta = responseMeta || { total: Number(rowsOrResp.count ?? rowsOrResp.total ?? rows.length) };
+    }
+    const mapped = (rows || []).map((it: any): StaffEntryRow => ({
+      id: it.id,
+      created_datetime: it.created_datetime ?? null,
+      staff_name: it.staff_name ?? '',
+      staff_force_number: it.staff_force_number ?? '',
+      senior: typeof it.senior === 'boolean' ? it.senior : null,
+      staff_rank_name: it.staff_rank_name ?? it.staff_rank ?? '',
+      station_name: it.station_name ?? it.station ?? '',
+      time_in: it.time_in ?? null,
+      time_out: it.time_out ?? null,
+      attendance_type: it.attendance_type ?? null,
+      remark: it.remark ?? '',
+    }));
+    setTableData(mapped);
+    const serverTotal = Number(responseMeta?.total ?? responseMeta?.count ?? NaN);
+    setTotal(Number.isFinite(serverTotal) ? serverTotal : mapped.length);
+    // optionally refresh summary from mapped (but keep summary fetch as source of truth)
+    console.debug('DataTable onLoaded normalized', { rows: mapped.length, total: serverTotal || mapped.length });
+  }, []);
 
   // barcode scanner hook: when enabled, global key capture sends scanned value to onScan
   useBarcodeScanner(async (code) => {
@@ -353,7 +390,9 @@ export function StaffEntryExitScreen() {
 
       await StaffEntryService.createEntry(payload);
       toast.success('Staff entry recorded successfully');
-      loadTable(1, pageSize, sortField, sortDir, search);
+      // tell DataTable to refetch via reload key and update summary
+      setTableReloadKey(k => k + 1);
+      fetchSummary();
       setDialogOpen(false);
       resetForm();
     } catch (err: any) {
@@ -376,7 +415,11 @@ export function StaffEntryExitScreen() {
       toast.success('Record deleted');
       setDeleteDialogOpen(false);
       setRecordToDelete(null);
-      loadTable(1, pageSize, sortField, sortDir, search);
+      setRecordToDeleteObj(null);
+      // reset to first page and bump reload key so DataTable remounts/refetches
+      setPage(1);
+      setTableReloadKey(k => k + 1);
+      fetchSummary();
     } catch (err) {
       console.error('delete error', err?.response ?? err);
       toast.error('Failed to delete record');
@@ -503,6 +546,7 @@ export function StaffEntryExitScreen() {
             size="sm"
             onClick={() => {
               setRecordToDelete(row.id);
+              setRecordToDeleteObj(row);
               setDeleteDialogOpen(true);
             }}
           >
@@ -535,8 +579,8 @@ export function StaffEntryExitScreen() {
       toast.success('Record updated');
       setEditDialogOpen(false);
       setEditingRecord(null);
-      // refresh table
-      loadTable(1, pageSize, sortField, sortDir, search);
+      setTableReloadKey(k => k + 1);
+      fetchSummary();
     } catch (err: any) {
       console.error('updateEntry error', err?.response ?? err);
       toast.error('Failed to update record');
@@ -593,7 +637,7 @@ export function StaffEntryExitScreen() {
                     <div className="text-sm text-muted-foreground">Or enter force number manually</div>
                   </div>
 
-                  <form onSubmit={(e) => { e.preventDefault(); handleFetchClick(e); }} className="space-y-2">
+                  {/* <form onSubmit={(e) => { e.preventDefault(); handleFetchClick(e); }} className="space-y-2">
                     <div className="flex gap-2">
                       <Input
                         placeholder="Force number / Barcode"
@@ -605,6 +649,125 @@ export function StaffEntryExitScreen() {
                       <Button type="submit" disabled={!forceInput.trim() || fetchLoading || hasFetched}>
                         {fetchLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Fetch</> : 'Fetch'}
                       </Button>
+                    </div>
+                  </form> */}
+                  <form onSubmit={(e) => { e.preventDefault(); handleFetchClick(e); }} className="space-y-2" autoComplete="off">
+                    <div className="relative">
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Force number / Barcode"
+                          value={forceInput}
+                          disabled={scanningMode || hasFetched}
+                          autoFocus={!scanningMode && !hasFetched}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setForceInput(v);
+                            // cancel any pending timer
+                            if (suggestTimerRef.current) { window.clearTimeout(suggestTimerRef.current); suggestTimerRef.current = null; }
+                            // close suggestions immediately if input too short
+                            if ((v || '').trim().length < MIN_SUGGEST) {
+                              // abort in-flight request
+                              try { suggestionsAbortRef.current?.abort(); } catch {}
+                              setSuggestions([]);
+                              setSuggestOpen(false);
+                              setHighlightIndex(-1);
+                              return;
+                            }
+                            // debounce search
+                            suggestTimerRef.current = window.setTimeout(async () => {
+                              // abort previous
+                              try { suggestionsAbortRef.current?.abort(); } catch {}
+                              const controller = new AbortController();
+                              suggestionsAbortRef.current = controller;
+                              try {
+                                const q = (v || '').trim();
+                                // server-side partial match on name or force_number
+                                const res = await StaffEntryService.fetchStaffProfiles({ search: q, page_size: 10 });
+                                const list = Array.isArray(res) ? res : (res?.results ?? []);
+                                setSuggestions(list || []);
+                                setSuggestOpen(Array.isArray(list) && list.length > 0);
+                                setHighlightIndex(0);
+                              } catch (err) {
+                                // abort or network: just close suggestions quietly
+                                console.debug('autocomplete fetch error', err);
+                                setSuggestions([]);
+                                setSuggestOpen(false);
+                                setHighlightIndex(-1);
+                              } finally {
+                                suggestionsAbortRef.current = null;
+                              }
+                            }, SUGGEST_DEBOUNCE_MS);
+                          }}
+                          onKeyDown={(e) => {
+                            if (!suggestOpen) {
+                              if (e.key === 'ArrowDown') {
+                                // open suggestions if available
+                                if (suggestions.length > 0) { setSuggestOpen(true); setHighlightIndex(0); e.preventDefault(); }
+                              }
+                              return;
+                            }
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault();
+                              setHighlightIndex((i) => Math.min(i + 1, suggestions.length - 1));
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault();
+                              setHighlightIndex((i) => Math.max(i - 1, 0));
+                            } else if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const sel = suggestions[highlightIndex];
+                              if (sel) {
+                                // put only force_number into input per requirement
+                                setForceInput(sel.force_number ?? '');
+                                setSuggestOpen(false);
+                                setSuggestions([]);
+                                setHighlightIndex(-1);
+                              } else {
+                                // no suggestion selected -> treat as fetch submit
+                                handleFetchClick();
+                              }
+                            } else if (e.key === 'Escape') {
+                              setSuggestOpen(false);
+                              setHighlightIndex(-1);
+                            }
+                          }}
+                        />
+                        <Button type="submit" disabled={!forceInput.trim() || fetchLoading || hasFetched}>
+                          {fetchLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin"/> Fetch</> : 'Fetch'}
+                        </Button>
+                      </div>
+
+                      {/* suggestions dropdown */}
+                      {suggestOpen && suggestions.length > 0 && (
+                        <ul role="listbox" aria-label="staff suggestions"
+                          className="absolute z-50 mt-1 w-full bg-white border rounded-md shadow-lg max-h-64 overflow-auto"
+                          onMouseLeave={() => setHighlightIndex(-1)}
+                        >
+                          {suggestions.map((it, idx) => {
+                            const label = `${(it.first_name ?? '').trim()} ${(it.middle_name ?? '').trim()} ${(it.last_name ?? '').trim()}`.replace(/\s+/g, ' ').trim();
+                            const display = label ? `${label} | ${it.force_number ?? ''}` : (it.force_number ?? it.id);
+                            const isActive = idx === highlightIndex;
+                            return (
+                              <li
+                                key={it.id}
+                                role="option"
+                                aria-selected={isActive}
+                                className={`px-3 py-2 cursor-pointer ${isActive ? 'bg-slate-100' : 'hover:bg-slate-100'} transition-colors`}
+                                onMouseEnter={() => setHighlightIndex(idx)}
+                                onClick={() => {
+                                  // requirement: set only force_number into input and close suggestions
+                                  setForceInput(it.force_number ?? '');
+                                  setSuggestOpen(false);
+                                  setSuggestions([]);
+                                  setHighlightIndex(-1);
+                                }}
+                              >
+                                <div className="text-sm font-medium">{display}</div>
+                                <div className="text-xs text-muted-foreground">{it.rank_name ?? it.rank ?? ''} {it.station_name ? `• ${it.station_name}` : ''}</div>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
                     </div>
                   </form>
                 </>
@@ -741,19 +904,43 @@ export function StaffEntryExitScreen() {
                         rows={3}
                       />
                     </div>
+                    {/* Moved Footer: Cancel / Save appear only when staffDetails is shown */}
+                    <div className="flex gap-2 justify-end mt-4">
+                      <Button
+                        variant="outline"
+                        onClick={() => {
+                          setDialogOpen(false);
+                          resetForm();
+                        }}
+                        disabled={submitLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button onClick={handleConfirmEntry} className="bg-primary hover:bg-primary/90" disabled={submitLoading}>
+                        {submitLoading ? 'Saving...' : 'Save'}
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
             </div>
 
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={submitLoading}>
+            {/* <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  // close dialog and fully reset the form state (same behavior as the top-right close)
+                  setDialogOpen(false);
+                  resetForm();
+                }}
+                disabled={submitLoading}
+              >
                 Cancel
               </Button>
               <Button onClick={handleConfirmEntry} className="bg-primary hover:bg-primary/90" disabled={submitLoading}>
                 {submitLoading ? 'Saving...' : 'Save'}
               </Button>
-            </DialogFooter>
+            </DialogFooter> */}
           </DialogContent>
         </Dialog>
       </div>
@@ -770,19 +957,19 @@ export function StaffEntryExitScreen() {
       <div className="grid gap-4 md:grid-cols-4">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Total Records</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl text-[#650000]">{total}</div></CardContent>
+          <CardContent><div className="text-2xl text-[#650000]">{summaryTotal}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Present</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl text-green-600">{presentCount}</div></CardContent>
+          <CardContent><div className="text-2xl text-green-600">{summaryPresent}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">Absent</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl text-red-600">{absentCount}</div></CardContent>
+          <CardContent><div className="text-2xl text-red-600">{summaryAbsent}</div></CardContent>
         </Card>
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-600">On Duty</CardTitle></CardHeader>
-          <CardContent><div className="text-2xl text-blue-600">{onDutyCount}</div></CardContent>
+          <CardContent><div className="text-2xl text-blue-600">{summaryOnDuty}</div></CardContent>
         </Card>
       </div>
 
@@ -808,50 +995,70 @@ export function StaffEntryExitScreen() {
             </div>
           )}
 
-          {/* <DataTable
-            url="/station-management/api/attendance/"
-            title="Staff Entry & Exit Records"
-            columns={userColumns}
-          /> */}
-
           <DataTable
-            /* controlled mode: we already fetch server data in this component (loadTable) */
-            url="/station-management/api/attendance/"
-            data={tableData}
-            loading={tableLoading}
-            total={total}
-            title="Staff Entry & Exit Records"
-            columns={userColumns}
-            externalSearch={search}
-
-
-            
-          />
-          
-        </CardContent>
-      </Card>
-
+            key={`attendance-${tableReloadKey}-${search}-${page}-${pageSize}`}
+             // server-driven DataTable: let it fetch. pass params so DataTable composes the final request
+             url="/station-management/api/attendance/"
+             params={{
+               region: globalRegion ?? undefined,
+               district: globalDistrict ?? undefined,
+               station: globalStation ?? undefined,
+               search: search || undefined,
+               _t: tableReloadKey,
+             }}
+             title="Staff Entry & Exit Records"
+             columns={userColumns}
+             externalSearch={search}
+             onLoaded={handleDataTableLoaded}
+             onError={(err: any) => {
+               console.error('DataTable load error', err);
+               setLoadError(err?.message ?? 'Failed to load records');
+             }}
+             onSearch={(q: string) => { setSearch(q); setPage(1); setTableReloadKey(k => k + 1); }}
+             onPageChange={(p: number) => { setPage(p); setTableReloadKey(k => k + 1); }}
+             onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); setTableReloadKey(k => k + 1); }}
+             onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); setTableReloadKey(k => k + 1); }}
+             page={page}
+             pageSize={pageSize}
+           />
+           
+         </CardContent>
+       </Card>
+ 
       {/* Delete confirmation dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Delete</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this record? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setDeleteDialogOpen(false)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) {
+            setRecordToDelete(null);
+            setRecordToDeleteObj(null);
+          }
+        }}
+        title="Delete Attendance Record"
+        description="Are you sure you want to delete this attendance record? This action cannot be undone."
+        details={
+          recordToDeleteObj ? (
+            <div className="text-sm space-y-1">
+              <div><strong>Force No:</strong> {recordToDeleteObj.staff_force_number ?? '-'}</div>
+              <div><strong>Staff Name:</strong> {recordToDeleteObj.staff_name ?? '-'}</div>
+              <div><strong>Category:</strong> {typeof recordToDeleteObj.senior === 'boolean' ? (recordToDeleteObj.senior ? 'Senior' : 'Junior') : '-'}</div>
+              <div><strong>Station:</strong> {recordToDeleteObj.station_name ?? '-'}</div>
+              <div><strong>Attendance:</strong> {recordToDeleteObj.attendance_type ?? '-'}</div>
+              <div><strong>Date:</strong> {recordToDeleteObj.created_datetime ? String(recordToDeleteObj.created_datetime).split('T')[0] : '-'}</div>
+            </div>
+          ) : null
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          await handleDelete();
+        }}
+      />
 
       {/* Edit Record Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Staff Entry</DialogTitle>
             <DialogDescription>

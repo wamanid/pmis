@@ -15,7 +15,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchSexes } from '../../services/system_administration';
+import { fetchSexes } from '../../services/system_administration/sexService';
 import type { Sex } from '../../models/system_administration';
 
 export interface SexSelectProps {
