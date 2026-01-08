@@ -1300,7 +1300,7 @@ export default function VisitationsScreen() {
                 // externalSearch={debouncedSearch}
                  title="Visitor Records"
                  columns={[
-                  { key: 'full_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => {
+                  { key: 'first_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => {
                       const r = row ?? {};
                       return (<div><p>{`${r.first_name ?? ''} ${r.middle_name ?? ''} ${r.last_name ?? ''}`.trim()}</p>{r.organisation ? <p className="text-xs text-muted-foreground">{String(r.organisation)}</p> : null}</div>);
                     }
@@ -1319,7 +1319,7 @@ export default function VisitationsScreen() {
                       return r.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(r.time_out)}</div>) : '-';
                   }},
                   { key: 'visitor_status_name', label: 'Status', sortable: true, render: (_v:any,row:any) => getStatusBadge(String((row ?? {})?.visitor_status_name ?? '')) },
-                  { key: 'id', label: 'Actions', sortable: false, render: (_v:any,row:any) => {
+                  { key: 'actions', label: 'Actions', sortable: false, render: (_v:any,row:any) => {
                       const r = row ?? {};
                       return (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(r)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(r)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>);
                   }},

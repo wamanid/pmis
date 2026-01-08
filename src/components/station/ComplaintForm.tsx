@@ -1,5 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import React, { useState, useEffect } from "react";
+import { useForm, Controller } from "react-hook-form";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+import SearchableSelect from "../common/SearchableSelect";
+import DatePicker from "../common/DatePicker";
 import {
   Plus,
   Trash2,
@@ -45,7 +48,8 @@ interface ComplaintAction {
   deleted_datetime: string | null;
   action: string;
   action_date: string;
-  action_status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  // store UUID or name from backend — keep as string
+  action_status: string;
   action_remark: string;
   created_by: number;
   updated_by: number | null;
@@ -105,7 +109,7 @@ interface ComplaintFormData {
 interface ActionFormData {
   action: string;
   action_date: string;
-  // store as string (may be UUID or name); we'll resolve to UUID when persisting
+  // store selected approval-status id (UUID) from API (string)
   action_status: string;
   action_remark: string;
 }
@@ -139,25 +143,71 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   const [actions, setActions] = useState<ComplaintAction[]>([]);
   const [isAddingAction, setIsAddingAction] = useState(false);
   // add search state for prisoners and stations
-  const [prisonerSearch, setPrisonerSearch] = useState("");
   const [stationSearch, setStationSearch] = useState("");
   const [currentActionForm, setCurrentActionForm] = useState<ActionFormData>({
     action: "",
     action_date: new Date().toISOString().split("T")[0],
-    action_status: "OPEN",
+    // start blank; we populate with UUID when user picks from select
+    action_status: "",
     action_remark: "",
   });
   const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
   const [staffSearch, setStaffSearch] = useState<string>("");
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  // derived options that combine searchable fields so SearchableSelect can match force number, username or name
+  const staffOptions = staffProfiles.map(sp => ({
+    ...sp,
+    search_label: `${sp.force_number ?? ""} ${sp.username ?? ""} ${sp.name ?? ""}`.trim(),
+  }));
 
   // display name for station (auto-populated when prisoner selected)
   const [stationDisplay, setStationDisplay] = useState<string>("");
 
   // complaint statuses loaded from backend (ids + names)
   const [complaintStatuses, setComplaintStatuses] = useState<any[]>([]);
+  // approval statuses used for action status select (fetched from system-administration/approval-statuses/)
+  const [approvalStatuses, setApprovalStatuses] = useState<any[]>([]);
   // track actions that are pending (not yet persisted)
   const [pendingActions, setPendingActions] = useState<ComplaintAction[]>([]);
+
+  // local small cache for initial items / quick prefill (rename to avoid conflict with prop)
+  const [localPrisoners, setLocalPrisoners] = useState<any[]>(prisoners ?? []);
+  const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
+  // when editing an existing complaint, populate prisoner + station and keep them non-editable
+  useEffect(() => {
+    if (!complaint || mode !== "edit") {
+      // clear when not editing
+      setOriginalStationLabel("");
+      return;
+    }
+    // complaint.prisoner is the prisoner id, complaint.prisoner_name is display name
+    try {
+      // set form fields (react-hook-form setValue must be in scope)
+      if (typeof setValue === "function") {
+        setValue("prisoner", complaint.prisoner ?? null);
+        setValue("original_station", complaint.station ?? "");
+        // also ensure main station field is set (used by hidden input / submission)
+        setValue("station", complaint.station ?? "");
+      }
+    } catch (e) {
+      // ignore if setValue not available
+    }
+    // populate both station display states so the UI shows the station on edit
+    setOriginalStationLabel(complaint.station_name ?? "");
+    setStationDisplay(complaint.station_name ?? "");
+    // ensure local cache contains the prisoner object so CustomPrisonerSearch (or display) can show label
+    const p = localPrisoners.find((pr: any) => String(pr.id) === String(complaint.prisoner));
+    if (!p) {
+      const newPr = {
+        id: complaint.prisoner,
+        full_name: complaint.prisoner_name ?? "",
+        current_station: complaint.station ?? "",
+        current_station_name: complaint.station_name ?? "",
+      };
+      setLocalPrisoners((prev) => [newPr, ...prev]);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [complaint, mode]);
 
   const {
     register,
@@ -166,6 +216,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     watch,
     reset,
     formState: { errors },
+    control,
   } = useForm<ComplaintFormData>({
     defaultValues: {
       prisoner: "",
@@ -229,7 +280,8 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       setCurrentActionForm({
         action: "",
         action_date: new Date().toISOString().split("T")[0],
-        action_status: "OPEN",
+        // start blank; we populate with UUID when user picks from select
+        action_status: "",
         action_remark: "",
       });
     }
@@ -282,19 +334,31 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       setStationDisplay("");
       return;
     }
-    const p = prisoners.find((pr: any) => String(pr.id) === String(pid));
+    const p = localPrisoners.find((pr: any) => String(pr.id) === String(pid));
     if (p) {
-      // p.raw may contain current_station (id) and current_station_name
-      const stationId = p.raw?.current_station ?? p.raw?.current_station_name ?? "";
-      const stationName = p.raw?.current_station_name ?? p.raw?.current_station ?? p.name ?? "";
-      // if stationId looks like an id vs name, set station id; otherwise set to name to preserve original behavior
+      // support multiple prisoner item shapes: prefer explicit fields, fallback to .raw or name/full_name
+      const stationId =
+        p.current_station ??
+        p.current_station_id ??
+        p.raw?.current_station ??
+        p.station ??
+        p.station_id ??
+        "";
+      const stationName =
+        p.current_station_name ??
+        p.current_stationName ??
+        p.raw?.current_station_name ??
+        p.name ??
+        p.full_name ??
+        "";
+      // set the hidden station value (id) and the UI label (name)
       setValue("station", stationId || "");
-      setStationDisplay(stationName || "");
+      setStationDisplay(stationName || stationId || "");
     } else {
       setValue("station", "");
       setStationDisplay("");
     }
-  }, [watchPrisoner, prisoners, setValue]);
+  }, [watchPrisoner, localPrisoners, setValue]);
 
   // load complaint statuses from backend
   useEffect(() => {
@@ -312,13 +376,30 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     return () => { mounted = false; c.abort(); };
   }, []);
 
+  // load approval statuses for action status select
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        // service should return array of { id, name } from /system-administration/approval-statuses/
+        const ap = await (ComplaintsService.fetchApprovalStatuses?.(c.signal) ?? ComplaintsService.fetchApprovalStatuses?.());
+        if (!mounted) return;
+        setApprovalStatuses(ap ?? []);
+      } catch (err) {
+        console.error('load approval statuses', err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, []);
+
   const onSubmit = async (data: ComplaintFormData) => {
     // Get names from IDs
     const stationName = stations.find((s) => s.id === data.station)?.name || "";
     const natureName = complaintNatures.find((n) => n.id === data.nature_of_complaint)?.name || "";
     const priorityName = priorities.find((p) => p.id === data.complaint_priority)?.name || "";
     const rankName = ranks.find((r) => r.id === data.rank)?.name || "";
-    const prisonerName = prisoners.find((p) => p.id === (data as any).prisoner)?.name || (data as any).prisoner || "";
+    const prisonerName = localPrisoners.find((p) => p.id === (data as any).prisoner)?.name || (data as any).prisoner || "";
 
     const complaintData: Complaint = {
       id: complaint?.id || `complaint-${Date.now()}`,
@@ -362,6 +443,11 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       rank: data.rank, // rank UUID
       force_number: data.force_number, // string
     };
+
+    // ensure we include the existing complaint id when editing so update uses correct URL
+    if (mode === "edit" && complaint?.id) {
+      (submitPayload as any).id = complaint.id;
+    }
     try {
       const created = await onSave(submitPayload);
       // if there are pending actions (created while adding new complaint), persist them now
@@ -474,7 +560,8 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     setCurrentActionForm({
       action: "",
       action_date: new Date().toISOString().split("T")[0],
-      action_status: "OPEN",
+      // start blank; we populate with UUID when user picks from select
+      action_status: "",
       action_remark: "",
     });
     setIsAddingAction(false);
@@ -487,20 +574,22 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   };
 
   const getActionStatusBadge = (
-    status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED",
+    status: string,
   ) => {
-    const statusConfig = {
+    // resolve status name from approvalStatuses if status is an id (UUID)
+    const resolved = approvalStatuses.find(s => String(s.id) === String(status)) ?? approvalStatuses.find(s => String(s.name).toUpperCase() === String(status).toUpperCase());
+    const name = resolved?.name ?? status;
+    const key = String(name).toUpperCase().replace(/\s+/g, "_");
+    const statusConfig: Record<string, { color: string }> = {
       OPEN: { color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
       IN_PROGRESS: { color: "bg-blue-50 text-blue-700 border-blue-200" },
       COMPLETED: { color: "bg-green-50 text-green-700 border-green-200" },
       CANCELLED: { color: "bg-red-50 text-red-700 border-red-200" },
     };
-
-    const config = statusConfig[status];
-
+    const config = statusConfig[key] ?? { color: "bg-gray-50 text-gray-700 border-gray-200" };
     return (
       <Badge className={`${config.color} border`} variant="outline">
-        {status.replace("_", " ")}
+        {name.replace("_", " ")}
       </Badge>
     );
   };
@@ -532,34 +621,44 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 <Label htmlFor="prisoner">
                   Prisoner <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={watchPrisoner}
-                  onValueChange={(value: string) => setValue("prisoner", value)}
-                  >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select prisoner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <div className="px-3 py-2">
-                    <Input
-                      placeholder="Search prisoner..."
-                      value={prisonerSearch}
-                      onChange={(e) => setPrisonerSearch(e.target.value)}
-                      className="mb-2"
-                    />
-                    </div>
-                    {prisoners
-                    .filter((p) => {
-                      if (!prisonerSearch) return true;
-                      return p.name?.toLowerCase().includes(prisonerSearch.toLowerCase());
-                    })
-                    .map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                      {p.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="prisoner"
+                  control={control}
+                  rules={{ required: true }}
+                  render={({ field }) => {
+                    // when editing, show a disabled input with prisoner name (not editable)
+                    if (mode === "edit") {
+                      const displayName =
+                        localPrisoners.find((pr: any) => String(pr.id) === String(field.value))?.full_name ??
+                        complaint?.prisoner_name ??
+                        "";
+                      return <Input disabled value={displayName} />;
+                    }
+
+                    return (
+                      <CustomPrisonerSearch
+                        value={field.value ?? null}
+                        onChange={(v) => field.onChange(v ?? null)}
+                        onSelectItem={(p: any) => {
+                          // set prisoner id on form
+                          field.onChange(p?.id ?? null);
+                          // auto-populate original_station (store ID) but show name in the disabled label field
+                          if (typeof setValue === "function") {
+                            setValue("original_station", p?.current_station ?? "");
+                          }
+                          setOriginalStationLabel(p?.current_station_name ?? "");
+                          // update local cache so initialItems contains selection next time
+                          setLocalPrisoners((prev) => (prev.some((x) => String(x.id) === String(p.id)) ? prev : [p, ...prev]));
+                        }}
+                        placeholder="Select prisoner"
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={localPrisoners}
+                        pageSize={25}
+                      />
+                    );
+                  }}
+                />
                 {errors.prisoner && (
                   <p className="text-red-500 text-sm mt-1">{(errors as any).prisoner?.message}</p>
                 )}
@@ -586,15 +685,22 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="complaint_date">
+                {/* <Label htmlFor="complaint_date">
                   Complaint Date <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="complaint_date"
-                  type="date"
-                  {...register("complaint_date", {
-                    required: "Complaint date is required",
-                  })}
+                </Label> */}
+                <Controller
+                  name="complaint_date"
+                  control={control}
+                  rules={{ required: "Complaint date is required" }}
+                  render={({ field }) => (
+                    <DatePicker
+                      label="Complaint Date"
+                      required
+                      value={field.value ? new Date(field.value) : null}
+                      onChange={(d) => field.onChange(d ? d.toISOString().split("T")[0] : "")}
+                      placeholder="Pick a date"
+                    />
+                  )}
                 />
                 {errors.complaint_date && (
                   <p className="text-red-500 text-sm mt-1">
@@ -604,7 +710,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
               </div>
 
               <div>
-                <Label htmlFor="complaint_status">
+                <Label htmlFor="complaint_status" className="mb-2">
                   Status <span className="text-red-500">*</span>
                 </Label>
                 <Select
@@ -639,23 +745,16 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 <Label htmlFor="nature_of_complaint">
                   Nature of Complaint <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={watchNature}
-                  onValueChange={(value) =>
-                    setValue("nature_of_complaint", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select nature" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {complaintNatures.map((nature) => (
-                      <SelectItem key={nature.id} value={nature.id}>
-                        {nature.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  value={watchNature ?? null}
+                  onChange={(v) => setValue("nature_of_complaint", v ?? "")}
+                  items={complaintNatures}
+                  idField="id"
+                  labelField="name"
+                  placeholder="Select nature"
+                  pageSize={25}
+                  className="w-full"
+                />
                 {errors.nature_of_complaint && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.nature_of_complaint.message}
@@ -733,50 +832,46 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <Label htmlFor="force_number">Force Number <span className="text-red-500">*</span></Label>
-                <Select
-                  value={selectedStaffId ?? ""}
-                  onValueChange={(val) => {
-                    setSelectedStaffId(val || null);
+                <SearchableSelect
+                  value={selectedStaffId ?? null}
+                  // when user selects an item, populate the form fields immediately
+                  onChange={(v) => {
+                    if (!v) {
+                      setSelectedStaffId(null);
+                      setValue("officer_requested", "");
+                      setValue("force_number", "");
+                      setValue("rank", "");
+                      setValue("officer_requested_username", "");
+                      setValue("rank_name", "");
+                      return;
+                    }
+                    const s = staffOptions.find(sp => String(sp.id) === String(v));
+                    if (s) {
+                      setSelectedStaffId(String(s.id));
+                      // set fields expected by backend (ids) and user-facing fields
+                      setValue("officer_requested", s.id);
+                      setValue("force_number", s.force_number ?? "");
+                      setValue("rank", s.rank ?? "");
+                      setValue("officer_requested_username", s.username ?? "");
+                      setValue("rank_name", s.rank_name ?? "");
+                    } else {
+                      setSelectedStaffId(String(v));
+                    }
                   }}
-                >
-                  <SelectTrigger>
-                    {/* show only force_number for selected staff */}
-                    <SelectValue placeholder="Select force number">
-                      {selectedStaffId ? (staffProfiles.find(s => String(s.id) === String(selectedStaffId))?.force_number ?? "") : undefined}
-                    </SelectValue>
-                  </SelectTrigger>
-
-                  <SelectContent>
-                    <div className="px-3 py-2">
-                      <Input
-                        placeholder="Search force number or username..."
-                        value={staffSearch}
-                        // prevent Select from consuming key events (fixes focus/keyboard issue)
-                        onKeyDown={(e) => e.stopPropagation()}
-                        onKeyUp={(e) => e.stopPropagation()}
-                        onChange={(e) => setStaffSearch(e.target.value)}
-                        autoFocus
-                      />
+                  items={staffOptions}
+                  idField="id"
+                  // search_label contains force_number + username + name so users can search by any
+                  labelField="search_label"
+                  placeholder="Search by force number, username or name"
+                  pageSize={25}
+                  renderItem={(sp: any) => (
+                    <div className="flex flex-col">
+                      <span className="font-medium">{sp.force_number}</span>
+                      <span className="text-xs text-muted-foreground">{sp.username} {sp.name ? ` • ${sp.name}` : ""}</span>
                     </div>
-
-                    {(staffProfiles || [])
-                      .filter(sp => {
-                        if (!staffSearch) return true;
-                        const q = staffSearch.toLowerCase();
-                        return String(sp.force_number ?? "").toLowerCase().includes(q)
-                          || String(sp.username ?? "").toLowerCase().includes(q)
-                          || String(sp.name ?? "").toLowerCase().includes(q);
-                      })
-                      .map(sp => (
-                        <SelectItem key={sp.id} value={String(sp.id)}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{sp.force_number}</span>
-                            <span className="text-xs text-muted-foreground">{sp.username}</span>
-                          </div>
-                        </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  )}
+                  className="w-full"
+                />
                 {errors.force_number && <p className="text-red-500 text-sm mt-1">{(errors as any).force_number?.message}</p>}
               </div>
 
@@ -870,24 +965,20 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                         onValueChange={(value) =>
                           setCurrentActionForm({
                             ...currentActionForm,
-                            action_status: value as
-                              | "OPEN"
-                              | "IN_PROGRESS"
-                              | "COMPLETED"
-                              | "CANCELLED",
+                            // value will be the approval-status id (UUID) returned by API
+                            action_status: String(value ?? ""),
                           })
                         }
                       >
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Select status" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="OPEN">Open</SelectItem>
-                          <SelectItem value="IN_PROGRESS">
-                            In Progress
-                          </SelectItem>
-                          <SelectItem value="COMPLETED">Completed</SelectItem>
-                          <SelectItem value="CANCELLED">Cancelled</SelectItem>
+                          {(approvalStatuses || []).map((s: any) => (
+                            <SelectItem key={s.id} value={s.id}>
+                              {s.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>

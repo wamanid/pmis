@@ -264,7 +264,7 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
     <div className="space-y-6">
       {/* Top Controls */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-lg border">
-        <div className="space-y-2">
+        {/* <div className="space-y-2">
           <Label htmlFor="station">
             Station <span className="text-red-500">*</span>
           </Label>
@@ -280,7 +280,7 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
               ))}
             </SelectContent>
           </Select>
-        </div>
+        </div> */}
 
         <div className="space-y-2">
           <Label htmlFor="lockup_type">

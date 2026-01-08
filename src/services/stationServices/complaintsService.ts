@@ -12,6 +12,7 @@ const RANKS_ENDPOINT = '/system-administration/ranks/';
 const OFFICER_ENDPOINT = '/auth/staff-profiles/';
 const COMPLAINT_STATUS_ENDPOINT = '/station-management/api/complaint-status/';
 const COMPLAINT_ACTIONS_ENDPOINT = '/station-management/api/complaint-actions/';
+const APPROVAL_STATUSES = '/system-administration/approval-statuses/';
 
 export const fetchComplaints = async (params?: Record<string, any>) => {
     const res = await axiosInstance.get(BASE, { params });
@@ -149,4 +150,10 @@ export const createComplaintAction = async (payload: any) => {
     console.error('createComplaintAction error', err?.response ?? err);
     throw err;
   }
+};
+
+export const fetchApprovalStatuses = async (signal?: AbortSignal) => {
+  const res = await axiosInstance.get(APPROVAL_STATUSES, { signal });
+  // Return either paginated results or raw array
+  return res.data?.results ?? res.data;
 };

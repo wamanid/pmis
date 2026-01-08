@@ -855,13 +855,22 @@ export default function PhonesLettersScreen() {
               </div>
               {/* Call Notes */}
               <div>
-                <Label htmlFor="call_notes">Call Notes</Label>
+                <Label htmlFor="call_notes">Call Notes <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="call_notes"
                   {...callForm.register("call_notes")}
                   placeholder="Enter any notes about the call"
                   rows={6}
                 />
+                <Textarea
+                  id="call_notes"
+                  {...callForm.register("call_notes", requiredValidation("Call notes"))}
+                  placeholder="Enter any notes about the call"
+                  rows={6}
+                />
+                {callForm.formState.errors.call_notes && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.call_notes as any).message}</p>
+                )}
               </div>
             </div>
             
@@ -1031,12 +1040,22 @@ export default function PhonesLettersScreen() {
 
               {/* Sender Name */}
               <div>
-                <Label htmlFor="sender_name">Sender Name</Label>
+                {/* <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="sender_name"
                   {...letterForm.register("sender_name")}
                   placeholder="Enter sender name"
+                /> */}
+
+                <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="sender_name"
+                  {...letterForm.register("sender_name", requiredValidation("Sender name"))}
+                  placeholder="Enter sender name"
                 />
+                {letterForm.formState.errors.sender_name && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.sender_name as any).message}</p>
+                )}
               </div>
 
               {/* Sender Email */}
@@ -1057,12 +1076,22 @@ export default function PhonesLettersScreen() {
 
               {/* Recipient Name */}
               <div>
-                <Label htmlFor="recipient_name">Recipient Name</Label>
+                {/* <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="recipient_name"
                   {...letterForm.register("recipient_name")}
                   placeholder="Enter recipient name"
+                /> */}
+
+                <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="recipient_name"
+                  {...letterForm.register("recipient_name", requiredValidation("Recipient name"))}
+                  placeholder="Enter recipient name"
                 />
+                {letterForm.formState.errors.recipient_name && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.recipient_name as any).message}</p>
+                )}
               </div>
 
               {/* Recipient Email */}
@@ -1085,13 +1114,24 @@ export default function PhonesLettersScreen() {
 
             {/* Letter Content */}
             <div>
-              <Label htmlFor="letter_content">Letter Content</Label>
+              {/* <Label htmlFor="letter_content">Letter Content <span className="text-red-500">*</span></Label>
               <Textarea
                 id="letter_content"
                 {...letterForm.register("letter_content")}
                 placeholder="Enter letter content"
                 rows={6}
+              /> */}
+
+              <Label htmlFor="letter_content">Letter Content <span className="text-red-500">*</span></Label>
+              <Textarea
+                id="letter_content"
+                {...letterForm.register("letter_content", requiredValidation("Letter content"))}
+                placeholder="Enter letter content"
+                rows={6}
               />
+              {letterForm.formState.errors.letter_content && (
+                <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_content as any).message}</p>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 
