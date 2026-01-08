@@ -1,13 +1,13 @@
 import React from "react";
-import { User, MapPin, Ruler, FileText } from "lucide-react";
+import { User, MapPin, Ruler, FileText, Users, Baby, Scale, Heart, Package, Calendar, GraduationCap, Construction } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "../../ui/card";
 import { Badge } from "../../ui/badge";
 import { Separator } from "../../ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../../ui/tabs";
-import { PrisonerBioData } from "./PrisonerBioDataList";
+import type { PrisonerBiodata } from "../../../models/admission";
 
 interface PrisonerBioDataViewProps {
-  bioData: PrisonerBioData;
+  bioData: PrisonerBiodata;
 }
 
 const PrisonerBioDataView: React.FC<PrisonerBioDataViewProps> = ({ bioData }) => {
@@ -92,11 +92,11 @@ const PrisonerBioDataView: React.FC<PrisonerBioDataViewProps> = ({ bioData }) =>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
                   <p className="text-muted-foreground">Prisoner Number</p>
-                  <p>{bioData.prisoner_number || "N/A"}</p>
+                  <p>{bioData.prisoner_number_value || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Personal Number</p>
-                  <p>{bioData.prisoner_personal_number || "N/A"}</p>
+                  <p>{bioData.prisoner_personal_number_value || "N/A"}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Age</p>
@@ -114,11 +114,18 @@ const PrisonerBioDataView: React.FC<PrisonerBioDataViewProps> = ({ bioData }) =>
 
       {/* Detailed Information Tabs */}
       <Tabs defaultValue="basic" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="w-full justify-start flex-wrap">
           <TabsTrigger value="basic">Basic Info</TabsTrigger>
           <TabsTrigger value="personal">Personal</TabsTrigger>
           <TabsTrigger value="address">Address</TabsTrigger>
           <TabsTrigger value="physical">Physical</TabsTrigger>
+          <TabsTrigger value="nextofkin">Next of Kin</TabsTrigger>
+          <TabsTrigger value="children">Children</TabsTrigger>
+          <TabsTrigger value="sentences">Sentences</TabsTrigger>
+          <TabsTrigger value="medical">Medical</TabsTrigger>
+          <TabsTrigger value="property">Property</TabsTrigger>
+          <TabsTrigger value="court">Court Schedule</TabsTrigger>
+          <TabsTrigger value="rehabilitation">Rehabilitation</TabsTrigger>
           <TabsTrigger value="other">Other Info</TabsTrigger>
         </TabsList>
 
@@ -284,6 +291,153 @@ const PrisonerBioDataView: React.FC<PrisonerBioDataViewProps> = ({ bioData }) =>
                   </div>
                 </>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Next of Kin */}
+        <TabsContent value="nextofkin" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Next of Kin
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Next of Kin information will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Children */}
+        <TabsContent value="children" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Baby className="h-5 w-5" />
+                Children Records
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Children records will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Sentences */}
+        <TabsContent value="sentences" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Scale className="h-5 w-5" />
+                Sentences
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Sentence information will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Medical */}
+        <TabsContent value="medical" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Heart className="h-5 w-5" />
+                Medical Records
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Medical records will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Property */}
+        <TabsContent value="property" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Property Records
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Property records will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Court Schedule */}
+        <TabsContent value="court" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Court Schedule
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Court schedule information will be displayed here.
+              </p>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Rehabilitation */}
+        <TabsContent value="rehabilitation" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <GraduationCap className="h-5 w-5" />
+                Rehabilitation Programs
+                <Badge variant="secondary" className="ml-2">
+                  <Construction className="h-3 w-3 mr-1" />
+                  Work in Progress
+                </Badge>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-muted-foreground text-center py-8">
+                Rehabilitation program information will be displayed here.
+              </p>
             </CardContent>
           </Card>
         </TabsContent>

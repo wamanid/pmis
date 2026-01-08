@@ -44,7 +44,7 @@ import {
 } from "../ui/select";
 import { Badge } from "../ui/badge";
 import { Progress } from "../ui/progress";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   Command,
   CommandEmpty,
@@ -56,6 +56,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import {useFilters} from "../../contexts/FilterContext";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
 import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
   addHousingAssignment,
@@ -1142,7 +1143,7 @@ export default function HousingAllocationScreen() {
         open={isAssignmentDialogOpen}
         onOpenChange={setIsAssignmentDialogOpen}
       >
-        <DialogContent className="max-w-2xl max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-md max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
@@ -1165,51 +1166,22 @@ export default function HousingAllocationScreen() {
                 control={controlAssignment}
                 rules={{ required: "Prisoner is required" }}
                 render={({ field }) => (
-                  <Popover open={prisonerSearchOpen} onOpenChange={setPrisonerSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={prisonerSearchOpen}
-                        className="w-full justify-between"
-                      >
-
-                        <>
-                           {field.value
-                            ? (() => {
-                                const prisoner = prisoners.find((p) => p.id === field.value);
-                                return prisoner
-                                  ? `${prisoner.full_name} (${prisoner.prisoner_number_value})`
-                                  : "Select prisoner...";
-                              })()
-                            : "Search prisoner..."}
-                         </>
-                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search prisoner..." />
-                        <CommandList>
-                          <CommandEmpty>No prisoner found.</CommandEmpty>
-                          <CommandGroup>
-                            {prisoners.map((prisoner) => (
-                              <CommandItem
-                                key={prisoner.id}
-                                value={`${prisoner.full_name} ${prisoner.prisoner_number_value}`}
-                                onSelect={() => {
-                                  field.onChange(prisoner.id);
-                                  setPrisonerSearchOpen(false);
-                                }}
-                              >
-                                {prisoner.full_name} ({prisoner.prisoner_number_value})
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <CustomPrisonerSearch
+                    value={field.value ?? null}
+                    onChange={(v) => field.onChange(v ?? null)}
+                    onSelectItem={(p: any) => {
+                      field.onChange(p?.id ?? null);
+                      // keep local cache so initialItems has recent picks
+                      setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                      // close old popover state if you still rely on it elsewhere
+                      setPrisonerSearchOpen(false);
+                    }}
+                    placeholder="Select prisoner"
+                    idField="id"
+                    labelField="full_name"
+                    initialItems={prisoners}
+                    pageSize={25}
+                  />
                 )}
               />
               {assignmentErrors.prisoner && (

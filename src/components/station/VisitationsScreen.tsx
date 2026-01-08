@@ -29,9 +29,12 @@ import {
   CommandItem,
 } from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import {useFilterRefresh} from "../../hooks/useFilterRefresh";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+import StaffProfileSelect from "../common/StaffProfileSelect";
 import { Calendar } from "../ui/calendar";
 import { Badge } from "../ui/badge";
-import { toast } from "sonner@2.0.3";
+import { toast } from "sonner";
 import {
   Plus,
   Search,
@@ -119,6 +122,15 @@ interface Staff {
 }
 
 export default function VisitationsScreen() {
+  // bump this when global filters change so DataTable remounts & refetches
+  const [filtersReloadKey, setFiltersReloadKey] = useState(0);
+
+  // useFilterRefresh should call this callback when global filters (region/district/station/all) change
+  useFilterRefresh(() => {
+    setPage(1);
+    setFiltersReloadKey((k) => k + 1);
+  });
+
   // Filter & data states
   const [items, setItems] = useState<VisitorItem[]>([]);
   const [gates, setGates] = useState<Gate[]>([]);
@@ -183,19 +195,19 @@ export default function VisitationsScreen() {
   const [openGateCombo, setOpenGateCombo] = useState(false);
   const [openPrisonerCombo, setOpenPrisonerCombo] = useState(false);
   const [openVisitorTypeCombo, setOpenVisitorTypeCombo] = useState(false);
-  const [openGateKeeperCombo, setOpenGateKeeperCombo] = useState(false);
+  // openGateKeeper/openPrisoner state removed — using reusable selects instead
   const [openRelationCombo, setOpenRelationCombo] = useState(false);
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
 
   const [visitorRecordsLoading, setVisitorRecordsLoading] = useState(false)
-  // DataTable states
-  const [tableData, setTableData] = useState<Visitor[]>([]);
-  const [tableLoading, setTableLoading] = useState<boolean>(true);
-  const [total, setTotal] = useState<number>(0);
+  // DataTable: let the shared DataTable component handle loading/paging/sorting
+  const [tableData, setTableData] = useState<Visitor[]>([]); // kept for other code that may read it
+  const [tableLoading, setTableLoading] = useState<boolean>(false); // DataTable handles its own loading when using url
+  const [total, setTotal] = useState<number>(0); // not used by url mode but kept for compatibility
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [reloadCounter, setReloadCounter] = useState(0); // <-- added
+  const [reloadCounter, setReloadCounter] = useState(0);
   const [sortField, setSortField] = useState<string | undefined>(undefined);
   const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
   const requestIdRef = useRef(0);
@@ -221,6 +233,9 @@ export default function VisitationsScreen() {
     ...it,
   }), []);
 
+  // NOTE: DataTable handles fetching when you supply the `url` prop.
+  // Manual loadTable + effects are intentionally disabled to avoid double-fetch / shape mismatch.
+  // If you need server-side params (search/paging) coordinated, extend the shared DataTable to accept them.
   // loadTable: server-side load with abort + request id guard
   const loadTable = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
     try { abortRef.current?.abort(); } catch {}
@@ -262,10 +277,10 @@ export default function VisitationsScreen() {
     }
   }, [page, pageSize, sortField, sortDir, debouncedSearch, mapVisitor]);
 
-  // trigger load when paging/sorting/search change
-  useEffect(() => {
-    loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
-  }, [page, pageSize, sortField, sortDir, debouncedSearch, loadTable]);
+  // trigger load handled by DataTable (url prop). If you previously relied on loadTable, add server-side props support
+  // useEffect(() => {
+  //   loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
+  // }, [page, pageSize, sortField, sortDir, debouncedSearch, loadTable]);
 
   // Camera functions
   const startCamera = async () => {
@@ -543,13 +558,13 @@ export default function VisitationsScreen() {
           {/* Search and Actions */}
           <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
             <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              {/* <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search by name, ID number, or contact..."
                 value={searchQuery}
                 onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
                 className="pl-10"
-              />
+              /> */}
             </div>
 
             <Button 
@@ -801,53 +816,12 @@ export default function VisitationsScreen() {
                     {/* Gate Keeper */}
                     <div className="space-y-2">
                       <Label>Gate Keeper <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openGateKeeperCombo}
-                        onOpenChange={setOpenGateKeeperCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openGateKeeperCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.gate_keeper
-                              ? staffList.find((s) => s.id === form.gate_keeper)
-                                  ?.name
-                              : "Select gate keeper..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search staff..." />
-                            <CommandEmpty>No staff found.</CommandEmpty>
-                            <CommandGroup>
-                              {staffList.map((staff) => (
-                                <CommandItem
-                                  key={staff.id}
-                                  value={staff.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, gate_keeper: staff.id });
-                                    setOpenGateKeeperCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.gate_keeper === staff.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {staff.name} ({staff.force_number}) - {staff.rank}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <StaffProfileSelect
+                        value={form.gate_keeper ? String(form.gate_keeper) : ""}
+                        onChange={(val) => setForm(prev => ({ ...prev, gate_keeper: String(val ?? "") }))}
+                        placeholder="Select gate keeper..."
+                        initialItems={staffList}
+                      />
                     </div>
                   </div>
 
@@ -855,53 +829,16 @@ export default function VisitationsScreen() {
                     {/* Prisoner */}
                     <div className="space-y-2">
                       <Label>Prisoner to Visit <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openPrisonerCombo}
-                        onOpenChange={setOpenPrisonerCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openPrisonerCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.prisoner
-                              ? prisoners.find((p) => p.id === form.prisoner)
-                                  ?.full_name
-                              : "Select prisoner..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search prisoner..." />
-                            <CommandEmpty>No prisoner found.</CommandEmpty>
-                            <CommandGroup>
-                              {prisoners.map((prisoner) => (
-                                <CommandItem
-                                  key={prisoner.id}
-                                  value={prisoner.full_name}
-                                  onSelect={() => {
-                                    setForm({ ...form, prisoner: prisoner.id });
-                                    setOpenPrisonerCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.prisoner === prisoner.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {prisoner.full_name} ({prisoner.prisoner_number})
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <CustomPrisonerSearch
+                        value={form.prisoner ? String(form.prisoner) : null}
+                        onChange={(val) => setForm(prev => ({ ...prev, prisoner: String(val ?? "") }))}
+                        onSelectItem={(p: any) => setForm(prev => ({ ...prev, prisoner: String(p?.id ?? "") }))}
+                        placeholder="Select prisoner..."
+                        idField="id"
+                        labelField="full_name"
+                        initialItems={prisoners}
+                        pageSize={25}
+                      />
                     </div>
 
                     {/* Relationship */}
@@ -1358,22 +1295,34 @@ export default function VisitationsScreen() {
               </div>
             ) : (
               <DataTable
+                key={`visitors-${filtersReloadKey}`} // force remount/refetch when filters change
                 url="/gate-management/station-visitors/"
-                data={tableData}
-                loading={tableLoading}
-                total={total}
-                title="Visitor Records"
-                columns={[
-                  { key: 'full_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => (<div><p>{`${row.first_name ?? ''} ${row.middle_name ?? ''} ${row.last_name ?? ''}`.trim()}</p>{row.organisation && <p className="text-xs text-muted-foreground">{row.organisation}</p>}</div>) },
-                  { key: 'id_number', label: 'ID Number', sortable: true },
-                  { key: 'contact_no', label: 'Contact', sortable: true },
-                  { key: 'prisoner_name', label: 'Prisoner', sortable: true },
-                  { key: 'visitor_type_name', label: 'Visitor Type', sortable: true },
-                  { key: 'gate_name', label: 'Gate', sortable: true },
-                  { key: 'time_in', label: 'Time In', sortable: true, render: (_v: any, row: any) => row.time_in ? (<div className="flex items-center gap-1 text-green-600"><LogIn className="h-3 w-3" />{extractTimeHHMM(row.time_in)}</div>) : '-' },
-                  { key: 'time_out', label: 'Time Out', sortable: true, render: (_v: any, row: any) => row.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(row.time_out)}</div>) : '-' },
-                  { key: 'visitor_status_name', label: 'Status', sortable: true, render: (v: any) => getStatusBadge(v) },
-                  { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(row)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>)},
+                // externalSearch={debouncedSearch}
+                 title="Visitor Records"
+                 columns={[
+                  { key: 'first_name', label: 'Visitor Name', sortable: true, render: (_v: any, row: any) => {
+                      const r = row ?? {};
+                      return (<div><p>{`${r.first_name ?? ''} ${r.middle_name ?? ''} ${r.last_name ?? ''}`.trim()}</p>{r.organisation ? <p className="text-xs text-muted-foreground">{String(r.organisation)}</p> : null}</div>);
+                    }
+                  },
+                  { key: 'id_number', label: 'ID Number', sortable: true, render: (_v:any,row:any) => String((row ?? {})?.id_number ?? '-') },
+                  { key: 'contact_no', label: 'Contact', sortable: true, render: (_v:any,row:any) => String((row ?? {})?.contact_no ?? '-') },
+                  { key: 'prisoner_name', label: 'Prisoner', sortable: true, render: (_v:any,row:any) => String((row ?? {})?.prisoner_name ?? '-') },
+                  { key: 'visitor_type_name', label: 'Visitor Type', sortable: true, render: (_v:any,row:any) => String((row ?? {})?.visitor_type_name ?? '-') },
+                  { key: 'gate_name', label: 'Gate', sortable: true, render: (_v:any,row:any) => String((row ?? {})?.gate_name ?? '-') },
+                  { key: 'time_in', label: 'Time In', sortable: true, render: (_v: any, row: any) => {
+                      const r = row ?? {};
+                      return r.time_in ? (<div className="flex items-center gap-1 text-green-600"><LogIn className="h-3 w-3" />{extractTimeHHMM(r.time_in)}</div>) : '-';
+                  }},
+                  { key: 'time_out', label: 'Time Out', sortable: true, render: (_v: any, row: any) => {
+                      const r = row ?? {};
+                      return r.time_out ? (<div className="flex items-center gap-1 text-red-600"><LogOut className="h-3 w-3" />{extractTimeHHMM(r.time_out)}</div>) : '-';
+                  }},
+                  { key: 'visitor_status_name', label: 'Status', sortable: true, render: (_v:any,row:any) => getStatusBadge(String((row ?? {})?.visitor_status_name ?? '')) },
+                  { key: 'actions', label: 'Actions', sortable: false, render: (_v:any,row:any) => {
+                      const r = row ?? {};
+                      return (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(r)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(r)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>);
+                  }},
                 ]}
                 // externalSearch={searchQuery}
                 onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
@@ -1383,8 +1332,8 @@ export default function VisitationsScreen() {
                 page={page}
                 pageSize={pageSize}
               />
-            )}
-          </div>
+             )}
+           </div>
         </TabsContent>
 
         {/* Visitor Items Tab */}

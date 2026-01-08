@@ -567,7 +567,11 @@ export function StageAssignList() {
                       className="w-full justify-start text-left font-normal"
                     >
                       <CalendarIcon className="mr-2 h-4 w-4" />
-                     
+                      {startDateFrom ? (
+                        format(startDateFrom, 'PPP')
+                      ) : (
+                        <span>Pick a date</span>
+                      )}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0">

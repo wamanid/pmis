@@ -10,7 +10,7 @@ import {
   getPropertyStatuses,
   getPropertyTypes, PrisonerProperty, Property,
   PropertyBag, updateProperty
-} from "../../services/stationServices/propertyService";
+} from "../../services/propertyServices/propertyService";
 import PropertyItem from "./PropertyItem";
 import {getNextOfKins, NextOfKinResponse} from "../../services/admission/nextOfKinService";
 import {
@@ -54,10 +54,10 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import {
-  getPropertyTypeUtil,
-  handleCatchError,
-  handleEmptyList,
-  handleServerError
+    getPropertyTypeUtil,
+    handleCatchError,
+    handleEmptyList, handleResponseError,
+    handleServerError
 } from "../../services/stationServices/utils";
 
 interface ChildProps {
@@ -165,6 +165,8 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         try {
           if (selectedProperty === null) {
              const response = await addProperty(property)
+              if (handleResponseError(response)) return
+
              setProperties(prev => ([response, ...prev]))
              toast.success("Property created successfully");
           }
@@ -360,7 +362,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
             <div className="p-4">
               <h3 className="mb-4" style={{color: '#650000'}}>Prisoner Information</h3>
               <div className="space-y-2">
-                <Label htmlFor="prisoner">Prisoner *</Label>
+                <Label htmlFor="prisoner">Prisoner <span className="text-red-500">*</span></Label>
                 <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
                   <PopoverTrigger asChild>
                     <Button

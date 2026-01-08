@@ -5,7 +5,7 @@ import {
     getPropertyTypes, PrisonerProperty,
     PropertyBag,
     PropertyItem
-} from "../../services/stationServices/propertyService";
+} from "../../services/propertyServices/propertyService";
 import {ItemCategory, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 import {Card} from "../ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "../ui/collapsible";
@@ -239,7 +239,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
               {
                   !!visitorItems.length && (
                        <div className="space-y-2 md:col-span-2">
-                        <Label>Select Visitor Item (Optional) *</Label>
+                        <Label>Select Visitor Item (Optional) <span className="text-red-500">*</span></Label>
                         <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
                           <PopoverTrigger asChild>
                             <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -298,7 +298,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
               <>
                    {/* Property Type */}
                     <div className="space-y-2">
-                      <Label>Property Type *</Label>
+                      <Label>Property Type <span className="text-red-500">*</span></Label>
                       <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
@@ -342,7 +342,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                    {
                        selectedProperty === null && (
                            <div className="space-y-2">
-                              <Label>Property Category *</Label>
+                              <Label>Property Category <span className="text-red-500">*</span></Label>
                               <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
                                 <PopoverTrigger asChild>
                                   <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
@@ -386,7 +386,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
                     {/* Property Item */}
                     <div className="space-y-2">
-                      <Label>Property Item *</Label>
+                      <Label>Property Item <span className="text-red-500">*</span></Label>
                       <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
@@ -468,7 +468,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
                     {/* Quantity */}
                     <div className="space-y-2">
-                      <Label>Quantity *</Label>
+                      <Label>Quantity <span className="text-red-500">*</span></Label>
                       <Input
                         type="text"
                         name="quantity"
@@ -495,7 +495,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
                     {/* Property Bag */}
                     <div className="space-y-2">
-                      <Label>Property Bag *</Label>
+                      <Label>Property Bag <span className="text-red-500">*</span></Label>
                       <Popover open={openPropertyBag} onOpenChange={setOpenPropertyBag}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -533,7 +533,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
 
                     {/* Property Status */}
                     <div className="space-y-2">
-                      <Label>Property Status *</Label>
+                      <Label>Property Status <span className="text-red-500">*</span></Label>
                       <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
                         <PopoverTrigger asChild>
                           <Button variant="outline" role="combobox" className="w-full justify-between" type="button">

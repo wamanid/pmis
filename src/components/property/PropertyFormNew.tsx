@@ -61,7 +61,7 @@ const PropertyFormNew = ({
             <div className="p-4">
               <h3 className="mb-4" style={{ color: '#650000' }}>Prisoner Information</h3>
               <div className="space-y-2">
-                <Label htmlFor="prisoner">Prisoner *</Label>
+                <Label htmlFor="prisoner">Prisoner <span className="text-red-500">*</span></Label>
                 <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
                   <PopoverTrigger asChild>
                     <Button
@@ -346,7 +346,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Property Type */}
         <div className="space-y-2">
-          <Label>Property Type *</Label>
+          <Label>Property Type <span className="text-red-500">*</span></Label>
           <Popover open={openStates.propertyType} onOpenChange={() => toggleOpen('propertyType')}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -384,7 +384,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
 
         {/* Property Category */}
         <div className="space-y-2">
-          <Label>Property Category *</Label>
+          <Label>Property Category <span className="text-red-500">*</span></Label>
           <Popover open={openStates.propertyCategory} onOpenChange={() => toggleOpen('propertyCategory')}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -422,7 +422,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
 
         {/* Property Item */}
         <div className="space-y-2">
-          <Label>Property Item *</Label>
+          <Label>Property Item <span className="text-red-500">*</span></Label>
           <Popover open={openStates.propertyItem} onOpenChange={() => toggleOpen('propertyItem')}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -498,7 +498,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
 
         {/* Quantity */}
         <div className="space-y-2">
-          <Label>Quantity *</Label>
+          <Label>Quantity <span className="text-red-500">*</span></Label>
           <Input
             type="text"
             value={item.quantity}
@@ -521,7 +521,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
 
         {/* Property Bag */}
         <div className="space-y-2">
-          <Label>Property Bag *</Label>
+          <Label>Property Bag <span className="text-red-500">*</span></Label>
           <Popover open={openStates.propertyBag} onOpenChange={() => toggleOpen('propertyBag')}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
@@ -559,7 +559,7 @@ const PropertyItemFields = ({ item, index, propertyItems, handleUpdatePropertyIt
 
         {/* Property Status */}
         <div className="space-y-2">
-          <Label>Property Status *</Label>
+          <Label>Property Status <span className="text-red-500">*</span></Label>
           <Popover open={openStates.propertyStatus} onOpenChange={() => toggleOpen('propertyStatus')}>
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="w-full justify-between" type="button">

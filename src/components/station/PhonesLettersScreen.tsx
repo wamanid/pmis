@@ -1,4 +1,3 @@
-
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -27,6 +26,7 @@ import { sendFile, AUDIO_EXTS, LETTER_ALLOWED_EXTS } from "../../services/upload
 import { readFileAsBase64 } from "../../services/fileUploadService"; // keep if used elsewhere
 import StaffProfileSelect from "../common/StaffProfileSelect";
 import ConfirmDialog from "../common/ConfirmDialog";
+import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
 
 /**
  * Centralized API endpoints (single source of truth).
@@ -131,18 +131,31 @@ type Tab = "calls" | "letters";
 
 export default function PhonesLettersScreen() {
   const { station, district, region } = useFilters();
+  const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
+  // preload staff profiles once (and re-load when top-nav filters change)
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+    (async () => {
+      try {
+        const res = await axiosInstance.get("/auth/staff-profiles/", { params: { page_size: 200, station: station ?? undefined, district: district ?? undefined, region: region ?? undefined }, signal: c.signal });
+        if (!mounted) return;
+        const items = res?.data?.results ?? res?.data ?? [];
+        setStaffProfiles(Array.isArray(items) ? items : []);
+      } catch (err: any) {
+        // ignore abort / cancel noise
+        if ((err as any)?.name === "AbortError" || (err as any)?.code === "ERR_CANCELED") return;
+        console.error("prefetch staffProfiles", err);
+      }
+    })();
+    return () => { mounted = false; c.abort(); };
+  }, [station, district, region]);
 
   const [activeTab, setActiveTab] = useState<Tab>("calls");
 
-  // shared table state (calls)
-  const [callsData, setCallsData] = useState<PhoneService.CallRecordItem[]>([]);
-  const [callsLoading, setCallsLoading] = useState(true);
-  const [callsTotal, setCallsTotal] = useState(0);
-
-  // shared table state (letters)
-  const [lettersData, setLettersData] = useState<LetterService.ELetterItem[]>([]);
-  const [lettersLoading, setLettersLoading] = useState(true);
-  const [lettersTotal, setLettersTotal] = useState(0);
+  // small totals used in tab labels (we still fetch totals separately)
+  const [callsTotal, setCallsTotal] = useState<number>(0);
+  const [lettersTotal, setLettersTotal] = useState<number>(0);
 
   // paging / sort / search (shared pattern, separate state per table)
   const [page, setPage] = useState(1);
@@ -156,8 +169,8 @@ export default function PhonesLettersScreen() {
     return () => window.clearTimeout(id);
   }, [searchTerm]);
 
-  const abortRef = useRef<AbortController | null>(null);
-  const requestIdRef = useRef(0);
+  // bump to force DataTable remount/refetch (filters or after mutations)
+  const [filtersReloadKey, setFiltersReloadKey] = useState<number>(0);
 
   // lookups for selects
   const [prisoners, setPrisoners] = useState<any[]>([]);
@@ -179,110 +192,131 @@ export default function PhonesLettersScreen() {
   const mapCall = useCallback((it: any): PhoneService.CallRecordItem => ({ ...it }), []);
   const mapLetter = useCallback((it: any): LetterService.ELetterItem => ({ ...it }), []);
 
+  // helper: fetch totals only (used in tab headers)
+  const fetchCallsTotal = useCallback(async (q = debouncedSearch) => {
+    try {
+      const params: any = { page: 1, page_size: 1 };
+      if (q) params.search = q;
+      if (station) params.station = station;
+      if (district) params.district = district;
+      if (region) params.region = region;
+      const res = await PhoneService.fetchCallRecords(params);
+      const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
+      setCallsTotal(count);
+    } catch (err) {
+      console.error("fetchCallsTotal error", err);
+    }
+  }, [debouncedSearch, station, district, region]);
+
+  const fetchLettersTotal = useCallback(async (q = debouncedSearch) => {
+    try {
+      const params: any = { page: 1, page_size: 1 };
+      if (q) params.search = q;
+      if (station) params.station = station;
+      if (district) params.district = district;
+      if (region) params.region = region;
+      const res = await LetterService.fetchLetters(params);
+      const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
+      setLettersTotal(count);
+    } catch (err) {
+      console.error("fetchLettersTotal error", err);
+    }
+  }, [debouncedSearch, station, district, region]);
+
+  // helpers used after mutations — force DataTable to remount/refetch and refresh totals
+  const loadCalls = useCallback(async (p = page, ps = pageSize) => {
+    setFiltersReloadKey(k => k + 1);
+    try { await fetchCallsTotal(); } catch (e) { /* ignore */ }
+    return;
+  }, [fetchCallsTotal]);
+
+  const loadLetters = useCallback(async (p = page, ps = pageSize) => {
+    setFiltersReloadKey(k => k + 1);
+    try { await fetchLettersTotal(); } catch (e) { /* ignore */ }
+    return;
+  }, [fetchLettersTotal]);
+
   // load lookups used in searchable selects
+  useEffect(() => {
+     let mounted = true;
+     const c = new AbortController();
+     (async () => {
+       try {
+         const [lt, rel] = await Promise.all([
+           LetterService.fetchLetterTypes(undefined, c.signal),
+           LetterService.fetchRelationships(undefined, c.signal),
+         ]);
+         if (!mounted) return;
+        // normalize so select components can use either id/name or value/label
+        const normLetterTypes = (lt ?? []).map((x:any) => ({
+          id: x.id ?? x.pk ?? x.value,
+          value: x.id ?? x.pk ?? x.value,
+          name: x.name ?? x.label ?? x.type ?? String(x),
+          label: x.name ?? x.label ?? x.type ?? String(x),
+          raw: x,
+        }));
+        const normRelationships = (rel ?? []).map((x:any) => ({
+          id: x.id ?? x.pk ?? x.value,
+          value: x.id ?? x.pk ?? x.value,
+          name: x.name ?? x.label ?? x.relation ?? String(x),
+          label: x.name ?? x.label ?? x.relation ?? String(x),
+          raw: x,
+        }));
+         console.debug("loaded letterTypes:", normLetterTypes);
+         console.debug("loaded relationships:", normRelationships);
+         setLetterTypes(normLetterTypes);
+         setRelationships(normRelationships);
+       } catch (err) {
+         console.error("lookup error", err);
+       }
+     })();
+     return () => { mounted = false; c.abort(); };
+   }, []);
+
+  // prefetch call types once and normalize to the same shape as other lookups
   useEffect(() => {
     let mounted = true;
     const c = new AbortController();
     (async () => {
       try {
-        const [lt, rel] = await Promise.all([
-          LetterService.fetchLetterTypes(undefined, c.signal),
-          LetterService.fetchRelationships(undefined, c.signal),
-        ]);
+        const res = await axiosInstance.get("/rehabilitation/call-types/", { params: { page_size: 50 }, signal: c.signal });
+        const items = res?.data?.results ?? res?.data ?? [];
         if (!mounted) return;
-        setLetterTypes(lt ?? []);
-        setRelationships(rel ?? []);
+        const norm = (Array.isArray(items) ? items : []).map((it: any) => ({
+          id: it.id ?? it.pk ?? it.value,
+          value: it.id ?? it.pk ?? it.value,
+          name: it.name ?? it.label ?? it.call_type_name ?? String(it),
+          label: it.name ?? it.label ?? it.call_type_name ?? String(it),
+          raw: it,
+        }));
+        setCallTypes(norm);
       } catch (err) {
-        console.error("lookup error", err);
+        if ((err as any)?.name === "AbortError") return;
+        console.error("prefetch call types", err);
       }
     })();
     return () => { mounted = false; c.abort(); };
   }, []);
 
-  // Parent-controlled loadTable for calls
-  const loadCalls = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setCallsLoading(true);
-    try {
-      const params: Record<string, any> = {
-        page: Math.max(1, Number(_page) || 1),
-        page_size: Number(_pageSize) || 10,
-      };
-      if (_sortField) params.ordering = _sortDir === "desc" ? `-${_sortField}` : _sortField;
-      if (_search) params.search = _search;
-      // include location filters from top nav if present
-      if (station) params.station = station;
-      if (district) params.district = district;
-      if (region) params.region = region;
-
-      const res = await PhoneService.fetchCallRecords(params, controller.signal);
-      const items = res?.results ?? res ?? [];
-      const count = Number(res?.count ?? items.length ?? 0);
-      if (requestIdRef.current === reqId) {
-        setCallsData((items || []).map(mapCall));
-        setCallsTotal(count);
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return;
-      console.error("loadCalls error", err);
-      toast.error("Failed to load call records");
-    } finally {
-      if (requestIdRef.current === reqId) setCallsLoading(false);
-    }
-  }, [page, pageSize, sortField, sortDir, debouncedSearch, station, district, region, mapCall]);
-
-  // Parent-controlled loadTable for letters
-  const loadLetters = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = debouncedSearch) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setLettersLoading(true);
-    try {
-      const params: Record<string, any> = {
-        page: Math.max(1, Number(_page) || 1),
-        page_size: Number(_pageSize) || 10,
-      };
-      if (_sortField) params.ordering = _sortDir === "desc" ? `-${_sortField}` : _sortField;
-      if (_search) params.search = _search;
-      if (station) params.station = station;
-      if (district) params.district = district;
-      if (region) params.region = region;
-
-      const res = await LetterService.fetchLetters(params, controller.signal);
-      const items = res?.results ?? res ?? [];
-      const count = Number(res?.count ?? items.length ?? 0);
-      if (requestIdRef.current === reqId) {
-        setLettersData((items || []).map(mapLetter));
-        setLettersTotal(count);
-      }
-    } catch (err: any) {
-      if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return;
-      console.error("loadLetters error", err);
-      toast.error("Failed to load letters");
-    } finally {
-      if (requestIdRef.current === reqId) setLettersLoading(false);
-    }
-  }, [page, pageSize, sortField, sortDir, debouncedSearch, station, district, region, mapLetter]);
-
-  // reload when filters or debounce/search change
+  // refresh totals when filters/search/tab change (DataTable will fetch rows itself)
   useEffect(() => {
-    if (activeTab === "calls") {
-      loadCalls(1, pageSize, sortField, sortDir, debouncedSearch);
-    } else {
-      loadLetters(1, pageSize, sortField, sortDir, debouncedSearch);
-    }
-  }, [activeTab, page, pageSize, sortField, sortDir, debouncedSearch, loadCalls, loadLetters]);
+    fetchCallsTotal();
+    fetchLettersTotal();
+    // reset page when search or context changes
+    setPage(1);
+  }, [activeTab, debouncedSearch, station, district, region, fetchCallsTotal, fetchLettersTotal]);
 
   // wire top-nav filter refresh
   useFilterRefresh(() => {
-    // reset page and reload active tab
-    setPage(1);
-    if (activeTab === "calls") loadCalls(1, pageSize, sortField, sortDir, debouncedSearch);
-    else loadLetters(1, pageSize, sortField, sortDir, debouncedSearch);
+    // Wait one tick so the filter context (region/district/station) has updated
+    // before we remount DataTable / refresh totals.
+    setTimeout(() => {
+      setPage(1);
+      setFiltersReloadKey(k => k + 1);
+      // refresh totals after remount so counts reflect new filters
+      fetchCallsTotal();
+      fetchLettersTotal();
+    }, 0);
   }, [region, district, station]);
 
   // datatable callbacks
@@ -394,11 +428,6 @@ export default function PhonesLettersScreen() {
       return [];
     }
   }, [station, district, region]);
-
-  const fetchCallTypes = useCallback(async (q = "", signal?: AbortSignal) => {
-    const res = await axiosInstance.get("/rehabilitation/call-types/", { params: { search: q, page_size: 50 }, signal });
-    return res.data?.results ?? [];
-  }, []);
 
   // small wrappers for preloaded lists (relationships, letterTypes)
   const fetchRelationshipsLocal = useCallback(async (q = "") => {
@@ -565,8 +594,8 @@ export default function PhonesLettersScreen() {
 
       <div className="flex gap-4 items-center">
         <div className="relative flex-1 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={`Search ${activeTab === "calls" ? "calls" : "letters"}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" />
+          {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input placeholder={`Search ${activeTab === "calls" ? "calls" : "letters"}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /> */}
         </div>
         <Button className="bg-primary" 
           onClick={() => { 
@@ -600,13 +629,11 @@ export default function PhonesLettersScreen() {
           <CardContent>
             {activeTab === "calls" ? (
               <DataTable
-              url="/rehabilitation/call-records/"
-                data={callsData}
-                loading={callsLoading}
-                total={callsTotal}
+                key={`calls-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                url={`/rehabilitation/call-records/?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                externalSearch={debouncedSearch}
                 title="Call Records"
                 columns={callsColumns}
-                externalSearch={searchTerm}
                 onSearch={onSearch}
                 onPageChange={onPageChange}
                 onPageSizeChange={onPageSizeChange}
@@ -616,13 +643,11 @@ export default function PhonesLettersScreen() {
               />
             ) : (
               <DataTable
-              url="/rehabilitation/eletters/"
-                data={lettersData}
-                loading={lettersLoading}
-                total={lettersTotal}
+                key={`letters-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                url={`/rehabilitation/eletters/?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                externalSearch={debouncedSearch}
                 title="Letters"
                 columns={lettersColumns}
-                externalSearch={searchTerm}
                 onSearch={onSearch}
                 onPageChange={onPageChange}
                 onPageSizeChange={onPageSizeChange}
@@ -637,7 +662,7 @@ export default function PhonesLettersScreen() {
 
       {/* Call dialog */}
       <Dialog open={callDialogOpen} onOpenChange={setCallDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingCall ? "Edit Call Record" : "Add Call Record"}</DialogTitle></DialogHeader>
           <form onSubmit={callForm.handleSubmit(onSubmitCall)} className="space-y-4 p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -651,20 +676,18 @@ export default function PhonesLettersScreen() {
                   control={callForm.control}
                   rules={requiredValidation("Prisoner")}
                   render={({ field }) => (
-                    <SearchableSelect
-                      key={`prisoner-select-${region ?? ""}-${district ?? ""}-${station ?? ""}`}
-                      value={field.value}
-                      onChange={(id) => field.onChange(id)}
-                      fetchOptions={fetchPrisoners}
+                    <CustomPrisonerSearch
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      onSelectItem={(p:any) => {
+                        field.onChange(p?.id ?? p ?? null);
+                        setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                      }}
                       placeholder="Select prisoner"
                       idField="id"
                       labelField="full_name"
-                      renderItem={(p: any) => {
-                        const name = p.full_name ?? `${(p.first_name ?? "")} ${(p.last_name ?? "")}`.trim();
-                        const number = p.prisoner_number_value ?? p.prisoner_number ?? "";
-                        const stationName = p.current_station_name ?? p.station_name ?? "";
-                        return `${String(name).trim()} ${number ? `(${number})` : ""}${stationName ? ` — ${stationName}` : ""}`;
-                      }}
+                      initialItems={prisoners}
+                      pageSize={25}
                     />
                   )}
                 />
@@ -716,7 +739,7 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      fetchOptions={fetchCallTypes}
+                      items={callTypes}
                       placeholder="Select call type"
                       idField="id"
                       labelField="name"
@@ -741,7 +764,7 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      fetchOptions={fetchRelationshipsLocal}
+                      items={relationships}
                       placeholder="Select relationship"
                       idField="id"
                       labelField="name"
@@ -764,9 +787,10 @@ export default function PhonesLettersScreen() {
                   rules={requiredValidation("Welfare officer")}
                   render={({ field }) => (
                     <StaffProfileSelect
-                      value={field.value}
-                      onChange={(forceNumber) => field.onChange(forceNumber)}
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
                       placeholder="Select welfare officer"
+                      initialItems={staffProfiles}
                     />
                   )}
                 />
@@ -831,13 +855,22 @@ export default function PhonesLettersScreen() {
               </div>
               {/* Call Notes */}
               <div>
-                <Label htmlFor="call_notes">Call Notes</Label>
+                <Label htmlFor="call_notes">Call Notes <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="call_notes"
                   {...callForm.register("call_notes")}
                   placeholder="Enter any notes about the call"
                   rows={6}
                 />
+                <Textarea
+                  id="call_notes"
+                  {...callForm.register("call_notes", requiredValidation("Call notes"))}
+                  placeholder="Enter any notes about the call"
+                  rows={6}
+                />
+                {callForm.formState.errors.call_notes && (
+                  <p className="text-red-500 text-sm mt-1">{(callForm.formState.errors.call_notes as any).message}</p>
+                )}
               </div>
             </div>
             
@@ -850,8 +883,9 @@ export default function PhonesLettersScreen() {
        </Dialog>
 
       {/* Letter dialog */}
+      
       <Dialog open={letterDialogOpen} onOpenChange={setLetterDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingLetter ? "Edit Letter" : "Add Letter"}</DialogTitle></DialogHeader>
           <form onSubmit={letterForm.handleSubmit(onSubmitLetter)} className="space-y-4 p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -865,19 +899,18 @@ export default function PhonesLettersScreen() {
                   control={letterForm.control}
                   rules={requiredValidation("Prisoner")}
                   render={({ field }) => (
-                    <SearchableSelect
-                      value={field.value}
-                      onChange={(id) => field.onChange(id)}
-                      fetchOptions={fetchPrisoners}
+                    <CustomPrisonerSearch
+                      value={field.value ?? null}
+                      onChange={(v) => field.onChange(v ?? null)}
+                      onSelectItem={(p:any) => {
+                        field.onChange(p?.id ?? p ?? null);
+                        setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                      }}
                       placeholder="Select prisoner"
                       idField="id"
                       labelField="full_name"
-                      renderItem={(p: any) => {
-                        const name = p.full_name ?? `${(p.first_name ?? "")} ${(p.last_name ?? "")}`.trim();
-                        const number = p.prisoner_number_value ?? p.prisoner_number ?? "";
-                        const stationName = p.current_station_name ?? p.station_name ?? "";
-                        return `${String(name).trim()} ${number ? `(${number})` : ""}${stationName ? ` — ${stationName}` : ""}`;
-                      }}
+                      initialItems={prisoners}
+                      pageSize={25}
                     />
                   )}
                 />
@@ -954,7 +987,7 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      fetchOptions={fetchRelationshipsLocal}
+                      items={relationships}
                       placeholder="Select relationship"
                       idField="id"
                       labelField="name"
@@ -967,29 +1000,62 @@ export default function PhonesLettersScreen() {
               </div>
 
               {/* Welfare Officer */}
-              <div>
+              {/* <div>
                 <Label htmlFor="welfare_officer">Welfare Officer</Label>
                 <Controller
                   name="welfare_officer"
                   control={letterForm.control}
                   render={({ field }) => (
                     <StaffProfileSelect
-                      value={field.value}
-                      onChange={(forceNumber) => field.onChange(forceNumber)}
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
                       placeholder="Select welfare officer"
+                      initialItems={[]} // optional: replace with cached staff if available
                     />
                   )}
                 />
+              </div> */}
+
+              <div>
+                <Label htmlFor="welfare_officer">
+                  Welfare Officer <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="welfare_officer"
+                  control={letterForm.control}
+                  rules={requiredValidation("Welfare officer")}
+                  render={({ field }) => (
+                    <StaffProfileSelect
+                      value={String(field.value ?? "")}
+                      onChange={(v) => field.onChange(v ?? "")}
+                      placeholder="Select welfare officer"
+                      initialItems={staffProfiles}
+                    />
+                  )}
+                />
+                {letterForm.formState.errors.welfare_officer && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.welfare_officer as any).message}</p>
+                )}
               </div>
 
               {/* Sender Name */}
               <div>
-                <Label htmlFor="sender_name">Sender Name</Label>
+                {/* <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="sender_name"
                   {...letterForm.register("sender_name")}
                   placeholder="Enter sender name"
+                /> */}
+
+                <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="sender_name"
+                  {...letterForm.register("sender_name", requiredValidation("Sender name"))}
+                  placeholder="Enter sender name"
                 />
+                {letterForm.formState.errors.sender_name && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.sender_name as any).message}</p>
+                )}
               </div>
 
               {/* Sender Email */}
@@ -1010,12 +1076,22 @@ export default function PhonesLettersScreen() {
 
               {/* Recipient Name */}
               <div>
-                <Label htmlFor="recipient_name">Recipient Name</Label>
+                {/* <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="recipient_name"
                   {...letterForm.register("recipient_name")}
                   placeholder="Enter recipient name"
+                /> */}
+
+                <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
+                <Input
+                  id="recipient_name"
+                  {...letterForm.register("recipient_name", requiredValidation("Recipient name"))}
+                  placeholder="Enter recipient name"
                 />
+                {letterForm.formState.errors.recipient_name && (
+                  <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.recipient_name as any).message}</p>
+                )}
               </div>
 
               {/* Recipient Email */}
@@ -1038,13 +1114,24 @@ export default function PhonesLettersScreen() {
 
             {/* Letter Content */}
             <div>
-              <Label htmlFor="letter_content">Letter Content</Label>
+              {/* <Label htmlFor="letter_content">Letter Content <span className="text-red-500">*</span></Label>
               <Textarea
                 id="letter_content"
                 {...letterForm.register("letter_content")}
                 placeholder="Enter letter content"
                 rows={6}
+              /> */}
+
+              <Label htmlFor="letter_content">Letter Content <span className="text-red-500">*</span></Label>
+              <Textarea
+                id="letter_content"
+                {...letterForm.register("letter_content", requiredValidation("Letter content"))}
+                placeholder="Enter letter content"
+                rows={6}
               />
+              {letterForm.formState.errors.letter_content && (
+                <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_content as any).message}</p>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
 

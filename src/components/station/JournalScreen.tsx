@@ -5,16 +5,22 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Badge } from '../ui/badge';
-import { Plus, Search, Edit, Trash2, Filter, Building2, Calendar as CalendarIcon, X } from 'lucide-react';
+import { Calendar } from "../ui/calendar";
+import DatePicker from '../common/DatePicker';
+import { Plus, Search, Edit, Trash2, Filter, Building2, Calendar as CalendarIcon, X, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+import ConfirmDialog from '../common/ConfirmDialog';
 import { Switch } from '../ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Checkbox } from '../ui/checkbox';
 import { DataTable } from '../common/DataTable';
 import * as JournalService from '../../services/stationServices/journalService';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
+import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
 
 interface JournalRow {
   id: string;
@@ -23,7 +29,7 @@ interface JournalRow {
   journal_date?: string;
   type_of_journal_name?: string;
   station_name?: string;
-  duty_officer_username?: string;
+  duty_officer_name?: string;
   rank_name?: string;
   activity?: string;
   force_number?: string;
@@ -31,11 +37,7 @@ interface JournalRow {
 }
 
 export function JournalScreen() {
-  // table
-  const [tableData, setTableData] = useState<JournalRow[]>([]);
-  // start as loading to avoid "No data available" flash on first render
-  const [tableLoading, setTableLoading] = useState(true);
-  const [total, setTotal] = useState(0);
+  // table controls (DataTable will perform fetch from the provided url)
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState<number>(10);
   const [sortField, setSortField] = useState<string | undefined>(undefined);
@@ -58,6 +60,10 @@ export function JournalScreen() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [journalToDelete, setJournalToDelete] = useState<string | null>(null);
+  // view dialog state for "View" action in the table
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewJournal, setViewJournal] = useState<JournalRow | null>(null);
+  const handleView = (row: JournalRow) => { setViewJournal(row); setViewDialogOpen(true); };
 
   // form
   const [editingJournal, setEditingJournal] = useState<JournalRow | null>(null);
@@ -79,7 +85,6 @@ export function JournalScreen() {
 
   // refs
   const abortRef = useRef<AbortController | null>(null);
-  const searchDebounceRef = useRef<number | null>(null);
   const [dutyQuery, setDutyQuery] = useState('');
   const [stationQuery, setStationQuery] = useState('');
 
@@ -119,7 +124,17 @@ export function JournalScreen() {
         if (!mounted) return;
         const items = res?.results ?? res ?? [];
         setSampleJournals(items.map(mapItem));
-      } catch (err) {
+      } catch (err: any) {
+        // ignore expected abort / cancel errors (user navigated away / reloadKey changed)
+        if (
+          err?.name === 'AbortError' ||
+          err?.code === 'ERR_CANCELED' ||
+          String(err?.message).toLowerCase().includes('canceled') ||
+          (err?.request && err?.request?.readyState === 0 && !err?.response)
+        ) {
+          // expected cancellation / network abort — do not log
+          return;
+        }
         console.error('sample load error', err);
       }
     })();
@@ -133,112 +148,46 @@ export function JournalScreen() {
     journal_date: it.journal_date ?? '',
     type_of_journal_name: it.type_of_journal_name ?? '',
     station_name: it.station_name ?? '',
-    duty_officer_username: it.duty_officer_username ?? '',
+    duty_officer_name: it.duty_officer_name ?? '',
     rank_name: it.rank_name ?? '',
     activity: it.activity ?? '',
     force_number: it.force_number ?? '',
     ...it,
   }), []);
 
-  // loadTable
-  const requestIdRef = useRef(0);
+  // (search is handled directly by DataTable via journalsUrl() and externalSearch)
 
-  const loadTable = useCallback(async (p = page, ps = pageSize, sf = sortField, sd = sortDir, q = searchTerm) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
+  // global filters (from app) drive reloads and are included in DataTable url below
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
+  useFilterRefresh(() => {
+    setReloadKey(() => Date.now());
+  }, [globalRegion, globalDistrict, globalStation]);
 
-    const reqId = ++requestIdRef.current;            // <- new
-    setTableLoading(true);
-
-    try {
-      const params: Record<string, any> = {};
-      const filtersActive = selectedJournalTypes.length > 0 || selectedStations.length > 0;
-      params.page = Math.max(1, Number(p) || 1);
-      params.page_size = filtersActive ? -1 : (ps === -1 ? -1 : Number(ps) || 10);
-      if (sf) params.ordering = sd === 'desc' ? `-${sf}` : sf;
-      if (q) params.search = q;
-      params._t = reloadKey;
-
-      const res = await JournalService.fetchJournals(params, controller.signal);
-      const items = res?.results ?? [];
-      const count = Number(res?.count ?? items.length ?? 0);
-
-      const filteredItems = (items || []).filter((it: any) => {
-        if (selectedJournalTypes.length > 0) {
-          const typeId = String(it.type_of_journal ?? it.type_of_journal_name ?? it.type_of_journal_id ?? '');
-          // match either id or name if the lookup contains names
-          const matchesType = selectedJournalTypes.some(sid =>
-            String(sid) === typeId || String(getJournalTypeName(sid)).toLowerCase() === String(it.type_of_journal_name ?? '').toLowerCase()
-          );
-          if (!matchesType) return false;
-        }
-        if (selectedStations.length > 0) {
-          const stationId = String(it.station ?? it.station_name ?? it.station_id ?? '');
-          const matchesStation = selectedStations.some(sid =>
-            String(sid) === stationId || String(getStationName(sid)).toLowerCase() === String(it.station_name ?? '').toLowerCase()
-          );
-          if (!matchesStation) return false;
-        }
-        return true;
-      });
-
-      const effectiveTotal = (params.page_size === -1) ? filteredItems.length : count;
-      const effectivePageSize = params.page_size === -1 ? effectiveTotal || filteredItems.length : params.page_size;
-      const totalPages = Math.max(1, Math.ceil(effectiveTotal / (effectivePageSize || 1)));
-      if (params.page > totalPages) { setPage(totalPages); return; }
-
-      const finalItems = filtersActive ? filteredItems : (items || []);
-      // Only apply results from the latest request
-      if (requestIdRef.current === reqId) {
-        setTableData((finalItems || []).map(mapItem));
-        setTotal(effectiveTotal);
-      }
-    } catch (err: any) {
-      // Ignore abort / axios cancel errors
-      if (
-        err?.name === 'AbortError' ||
-        err?.name === 'CanceledError' ||
-        err?.code === 'ERR_CANCELED' ||
-        String(err?.message).toLowerCase().includes('canceled')
-      ) {
-        return;
-      }
-      console.error('loadTable error', err?.response ?? err);
-      const status = err?.response?.status;
-      const detail = String(err?.response?.data?.detail ?? '').toLowerCase();
-      if (status === 404 && detail.includes('invalid page')) {
-        setPage(1);
-        return;
-      }
-      toast.error('Failed to load journals');
-    } finally {
-      // only clear loading for latest request
-      if (requestIdRef.current === reqId) {
-        setTableLoading(false);
-      }
-    }
-  }, [page, pageSize, sortField, sortDir, searchTerm, reloadKey, mapItem, selectedJournalTypes, selectedStations]);
-
-
-  // debounced search
-  const [debouncedSearch, setDebouncedSearch] = useState(searchTerm);
-
-  useEffect(() => {
-    const id = window.setTimeout(() => setDebouncedSearch(searchTerm), 350);
-    return () => window.clearTimeout(id);
-  }, [searchTerm]);
-
-  // single effect to load table when relevant inputs change
-  useEffect(() => {
-    loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
-  }, [page, pageSize, sortField, sortDir, reloadKey, selectedJournalTypes, selectedStations, debouncedSearch, loadTable]);
+  // DataTable now fetches directly from the URL returned by journalsUrl()
+  // reloadKey and filters drive the URL so DataTable will refetch automatically.
+  // useEffect(() => {
+  //   loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
+  // }, [page, pageSize, sortField, sortDir, reloadKey, selectedJournalTypes, selectedStations, debouncedSearch, loadTable]);
 
   // datatable callbacks
   const onSearch = (q: string) => { setSearchTerm(q); setPage(1); };
   const onPageChange = (p: number) => { setPage(p); };
   const onPageSizeChange = (s: number) => { setPageSize(s); setPage(1); };
   const onSort = (f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); };
+
+  // build DataTable url with global + local filters and reload key to force refetch when needed
+  const journalsUrl = useCallback(() => {
+    const base = '/station-management/api/journals/';
+    const params: string[] = [];
+    params.push(`_t=${reloadKey}`);
+    if (searchTerm) params.push(`search=${encodeURIComponent(searchTerm)}`);
+    if (selectedJournalTypes.length) params.push(`type_of_journal=${encodeURIComponent(selectedJournalTypes.join(','))}`);
+    if (selectedStations.length) params.push(`station=${encodeURIComponent(selectedStations.join(','))}`);
+    if (globalRegion) params.push(`region=${encodeURIComponent(globalRegion)}`);
+    if (globalDistrict) params.push(`district=${encodeURIComponent(globalDistrict)}`);
+    if (globalStation) params.push(`station=${encodeURIComponent(globalStation)}`);
+    return `${base}?${params.join('&')}`;
+  }, [reloadKey, searchTerm, selectedJournalTypes, selectedStations, globalRegion, globalDistrict, globalStation]);
 
   // duty selection autofill
   const handleDutyOfficerSelect = (id: string) => {
@@ -403,14 +352,37 @@ export function JournalScreen() {
   const getStationName = (id: string) => stations.find(s => String(s.id) === String(id))?.name ?? String(id);
   // const getRankName = (idOrName?: string) => idOrName ?? '';
   // helper to get officer name from dutyOfficers lookup
-  const getOfficerName = (id?: string) => {
-    if (!id) return '';
-    const o = dutyOfficers.find(d => String(d.id) === String(id));
-    if (!o) return '';
-    const name = `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim();
-    return name || String(o.id);
-  };
+  // const getOfficerName = (id?: string) => {
+  //   if (!id) return '';
+  //   const o = dutyOfficers.find(d => String(d.id) === String(id));
+  //   if (!o) return '';
+  //   const name = `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim();
+  //   return name || String(o.id);
+  // };
+  
+  // build details content for delete confirm (prefer server-provided name fields, fallback to lookups)
+  const deleteDialogDetails = journalToDelete
+    ? (() => {
+        const j = sampleJournals.find(s => String(s.id) === String(journalToDelete)) ?? null;
+        const jt = j?.type_of_journal_name ?? getJournalTypeName(j?.type_of_journal ?? '');
+        const st = j?.station_name ?? getStationName(j?.station ?? '');
+        const dt = j?.journal_date ?? '';
+        const at = j?.activity ?? '';
+        // const sts = j?.is_active ?? '';
 
+        return (
+          <div className="text-sm space-y-1">
+            <div><strong>Journal Type:</strong> {jt || '-'}</div>
+            <div><strong>Station:</strong> {st || '-'}</div>
+            <div><strong>Date:</strong> {dt || '-'}</div>
+            {/* <div><strong>Status:</strong> {sts || '-'}</div> */}
+            <div><strong>Activity:</strong> {at || '-'}</div>
+            {/* <div className="text-xs text-muted-foreground">ID: {journalToDelete}</div> */}
+          </div>
+        );
+      })()
+    : null;
+  
   const journalColumns = [
     // { key: 'is_active', label: 'Status', render: (v: boolean) => (v ? 'Active' : 'Inactive') },
     {
@@ -425,7 +397,7 @@ export function JournalScreen() {
     { key: 'journal_date', label: 'Date', sortable: true },
     // { key: 'type_of_journal_name', label: 'Journal Type', sortable: true },
     {
-      key: 'type_of_journal',
+      key: 'type_of_journal_name',
       label: 'Journal Type',
       sortable: true,
       render: (_v: any, journal: JournalRow) => (
@@ -433,34 +405,47 @@ export function JournalScreen() {
       ),
     },
     { key: 'station_name', label: 'Station', sortable: true },
-    // { key: 'duty_officer_username', label: 'Duty Officer', sortable: true },
+    // { key: 'duty_officer_name', label: 'Duty Officer', sortable: true },
     {
-      key: 'duty_officer',
+
+      key: 'duty_officer_name',
       label: 'Duty Officer',
       sortable: true,
-      render: (_v: any, journal: JournalRow) => (
+
+      render: (v: any, journal: JournalRow) => (
         <div>
-          <p className="text-sm">{getOfficerName(journal.duty_officer) || journal.duty_officer_username}</p>
+          <p className="text-sm">
+            {journal.duty_officer_name ?? '-'}
+            {/* {v ?? journal.duty_officer_name ?? journal.duty_officer ?? '-'} */}
+          </p>
           <p className="text-xs text-muted-foreground font-mono">{journal.force_number ?? '-'}</p>
         </div>
       ),
+      // key: 'duty_officer',
+      // label: 'Duty Officer',
+      // sortable: true,
+      // render: (_v: any, journal: JournalRow) => (
+      //   <div>
+      //     <p className="text-sm">{getOfficerName(journal.duty_officer) || journal.duty_officer_name}</p>
+      //     <p className="text-xs text-muted-foreground font-mono">{journal.force_number ?? '-'}</p>
+      //   </div>
+      // ),
     },
     { key: 'rank_name', label: 'Rank' },
     { key: 'activity', label: 'Activity' },
     {
-      key: 'id',
+      key: 'actions',
       label: 'Actions',
       sortable: false,
       render: (_v: any, row: JournalRow) => (
         <div className="flex items-center justify-end gap-2">
+          <Button variant="ghost" size="sm" onClick={() => handleView(row)}><Eye className="h-4 w-4 text-green-600" /></Button>
           <Button variant="ghost" size="sm" onClick={() => handleEdit(row)}><Edit className="h-4 w-4 text-blue-600" /></Button>
           <Button variant="ghost" size="sm" onClick={() => handleDeleteConfirm(row.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
         </div>
       ),
     },
   ];
-
-  const journalsUrl = `/station-management/api/journals/?_t=${reloadKey}`;
 
   // stats derived from sampleJournals
   const totalCount = sampleJournals.length;
@@ -499,82 +484,89 @@ export function JournalScreen() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Journal Date <span className="text-red-500">*</span></Label>
+                    {/* <Label>Journal Date <span className="text-red-500">*</span></Label>
                     <div className="relative">
                       <CalendarIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                       <Input className="pl-9" type="date" value={formData.journal_date} onChange={(e) => setFormData({ ...formData, journal_date: e.target.value })} required />
-                    </div>
+                    </div> */}
+                    <DatePicker
+                      label="Journal Date"
+                      required
+                      value={formData.journal_date ? new Date(formData.journal_date) : null}
+                      onChange={(d) => setFormData({ ...formData, journal_date: d ? d.toISOString().split('T')[0] : '' })}
+                      placeholder="Pick a date"
+                    />
                   </div>
 
                   <div>
-                    <Label>Station <span className="text-red-500">*</span></Label>
-                    <Select value={formData.station} onValueChange={(v) => setFormData({ ...formData, station: v })} required>
-                      <SelectTrigger><SelectValue placeholder="Select station" /></SelectTrigger>
-                      <SelectContent>
-                        <div className="px-2 py-2"><Input placeholder="Filter stations..." value={stationQuery} onChange={(e) => setStationQuery(e.target.value)} /></div>
-                        {stations.filter(s => !stationQuery || String(s.name ?? s.station_name ?? '').toLowerCase().includes(stationQuery.toLowerCase())).map(s => <SelectItem key={s.id} value={s.id}>{s.name ?? s.station_name ?? s.id}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label>Journal Type <span className="text-red-500">*</span></Label>
-                    <Select value={formData.type_of_journal} onValueChange={(v) => setFormData({ ...formData, type_of_journal: v })} required>
-                      <SelectTrigger><SelectValue placeholder="Select journal type" /></SelectTrigger>
-                      <SelectContent>{journalTypes.map((t: any) => <SelectItem key={t.id} value={t.id}>{t.name}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label>Duty Officer <span className="text-red-500">*</span></Label>
-                    <Select value={String(formData.duty_officer ?? '')} onValueChange={(v) => handleDutyOfficerSelect(v)} required>
-                      <SelectTrigger><SelectValue placeholder="Select duty officer" /></SelectTrigger>
-                      <SelectContent>
-                        <div className="px-2 py-2"><Input placeholder="Filter officers..." value={dutyQuery} onChange={(e) => setDutyQuery(e.target.value)} /></div>
-                        {dutyOfficers.filter(o => {
-                          if (!dutyQuery) return true;
-                          const full = `${o.first_name ?? ''} ${o.last_name ?? ''} ${o.force_number ?? ''}`.toLowerCase();
-                          return full.includes(dutyQuery.toLowerCase());
-                        }).map((o: any) => <SelectItem key={o.id} value={String(o.id)}>{(o.first_name ?? '') + ' ' + (o.last_name ?? '')} {o.force_number ? `(${o.force_number})` : ''}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
+                    <Label className="mb-2">Station <span className="text-red-500">*</span></Label>
+                    <SearchableSelect
+                      value={formData.station}
+                      onChange={(v) => setFormData({ ...formData, station: v ?? '' })}
+                      items={stations.map(s => ({ ...s, name: s.name ?? s.station_name ?? s.id }))}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select station"
+                    />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>Force Number <span className="text-red-500">*</span></Label>
+                    <Label className="mb-2">Journal Type <span className="text-red-500">*</span></Label>
+                    <SearchableSelect
+                      value={formData.type_of_journal}
+                      onChange={(v) => setFormData({ ...formData, type_of_journal: v ?? '' })}
+                      items={journalTypes.map(t => ({ ...t, name: t.name ?? t.type_of_journal_name ?? t.id }))}
+                      idField="id"
+                      labelField="name"
+                      placeholder="Select journal type"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="mb-2">Duty Officer <span className="text-red-500">*</span></Label>
+                    <StaffProfileSelect
+                      value={formData.duty_officer || null}
+                      onChange={(v) => handleDutyOfficerSelect(v ?? '')}
+                      placeholder="Select duty officer"
+                      initialItems={dutyOfficers}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="mb-2">Force Number <span className="text-red-500">*</span></Label>
                     <Input value={formData.force_number} readOnly className="bg-muted" placeholder="Auto-populated" required />
                   </div>
                   <div>
                     {/* <Label>Rank <span className="text-red-500">*</span></Label>
                     <Input value={formData.rank} readOnly className="bg-muted" placeholder="Auto-populated" required /> */}
-                    <Label>Rank <span className="text-red-500">*</span></Label>
+                    <Label className="mb-2">Rank <span className="text-red-500">*</span></Label>
                     <Input value={formData.rank_name} readOnly className="bg-muted" placeholder="Auto-populated" required />
 
                   </div>
                 </div>
 
                 <div>
-                  <Label>Activity <span className="text-red-500">*</span></Label>
+                  <Label className="mb-2">Activity <span className="text-red-500">*</span></Label>
                   <Textarea value={formData.activity} onChange={(e) => setFormData({ ...formData, activity: e.target.value })} required />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label>State of Prisoners <span className="text-red-500">*</span></Label>
+                    <Label className="mb-2">State of Prisoners <span className="text-red-500">*</span></Label>
                     <Textarea value={formData.state_of_prisoners} onChange={(e) => setFormData({ ...formData, state_of_prisoners: e.target.value })} required />
                   </div>
                   <div>
-                    <Label>State of Prison <span className="text-red-500">*</span></Label>
+                    <Label className="mb-2">State of Prison <span className="text-red-500">*</span></Label>
                     <Textarea value={formData.state_of_prison} onChange={(e) => setFormData({ ...formData, state_of_prison: e.target.value })} required />
                   </div>
                 </div>
 
                 <div>
-                  <Label>Remarks</Label>
+                  <Label className="mb-2">Remarks</Label>
                   <Textarea value={formData.remark} onChange={(e) => setFormData({ ...formData, remark: e.target.value })} />
                 </div>
               </div>
@@ -606,10 +598,10 @@ export function JournalScreen() {
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div><CardTitle>Journal Entries</CardTitle><CardDescription>View and manage all journal entries</CardDescription></div>
             <div className="flex flex-col sm:flex-row gap-2 items-center">
-              <div className="relative w-full sm:w-72">
+              {/* <div className="relative w-full sm:w-72">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input placeholder="Search journals..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-              </div>
+              </div> */}
 
               <div className="flex gap-2">
                 <Popover>
@@ -649,10 +641,7 @@ export function JournalScreen() {
         <CardContent>
           <div className="">
             <DataTable
-            url="/station-management/api/journals/"
-              data={tableData}
-              loading={tableLoading}
-              total={total}
+              url={journalsUrl()}
               title="Journal Entries"
               columns={journalColumns}
               externalSearch={searchTerm}
@@ -665,19 +654,53 @@ export function JournalScreen() {
         </CardContent>
       </Card>
 
-      {/* Delete confirmation */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Journal Entry</AlertDialogTitle>
-            <AlertDialogDescription>Are you sure you want to delete this journal entry? This action cannot be undone.</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setJournalToDelete(null)}>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-red-600 hover:bg-red-700">Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setJournalToDelete(null);
+        }}
+        title="Delete Journal Entry"
+        description="Are you sure you want to delete this journal entry? This action cannot be undone."
+        details={deleteDialogDetails}
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={async () => {
+          if (!journalToDelete) return;
+          await handleDelete();
+          // ensure DataTable refetch via reloadKey
+          setReloadKey(Date.now());
+        }}
+      />
+
+      {/* View dialog */}
+      <Dialog open={viewDialogOpen} onOpenChange={(open) => { setViewDialogOpen(open); if (!open) setViewJournal(null); }}>
+        <DialogContent className="max-w-md w-[90vw] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>View Journal Entry</DialogTitle>
+            <DialogDescription>Read-only details for the selected journal entry</DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-3 py-4">
+            <div><strong>Date:</strong> {viewJournal?.journal_date ?? '-'}</div>
+            <div><strong>Journal Type:</strong> {viewJournal?.type_of_journal_name ?? viewJournal?.type_of_journal ?? '-'}</div>
+            <div><strong>Station:</strong> {viewJournal?.station_name ?? viewJournal?.station ?? '-'}</div>
+            <div><strong>Duty Officer:</strong> {viewJournal?.duty_officer_name ?? viewJournal?.duty_officer ?? '-'}</div>
+            <div><strong>Force Number:</strong> {viewJournal?.force_number ?? '-'}</div>
+            <div><strong>Rank:</strong> {viewJournal?.rank_name ?? viewJournal?.rank ?? '-'}</div>
+            <div><strong>Activity:</strong> {viewJournal?.activity ?? '-'}</div>
+            <div><strong>State of Prisoners:</strong> {viewJournal?.state_of_prisoners ?? '-'}</div>
+            <div><strong>State of Prison:</strong> {viewJournal?.state_of_prison ?? '-'}</div>
+            <div><strong>Remarks:</strong> {viewJournal?.remark ?? '-'}</div>
+            {/* <div><strong>Created:</strong> {viewJournal?.created_datetime ?? '-'}</div> */}
+            {/* <div className="text-xs text-muted-foreground">ID: {viewJournal?.id ?? '-'}</div> */}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setViewDialogOpen(false); setViewJournal(null); }}>Close</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

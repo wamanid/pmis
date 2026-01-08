@@ -14,7 +14,12 @@ import {
   XCircle,
 } from "lucide-react";
 import ComplaintForm from "./ComplaintForm";
+import DateTime from "../common/DateTime";
 import * as ComplaintsService from '../../services/stationServices/complaintsService';
+// import { useFilterRefresh, useFilters } from '../../hooks/useFilters';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
+import { useFilters } from '../../contexts/FilterContext';
+
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import {
@@ -46,7 +51,8 @@ interface ComplaintAction {
   deleted_datetime: string | null;
   action: string;
   action_date: string;
-  action_status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED";
+  // backend returns UUID or name -> use string
+  action_status: string;
   action_remark: string;
   created_by: number;
   updated_by: number | null;
@@ -70,7 +76,8 @@ interface Complaint {
   deleted_datetime: string | null;
   complaint: string;
   complaint_date: string;
-  complaint_status: "OPEN" | "IN_PROGRESS" | "RESOLVED" | "CLOSED";
+  // backend returns UUID or name -> use string
+  complaint_status: string;
   complaint_remark: string;
   date_of_response: string | null;
   force_number: string;
@@ -98,7 +105,11 @@ export function ComplaintsScreen() {
   const requestIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
 
+  // DataTable reload key (keep pagination state declared once above)
+  const [tableReloadKey, setTableReloadKey] = useState(0);
+
   const [stations, setStations] = useState<any[]>([]);
+  // small local cache used for initial items; CustomPrisonerSearch will handle searching
   const [prisoners, setPrisoners] = useState<any[]>([]);
   const [natures, setNatures] = useState<any[]>([]);
   const [priorities, setPriorities] = useState<any[]>([]);
@@ -120,6 +131,7 @@ export function ComplaintsScreen() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Complaint | null>(null);
   const [confirmDescription, setConfirmDescription] = useState<string>('');
+  const [confirmDetails, setConfirmDetails] = useState<React.ReactNode | null>(null);
   const [complaintStatuses, setComplaintStatuses] = useState<any[]>([]);
   const [priorityOptions, setPriorityOptions] = useState<any[]>([]);
 
@@ -159,7 +171,9 @@ export function ComplaintsScreen() {
     return () => { mounted = false; c.abort(); };
   }, []);
 
-  // client-side resolved fields (keeps existing resolved name helpers)
+  // When DataTable is server-driven, rows come directly from the server.
+  // We'll still keep a local complaints array for the details dialog, but table rendering
+  // will be driven by DataTable's internal fetch.
   const resolvedComplaints = complaints.map((cmp) => {
     const statusObj = complaintStatuses.find((s) => String(s.id) === String(cmp.complaint_status));
     const statusName = statusObj?.name ?? cmp.complaint_status;
@@ -171,30 +185,30 @@ export function ComplaintsScreen() {
   // Get status badge
   const getStatusBadge = (status?: string | number) => {
     // Try to resolve status object from API list (match id or name)
-    const resolved = complaintStatuses.find(s =>
-      String(s.id) === String(status) || String(s.name) === String(status)
+    const resolved = complaintStatuses.find(
+      (s) => String(s.id) === String(status) || String(s.name) === String(status),
     );
-    const name = resolved?.name ?? (typeof status === 'string' ? status : undefined);
+    const name = resolved?.name ?? (typeof status === "string" ? status : undefined);
 
     // derive visual style from name (fallbacks provided)
-    const n = (name || '').toLowerCase();
-    const isOpen = n.includes('open');
-    const isInProgress = n.includes('progress') || n.includes('in_progress');
-    const isResolved = n.includes('resolve') || n.includes('resolved');
-    const isClosed = n.includes('close') || n.includes('closed');
+    const n = (name || "").toLowerCase();
+    const isOpen = n.includes("open");
+    const isInProgress = n.includes("progress") || n.includes("in_progress");
+    const isResolved = n.includes("resolve") || n.includes("resolved");
+    const isClosed = n.includes("close") || n.includes("closed");
 
     const config = isOpen
-      ? { color: 'bg-yellow-100 text-yellow-800', icon: AlertCircle }
+      ? { color: "bg-yellow-100 text-yellow-800", icon: AlertCircle }
       : isInProgress
-      ? { color: 'bg-blue-100 text-blue-800', icon: Clock }
+      ? { color: "bg-blue-100 text-blue-800", icon: Clock }
       : isResolved
-      ? { color: 'bg-green-100 text-green-800', icon: CheckCircle }
+      ? { color: "bg-green-100 text-green-800", icon: CheckCircle }
       : isClosed
-      ? { color: 'bg-gray-100 text-gray-800', icon: XCircle }
-      : { color: 'bg-gray-100 text-gray-700', icon: AlertCircle };
+      ? { color: "bg-gray-100 text-gray-800", icon: XCircle }
+      : { color: "bg-gray-100 text-gray-700", icon: AlertCircle };
 
     const Icon = config.icon;
-    const label = name ? String(name).replace(/_/g, ' ') : 'Unknown';
+    const label = name ? String(name).replace(/_/g, " ") : "Default";
 
     return (
       <Badge className={`${config.color} flex items-center gap-1`} variant="secondary">
@@ -205,62 +219,51 @@ export function ComplaintsScreen() {
   };
 
   // Get priority badge
-  const getPriorityBadge = (priority: string) => {
-    const priorityConfig: Record<
-      string,
-      { color: string; bgColor: string }
-    > = {
+  const getPriorityBadge = (priority?: string) => {
+    const priorityConfig: Record<string, { color: string; bgColor: string }> = {
       Critical: { color: "text-red-800", bgColor: "bg-red-100" },
       High: { color: "text-orange-800", bgColor: "bg-orange-100" },
       Medium: { color: "text-yellow-800", bgColor: "bg-yellow-100" },
       Low: { color: "text-green-800", bgColor: "bg-green-100" },
     };
 
-    const config = priorityConfig[priority] || {
-      color: "text-gray-800",
-      bgColor: "bg-gray-100",
-    };
+    const label = priority && String(priority).trim() !== "" ? priority : "Default";
+    const config = priority && priorityConfig[priority] ? priorityConfig[priority] : { color: "text-gray-800", bgColor: "bg-gray-100" };
 
     return (
       <Badge className={`${config.bgColor} ${config.color}`} variant="secondary">
-        {priority}
+        {label}
       </Badge>
     );
   };
 
-  // Get action status badge
-  const getActionStatusBadge = (
-    status: "OPEN" | "IN_PROGRESS" | "COMPLETED" | "CANCELLED",
-  ) => {
-    const statusConfig = {
+  // Get action status badge (accepts string from API: id or name)
+  const getActionStatusBadge = (status?: string) => {
+    // try to resolve friendly name from complaintStatuses / approvalStatuses where available
+    const resolved =
+      complaintStatuses.find((s) => String(s.id) === String(status)) ??
+      complaintStatuses.find((s) => String(s.name).toUpperCase() === String(status).toUpperCase());
+    const name = resolved?.name ?? (status && String(status).trim() !== "" ? status : "Default");
+    const key = String(name).toUpperCase().replace(/\s+/g, "_");
+    const statusConfig: Record<string, { color: string }> = {
       OPEN: { color: "bg-yellow-50 text-yellow-700 border-yellow-200" },
       IN_PROGRESS: { color: "bg-blue-50 text-blue-700 border-blue-200" },
       COMPLETED: { color: "bg-green-50 text-green-700 border-green-200" },
       CANCELLED: { color: "bg-red-50 text-red-700 border-red-200" },
     };
-
-    const config = statusConfig[status];
-
+    const cfg = statusConfig[key] ?? { color: "bg-gray-50 text-gray-700 border-gray-200" };
     return (
-      <Badge className={`${config.color} border`} variant="outline">
-        {status.replace("_", " ")}
+      <Badge className={`${cfg.color} border`} variant="outline">
+        {String(name).replace("_", " ")}
       </Badge>
     );
   };
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-  };
+  // use DateTime component for formatting (see DateTime.tsx)
 
   // View complaint details
   const viewComplaintDetails = (complaint: Complaint) => {
+    // DataTable provides the row object; set it as selected so details dialog can render.
     setSelectedComplaint(complaint);
     setIsDetailsOpen(true);
   };
@@ -282,8 +285,19 @@ export function ComplaintsScreen() {
   // Prepare delete confirmation
   const handleDeleteClick = (complaint: Complaint) => {
     setDeleteTarget(complaint);
-    const detail = `${complaint.prisoner_name ?? ''} — ${complaint.station_name ?? ''} — ${complaint.complaint_date ?? ''}`;
-    setConfirmDescription(`Are you sure you want to delete this complaint: ${detail}\n\n"${(complaint.complaint ?? '').slice(0,120)}"${(complaint.complaint?.length ?? 0) > 120 ? '…' : ''}`);
+    // short description for dialog
+    setConfirmDescription(`Are you sure you want to delete this complaint?`);
+    // provide richer details in the reusable ConfirmDialog `details` slot
+    setConfirmDetails(
+      <div className="text-sm">
+        <div><strong>Prisoner:</strong> {complaint.prisoner_name || '—'}</div>
+        <div><strong>Station:</strong> {complaint.station_name || '—'}</div>
+        <div><strong>Priority:</strong> {getPriorityBadge(complaint.complaint_priority_name) || '—'}</div>
+        {/* <div><strong>Status:</strong> {complaint.complaint_status || '—'}</div> */}
+        <div><strong>Date:</strong> <DateTime value={complaint.complaint_date} format="dateOnly" /></div>
+        <div className="mt-2"><strong>Complaint:</strong> <div className="mt-1 bg-gray-50 p-2 rounded text-sm">{(complaint.complaint ?? '').slice(0, 400)}</div></div>
+      </div>
+    );
     setConfirmOpen(true);
   };
 
@@ -294,6 +308,8 @@ export function ComplaintsScreen() {
       // remove from local list and adjust server total count
       setComplaints((prev) => prev.filter((c) => c.id !== deleteTarget.id));
       setTotal((t) => Math.max(0, (t || 0) - 1));
+      // force DataTable to refetch / remount so server-side list updates immediately
+      setTableReloadKey(k => k + 1);
       if (selectedComplaint?.id === deleteTarget.id) {
         setIsDetailsOpen(false);
         setSelectedComplaint(null);
@@ -304,6 +320,7 @@ export function ComplaintsScreen() {
       setConfirmOpen(false);
       setDeleteTarget(null);
       setConfirmDescription('');
+      setConfirmDetails(null);
     }
   };
 
@@ -313,12 +330,15 @@ export function ComplaintsScreen() {
       if (formMode === "add") {
         const created = await ComplaintsService.createComplaint(complaint);
         const newItem = created?.results ? created.results[0] : created;
+        // update tiny local cache and force DataTable to refetch from server
         setComplaints((prev) => [newItem || complaint, ...prev]);
+        setTableReloadKey(k => k + 1);
         return newItem || created;
       } else {
         const updated = await ComplaintsService.updateComplaint(complaint.id, complaint);
         const updatedItem = updated?.results ? updated.results[0] : updated;
         setComplaints((prev) => prev.map((c) => (c.id === (updatedItem?.id ?? complaint.id) ? (updatedItem || complaint) : c)));
+        setTableReloadKey(k => k + 1);
         return updatedItem || updated;
       }
     } catch (err: any) {
@@ -328,73 +348,71 @@ export function ComplaintsScreen() {
     }
   };
 
-  // Load data on mount
-  // server-side load function (pagination, sorting, search)
-  const loadComplaints = useCallback(async (_page = page, _pageSize = pageSize, _sortField = sortField, _sortDir = sortDir, _search = searchTerm) => {
-    try { abortRef.current?.abort(); } catch {}
-    const controller = new AbortController();
-    abortRef.current = controller;
-    const reqId = ++requestIdRef.current;
-    setTableLoading(true);
-    try {
-      const params: Record<string, any> = {};
-      params.page = Math.max(1, Number(_page) || 1);
-      params.page_size = Number(_pageSize) || 10;
-      if (_sortField) params.ordering = _sortDir === 'desc' ? `-${_sortField}` : _sortField;
-      if (_search) params.search = _search;
-
-      const res = await ComplaintsService.fetchComplaints(params);
-      const items = res?.results ?? res ?? [];
-      const count = Number(res?.count ?? items.length ?? 0);
-      if (requestIdRef.current === reqId) {
-        setComplaints(items);
-        setTotal(count);
-      }
-    } catch (err: any) {
-      if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
-      console.error('load complaints error', err?.response ?? err);
-      // axiosInstance already toasts
-    } finally {
-      if (requestIdRef.current === reqId) setTableLoading(false);
-    }
-  }, [page, pageSize, sortField, sortDir, searchTerm]);
-
-  // initial lookups (stations/prisoners/natures/priorities/ranks) and first load
+  // initial lookups (stations/natures/priorities/ranks). Do NOT prefetch prisoners here:
   useEffect(() => {
     let mounted = true;
     const controller = new AbortController();
     (async () => {
       try {
-        const [stationsRes, prisonersRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
+        const [stationsRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
           ComplaintsService.fetchStations(),
-          ComplaintsService.fetchPrisoners(),
           ComplaintsService.fetchComplaintNatures(),
           ComplaintsService.fetchPriorities(),
           ComplaintsService.fetchRanks(),
         ]);
         if (!mounted) return;
         setStations(stationsRes || []);
-        setPrisoners(prisonersRes || []);
         setNatures(naturesRes || []);
         setPriorities(prioritiesRes || []);
         setRanks(ranksRes || []);
       } catch (err) {
         // handled by services
       }
-      // load first page
-      loadComplaints(page, pageSize, sortField, sortDir, searchTerm);
     })();
     return () => { mounted = false; controller.abort(); };
-  }, []); // run once
+  }, []);
 
-  // reload when pagination/sort/search changes
+  // DataTable is now server-driven. Use global filter refresh to force reloads.
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
+  useFilterRefresh(() => {
+    setTableReloadKey(k => k + 1);
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // Keep server-side total in sync for dashboard cards.
+  // Fetch a single page with page_size=1 so API returns the `count` without retrieving all rows.
   useEffect(() => {
-    loadComplaints(page, pageSize, sortField, sortDir, searchTerm);
-  }, [page, pageSize, sortField, sortDir, searchTerm, loadComplaints]);
+    let mounted = true;
+    const controller = new AbortController();
+    (async () => {
+      try {
+        const params: Record<string, any> = {
+          page: 1,
+          page_size: 1,
+          search: searchTerm || undefined,
+          complaint_status: statusFilter && statusFilter !== 'all' ? statusFilter : undefined,
+          complaint_priority: priorityFilter && priorityFilter !== 'all' ? priorityFilter : undefined,
+          region: globalRegion || undefined,
+          district: globalDistrict || undefined,
+          station: globalStation || undefined,
+          _t: tableReloadKey,
+        };
+        const res = await ComplaintsService.fetchComplaints(params);
+        if (!mounted) return;
+        const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0));
+        setTotal(count);
+        // Keep a tiny local cache (first item) so details/dialogs have something quickly if needed
+        const items = res?.results ?? (Array.isArray(res) ? res : []);
+        setComplaints(items);
+      } catch (err) {
+        console.error('fetch complaints count error', err?.response ?? err);
+      }
+    })();
+    return () => { mounted = false; controller.abort(); };
+  }, [tableReloadKey, searchTerm, statusFilter, priorityFilter, globalRegion, globalDistrict, globalStation]);
 
   // Statistics (derived from current in-memory resolved list)
   const stats = {
-    total: complaints.length > 0 ? total : 0,
+    total: total || 0,
     open: resolvedComplaints.filter((c) =>
       (c._statusName ?? "").toLowerCase().includes("open")
     ).length,
@@ -512,34 +530,31 @@ export function ComplaintsScreen() {
       <Card className="pt-6">
         <CardContent>
           <DataTable
-            url="/station-management/api/complaints/"
-            data={resolvedComplaints}
-            loading={tableLoading}
-            total={total}
+            // server-driven DataTable: let it fetch from the API. Include filter params + reload key.
+            url={`/station-management/api/complaints/?region=${encodeURIComponent(globalRegion || '')}&district=${encodeURIComponent(globalDistrict || '')}&station=${encodeURIComponent(globalStation || '')}&_t=${tableReloadKey}`}
             title="Complaints"
             columns={[
               { key: 'prisoner_name', label: 'Prisoner' },
               { key: 'station_name', label: 'Station' },
               { key: 'complaint', label: 'Complaint', render: (v: any, row: any) => <div className="truncate max-w-xs" title={row.complaint}>{row.complaint}</div> },
               { key: 'nature_of_complaint_name', label: 'Nature' },
-              { key: '_priorityName', label: 'Priority', render: (v: any) => getPriorityBadge(v) },
-              { key: '_statusName', label: 'Status', render: (v: any, row: any) => getStatusBadge(row.complaint_status) },
-              { key: 'complaint_date', label: 'Date' },
+              // priority comes from server field complaint_priority_name (or complaint_priority)
+              { key: 'complaint_priority_name', label: 'Priority', render: (_v: any, row: any) => getPriorityBadge(row?.complaint_priority_name ?? row?.complaint_priority ?? '') },
+              { key: 'complaint_status', label: 'Status', render: (_v: any, row: any) => getStatusBadge(row?.complaint_status) },
+              { key: 'complaint_date', label: 'Date', render: (_v: any, row: any) => <DateTime value={row?.complaint_date} format="dateOnly" /> },
               { key: 'actions', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
                   <div className="flex gap-2 justify-end">
                     <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4" /></Button>
                     <Button variant="outline" size="sm" onClick={() => handleEditComplaint(row)} className="text-[#0000FF] border-[#0000FF]"><Edit className="h-4 w-4" /></Button>
                     <Button variant="outline" size="sm" onClick={() => handleDeleteClick(row)} className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"><Trash className="h-4 w-4" /></Button>
-                    {/* <Button variant="outline" size="sm" onClick={() => handleDeleteClick(row)} className="text-red-600 border-red-600 hover:bg-red-600 hover:text-white"><Trash className="h-4 w-4" /></Button> */}
                   </div>
                 )},
             ]}
             externalSearch={searchTerm}
-            onSearch={(q: string) => { setSearchTerm(q); setPage(1); }}
-            onPageChange={(p: number) => setPage(p)}
-            onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
-            onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
-            // optional server-side props the DataTable supports: page, pageSize
+            onSearch={(q: string) => { setSearchTerm(q); setPage(1); setTableReloadKey(k => k + 1); }}
+            onPageChange={(p: number) => { setPage(p); setTableReloadKey(k => k + 1); }}
+            onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); setTableReloadKey(k => k + 1); }}
+            onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); setTableReloadKey(k => k + 1); }}
             page={page}
             pageSize={pageSize}
           />
@@ -549,9 +564,17 @@ export function ComplaintsScreen() {
       {/* Confirm delete dialog */}
       <ConfirmDialog
         open={confirmOpen}
-        onOpenChange={setConfirmOpen}
+        onOpenChange={(open) => {
+          setConfirmOpen(open);
+          if (!open) {
+            setDeleteTarget(null);
+            setConfirmDescription('');
+            setConfirmDetails(null);
+          }
+        }}
         title="Delete complaint"
         description={confirmDescription || "Are you sure you want to delete this complaint? This action cannot be undone."}
+        details={confirmDetails}
         confirmLabel="Delete"
         cancelLabel="Cancel"
         onConfirm={handleConfirmDelete}
@@ -616,7 +639,7 @@ export function ComplaintsScreen() {
                     <label className="text-sm text-gray-600">
                       Complaint Date
                     </label>
-                    <p>{formatDate(selectedComplaint.complaint_date)}</p>
+                    <p><DateTime value={selectedComplaint.complaint_date} format="dateOnly" /></p>
                   </div>
                 </div>
               </div>
@@ -658,14 +681,8 @@ export function ComplaintsScreen() {
                     <p>{selectedComplaint.force_number}</p>
                   </div>
                   <div>
-                    <label className="text-sm text-gray-600">
-                      Date of Response
-                    </label>
-                    <p>
-                      {selectedComplaint.date_of_response
-                        ? formatDate(selectedComplaint.date_of_response)
-                        : "Pending"}
-                    </p>
+                    <label className="text-sm text-gray-600">Date of Response</label>
+                    <p>{selectedComplaint.date_of_response ? <DateTime value={selectedComplaint.date_of_response} format="dateOnly" /> : "Pending"}</p>
                   </div>
                 </div>
                 {selectedComplaint.response && (
@@ -713,7 +730,7 @@ export function ComplaintsScreen() {
                             {action.action_remark}
                           </p>
                           <p className="text-xs text-gray-500">
-                            {formatDate(action.action_date)}
+                            <DateTime value={action.action_date} format="dateOnly" />
                           </p>
                         </div>
                       </div>
@@ -734,11 +751,11 @@ export function ComplaintsScreen() {
                   </div>
                   <div>
                     <label className="text-gray-600">Created Date</label>
-                    <p>{formatDate(selectedComplaint.created_datetime)}</p>
+                    <p><DateTime value={selectedComplaint.created_datetime} /></p>
                   </div>
                   <div>
                     <label className="text-gray-600">Last Updated</label>
-                    <p>{formatDate(selectedComplaint.updated_datetime)}</p>
+                    <p><DateTime value={selectedComplaint.updated_datetime} /></p>
                   </div>
                   <div>
                     <label className="text-gray-600">Status</label>

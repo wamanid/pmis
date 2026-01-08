@@ -48,7 +48,7 @@ import {
   getPropertyItems, getPropertyStatuses,
   getPropertyTypes,
   PrisonerProperty, PropertyBag, PropertyItem
-} from "../../services/stationServices/propertyService";
+} from "../../services/propertyServices/propertyService";
 import {
   getIdTypes,
   getPrisoners, getRelationships,

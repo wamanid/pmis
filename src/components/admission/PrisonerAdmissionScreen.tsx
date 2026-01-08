@@ -316,7 +316,7 @@ const PrisonerAdmissionScreen: React.FC = () => {
     if (!biodata) return;
 
     const mapped: PrisonerBiodata = {
-      id: biodata.id,
+      // id: biodata.id,
       first_name: biodata.first_name ?? undefined,
       middle_name: biodata.middle_name ?? undefined,
       surname: biodata.surname ?? undefined,

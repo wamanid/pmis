@@ -11,7 +11,9 @@ import {
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { useFilters } from '../../contexts/FilterContext';
-import { fetchRegionById, fetchDistrictById, fetchStationById } from '../../services/system_administration';
+import { fetchRegionById } from '../../services/systemAdministrationService';
+import { fetchDistrictById } from '../../services/systemAdministrationService';
+import { fetchStationById } from '../../services/systemAdministrationService';
 
 export interface LocationFilterProps {
   className?: string;
@@ -33,9 +35,6 @@ export function LocationFilter({ className }: LocationFilterProps) {
         if (region) {
           const regionData = await fetchRegionById(region);
           setRegionName(regionData.name);
-          // localStorage.setItem('region_name', regionData.name);
-          // localStorage.removeItem('district_name');
-          // localStorage.removeItem('station_name')
         } else {
           setRegionName('');
         }
@@ -43,17 +42,13 @@ export function LocationFilter({ className }: LocationFilterProps) {
         if (district) {
           const districtData = await fetchDistrictById(district);
           setDistrictName(districtData.name);
-          // localStorage.setItem('district_name', districtData.name);
-          // localStorage.removeItem('station_name')
         } else {
           setDistrictName('');
         }
 
         if (station) {
           const stationData = await fetchStationById(station);
-          const name = stationData?.name
-          // localStorage.setItem('station_name', name);
-          setStationName(name);
+          setStationName(stationData.name);
         } else {
           setStationName('');
         }

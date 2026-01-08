@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -10,13 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Switch } from '../ui/switch';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '../ui/resizable';
-import BiometricCapture from '../common/BiometricCapture';
 import VisitorPassList from './VisitorPassList';
-import VisitorPassForm from './VisitorPassForm';
-import VisitorRegistrationDialog from '../station/VisitorRegistrationDialog';
 import { 
   Plus, 
   Search, 
@@ -30,166 +24,21 @@ import {
   Shield,
   Clock,
   CheckCircle,
-  AlertCircle,
-  Printer,
-  Download,
-  Check,
-  ChevronsUpDown
+  AlertCircle
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-
-interface Prisoner {
-  id: string;
-  prisoner_name: string;
-  working_party_name: string;
-  destination: string;
-  time_out: string;
-  time_in: string | null;
-  reason: string;
-  prisoner: string;
-  gate_pass: string;
-  working_party: string | null;
-  fingerprint_verification?: string;
-}
-
-interface Escort {
-  id: string;
-  full_name: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  rank: string;
-  force_number: string;
-  gate_pass: string;
-}
-
-interface GatePass {
-  id: string;
-  gate_keeper_username: string;
-  gate_pass_type_name: string;
-  prisoners: Prisoner[];
-  escorts: Escort[];
-  destination: string;
-  main_gate_required: boolean;
-  exception_reason: string;
-  remarks: string;
-  gate_keeper: number;
-  gate_pass_type: string;
-  created_at?: string;
-  status?: 'active' | 'completed' | 'pending';
-}
-
-interface PrisonerRecord {
-  id: string;
-  full_name: string;
-  prisoner_number: string;
-  category: string;
-}
-
-interface WorkingParty {
-  id: string;
-  name: string;
-  description: string;
-}
-
-interface GatePassType {
-  id: string;
-  name: string;
-  description: string;
-}
-
-interface User {
-  id: number;
-  username: string;
-  full_name: string;
-  rank: string;
-  force_number: string;
-}
-
-interface VisitorPass {
-  id?: string;
-  prisoner_name?: string;
-  visitor_name?: string;
-  suspended_by_username?: string;
-  visitor_tag_number: string;
-  valid_from: string;
-  valid_until: string;
-  purpose: string;
-  issue_date: string;
-  is_suspended: boolean;
-  suspended_date: string;
-  suspended_reason: string;
-  is_valid?: boolean;
-  prisoner: string;
-  visitor: string;
-  suspended_by: number;
-}
-
-interface Visitor {
-  id: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  id_number: string;
-  contact_no: string;
-  address: string;
-  relation: string;
-}
-
-interface Relationship {
-  id: string;
-  name: string;
-}
-
-interface IDType {
-  id: string;
-  name: string;
-}
-
+//models importation
+import { Prisoner } from '../../models/gate/Prisoner';
+import { Escort } from '../../models/gate/Escort';
+import { GatePass, PrisonerRecord, WorkingParty, GatePassType, User ,Visitor, Relationship, IDType,VisitorPass} from '../../models/gate/Index';
+import { getworkingparty,getescots, getpasstypes, getprisoners,submitGatePass, getgatepasses, deletegatepasses, getvisitors, submitVisitorPass, getvisitorspass, deletevisitorpass, editVisitorPass, editgatePass } from '../../services/gateService';
+import VisitorPassForm from './VisitorPassForm';
 // Mock Data
-const mockRelationships: Relationship[] = [
-  { id: 'rel1', name: 'Spouse' },
-  { id: 'rel2', name: 'Parent' },
-  { id: 'rel3', name: 'Child' },
-  { id: 'rel4', name: 'Sibling' },
-  { id: 'rel5', name: 'Lawyer' },
-  { id: 'rel6', name: 'Friend' },
-  { id: 'rel7', name: 'Other' }
-];
 
-const mockIDTypes: IDType[] = [
-  { id: 'id1', name: 'National ID' },
-  { id: 'id2', name: 'Passport' },
-  { id: 'id3', name: 'Driver License' },
-  { id: 'id4', name: 'Voter ID' }
-];
-
-const mockVisitors: Visitor[] = [
-  {
-    id: 'v1',
-    first_name: 'Jane',
-    middle_name: 'Marie',
-    last_name: 'Doe',
-    id_number: 'ID-123456',
-    contact_no: '+256-700-123456',
-    address: '123 Main Street, Kampala',
-    relation: 'rel1'
-  },
-  {
-    id: 'v2',
-    first_name: 'Robert',
-    middle_name: 'James',
-    last_name: 'Smith',
-    id_number: 'ID-789012',
-    contact_no: '+256-700-789012',
-    address: '456 Oak Avenue, Kampala',
-    relation: 'rel5'
-  }
-];
-
-// Mock Data
-const mockGatePasses: GatePass[] = [
-  {
+let visitorPassesDefault: VisitorPass[] = []
+let mockGatePasses: GatePass[] = [
+    /*{
+  
     id: '1',
     gate_keeper_username: 'officer_john',
     gate_pass_type_name: 'Court Appearance',
@@ -223,129 +72,18 @@ const mockGatePasses: GatePass[] = [
     main_gate_required: true,
     exception_reason: '',
     remarks: 'Scheduled court hearing for case #2024/567',
-    gate_keeper: 1,
+    gate_keeper: "2",
     gate_pass_type: 'gpt1',
     created_at: '2025-10-28T07:00:00Z',
     status: 'completed'
-  },
-  {
-    id: '2',
-    gate_keeper_username: 'officer_mary',
-    gate_pass_type_name: 'Hospital Visit',
-    prisoners: [
-      {
-        id: 'p2',
-        prisoner_name: 'Michael Smith',
-        working_party_name: '',
-        destination: 'General Hospital',
-        time_out: '2025-10-28T09:30:00Z',
-        time_in: null,
-        reason: 'Medical emergency',
-        prisoner: 'pr2',
-        gate_pass: '2',
-        working_party: null
-      }
-    ],
-    escorts: [
-      {
-        id: 'e2',
-        full_name: 'Cpl. Sarah Johnson',
-        first_name: 'Sarah',
-        middle_name: '',
-        last_name: 'Johnson',
-        rank: 'Corporal',
-        force_number: 'PS-34567',
-        gate_pass: '2'
-      },
-      {
-        id: 'e3',
-        full_name: 'PC. Robert Brown',
-        first_name: 'Robert',
-        middle_name: '',
-        last_name: 'Brown',
-        rank: 'Police Constable',
-        force_number: 'PS-23456',
-        gate_pass: '2'
-      }
-    ],
-    destination: 'General Hospital',
-    main_gate_required: true,
-    exception_reason: '',
-    remarks: 'Emergency medical attention required',
-    gate_keeper: 2,
-    gate_pass_type: 'gpt2',
-    created_at: '2025-10-28T09:00:00Z',
-    status: 'active'
-  },
-  {
-    id: '3',
-    gate_keeper_username: 'officer_peter',
-    gate_pass_type_name: 'Working Party',
-    prisoners: [
-      {
-        id: 'p3',
-        prisoner_name: 'David Wilson',
-        working_party_name: 'Farm Labor',
-        destination: 'Prison Farm',
-        time_out: '2025-10-28T06:00:00Z',
-        time_in: '2025-10-28T15:00:00Z',
-        reason: 'Daily farm work',
-        prisoner: 'pr3',
-        gate_pass: '3',
-        working_party: 'wp1'
-      },
-      {
-        id: 'p4',
-        prisoner_name: 'Thomas Anderson',
-        working_party_name: 'Farm Labor',
-        destination: 'Prison Farm',
-        time_out: '2025-10-28T06:00:00Z',
-        time_in: '2025-10-28T15:00:00Z',
-        reason: 'Daily farm work',
-        prisoner: 'pr4',
-        gate_pass: '3',
-        working_party: 'wp1'
-      }
-    ],
-    escorts: [
-      {
-        id: 'e4',
-        full_name: 'Sgt. William Davis',
-        first_name: 'William',
-        middle_name: '',
-        last_name: 'Davis',
-        rank: 'Sergeant',
-        force_number: 'PS-56789',
-        gate_pass: '3'
-      }
-    ],
-    destination: 'Prison Farm',
-    main_gate_required: false,
-    exception_reason: 'Internal movement',
-    remarks: 'Daily working party - routine farm duties',
-    gate_keeper: 3,
-    gate_pass_type: 'gpt3',
-    created_at: '2025-10-28T05:30:00Z',
-    status: 'completed'
   }
+*/
+];
+let mockPrisonerRecords: PrisonerRecord[] = [];
+let mockWorkingParties: WorkingParty[] = [
 ];
 
-const mockPrisonerRecords: PrisonerRecord[] = [
-  { id: 'pr1', full_name: 'John Doe', prisoner_number: 'PN-2024-001', category: 'Remand' },
-  { id: 'pr2', full_name: 'Michael Smith', prisoner_number: 'PN-2024-002', category: 'Convict' },
-  { id: 'pr3', full_name: 'David Wilson', prisoner_number: 'PN-2024-003', category: 'Convict' },
-  { id: 'pr4', full_name: 'Thomas Anderson', prisoner_number: 'PN-2024-004', category: 'Convict' },
-  { id: 'pr5', full_name: 'James Taylor', prisoner_number: 'PN-2024-005', category: 'Awaiting Trial' }
-];
-
-const mockWorkingParties: WorkingParty[] = [
-  { id: 'wp1', name: 'Farm Labor', description: 'Agricultural work at prison farm' },
-  { id: 'wp2', name: 'Kitchen Duty', description: 'Food preparation and kitchen maintenance' },
-  { id: 'wp3', name: 'Maintenance', description: 'General prison maintenance work' },
-  { id: 'wp4', name: 'Laundry', description: 'Laundry and cleaning services' }
-];
-
-const mockGatePassTypes: GatePassType[] = [
+let mockGatePassTypes: GatePassType[] = [
   { id: 'gpt1', name: 'Court Appearance', description: 'Prisoner transport to court' },
   { id: 'gpt2', name: 'Hospital Visit', description: 'Medical treatment outside facility' },
   { id: 'gpt3', name: 'Working Party', description: 'Supervised work detail' },
@@ -353,21 +91,153 @@ const mockGatePassTypes: GatePassType[] = [
   { id: 'gpt5', name: 'Family Emergency', description: 'Compassionate leave' }
 ];
 
-const mockUsers: User[] = [
-  { id: 1, username: 'officer_john', full_name: 'John Smith', rank: 'Inspector', force_number: 'PS-12345' },
-  { id: 2, username: 'officer_mary', full_name: 'Mary Johnson', rank: 'Sergeant', force_number: 'PS-23456' },
-  { id: 3, username: 'officer_peter', full_name: 'Peter Williams', rank: 'Sergeant', force_number: 'PS-34567' }
+let visitors: Visitor[] = [];
+let mockUsers: User[] = [];
+let mockEscortStaff: User[] = [];
+
+//real data here
+const PrisonerRecords: PrisonerRecord[] = [
+  { id: 'pr1', full_name: 'John Doe', prisoner_number: 'PN-2024-001', category: 'Remand' },
+  { id: 'pr2', full_name: 'Michael Smith', prisoner_number: 'PN-2024-002', category: 'Convict' },
+  { id: 'pr3', full_name: 'David Wilson', prisoner_number: 'PN-2024-003', category: 'Convict' },
+  { id: 'pr4', full_name: 'Thomas Anderson', prisoner_number: 'PN-2024-004', category: 'Convict' },
+  { id: 'pr5', full_name: 'James Taylor', prisoner_number: 'PN-2024-005', category: 'Awaiting Trial' }
 ];
 
-const mockEscortStaff: User[] = [
-  { id: 4, username: 'escort_james', full_name: 'James Wilson', rank: 'Sergeant', force_number: 'PS-45678' },
-  { id: 5, username: 'escort_sarah', full_name: 'Sarah Johnson', rank: 'Corporal', force_number: 'PS-34567' },
-  { id: 6, username: 'escort_robert', full_name: 'Robert Brown', rank: 'Police Constable', force_number: 'PS-23456' },
-  { id: 7, username: 'escort_william', full_name: 'William Davis', rank: 'Sergeant', force_number: 'PS-56789' },
-  { id: 8, username: 'escort_lisa', full_name: 'Lisa Anderson', rank: 'Corporal', force_number: 'PS-67890' }
+// Mock Data
+const mockRelationships: Relationship[] = [
+  { id: 'rel1', name: 'Spouse' },
+  { id: 'rel2', name: 'Parent' },
+  { id: 'rel3', name: 'Child' },
+  { id: 'rel4', name: 'Sibling' },
+  { id: 'rel5', name: 'Lawyer' },
+  { id: 'rel6', name: 'Friend' },
+  { id: 'rel7', name: 'Other' }
 ];
 
-export default function GatePassScreen() {
+const mockIDTypes: IDType[] = [
+  { id: 'id1', name: 'National ID' },
+  { id: 'id2', name: 'Passport' },
+  { id: 'id3', name: 'Driver License' },
+  { id: 'id4', name: 'Voter ID' }
+];
+
+let mockVisitors: Visitor[] = [
+  /*{
+    id: 'v1',
+    first_name: 'Jane',
+    middle_name: 'Marie',
+    last_name: 'Doe',
+    id_number: 'ID-123456',
+    contact_no: '+256-700-123456',
+    address: '123 Main Street, Kampala',
+    relation: 'rel1'
+  },
+  {
+    id: 'v2',
+    first_name: 'Robert',
+    middle_name: 'James',
+    last_name: 'Smith',
+    id_number: 'ID-789012',
+    contact_no: '+256-700-789012',
+    address: '456 Oak Avenue, Kampala',
+    relation: 'rel5'
+  }*/
+];
+
+
+
+export  function GatePassScreen() {
+  //load api data from here
+const loadData = async () => { 
+ // getvisitors
+setIsLoading(true);
+
+getvisitorspass().then((data) => {
+visitorPassesDefault=data.results;
+setVisitorPasses(visitorPassesDefault);
+// alert(JSON.stringify(data.results));
+}).catch((error) => {
+  alert(error);
+});
+
+
+getvisitors().then((data) => {
+  mockVisitors=data.results;
+  setVisitors(data.results);
+}).catch((error) => {
+  alert(error);
+});
+
+
+
+  getgatepasses().then((data) => {
+  mockGatePasses = data.results;
+  setGatePasses(mockGatePasses);
+ //alert(JSON.stringify(data.results));
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+  //get the prisoners here
+    //get pass types
+  getprisoners().then((data) => {
+  //alert(JSON.stringify(data.results));
+   mockPrisonerRecords = data.results;
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+
+  //get pass types
+  getpasstypes().then((data) => {
+  //alert(JSON.stringify(data.results));
+   mockGatePassTypes = data.results;
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+  
+getescots().then((data) => {
+  //set working party to the api data
+ // alert(JSON.stringify(data.results));
+  mockEscortStaff = data.results;
+  mockUsers = data.results;
+    setIsLoading(false);
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+
+
+getworkingparty().then((data) => {
+  //set working party to the api data
+  //alert(JSON.stringify(data.results));
+  mockWorkingParties = data.results;
+  //alert(data.results[0].name);
+    setIsLoading(false);
+}).catch((error) => {
+  alert(error);
+    setIsLoading(true);
+});
+
+}
+
+  // Visitor Pass state
+  
+  const [isVisitorDialogOpenold, setIsVisitorPassDialogOpentwo] = useState(false);
+  const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
+  const [isVisitorPassViewDialogOpen, setIsVisitorPassViewDialogOpen] = useState(false);
+  const [visitorPassDialogMode, setVisitorPassDialogMode] = useState<'create' | 'edit'>('create');
+  const [selectedVisitorPass, setSelectedVisitorPass] = useState<any>(null);
+  
+  // Visitor management state
+  const [visitors, setVisitors] = useState<Visitor[]>(mockVisitors);
+  const [visitorPasses, setVisitorPasses] = useState<VisitorPass[]>(visitorPassesDefault);
+  
+
+
+  const [isLoading, setIsLoading]=useState(true);
   const [gatePasses, setGatePasses] = useState<GatePass[]>(mockGatePasses);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -377,25 +247,30 @@ export default function GatePassScreen() {
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [selectedGatePass, setSelectedGatePass] = useState<GatePass | null>(null);
-  
-  // Visitor Pass state
-  const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
-  const [isVisitorPassViewDialogOpen, setIsVisitorPassViewDialogOpen] = useState(false);
-  const [visitorPassDialogMode, setVisitorPassDialogMode] = useState<'create' | 'edit'>('create');
-  const [selectedVisitorPass, setSelectedVisitorPass] = useState<any>(null);
-  
-  // Visitor management state
-  const [visitors, setVisitors] = useState<Visitor[]>(mockVisitors);
-  const [isVisitorDialogOpen, setIsVisitorDialogOpen] = useState(false);
 
+  useEffect(() => {
+    loadData();
+    //load api data here
+  }, []);
+  //visitor dialog
+    const [isVisitorDialogOpen, setIsVisitorDialogOpen] = useState(false);
   // Form state
   const [formData, setFormData] = useState({
     gate_pass_type: '',
-    gate_keeper: '',
     destination: '',
     main_gate_required: true,
     exception_reason: '',
-    remarks: ''
+    remarks: '',
+    gate_pass_keeper:'',
+
+            visit_prisoner:'',
+            visit_visitor:'',
+            visitor_tag_number:'',
+            visitor_issue_date:'',
+            visitor_valid_from:'',
+            visitor_valid_to:'',
+            visitor_purpose:'',
+            visitor_tag_suspended: false,
   });
 
   const [selectedPrisoners, setSelectedPrisoners] = useState<Array<{
@@ -405,30 +280,44 @@ export default function GatePassScreen() {
     reason: string;
     time_out: string;
     time_in: string;
-    fingerprint_verification: string;
   }>>([]);
 
   const [selectedEscorts, setSelectedEscorts] = useState<string[]>([]);
-
-  // Users and gate keeper state
-  const [users, setUsers] = useState<User[]>(mockUsers);
-  const [isUsersLoading, setIsUsersLoading] = useState(false);
-  const [openGateKeeperCombobox, setOpenGateKeeperCombobox] = useState(false);
 
   const itemsPerPage = 10;
 
   // Filter gate passes
   const filteredGatePasses = gatePasses.filter(gatePass => {
     const matchesSearch = 
-      gatePass.gate_keeper_username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+     // gatePass.gate_keeper_username.toLowerCase().includes(searchTerm.toLowerCase()) ||
       gatePass.gate_pass_type_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       gatePass.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       gatePass.prisoners.some(p => p.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    const matchesStatus = statusFilter === 'all' || gatePass.status === statusFilter;
-    const matchesType = typeFilter === 'all' || gatePass.gate_pass_type === typeFilter;
+    //const matchesStatus = statusFilter === 'all' || gatePass.status === statusFilter;
+    //const matchesType = typeFilter === 'all' || gatePass.gate_pass_type === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
+    return matchesSearch /*&& matchesStatus && matchesType*/;
+  });
+
+
+
+
+
+
+  
+
+    // Filter visitor passes
+  const filteredVisitorPasses = visitorPasses.filter(gatePass => {
+    const matchesSearch = 
+     // gatePass.gate_keeper_username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      gatePass.prisoner.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      gatePass.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      gatePass.purpose.toLowerCase().includes(searchTerm.toLowerCase()) ;
+    //const matchesStatus = statusFilter === 'all' || gatePass.status === statusFilter;
+    //const matchesType = typeFilter === 'all' || gatePass.gate_pass_type === typeFilter;
+
+    return matchesSearch /*&& matchesStatus && matchesType*/;
   });
 
   const totalPages = Math.ceil(filteredGatePasses.length / itemsPerPage);
@@ -437,11 +326,20 @@ export default function GatePassScreen() {
     currentPage * itemsPerPage
   );
 
+
+
+  const totalPagesvisitor = Math.ceil(filteredVisitorPasses.length / itemsPerPage);
+  const paginatedVisitorPasses = filteredVisitorPasses.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+
+
   const handleCreateGatePass = () => {
     setDialogMode('create');
     setFormData({
       gate_pass_type: '',
-      gate_keeper: '',
       destination: '',
       main_gate_required: true,
       exception_reason: '',
@@ -452,36 +350,71 @@ export default function GatePassScreen() {
     setIsDialogOpen(true);
   };
 
+
+    const handleCreateVisitorPassold = () => {
+    setDialogMode('create');
+    setFormData({
+      gate_pass_type: '',
+      destination: '',
+      main_gate_required: true,
+      exception_reason: '',
+      remarks: ''
+    });
+   // setSelectedPrisoners([]);
+    //setSelectedEscorts([]);
+    setIsVisitorDialogOpen(true);
+  };
+
   const handleEditGatePass = (gatePass: GatePass) => {
     setDialogMode('edit');
     setSelectedGatePass(gatePass);
     setFormData({
+      gate_pass_keeper:gatePass.gate_keeper,
       gate_pass_type: gatePass.gate_pass_type,
-      gate_keeper: gatePass.gate_keeper.toString(),
       destination: gatePass.destination,
       main_gate_required: gatePass.main_gate_required,
       exception_reason: gatePass.exception_reason,
       remarks: gatePass.remarks
     });
+
+
+
     setSelectedPrisoners(gatePass.prisoners.map(p => ({
-      prisoner_id: p.prisoner,
+      prisoner_number: p.prisoner.prisoner_number,
+      prisoner_id: p.prisoner.id,
+      id: p.prisoner.id,
       working_party_id: p.working_party,
       destination: p.destination,
       reason: p.reason,
       time_out: p.time_out,
-      time_in: p.time_in || '',
-      fingerprint_verification: p.fingerprint_verification || ''
+      time_in: p.time_in || ''
     })));
+
+
+ // alert(JSON.stringify(selectedPrisoners));
+
     setSelectedEscorts(gatePass.escorts.map(e => e.force_number));
     setIsDialogOpen(true);
   };
 
   const handleViewGatePass = (gatePass: GatePass) => {
+
+
+    alert()
     setSelectedGatePass(gatePass);
     setIsViewDialogOpen(true);
   };
 
   const handleDeleteGatePass = (id: string) => {
+
+    setIsLoading(true);
+    deletegatepasses(id).then((data) => {
+    setIsLoading(false);
+        //also reload
+    loadData();
+    }).catch((error) => {
+    setIsLoading(false);
+    });
     if (confirm('Are you sure you want to delete this gate pass?')) {
       setGatePasses(gatePasses.filter(gp => gp.id !== id));
       toast.success('Gate pass deleted successfully');
@@ -489,17 +422,18 @@ export default function GatePassScreen() {
   };
 
   const handleSubmit = () => {
-    if (!formData.gate_pass_type || !formData.gate_keeper || !formData.destination || selectedPrisoners.length === 0 || selectedEscorts.length === 0) {
-      toast.error('Please fill all required fields including gate keeper, at least one prisoner and one escort');
+    if (!formData.gate_pass_type || !formData.destination ||  !formData.gate_pass_keeper ||
+      selectedPrisoners.length === 0 || selectedEscorts.length === 0) {
+      toast.error('Please fill all required fields including at least one prisoner and one escort');
       return;
     }
 
     const gatePassType = mockGatePassTypes.find(t => t.id === formData.gate_pass_type);
-    const selectedGateKeeper = users.find(u => u.id.toString() === formData.gate_keeper);
+    const currentUser = mockUsers[0];
 
-    const newGatePass: GatePass = {
+    let newGatePass: GatePass = {
       id: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
-      gate_keeper_username: selectedGateKeeper?.username || '',
+      gate_keeper_username: currentUser.username,
       gate_pass_type_name: gatePassType?.name || '',
       prisoners: selectedPrisoners.map((sp, idx) => {
         const prisoner = mockPrisonerRecords.find(p => p.id === sp.prisoner_id);
@@ -514,42 +448,90 @@ export default function GatePassScreen() {
           reason: sp.reason,
           prisoner: sp.prisoner_id,
           gate_pass: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
-          working_party: sp.working_party_id,
-          fingerprint_verification: sp.fingerprint_verification
+          working_party: sp.working_party_id
         };
       }),
+
       escorts: selectedEscorts.map((forceNumber, idx) => {
         const staff = mockEscortStaff.find(s => s.force_number === forceNumber);
         return {
           id: dialogMode === 'create' ? `e-${Date.now()}-${idx}` : selectedGatePass!.escorts[idx]?.id || `e-${Date.now()}-${idx}`,
-          full_name: staff?.full_name || '',
-          first_name: staff?.full_name.split(' ')[0] || '',
+          full_name: staff?.first_name+" "+staff?.last_name || '',
+          first_name: staff?.first_name.split(' ')[0] || '',
           middle_name: '',
-          last_name: staff?.full_name.split(' ')[1] || '',
+          last_name: staff?.last_name.split(' ')[1] || '',
           rank: staff?.rank || '',
           force_number: forceNumber,
-          gate_pass: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id
+          gate_pass: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
+          staff_profile:  staff?.id.toString() || ''
+         
         };
       }),
       destination: formData.destination,
       main_gate_required: formData.main_gate_required,
       exception_reason: formData.exception_reason,
       remarks: formData.remarks,
-      gate_keeper: parseInt(formData.gate_keeper),
+      gate_keeper: formData.gate_pass_keeper,
       gate_pass_type: formData.gate_pass_type,
       created_at: dialogMode === 'create' ? new Date().toISOString() : selectedGatePass!.created_at,
-      status: 'active'
+      status: '0996439c-24cc-453e-87e4-1936a3e52820'
     };
 
     if (dialogMode === 'create') {
-      setGatePasses([newGatePass, ...gatePasses]);
-      toast.success('Gate pass created successfully');
-    } else {
-      setGatePasses(gatePasses.map(gp => gp.id === selectedGatePass!.id ? newGatePass : gp));
-      toast.success('Gate pass updated successfully');
-    }
+      //set loading
+  setIsLoading(true);
+      //submit to server here.
+    // alert(JSON.stringify(newGatePass));
+     console.log(JSON.stringify(newGatePass));
+     // setGatePasses([newGatePass, ...gatePasses]);
+  //get pass types
+  submitGatePass(newGatePass).then((data) => {
+  toast.success('Gate pass created successfully');
+  setIsLoading(false);
+  loadData();
 
-    setIsDialogOpen(false);
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+    } else {
+
+      //remove those details
+      let newGatePass2: GatePass = {
+      id: dialogMode === 'create' ? `gp-${Date.now()}` : selectedGatePass!.id,
+      gate_keeper_username: currentUser.username,
+      gate_pass_type_name: gatePassType?.name || '',
+    
+      destination: formData.destination,
+      main_gate_required: formData.main_gate_required,
+      exception_reason: formData.exception_reason,
+      remarks: formData.remarks,
+      gate_keeper: formData.gate_pass_keeper,
+      gate_pass_type: formData.gate_pass_type,
+      created_at: dialogMode === 'create' ? new Date().toISOString() : selectedGatePass!.created_at,
+      status: '0996439c-24cc-453e-87e4-1936a3e52820'
+    };
+
+
+
+
+alert(JSON.stringify(newGatePass2));
+editgatePass(newGatePass2).then((data) => {
+  toast.success('Gate pass updated successfully');
+  setIsLoading(false);
+ // loadData();
+
+}).catch((error) => {
+  alert(error);
+    setIsLoading(false);
+});
+
+
+      //updating gatepass is here
+      setGatePasses(gatePasses.map(gp => gp.id === selectedGatePass!.id ? newGatePass : gp));
+
+    }
+  setIsDialogOpen(false);
   };
 
   const addPrisonerRow = () => {
@@ -559,8 +541,7 @@ export default function GatePassScreen() {
       destination: formData.destination,
       reason: '',
       time_out: new Date().toISOString().slice(0, 16),
-      time_in: '',
-      fingerprint_verification: ''
+      time_in: ''
     }]);
   };
 
@@ -588,23 +569,12 @@ export default function GatePassScreen() {
     setSelectedEscorts(updated);
   };
 
-  const getStatusBadge = (status?: string) => {
-    switch (status) {
-      case 'active':
-        return <Badge className="bg-blue-600">Active</Badge>;
-      case 'completed':
-        return <Badge className="bg-green-600">Completed</Badge>;
-      case 'pending':
-        return <Badge className="bg-yellow-600">Pending</Badge>;
-      default:
-        return <Badge>Unknown</Badge>;
-    }
-  };
+
+  //visitor pass
 
   // Visitor Pass handlers
   const handleCreateVisitorPass = () => {
     setVisitorPassDialogMode('create');
-    setSelectedVisitorPass(null);
     setIsVisitorPassDialogOpen(true);
   };
 
@@ -614,41 +584,98 @@ export default function GatePassScreen() {
     setIsVisitorPassDialogOpen(true);
   };
 
+
   const handleViewVisitorPass = (pass: VisitorPass) => {
     setSelectedVisitorPass(pass);
     setIsVisitorPassViewDialogOpen(true);
   };
-
-  const handleVisitorPassSubmit = (data: VisitorPass) => {
-    if (visitorPassDialogMode === 'create') {
+    const handleEditVisitorPassDelete = (pass: VisitorPass) => {
+      if (confirm('Are you sure you want to delete this visitor pass?')) {
+      setIsLoading(true);
+      deletevisitorpass(pass.id).then((pass) => {
       toast.success('Visitor pass created successfully');
-    } else {
-      toast.success('Visitor pass updated successfully');
-    }
-    setIsVisitorPassDialogOpen(false);
+      setIsLoading(false);
+       })
+      .catch((error) => {
+        toast.error(error.message);
+        setIsLoading(false);
+      });
+            //hit the api here
+         //  setVisitorPasses(visitorPasses.filter(pass => pass.id !== pass.id));
+            toast.success('Visitor pass deleted successfully');
+          }
   };
 
+  const handleVisitorPassSubmit = (data: VisitorPass) => {
+    //create visitor pass here
+   // alert(JSON.stringify(data));
+   setIsLoading(true);
+    if (visitorPassDialogMode === 'create') {
+      submitVisitorPass(data).then((data) => {
+      toast.success('Visitor pass created successfully');
+      })
+      .catch((error) => {
+        toast.error(error.message);
+      });
+    } else {
+            //pass to update
+  let passtosend:VisitorPass={
+        id: data.id,
+  visitor_tag_number: data.visitor_tag_number,
+  valid_from: data.valid_from,
+  valid_until:data.valid_until,
+  purpose: data.purpose,
+  issue_date: data.issue_date,
+  is_suspended:data.is_suspended,
+  is_valid:data.is_valid,
+  prisoner:data.prisoner,
+  visitor: data.visitor,
+  is_active:data.is_active
+      };
+      alert(JSON.stringify(passtosend));
+      editVisitorPass(passtosend).then((data) => {
+      toast.success('Visitor pass updated successfully');
+      setIsVisitorPassDialogOpen(false);
+      })
+      .catch((error) => {
+        toast.error(error.message);
+      });
+      
+    }
+    setIsLoading(false);
+    loadData();
+
+  };
   // Visitor management handlers
   const handleAddNewVisitor = () => {
     setIsVisitorDialogOpen(true);
   };
 
-  const handleVisitorCreated = (visitor: any) => {
-    // Convert the full visitor object from VisitorRegistrationDialog to our simpler Visitor format
-    const newVisitor: Visitor = {
-      id: visitor.id || `v-${Date.now()}`,
-      first_name: visitor.first_name,
-      middle_name: visitor.middle_name,
-      last_name: visitor.last_name,
-      id_number: visitor.id_number,
-      contact_no: visitor.contact_no,
-      address: visitor.address,
-      relation: visitor.relation
-    };
+    const getMainGateBatch = (status?: string) => {
+    if(status=="true")
+    {
+        return <Badge className="bg-blue-600">Required</Badge>;
+  }
+  else{
 
-    setVisitors([...visitors, newVisitor]);
-    toast.success('Visitor registered successfully');
-    setIsVisitorDialogOpen(false);
+   return <Badge className="bg-green-600">No Required</Badge>;  }
+     
+  };
+
+  const getStatusBadge = (status?: string) => {
+    switch (status) {
+      case 'Active':
+        return <Badge>Active</Badge>;
+      case 'Completed':
+        return <Badge className="bg-green-600">Completed</Badge>;
+      case 'Pending':
+        return <Badge className="bg-yellow-600">Pending</Badge>;
+      default:
+        return <Badge>
+        
+          
+          Unknown</Badge>;
+    }
   };
 
   const formatDateTime = (dateString: string) => {
@@ -662,442 +689,16 @@ export default function GatePassScreen() {
     });
   };
 
-  const handlePrintGatePass = () => {
-    if (!selectedGatePass) return;
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
-
-    const printContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Gate Pass - ${selectedGatePass.id}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 40px;
-              color: #333;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #650000;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              color: #650000;
-              margin: 0 0 10px 0;
-            }
-            .header h2 {
-              color: #666;
-              font-weight: normal;
-              margin: 0;
-              font-size: 18px;
-            }
-            .section {
-              margin-bottom: 30px;
-            }
-            .section h3 {
-              color: #650000;
-              border-bottom: 2px solid #650000;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
-            }
-            .info-grid {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 15px;
-              margin-bottom: 15px;
-            }
-            .info-item {
-              padding: 10px;
-              background: #f9f9f9;
-              border-left: 3px solid #650000;
-            }
-            .info-label {
-              font-size: 12px;
-              color: #666;
-              margin-bottom: 5px;
-            }
-            .info-value {
-              font-weight: bold;
-            }
-            .prisoner-card, .escort-card {
-              border: 1px solid #ddd;
-              padding: 15px;
-              margin-bottom: 10px;
-              border-radius: 5px;
-            }
-            .badge {
-              display: inline-block;
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 12px;
-              font-weight: bold;
-            }
-            .badge-green {
-              background: #10b981;
-              color: white;
-            }
-            .badge-blue {
-              background: #3b82f6;
-              color: white;
-            }
-            .badge-yellow {
-              background: #f59e0b;
-              color: white;
-            }
-            @media print {
-              body { padding: 20px; }
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>GATE PASS</h1>
-            <h2>Prison Management Information System</h2>
-          </div>
-
-          <div class="section">
-            <h3>Gate Pass Information</h3>
-            <div class="info-grid">
-              <div class="info-item">
-                <div class="info-label">Gate Pass Type</div>
-                <div class="info-value">${selectedGatePass.gate_pass_type_name}</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Status</div>
-                <div class="info-value">
-                  <span class="badge ${selectedGatePass.status === 'active' ? 'badge-blue' : selectedGatePass.status === 'completed' ? 'badge-green' : 'badge-yellow'}">
-                    ${selectedGatePass.status?.toUpperCase() || 'UNKNOWN'}
-                  </span>
-                </div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Gatekeeper</div>
-                <div class="info-value">${selectedGatePass.gate_keeper_username}</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Created</div>
-                <div class="info-value">${selectedGatePass.created_at ? formatDateTime(selectedGatePass.created_at) : '-'}</div>
-              </div>
-              <div class="info-item" style="grid-column: span 2;">
-                <div class="info-label">Destination</div>
-                <div class="info-value">${selectedGatePass.destination}</div>
-              </div>
-              <div class="info-item" style="grid-column: span 2;">
-                <div class="info-label">Main Gate Required</div>
-                <div class="info-value">${selectedGatePass.main_gate_required ? 'Yes' : 'No'}</div>
-              </div>
-              ${selectedGatePass.exception_reason ? `
-                <div class="info-item" style="grid-column: span 2;">
-                  <div class="info-label">Exception Reason</div>
-                  <div class="info-value">${selectedGatePass.exception_reason}</div>
-                </div>
-              ` : ''}
-              ${selectedGatePass.remarks ? `
-                <div class="info-item" style="grid-column: span 2;">
-                  <div class="info-label">Remarks</div>
-                  <div class="info-value">${selectedGatePass.remarks}</div>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Prisoners (${selectedGatePass.prisoners.length})</h3>
-            ${selectedGatePass.prisoners.map(prisoner => `
-              <div class="prisoner-card">
-                <div style="font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                  <span>${prisoner.prisoner_name}</span>
-                  <span class="badge ${prisoner.time_in ? 'badge-green' : 'badge-blue'}">
-                    ${prisoner.time_in ? 'RETURNED' : 'OUT'}
-                  </span>
-                </div>
-                <div class="info-grid">
-                  ${prisoner.working_party_name ? `
-                    <div>
-                      <div class="info-label">Working Party</div>
-                      <div>${prisoner.working_party_name}</div>
-                    </div>
-                  ` : ''}
-                  <div>
-                    <div class="info-label">Destination</div>
-                    <div>${prisoner.destination}</div>
-                  </div>
-                  <div>
-                    <div class="info-label">Reason</div>
-                    <div>${prisoner.reason}</div>
-                  </div>
-                  <div>
-                    <div class="info-label">Time Out</div>
-                    <div>${formatDateTime(prisoner.time_out)}</div>
-                  </div>
-                  ${prisoner.time_in ? `
-                    <div>
-                      <div class="info-label">Time In</div>
-                      <div>${formatDateTime(prisoner.time_in)}</div>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="section">
-            <h3>Escort Team (${selectedGatePass.escorts.length})</h3>
-            ${selectedGatePass.escorts.map(escort => `
-              <div class="escort-card">
-                <div style="font-weight: bold; margin-bottom: 5px;">${escort.full_name}</div>
-                <div style="color: #666; font-size: 14px;">
-                  Rank: ${escort.rank} | Force #: ${escort.force_number}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
-            <p>Generated on ${new Date().toLocaleString()}</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    printWindow.document.write(printContent);
-    printWindow.document.close();
-    printWindow.focus();
-    
-    // Slight delay to ensure content is loaded before printing
-    setTimeout(() => {
-      printWindow.print();
-    }, 250);
-  };
-
-  const handleExportToPDF = async () => {
-    if (!selectedGatePass) return;
-
-    // Create a hidden iframe for PDF generation
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'absolute';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
-
-    const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document;
-    if (!iframeDoc) return;
-
-    const pdfContent = `
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>Gate Pass - ${selectedGatePass.id}</title>
-          <style>
-            body {
-              font-family: Arial, sans-serif;
-              padding: 40px;
-              color: #333;
-            }
-            .header {
-              text-align: center;
-              border-bottom: 3px solid #650000;
-              padding-bottom: 20px;
-              margin-bottom: 30px;
-            }
-            .header h1 {
-              color: #650000;
-              margin: 0 0 10px 0;
-            }
-            .header h2 {
-              color: #666;
-              font-weight: normal;
-              margin: 0;
-              font-size: 18px;
-            }
-            .section {
-              margin-bottom: 30px;
-            }
-            .section h3 {
-              color: #650000;
-              border-bottom: 2px solid #650000;
-              padding-bottom: 10px;
-              margin-bottom: 15px;
-            }
-            .info-grid {
-              display: grid;
-              grid-template-columns: repeat(2, 1fr);
-              gap: 15px;
-              margin-bottom: 15px;
-            }
-            .info-item {
-              padding: 10px;
-              background: #f9f9f9;
-              border-left: 3px solid #650000;
-            }
-            .info-label {
-              font-size: 12px;
-              color: #666;
-              margin-bottom: 5px;
-            }
-            .info-value {
-              font-weight: bold;
-            }
-            .prisoner-card, .escort-card {
-              border: 1px solid #ddd;
-              padding: 15px;
-              margin-bottom: 10px;
-              border-radius: 5px;
-            }
-            .badge {
-              display: inline-block;
-              padding: 4px 8px;
-              border-radius: 4px;
-              font-size: 12px;
-              font-weight: bold;
-            }
-            .badge-green {
-              background: #10b981;
-              color: white;
-            }
-            .badge-blue {
-              background: #3b82f6;
-              color: white;
-            }
-            .badge-yellow {
-              background: #f59e0b;
-              color: white;
-            }
-          </style>
-        </head>
-        <body>
-          <div class="header">
-            <h1>GATE PASS</h1>
-            <h2>Prison Management Information System</h2>
-          </div>
-
-          <div class="section">
-            <h3>Gate Pass Information</h3>
-            <div class="info-grid">
-              <div class="info-item">
-                <div class="info-label">Gate Pass Type</div>
-                <div class="info-value">${selectedGatePass.gate_pass_type_name}</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Status</div>
-                <div class="info-value">
-                  <span class="badge ${selectedGatePass.status === 'active' ? 'badge-blue' : selectedGatePass.status === 'completed' ? 'badge-green' : 'badge-yellow'}">
-                    ${selectedGatePass.status?.toUpperCase() || 'UNKNOWN'}
-                  </span>
-                </div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Gatekeeper</div>
-                <div class="info-value">${selectedGatePass.gate_keeper_username}</div>
-              </div>
-              <div class="info-item">
-                <div class="info-label">Created</div>
-                <div class="info-value">${selectedGatePass.created_at ? formatDateTime(selectedGatePass.created_at) : '-'}</div>
-              </div>
-              <div class="info-item" style="grid-column: span 2;">
-                <div class="info-label">Destination</div>
-                <div class="info-value">${selectedGatePass.destination}</div>
-              </div>
-              <div class="info-item" style="grid-column: span 2;">
-                <div class="info-label">Main Gate Required</div>
-                <div class="info-value">${selectedGatePass.main_gate_required ? 'Yes' : 'No'}</div>
-              </div>
-              ${selectedGatePass.exception_reason ? `
-                <div class="info-item" style="grid-column: span 2;">
-                  <div class="info-label">Exception Reason</div>
-                  <div class="info-value">${selectedGatePass.exception_reason}</div>
-                </div>
-              ` : ''}
-              ${selectedGatePass.remarks ? `
-                <div class="info-item" style="grid-column: span 2;">
-                  <div class="info-label">Remarks</div>
-                  <div class="info-value">${selectedGatePass.remarks}</div>
-                </div>
-              ` : ''}
-            </div>
-          </div>
-
-          <div class="section">
-            <h3>Prisoners (${selectedGatePass.prisoners.length})</h3>
-            ${selectedGatePass.prisoners.map(prisoner => `
-              <div class="prisoner-card">
-                <div style="font-weight: bold; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center;">
-                  <span>${prisoner.prisoner_name}</span>
-                  <span class="badge ${prisoner.time_in ? 'badge-green' : 'badge-blue'}">
-                    ${prisoner.time_in ? 'RETURNED' : 'OUT'}
-                  </span>
-                </div>
-                <div class="info-grid">
-                  ${prisoner.working_party_name ? `
-                    <div>
-                      <div class="info-label">Working Party</div>
-                      <div>${prisoner.working_party_name}</div>
-                    </div>
-                  ` : ''}
-                  <div>
-                    <div class="info-label">Destination</div>
-                    <div>${prisoner.destination}</div>
-                  </div>
-                  <div>
-                    <div class="info-label">Reason</div>
-                    <div>${prisoner.reason}</div>
-                  </div>
-                  <div>
-                    <div class="info-label">Time Out</div>
-                    <div>${formatDateTime(prisoner.time_out)}</div>
-                  </div>
-                  ${prisoner.time_in ? `
-                    <div>
-                      <div class="info-label">Time In</div>
-                      <div>${formatDateTime(prisoner.time_in)}</div>
-                    </div>
-                  ` : ''}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div class="section">
-            <h3>Escort Team (${selectedGatePass.escorts.length})</h3>
-            ${selectedGatePass.escorts.map(escort => `
-              <div class="escort-card">
-                <div style="font-weight: bold; margin-bottom: 5px;">${escort.full_name}</div>
-                <div style="color: #666; font-size: 14px;">
-                  Rank: ${escort.rank} | Force #: ${escort.force_number}
-                </div>
-              </div>
-            `).join('')}
-          </div>
-
-          <div style="margin-top: 50px; padding-top: 20px; border-top: 1px solid #ddd; text-align: center; color: #666; font-size: 12px;">
-            <p>Generated on ${new Date().toLocaleString()}</p>
-          </div>
-        </body>
-      </html>
-    `;
-
-    iframeDoc.open();
-    iframeDoc.write(pdfContent);
-    iframeDoc.close();
-
-    // Wait for content to load, then trigger print dialog with PDF option
-    setTimeout(() => {
-      iframe.contentWindow?.focus();
-      iframe.contentWindow?.print();
-      
-      // Clean up after a delay
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 250);
-
-    toast.success('PDF export initiated. Please use "Save as PDF" in the print dialog.');
-  };
+    if (isLoading) {
+    return (
+      <div className="size-full flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading API data</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6">
@@ -1105,43 +706,44 @@ export default function GatePassScreen() {
       <div className="flex items-center justify-between">
         <div>
           <h1 style={{ color: '#650000' }}>Automated Gate Management</h1>
-          <p className="text-gray-600">Manage gate passes, prisoner movements, escort teams, and visitor passes</p>
+          <p className="text-gray-600">Manage gate passes, prisoner movements, and escort teams</p>
         </div>
       </div>
 
-      <Tabs defaultValue="gate-passes" className="w-full">
-        <div className="bg-white rounded-lg p-2 mb-6 shadow-sm border">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="gate-passes" className="data-[state=active]:bg-[#650000] data-[state=active]:text-white">
-              Gate Passes
-            </TabsTrigger>
-            <TabsTrigger value="visitor-passes" className="data-[state=active]:bg-[#650000] data-[state=active]:text-white">
-              Visitor Passes
-            </TabsTrigger>
-          </TabsList>
-        </div>
-
-        <TabsContent value="gate-passes" className="space-y-6">
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleCreateGatePass}
-              style={{ backgroundColor: '#650000' }}
-              className="hover:opacity-90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Gate Pass
-            </Button>
-          </div>
-
+          <Tabs defaultValue="gatepass">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="gatepass">Gate Pass</TabsTrigger>
+              <TabsTrigger value="visitor">Visitor Pass</TabsTrigger>
+            </TabsList>
+            <TabsContent value="gatepass" className="space-y-4 mt-4">
       {/* Stats Cards */}
+
+
+  {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 style={{ color: '#650000' }}></h1>
+          <p className="text-gray-600"></p>
+        </div>
+ <Button 
+          onClick={handleCreateGatePass}
+          style={{ backgroundColor: '#650000' }}
+          className="hover:opacity-90"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Gate Pass
+        </Button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardContent className="p-6">
+            
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Active Gate Passes</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').length}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').length}
                 </p>
               </div>
               <AlertCircle className="h-8 w-8 text-blue-600" />
@@ -1155,7 +757,7 @@ export default function GatePassScreen() {
               <div>
                 <p className="text-sm text-gray-600">Completed Today</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'completed').length}
+                  {gatePasses.filter(gp => gp.status_name === 'Completed').length}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-600" />
@@ -1169,7 +771,7 @@ export default function GatePassScreen() {
               <div>
                 <p className="text-sm text-gray-600">Prisoners Out</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').reduce((sum, gp) => sum + gp.prisoners.length, 0)}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').reduce((sum, gp) => sum + gp.prisoners.length, 0)}
                 </p>
               </div>
               <UserPlus className="h-8 w-8 text-orange-600" />
@@ -1183,7 +785,7 @@ export default function GatePassScreen() {
               <div>
                 <p className="text-sm text-gray-600">Escorts on Duty</p>
                 <p className="text-2xl" style={{ color: '#650000' }}>
-                  {gatePasses.filter(gp => gp.status === 'active').reduce((sum, gp) => sum + gp.escorts.length, 0)}
+                  {gatePasses.filter(gp => gp.status_name === 'Active').reduce((sum, gp) => sum + gp.escorts.length, 0)}
                 </p>
               </div>
               <Shield className="h-8 w-8" style={{ color: '#650000' }} />
@@ -1191,6 +793,7 @@ export default function GatePassScreen() {
           </CardContent>
         </Card>
       </div>
+
 
       {/* Filters */}
       <Card>
@@ -1244,16 +847,16 @@ export default function GatePassScreen() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow style={{ backgroundColor: '#650000' }}>
-                  <TableHead className="text-white">Gate Pass Type</TableHead>
-                  <TableHead className="text-white">Gatekeeper</TableHead>
-                  <TableHead className="text-white">Destination</TableHead>
-                  <TableHead className="text-white">Prisoners</TableHead>
-                  <TableHead className="text-white">Escorts</TableHead>
-                  <TableHead className="text-white">Main Gate</TableHead>
-                  <TableHead className="text-white">Status</TableHead>
-                  <TableHead className="text-white">Created</TableHead>
-                  <TableHead className="text-right text-white">Actions</TableHead>
+                <TableRow>
+                  <TableHead>Gate Pass Type</TableHead>
+                  <TableHead>Gatekeeper</TableHead>
+                  <TableHead>Destination</TableHead>
+                  <TableHead>Prisoners</TableHead>
+                  <TableHead>Escorts</TableHead>
+                  <TableHead>Main Gate</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Created</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -1277,12 +880,13 @@ export default function GatePassScreen() {
                       </TableCell>
                       <TableCell>
                         {gatePass.main_gate_required ? (
-                          <Badge className="bg-green-600">Required</Badge>
+                          <Badge>Required</Badge>
                         ) : (
-                          <Badge variant="outline">Not Required</Badge>
-                        )}
+                             <>Not Required</>
+                           
+                        )}                     
                       </TableCell>
-                      <TableCell>{getStatusBadge(gatePass.status)}</TableCell>
+                      <TableCell>{getStatusBadge(gatePass.status_name)}</TableCell>
                       <TableCell className="text-sm text-gray-600">
                         {gatePass.created_at ? formatDateTime(gatePass.created_at) : '-'}
                       </TableCell>
@@ -1350,31 +954,150 @@ export default function GatePassScreen() {
           )}
         </CardContent>
       </Card>
-        </TabsContent>
+            </TabsContent>
 
-        <TabsContent value="visitor-passes" className="space-y-6">
-          <div className="flex justify-end">
-            <Button 
-              onClick={handleCreateVisitorPass}
-              style={{ backgroundColor: '#650000' }}
-              className="hover:opacity-90"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Visitor Pass
-            </Button>
-          </div>
-
-          <VisitorPassList
+            <TabsContent value="visitor" className="space-y-4 mt-4">
+          
+            <div className="flex items-center justify-between">
+        <div>
+          <h1 style={{ color: '#650000' }}></h1>
+          <p className="text-gray-600"></p>
+        </div>
+ <Button 
+          onClick={handleCreateVisitorPass}
+          style={{ backgroundColor: '#650000' }}
+          className="hover:opacity-90"
+        >
+          <Plus className="mr-2 h-4 w-4" />
+          Create Visitor Pass
+        </Button>
+      </div>
+        <Card>
+        <CardHeader>
+          <CardTitle>Visitor Passes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            
+             <VisitorPassList
+             onDelete={handleEditVisitorPassDelete}
             onEdit={handleEditVisitorPass}
             onView={handleViewVisitorPass}
+            passes={visitorPasses}
           />
-        </TabsContent>
-      </Tabs>
+           {
+            /*
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tag Number</TableHead>
+                  <TableHead>Prisoner</TableHead>
+                  <TableHead>Visitor</TableHead>
+                  <TableHead>Valid From</TableHead>
+                  <TableHead>Valid Until</TableHead>
+                  <TableHead>Purpose</TableHead>
+                 
+                  <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedVisitorPasses.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                      No visitor passes found
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  paginatedVisitorPasses.map((gatePass) => (
+                    <TableRow key={gatePass.id}>
+                      <TableCell>{gatePass.visitor_tag_number}</TableCell>
+                      <TableCell>{gatePass.prisoner_name}</TableCell>
+                      <TableCell>{gatePass.visitor_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{gatePass.valid_from}</Badge>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{gatePass.valid_until}</Badge>
+                      </TableCell>
+                       <TableCell>{gatePass.purpose}</TableCell>
+                     
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleViewGatePass(gatePass)}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleEditGatePass(gatePass)}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDeleteGatePass(gatePass.id)}
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>*/
+           }
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between mt-4">
+              <p className="text-sm text-gray-600">
+                Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredGatePasses.length)} of {filteredGatePasses.length} results
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage - 1)}
+                  disabled={currentPage === 1}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <span className="px-4 py-2 text-sm">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setCurrentPage(currentPage + 1)}
+                  disabled={currentPage === totalPages}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+     
+            </TabsContent>
+
+           
+
+          
+          </Tabs>
+
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1400px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>
               {dialogMode === 'create' ? 'Create Gate Pass' : 'Edit Gate Pass'}
@@ -1388,7 +1111,7 @@ export default function GatePassScreen() {
 
           <Tabs defaultValue="general" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="general">Gate Pass Information</TabsTrigger>
+              <TabsTrigger value="general">General Information</TabsTrigger>
               <TabsTrigger value="prisoners">Prisoners</TabsTrigger>
               <TabsTrigger value="escorts">Escort Team</TabsTrigger>
             </TabsList>
@@ -1414,55 +1137,23 @@ export default function GatePassScreen() {
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+                 <div className="space-y-2">
                   <Label>Gate Keeper *</Label>
-                  <Popover open={openGateKeeperCombobox} onOpenChange={setOpenGateKeeperCombobox}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openGateKeeperCombobox}
-                        className="w-full justify-between"
-                      >
-                        {formData.gate_keeper
-                          ? users.find((user) => user.id.toString() === formData.gate_keeper)?.full_name
-                          : "Select gate keeper..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search gate keeper..." />
-                        <CommandList>
-                          <CommandEmpty>No gate keeper found.</CommandEmpty>
-                          <CommandGroup>
-                            {users.map((user) => (
-                              <CommandItem
-                                key={user.id}
-                                value={`${user.full_name} ${user.username} ${user.force_number}`}
-                                onSelect={() => {
-                                  setFormData({ ...formData, gate_keeper: user.id.toString() });
-                                  setOpenGateKeeperCombobox(false);
-                                }}
-                              >
-                                <Check
-                                  className={`mr-2 h-4 w-4 ${
-                                    formData.gate_keeper === user.id.toString() ? "opacity-100" : "opacity-0"
-                                  }`}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{user.full_name}</span>
-                                  <span className="text-sm text-gray-500">
-                                    {user.rank} - {user.force_number}
-                                  </span>
-                                </div>
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <Select 
+                    value={formData.gate_pass_keeper}
+                    onValueChange={(value) => setFormData({ ...formData, gate_pass_keeper: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select gate pass keeper" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mockUsers.map(type => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.first_name} {type.last_name} -  {type.rank_name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -1564,7 +1255,7 @@ export default function GatePassScreen() {
                               <SelectContent>
                                 {mockPrisonerRecords.map(pr => (
                                   <SelectItem key={pr.id} value={pr.id}>
-                                    {pr.full_name} ({pr.prisoner_number})
+                                    {pr.full_name} ({pr.prisoner_number_value})
                                   </SelectItem>
                                 ))}
                               </SelectContent>
@@ -1626,14 +1317,6 @@ export default function GatePassScreen() {
                               onChange={(e) => updatePrisonerRow(index, 'time_in', e.target.value ? new Date(e.target.value).toISOString() : '')}
                             />
                           </div>
-
-                          <div className="col-span-2">
-                            <BiometricCapture
-                              value={prisoner.fingerprint_verification}
-                              onChange={(value) => updatePrisonerRow(index, 'fingerprint_verification', value)}
-                              label={prisoner.time_in ? 'Check-In Verification' : 'Check-Out Verification'}
-                            />
-                          </div>
                         </div>
                       </CardContent>
                     </Card>
@@ -1690,7 +1373,9 @@ export default function GatePassScreen() {
                                 <SelectContent>
                                   {mockEscortStaff.map(staff => (
                                     <SelectItem key={staff.force_number} value={staff.force_number}>
-                                      {staff.rank} {staff.full_name} ({staff.force_number})
+                                        {staff.first_name} {staff.last_name} - 
+                                        {staff.rank_name}
+                                       ({staff.force_number})
                                     </SelectItem>
                                   ))}
                                 </SelectContent>
@@ -1708,7 +1393,7 @@ export default function GatePassScreen() {
                           </div>
                           {staff && (
                             <div className="ml-8 mt-2 text-sm text-gray-600">
-                              <p>Rank: {staff.rank}</p>
+                              <p>Rank: {staff.rank_name}</p>
                             </div>
                           )}
                         </CardContent>
@@ -1732,14 +1417,12 @@ export default function GatePassScreen() {
               {dialogMode === 'create' ? 'Create Gate Pass' : 'Update Gate Pass'}
             </Button>
           </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
-        <DialogContent className="max-w-[90vw] w-[1200px] max-h-[90vh] overflow-hidden p-0 flex flex-col resize">
-          <div className="flex-1 overflow-y-auto p-6">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle style={{ color: '#650000' }}>Gate Pass Details</DialogTitle>
             <DialogDescription>
@@ -1749,9 +1432,9 @@ export default function GatePassScreen() {
 
           {selectedGatePass && (
             <div className="space-y-6">
-              {/* Gate Pass Information */}
+              {/* General Information */}
               <div>
-                <h3 className="mb-3" style={{ color: '#650000' }}>Gate Pass Information</h3>
+                <h3 className="mb-3" style={{ color: '#650000' }}>General Information</h3>
                 <Card>
                   <CardContent className="p-4 space-y-3">
                     <div className="grid grid-cols-2 gap-4">
@@ -1761,7 +1444,7 @@ export default function GatePassScreen() {
                       </div>
                       <div>
                         <Label className="text-gray-600">Status</Label>
-                        <div className="mt-1">{getStatusBadge(selectedGatePass.status)}</div>
+                        <div className="mt-1">{getStatusBadge(selectedGatePass.status_name)}</div>
                       </div>
                       <div>
                         <Label className="text-gray-600">Gatekeeper</Label>
@@ -1877,32 +1560,16 @@ export default function GatePassScreen() {
             </div>
           )}
 
-          <DialogFooter className="flex justify-between items-center">
-            <div className="flex gap-2">
-              <Button 
-                variant="outline"
-                onClick={handlePrintGatePass}
-                className="flex items-center gap-2"
-              >
-                <Printer className="h-4 w-4" />
-                Print gate pass
-              </Button>
-              <Button 
-                variant="outline"
-                onClick={handleExportToPDF}
-                className="flex items-center gap-2"
-              >
-                <Download className="h-4 w-4" />
-                Export to PDF
-              </Button>
-            </div>
+          <DialogFooter>
             <Button variant="outline" onClick={() => setIsViewDialogOpen(false)}>
               Close
             </Button>
           </DialogFooter>
-          </div>
         </DialogContent>
       </Dialog>
+
+
+
 
       {/* Visitor Pass Create/Edit Dialog */}
       <Dialog 
@@ -1921,21 +1588,18 @@ export default function GatePassScreen() {
             </DialogDescription>
           </DialogHeader>
 
-          <VisitorPassForm
+          <VisitorPassForm prisoners={mockPrisonerRecords}
             pass={selectedVisitorPass}
             onSubmit={handleVisitorPassSubmit}
             onCancel={() => setIsVisitorPassDialogOpen(false)}
-            onAddNewVisitor={handleAddNewVisitor}
-            visitors={visitors.map(v => ({
-              id: v.id,
-              name: `${v.first_name} ${v.middle_name} ${v.last_name}`.replace(/\s+/g, ' ').trim(),
-              id_number: v.id_number
-            }))}
+            visitors={visitors}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Visitor Pass View Dialog */}
+
+
+ {/* Visitor Pass View Dialog */}
       <Dialog 
         open={isVisitorPassViewDialogOpen} 
         onOpenChange={setIsVisitorPassViewDialogOpen}
@@ -2012,12 +1676,6 @@ export default function GatePassScreen() {
         </DialogContent>
       </Dialog>
 
-      {/* Visitor Registration Dialog */}
-      <VisitorRegistrationDialog
-        open={isVisitorDialogOpen}
-        onOpenChange={setIsVisitorDialogOpen}
-        onVisitorCreated={handleVisitorCreated}
-      />
     </div>
   );
 }

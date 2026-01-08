@@ -7,7 +7,7 @@ import { Switch } from '../ui/switch';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Check, ChevronsUpDown, AlertCircle, Upload, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { cn } from '../ui/utils';
 import { phoneNumberValidation, emailValidation, requiredValidation } from "../../utils/validation";
 import {
@@ -52,55 +52,6 @@ interface VisitorItemFormProps {
   visitors: Visitor[];
   loading: boolean;
 }
-
-// Mock data for dropdowns
-const mockVisitors = [
-  { id: 'visitor-1', name: 'Sarah Doe', id_number: 'CM123456789' },
-  { id: 'visitor-2', name: 'Michael Johnson', id_number: 'CM987654321' },
-  { id: 'visitor-3', name: 'Emily Davis', id_number: 'CM456789123' },
-  { id: 'visitor-4', name: 'Lisa Thompson', id_number: 'CM789123456' },
-  { id: 'visitor-5', name: 'Maria Garcia', id_number: 'CM321654987' }
-];
-
-const mockItemCategories = [
-  { id: 'cat-1', name: 'Food Items' },
-  { id: 'cat-2', name: 'Clothing' },
-  { id: 'cat-3', name: 'Personal Care' },
-  { id: 'cat-4', name: 'Books & Magazines' },
-  { id: 'cat-5', name: 'Electronics' },
-  { id: 'cat-6', name: 'Medicine' }
-];
-
-const mockItems = [
-  { id: 'item-1', name: 'Rice', category_id: 'cat-1' },
-  { id: 'item-2', name: 'Beans', category_id: 'cat-1' },
-  { id: 'item-3', name: 'Sugar', category_id: 'cat-1' },
-  { id: 'item-4', name: 'T-Shirt', category_id: 'cat-2' },
-  { id: 'item-5', name: 'Trousers', category_id: 'cat-2' },
-  { id: 'item-6', name: 'Soap', category_id: 'cat-3' },
-  { id: 'item-7', name: 'Toothpaste', category_id: 'cat-3' },
-  { id: 'item-8', name: 'Bible', category_id: 'cat-4' },
-  { id: 'item-9', name: 'Novel', category_id: 'cat-4' },
-  { id: 'item-10', name: 'Radio', category_id: 'cat-5' }
-];
-
-const mockMeasurementUnits = [
-  { id: 'unit-1', name: 'Kilograms (Kg)' },
-  { id: 'unit-2', name: 'Grams (g)' },
-  { id: 'unit-3', name: 'Liters (L)' },
-  { id: 'unit-4', name: 'Pieces (Pcs)' },
-  { id: 'unit-5', name: 'Pairs' },
-  { id: 'unit-6', name: 'Packets' },
-  { id: 'unit-7', name: 'Bottles' }
-];
-
-const mockItemStatuses = [
-  { id: 'status-1', name: 'Pending Inspection', color: 'yellow' },
-  { id: 'status-2', name: 'Approved', color: 'green' },
-  { id: 'status-3', name: 'Rejected', color: 'red' },
-  { id: 'status-4', name: 'Collected', color: 'blue' },
-  { id: 'status-5', name: 'Stored', color: 'gray' }
-];
 
 const mockCurrencies = [
   { code: 'UGX', name: 'Uganda Shillings (UGX)' },
