@@ -9,6 +9,7 @@ import { transferRoutes } from './transfer.routes';
 import { gateRoutes } from './gate.routes';
 import { stageRoutes } from './stage.routes';
 import { dischargeRoutes } from './discharge.routes';
+import { reportsRoutes } from './reports.routes';
 
 /**
  * Application Routes Configuration
@@ -46,6 +47,9 @@ export const routes: RouteObject[] = [
   ...stageRoutes,
   // Discharge Management Routes
   ...dischargeRoutes,
+
+  // Reports Routes
+  ...reportsRoutes,
 
   // Default/Fallback Route
   {
