@@ -6,6 +6,7 @@ import { admissionRoutes } from './admission.routes';
 import { demoRoutes } from './demo.routes';
 import  {gateRoutes}  from './gate.routes';
 import  {stageRoutes}  from './stage.routes';
+import { reportsRoutes } from './reports.routes';
 
 
 /**
@@ -36,6 +37,9 @@ export const routes: RouteObject[] = [
 
     //stage classification
   ...stageRoutes,
+
+  // Reports Routes
+  ...reportsRoutes,
 
   // Default/Fallback Route
   {
