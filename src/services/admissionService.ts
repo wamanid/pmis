@@ -1,6 +1,21 @@
 import axiosInstance from './axiosInstance';
 import { DashboardResponse, DashboardFilters } from '../models/admission';
 
+export interface AdmissionType {
+  id: string;
+  name: string;
+  is_active: boolean;
+  created_datetime: string;
+  updated_datetime: string;
+}
+
+export interface AdmissionTypesResponse {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: AdmissionType[];
+}
+
 /**
  * Admission Service
  * Handles all API calls related to prisoner admissions
@@ -36,10 +51,25 @@ export const getAdmissionDashboard = async (
 };
 
 /**
+ * Fetch admission types from API
+ * @returns List of active admission types
+ */
+export const getAdmissionTypes = async (): Promise<AdmissionType[]> => {
+  try {
+    const response = await axiosInstance.get<AdmissionTypesResponse>('admission/admission-types/');
+    return response.data.results.filter(type => type.is_active);
+  } catch (error) {
+    console.error('Error fetching admission types:', error);
+    throw error;
+  }
+};
+
+/**
  * Export all admission service functions
  */
 export const admissionService = {
   getAdmissionDashboard,
+  getAdmissionTypes,
 };
 
 export default admissionService;

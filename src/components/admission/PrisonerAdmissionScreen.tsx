@@ -68,14 +68,7 @@ import {
   ChildRecord,
   ArmedPersonnel} from "../../models/admission";
 import { generatePrisonerNumber, getPrisonerById } from "../../services/admission";
-
-// Admission types configuration
-const admissionTypes = [
-  { id: "COURT", name: "Court" },
-  { id: "TRANSFER", name: "Transfer" },
-  { id: "LODGER", name: "Lodger" },
-  { id: "RECAPTURE", name: "Recapture" },
-];
+import { getAdmissionTypes, AdmissionType } from "../../services/admissionService";
 
 const PrisonerAdmissionScreen: React.FC = () => {
   const { station } = useFilters();
@@ -102,6 +95,28 @@ const PrisonerAdmissionScreen: React.FC = () => {
   const [searchMode, setSearchMode] = useState<"regular" | "biometric">("regular");
   const [isScanning, setIsScanning] = useState(false);
   const [scannedFingerprint, setScannedFingerprint] = useState("");
+  
+  // Admission types state
+  const [admissionTypes, setAdmissionTypes] = useState<AdmissionType[]>([]);
+  const [loadingAdmissionTypes, setLoadingAdmissionTypes] = useState(false);
+
+  // Fetch admission types on component mount
+  useEffect(() => {
+    const fetchAdmissionTypes = async () => {
+      setLoadingAdmissionTypes(true);
+      try {
+        const response = await getAdmissionTypes();
+        setAdmissionTypes(response);
+      } catch (error) {
+        console.error("Error fetching admission types:", error);
+        toast.error("Failed to load admission types");
+      } finally {
+        setLoadingAdmissionTypes(false);
+      }
+    };
+
+    fetchAdmissionTypes();
+  }, []);
 
   const {
     register,
@@ -795,16 +810,27 @@ const PrisonerAdmissionScreen: React.FC = () => {
               <Select
                 value={admissionType}
                 onValueChange={handleAdmissionTypeChange}
+                disabled={loadingAdmissionTypes}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select admission type" />
+                  <SelectValue placeholder={loadingAdmissionTypes ? "Loading..." : "Select admission type"} />
                 </SelectTrigger>
                 <SelectContent>
-                  {admissionTypes.map((type) => (
-                    <SelectItem key={type.id} value={type.id}>
-                      {type.name}
+                  {loadingAdmissionTypes ? (
+                    <SelectItem value="loading" disabled>
+                      Loading admission types...
                     </SelectItem>
-                  ))}
+                  ) : admissionTypes.length === 0 ? (
+                    <SelectItem value="none" disabled>
+                      No admission types available
+                    </SelectItem>
+                  ) : (
+                    admissionTypes.map((type: AdmissionType) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
             </div>

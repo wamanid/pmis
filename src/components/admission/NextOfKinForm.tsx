@@ -7,6 +7,10 @@ import { Checkbox } from "../ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { SexSelect } from "../common/SexSelect";
+import { RegionSelect } from "../common/RegionSelect";
+import { DistrictSelect } from "../common/DistrictSelect";
+import { CountySelect } from "../common/CountySelect";
+import { SubCountySelect } from "../common/SubCountySelect";
 import { NextOfKin } from "../../models/admission/";
 
 interface NextOfKinFormProps {
@@ -193,40 +197,43 @@ const NextOfKinForm: React.FC<NextOfKinFormProps> = ({
               {/* Region */}
               <div>
                 <Label htmlFor="nok_address_region">Region</Label>
-                <Input
-                  id="nok_address_region"
-                  {...register("address_region")}
-                  placeholder="Enter region"
+                <RegionSelect
+                  value={watch("address_region")}
+                  onValueChange={(value) => setValue("address_region", value)}
+                  placeholder="Select region"
                 />
               </div>
 
               {/* District */}
               <div>
                 <Label htmlFor="nok_address_district">District</Label>
-                <Input
-                  id="nok_address_district"
-                  {...register("address_district")}
-                  placeholder="Enter district"
+                <DistrictSelect
+                  value={watch("address_district")}
+                  onValueChange={(value) => setValue("address_district", value)}
+                  regionId={watch("address_region")}
+                  placeholder="Select district"
                 />
               </div>
 
               {/* County */}
               <div>
                 <Label htmlFor="nok_address_county">County</Label>
-                <Input
-                  id="nok_address_county"
-                  {...register("address_county")}
-                  placeholder="Enter county"
+                <CountySelect
+                  value={watch("address_county")}
+                  onValueChange={(value) => setValue("address_county", value)}
+                  districtId={watch("address_district")}
+                  placeholder="Select county"
                 />
               </div>
 
               {/* Sub County */}
               <div>
                 <Label htmlFor="nok_address_sub_county">Sub County</Label>
-                <Input
-                  id="nok_address_sub_county"
-                  {...register("address_sub_county")}
-                  placeholder="Enter sub county"
+                <SubCountySelect
+                  value={watch("address_sub_county")}
+                  onValueChange={(value) => setValue("address_sub_county", value)}
+                  countyId={watch("address_county")}
+                  placeholder="Select sub county"
                 />
               </div>
 
