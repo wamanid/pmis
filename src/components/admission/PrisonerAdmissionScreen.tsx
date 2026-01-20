@@ -19,7 +19,9 @@ import {
   X,
   Fingerprint,
   Loader2,
+  RotateCcw,
 } from "lucide-react";
+
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
@@ -686,17 +688,31 @@ const PrisonerAdmissionScreen: React.FC = () => {
     // Clear localStorage
     localStorage.removeItem("pmis_prisoner_number_reservation");
     localStorage.removeItem("pmis_admission_form_state");
+    localStorage.removeItem("pmis_biodata_form_state");
   };
 
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-[#650000]">Prisoner Admission</h1>
-        <p className="text-gray-600">
-          Register new prisoner admission and capture biodata
-          information
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-[#650000]">Prisoner Admission</h1>
+          <p className="text-gray-600">
+            Register new prisoner admission and capture biodata
+            information
+          </p>
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => {
+            resetForm();
+            toast.success("Admission draft cleared. Starting a new admission.");
+          }}
+        >
+          <RotateCcw className="h-4 w-4 mr-2" />
+          New Admission
+        </Button>
       </div>
 
       {/* Progress Indicator */}

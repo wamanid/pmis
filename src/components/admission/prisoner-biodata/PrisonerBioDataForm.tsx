@@ -47,6 +47,7 @@ import { CardTitle } from "../../ui/card";
 import { createPrisonerBiodata, updatePrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 import { getPrisonerRecordsByPrisonerId, createPrisonerRecord, updatePrisonerRecord } from "../../../services/admission/prisonerRecordService";
 import { pastOrTodayDateValidation, minimumAgeValidation } from "../../../utils/validation";
+import { useFilters } from "../../../contexts/FilterContext";
 import {
   Search,
   User,
@@ -74,15 +75,26 @@ interface PrisonerBiodataFormProps {
   bioData: PrisonerBiodata | null;
   onSubmit: (data: PrisonerBiodata) => void;
   onCancel: () => void;
-  prisonerCategory?: string;
 }
 
 const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
   bioData,
   onSubmit,
   onCancel,
-  prisonerCategory,
 }) => {
+  const { station } = useFilters();
+  const prisonerCategory = useMemo(() => {
+    try {
+      const admissionState = JSON.parse(
+        localStorage.getItem('pmis_admission_form_state') || '{}'
+      );
+      return typeof admissionState?.prisonerCategory === 'string'
+        ? admissionState.prisonerCategory
+        : '';
+    } catch {
+      return '';
+    }
+  }, []);
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [prisonerRecords, setPrisonerRecords] = useState<PrisonerRecord[]>([]);
@@ -121,7 +133,11 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
           // Populate all fields explicitly
           Object.keys(formData).forEach((key) => {
             if (formData[key] !== undefined && formData[key] !== null) {
-              setValue(key as keyof PrisonerBiodata, formData[key]);
+              if (key === 'continent') {
+                setValue(key as keyof PrisonerBiodata, coerceIdToUuid(formData[key]) as any);
+              } else {
+                setValue(key as keyof PrisonerBiodata, formData[key]);
+              }
             }
           });
         }
@@ -138,6 +154,10 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
   useEffect(() => {
     if (bioData) {
       reset(bioData);
+
+      if ((bioData as any).continent) {
+        setValue('continent' as keyof PrisonerBiodata, coerceIdToUuid((bioData as any).continent) as any);
+      }
       
       // Populate address fields explicitly for AddressSelect components
       if (bioData.address_region) setValue("address_region", bioData.address_region);
@@ -234,6 +254,15 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
     });
   };
 
+  const coerceIdToUuid = (value: unknown): string | undefined => {
+    if (typeof value === 'string') return value;
+    if (value && typeof value === 'object' && 'id' in value) {
+      const id = (value as { id?: unknown }).id;
+      return typeof id === 'string' ? id : undefined;
+    }
+    return undefined;
+  };
+
   const handleFormSubmit = async (data: PrisonerBiodata) => {
     try {
       setIsSubmitting(true);
@@ -275,6 +304,11 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
         height: data.height ? parseFloat(parseFloat(data.height as any).toFixed(2)) : null,
       };
 
+      // Ensure FK fields are UUID strings (not expanded objects)
+      if ((biodataSubmission as any).continent !== undefined) {
+        biodataSubmission.continent = coerceIdToUuid((biodataSubmission as any).continent) || null;
+      }
+
       // Remove prisoner record fields from biodata submission
       const formData = data as any;
       delete biodataSubmission.escapee;
@@ -308,6 +342,15 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
         : await createPrisonerBiodata(biodataSubmission);
       
       // 2. Prepare and submit prisoner record data separately
+      const storedFilters = JSON.parse(localStorage.getItem("pmis_user_filters") || "{}");
+      const prisonStationId = (station as any) || storedFilters.station;
+
+      if (!prisonStationId) {
+        toast.error("Station is required. Please select a station before submitting.");
+        setIsSubmitting(false);
+        return;
+      }
+
       const prisonerRecordData: any = {
         prisoner: prisonerId,
         prisoner_class: data.prisoner_class,
@@ -323,7 +366,7 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
         arrest_sub_county: data.arrest_sub_county,
         arrest_parish: data.arrest_parish,
         arrest_village: data.arrest_village,
-        prison_station: JSON.parse(localStorage.getItem("pmis_user_filters") || "{}").station || "",
+        prison_station: prisonStationId,
       };
 
       // Submit or update prisoner record
@@ -1907,6 +1950,7 @@ const {
                       <Input
                         id="age_on_admission"
                         type="number"
+                        disabled
                         {...register("age_on_admission")}
                         placeholder="Enter age"
                       />
