@@ -407,6 +407,16 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
             type: 'manual',
             message: errorMessage,
           });
+
+          if (Array.isArray(messages)) {
+            messages.forEach((m) => {
+              if (typeof m === 'string' && m.trim()) {
+                toast.error(`${field.replace(/_/g, ' ')}: ${m}`);
+              }
+            });
+          } else if (typeof messages === 'string' && messages.trim()) {
+            toast.error(`${field.replace(/_/g, ' ')}: ${messages}`);
+          }
         });
         
         // Display summary toast
@@ -439,18 +449,6 @@ const {
   const [nextOfKin, setNextOfKin] = useState<NextOfKin[]>([]);
   const [currentNextOfKin, setCurrentNextOfKin] = useState<NextOfKin | null>(null);
   const [showNextOfKinForm, setShowNextOfKinForm] = useState(false);
-
-  // Toast notification helper
-  const toast = {
-    success: (message: string) => {
-      console.log('Success:', message);
-      // TODO: Integrate with actual toast library
-    },
-    error: (message: string) => {
-      console.error('Error:', message);
-      // TODO: Integrate with actual toast library
-    }
-  };
 
   // Watch form values for selects
   const watchSex = watch("sex");
