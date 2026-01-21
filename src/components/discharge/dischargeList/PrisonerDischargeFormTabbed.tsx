@@ -60,7 +60,7 @@ import {getPrisoners, PrisonerItem} from "../../../services/stationServices/visi
 import {getStaffProfile, StaffItem} from "../../../services/stationServices/staffDeploymentService";
 import {handleCatchError, handleServerError2} from "../../../services/stationServices/utils";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
-import {NextOfKinResponse} from "../../../services/admission/nextOfKinService";
+import {getNextOfKins, NextOfKinResponse} from "../../../services/admission/nextOfKinService";
 
 interface PrisonerDischargeFormProps {
   initialData?: any;
@@ -85,87 +85,7 @@ interface PrisonerDischargeFormProps {
 type TabType = 'basic-info' | 'biometric' | 'officers' | 'documents';
 
 // Mock discharge types with on_premise flag
-const mockDischargeTypes = [
-  { 
-    id: 'type-001', 
-    name: 'Completion of Sentence', 
-    on_premise: true, 
-    affects_lockup: true,
-    description: 'Release due to completion of sentence',
-    is_execution: false
-  },
-  { 
-    id: 'type-002', 
-    name: 'Transfer', 
-    on_premise: false, 
-    affects_lockup: true,
-    description: 'Inter-prison transfer',
-    is_execution: false
-  },
-  { 
-    id: 'type-003', 
-    name: 'Death', 
-    on_premise: false, 
-    affects_lockup: true,
-    description: 'Prisoner deceased',
-    is_execution: false
-  },
-  { 
-    id: 'type-004', 
-    name: 'Court Order', 
-    on_premise: true, 
-    affects_lockup: true,
-    description: 'Release by court order',
-    is_execution: false
-  },
-  { 
-    id: 'type-005', 
-    name: 'Deportation', 
-    on_premise: true, 
-    affects_lockup: true,
-    description: 'Deportation of foreign nationals',
-    is_execution: false
-  },
-  { 
-    id: 'type-006', 
-    name: 'Execution', 
-    on_premise: false, 
-    affects_lockup: true,
-    description: 'Death penalty execution',
-    is_execution: true
-  },
-];
 
-// Mock staff data for officers
-const mockStaffProfiles = [
-  {
-    id: 'staff-001',
-    first_name: 'Michael',
-    middle_name: 'John',
-    last_name: 'Okello',
-    force_number: 'UPS/5432/2018',
-    rank: 'Senior Superintendent',
-    is_active: true,
-  },
-  {
-    id: 'staff-002',
-    first_name: 'Sarah',
-    middle_name: 'Grace',
-    last_name: 'Namuli',
-    force_number: 'UPS/6789/2019',
-    rank: 'Superintendent',
-    is_active: true,
-  },
-  {
-    id: 'staff-003',
-    first_name: 'David',
-    middle_name: 'Peter',
-    last_name: 'Kizito',
-    force_number: 'UPS/8901/2020',
-    rank: 'Assistant Superintendent',
-    is_active: true,
-  },
-];
 
 // Mock next of kin data
 const mockNextOfKinData: Record<string, any[]> = {
@@ -192,22 +112,6 @@ const mockNextOfKinData: Record<string, any[]> = {
     },
   ],
 };
-
-// Mock approving authorities
-const mockApprovingAuthorities = [
-  {
-    id: 'auth-001',
-    full_name: 'Hon. Chief Justice',
-    rank: 'Chief Justice',
-    force_number: 'CJ/001/2020',
-  },
-  {
-    id: 'auth-002',
-    full_name: 'Hon. President',
-    rank: 'President',
-    force_number: 'PRES/001/2021',
-  },
-];
 
 interface DischargeOfficer {
   id?: string;
@@ -281,6 +185,9 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   //API integration
   const [loader, setLoader] = useState(true)
   const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
+  const [newDialogLoader, setNewDialogLoader] = useState(false);
+  const [loaderText, setLoaderText] = useState("");
+  const [condition, setCondition] = useState({death: false, execution: false})
 
   useEffect(() => {
     if(loader) {
@@ -352,8 +259,6 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
   }
 
 
-
-
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -366,6 +271,59 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
       }
     }
   }, [initialData, mode]);
+
+  function resetData() {
+    setFormData(prev => ({
+      ...prev,
+      date_of_death: "",
+      morgue_details: "",
+      next_of_kin: "",
+      next_of_kin_available: false,
+      datetime_of_execution: "",
+      approving_authority: "",
+      approving_authority_name: ""
+    }))
+  }
+
+  useEffect(() => {
+    resetData()
+    const type = types.find(t => t.id === formData.discharge_type)?.name
+    if (type === "Death") {
+      if (formData.prisoner === "") {
+          handleChange("discharge_type", "")
+          toast.error("Please first select a prisoner")
+      }
+      else {
+        setNewDialogLoader(true)
+        setLoaderText("Loading Next of kin information")
+        fetchNOKData()
+      }
+    }else if (type === "Execution") {
+      setCondition({execution: true, death: false})
+    }
+  }, [formData.discharge_type]);
+
+  useEffect(() => {
+    if (formData.prisoner && (types.find(t => t.id === formData.discharge_type)?.name === "Death")){
+        setNewDialogLoader(true)
+        setLoaderText("Loading Next of kin information")
+        fetchNOKData()
+    }
+  }, [formData.prisoner]);
+
+  async function fetchNOKData() {
+    try {
+       const response2 = await getNextOfKins(formData.prisoner)
+       populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
+       setCondition({execution: false, death: true})
+    }
+    catch (error){
+      handleCatchError(error)
+    }finally {
+      setNewDialogLoader(false)
+      setLoaderText("")
+    }
+  }
 
   const handleChange = (field: string, value: string) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -445,7 +403,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
       updated[index] = {
         ...updated[index],
         staff: staffId,
-        staff_name: `${st.first_name} ${st.middle_name} ${st.last_name}`,
+        staff_name: `${st.first_name} ${st.last_name}`,
         force_number: st.force_number,
         rank: st.rank_name,
       };
@@ -655,9 +613,8 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
         </Select>
       </div>
 
-      {/* Deceased Fields */}
       {
-        (types.find(t => t.id === formData.discharge_type)?.name) === "Death" &&  (
+        condition.death ? (
           <div className="border-t pt-6 mt-6">
             <div
               className="px-4 py-3 rounded-lg mb-6"
@@ -695,21 +652,25 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
               </div>
             </div>
 
-            <div className="mt-4">
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="next_of_kin_available"
-                  checked={formData.next_of_kin_available}
-                  onCheckedChange={(checked) =>
-                    setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
-                  }
-                />
-                <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
-                  <User className="h-4 w-4" />
-                  Next of Kin Available
-                </Label>
-              </div>
-            </div>
+            {
+              !!nextOfKins.length && (
+                  <div className="mt-4">
+                    <div className="flex items-center space-x-2">
+                      <Checkbox
+                        id="next_of_kin_available"
+                        checked={formData.next_of_kin_available}
+                        onCheckedChange={(checked) =>
+                          setFormData((prev) => ({ ...prev, next_of_kin_available: !!checked }))
+                        }
+                      />
+                      <Label htmlFor="next_of_kin_available" className="flex items-center gap-2 cursor-pointer">
+                        <User className="h-4 w-4" />
+                        Next of Kin Available
+                      </Label>
+                    </div>
+                  </div>
+              )
+            }
 
             {formData.next_of_kin_available && (
               <div className="mt-4">
@@ -731,9 +692,9 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                         >
                           {formData.next_of_kin
                             ? (() => {
-                                const selected = nextOfKinList.find((nok) => nok.id === formData.next_of_kin);
+                                const selected = nextOfKins.find((nok) => nok.id === formData.next_of_kin);
                                 return selected
-                                  ? `${selected.full_name} (${selected.relationship})`
+                                  ? `${selected.full_name} (${selected.relationship_name})`
                                   : "Select next of kin...";
                               })()
                             : "Select next of kin..."}
@@ -746,7 +707,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                           <CommandList>
                             <CommandEmpty>No next of kin found.</CommandEmpty>
                             <CommandGroup>
-                              {nextOfKinList.map((nok) => (
+                              {nextOfKins.map((nok) => (
                                 <CommandItem
                                   key={nok.id}
                                   value={nok.full_name}
@@ -761,7 +722,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                                   <div className="flex flex-col">
                                     <span>{nok.full_name}</span>
                                     <span className="text-xs text-gray-500">
-                                      {nok.relationship} • {nok.phone}
+                                      {nok.relationship_name} • {nok.phone_number}
                                     </span>
                                   </div>
                                 </CommandItem>
@@ -817,12 +778,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
               </div>
             </div>
           </div>
-        )
-      }
-
-      {/* Execution Fields */}
-      {
-         (types.find(t => t.id === formData.discharge_type)?.name) === "Execution" &&  (
+        ) : condition.execution ? (
             <div className="border-t pt-6 mt-6">
               <div
                 className="px-4 py-3 rounded-lg mb-6"
@@ -862,12 +818,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                             className="w-full justify-between"
                             type="button"
                           >
-                            {formData.approving_authority
-                              ? (() => {
-                                  const selected = mockApprovingAuthorities.find((auth) => auth.id === formData.approving_authority);
-                                  return selected ? selected.full_name : "Select approving authority...";
-                                })()
-                              : "Select approving authority..."}
+                            {formData.approving_authority_name|| "Select approving authority..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -877,17 +828,17 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                             <CommandList>
                               <CommandEmpty>No approving authority found.</CommandEmpty>
                               <CommandGroup>
-                                {mockApprovingAuthorities.map((auth) => (
+                                {staff.map((auth) => (
                                   <CommandItem
                                     key={auth.id}
-                                    value={auth.full_name}
+                                    value={`${auth.first_name} ${auth.last_name}`}
                                     onSelect={() => {
                                       setFormData((prev) => ({
                                         ...prev,
                                         approving_authority: auth.id,
-                                        approving_authority_name: auth.full_name,
+                                        approving_authority_name: `${auth.first_name} ${auth.last_name}`,
                                         approving_authority_force_number: auth.force_number,
-                                        approving_authority_rank: auth.rank,
+                                        approving_authority_rank: auth.rank_name,
                                       }));
                                       setApprovingAuthorityOpen(false);
                                     }}
@@ -899,9 +850,9 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                                       )}
                                     />
                                     <div className="flex flex-col">
-                                      <span>{auth.full_name}</span>
+                                      <span>{auth.first_name} {auth.last_name}</span>
                                       <span className="text-xs text-gray-500">
-                                        {auth.rank} • {auth.force_number}
+                                        {auth.rank_name} • {auth.force_number}
                                       </span>
                                     </div>
                                   </CommandItem>
@@ -916,7 +867,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                 </div>
               </div>
             </div>
-         )
+        ) : null
       }
 
       <div>
@@ -1058,7 +1009,7 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
                                     )}
                                   />
                                   <div className="flex flex-col">
-                                    <span>{`${st.first_name} ${st.middle_name} ${st.last_name}`}</span>
+                                    <span>{`${st.first_name} ${st.last_name}`}</span>
                                     <span className="text-xs text-gray-500">
                                       {st.rank_name} • {st.force_number}
                                     </span>
@@ -1367,6 +1318,26 @@ export const PrisonerDischargeFormTabbed: React.FC<PrisonerDischargeFormProps> =
             onCancel={() => setShowDischargeRequestDialog(false)}
             mode="create"
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Loading Dialog */}
+      <Dialog open={newDialogLoader} onOpenChange={setNewDialogLoader}>
+        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+          <div className="flex-1 overflow-y-auto p-6">
+            <DialogHeader>
+              <DialogTitle style={{ color: '#650000' }}></DialogTitle>
+              <DialogDescription></DialogDescription>
+            </DialogHeader>
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground text-sm">
+                    {loaderText}
+                  </p>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </>
