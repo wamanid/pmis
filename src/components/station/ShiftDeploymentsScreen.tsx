@@ -106,7 +106,14 @@ interface Station {
 
 interface Shift {
   id: string;
-  name: string;
+  shift_name: string;
+  start_time: string;
+  end_time: string;
+  station: string;
+  station_name?: string;
+  is_active?: boolean;
+  created_by?: number;
+  created_by_name?: string;
 }
 
 interface DeploymentArea {
@@ -243,7 +250,7 @@ export default function ShiftDeploymentsScreen() {
   const deployRequestIdRef = useRef(0);
   const deployAbortRef = useRef<AbortController | null>(null);
 
-  // initial startup: load lookups + shift-details (derives shifts)
+  // initial startup: load lookups + shift-details
   useEffect(() => {
     let mounted = true;
     const c = new AbortController();
@@ -266,13 +273,6 @@ export default function ShiftDeploymentsScreen() {
         const allDetails = details?.results ?? [];
         const normalized = (allDetails || []).map(normalizeShiftDetail);
         setShiftDetails(normalized);
- 
-         // derive unique shifts from shift-details
-        const uniq: Record<string, string> = {};
-        normalized.forEach((d: any) => {
-          if (d.shift && d.shift_name) uniq[d.shift] = d.shift_name;
-        });
-        setShifts(Object.entries(uniq).map(([id, name]) => ({ id, name })));
       } catch (err) {
         console.error('initial lookups error', err);
         toast.error('Failed to load initial lookup data');
@@ -333,6 +333,30 @@ export default function ShiftDeploymentsScreen() {
 
     return () => { mounted = false; c.abort(); };
   }, [selectedDistrict]);
+
+  // Load shifts when station changes in the create shift form
+  useEffect(() => {
+    let mounted = true;
+    const c = new AbortController();
+
+    (async () => {
+      if (!shiftForm.station) {
+        setShifts([]);
+        return;
+      }
+      try {
+        const res = await svc.fetchShifts({ station: shiftForm.station, page_size: -1 }, c.signal);
+        if (!mounted) return;
+        const items = res?.results ?? [];
+        setShifts(items);
+      } catch (err) {
+        console.error('fetchShifts error', err);
+        toast.error('Failed to load shifts');
+      }
+    })();
+
+    return () => { mounted = false; c.abort(); };
+  }, [shiftForm.station]);
 
   // loadShiftDetails: cancellable, request-id guarded to avoid stale responses
   const loadShiftDetails = useCallback(async (p = 1, ps = 10, sf?: string, sd?: 'asc'|'desc', q?: string) => {
@@ -661,7 +685,7 @@ export default function ShiftDeploymentsScreen() {
                               key={station.id}
                               value={station.name}
                               onSelect={() => {
-                                setShiftForm({ ...shiftForm, station: station.id });
+                                setShiftForm({ ...shiftForm, station: station.id, shift: "" });
                                 setOpenStationCombo(false);
                               }}
                             >
@@ -694,7 +718,7 @@ export default function ShiftDeploymentsScreen() {
                         className="w-full justify-between"
                       >
                         {shiftForm.shift
-                          ? shifts.find((s) => s.id === shiftForm.shift)?.name
+                          ? shifts.find((s) => s.id === shiftForm.shift)?.shift_name
                           : "Select shift..."}
                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                       </Button>
@@ -707,7 +731,7 @@ export default function ShiftDeploymentsScreen() {
                           {shifts.map((shift) => (
                             <CommandItem
                               key={shift.id}
-                              value={shift.name}
+                              value={shift.shift_name}
                               onSelect={() => {
                                 setShiftForm({ ...shiftForm, shift: shift.id });
                                 setOpenShiftCombo(false);
@@ -721,7 +745,7 @@ export default function ShiftDeploymentsScreen() {
                                     : "opacity-0"
                                 )}
                               />
-                              {shift.name}
+                              {shift.shift_name}
                             </CommandItem>
                           ))}
                         </CommandGroup>
