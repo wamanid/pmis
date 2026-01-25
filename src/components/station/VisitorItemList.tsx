@@ -47,7 +47,8 @@ import {
   Filter,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Image
 } from 'lucide-react';
 import VisitorItemForm from './VisitorItemForm';
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
@@ -199,6 +200,10 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
   const [isViewDialogOpen, setIsViewDialogOpen] = useState(false);
   const [deleteItem, setDeleteItem] = useState<VisitorItem | null>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Photo viewing state
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string>('');
   
   // Filters
   const [filterCategory, setFilterCategory] = useState<string>('all');
@@ -590,6 +595,16 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>
+                          {item.photo && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => { setSelectedPhotoUrl(item.photo); setIsPhotoDialogOpen(true); }}
+                              title="View photo"
+                            >
+                              <Image className="h-4 w-4" />
+                            </Button>
+                          )}
                         </div>
                       </TableCell>
                     </TableRow>
@@ -743,6 +758,26 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Viewing Dialog */}
+      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>Item Photo</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-center p-4">
+            {selectedPhotoUrl ? (
+              <img 
+                src={selectedPhotoUrl} 
+                alt="Item photo" 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            ) : (
+              <p className="text-muted-foreground">No photo available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

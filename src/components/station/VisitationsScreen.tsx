@@ -50,6 +50,7 @@ import {
   Edit,
   Eye,
   FileText,
+  Image,
 } from "lucide-react";
 import { format } from "date-fns";
 import { cn } from "../ui/utils";
@@ -163,6 +164,10 @@ export default function VisitationsScreen() {
   // Visitor Pass Dialog states
   const [isVisitorPassDialogOpen, setIsVisitorPassDialogOpen] = useState(false);
   const [selectedVisitorForPass, setSelectedVisitorForPass] = useState<Visitor | null>(null);
+  
+  // Photo viewing state
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string>("");
 
   // Form states
   const [form, setForm] = useState({
@@ -1321,7 +1326,7 @@ export default function VisitationsScreen() {
                   { key: 'visitor_status_name', label: 'Status', sortable: true, render: (_v:any,row:any) => getStatusBadge(String((row ?? {})?.visitor_status_name ?? '')) },
                   { key: 'actions', label: 'Actions', sortable: false, render: (_v:any,row:any) => {
                       const r = row ?? {};
-                      return (<div className="flex gap-1 justify-end"><Button variant="ghost" size="sm" onClick={() => handleEdit(r)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(r)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button></div>);
+                      return (<div className="flex gap-1 justify-start"><Button variant="ghost" size="sm" onClick={() => handleEdit(r)} title="Edit visitor"><Edit className="h-4 w-4" /></Button><Button variant="ghost" size="sm" onClick={() => handleGenerateVisitorPass(r)} style={{ color: '#650000' }} title="Generate visitor pass"><FileText className="h-4 w-4" /></Button>{r.photo && <Button variant="ghost" size="sm" onClick={() => { setSelectedPhotoUrl(r.photo); setIsPhotoDialogOpen(true); }} title="View photo"><Image className="h-4 w-4" /></Button>}</div>);
                   }},
                 ]}
                 // externalSearch={searchQuery}
@@ -1394,6 +1399,26 @@ export default function VisitationsScreen() {
               }}
             />
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Photo Viewing Dialog */}
+      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>Visitor Photo</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-center p-4">
+            {selectedPhotoUrl ? (
+              <img 
+                src={selectedPhotoUrl} 
+                alt="Visitor photo" 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            ) : (
+              <p className="text-muted-foreground">No photo available</p>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </div>

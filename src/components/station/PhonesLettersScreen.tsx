@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
 import { Textarea } from "../ui/textarea";
 import { Badge } from "../ui/badge";
-import { Plus, Search, Edit, Trash2, X, Save, Calendar as CalendarIcon, Upload, Phone, Mail } from "lucide-react";
+import { Plus, Search, Edit, Trash2, X, Save, Calendar as CalendarIcon, Upload, Phone, Mail, Download } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger } from "../ui/tabs";
 import { toast } from "sonner"; // fixed import
 import SearchableSelect from "../common/SearchableSelect";
@@ -62,6 +62,48 @@ function toDatetimeLocal(iso?: string | null) {
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+// helper: download file from URL, base64, or API path
+function downloadFile(fileReference: string | null | undefined, filename: string) {
+  if (!fileReference) {
+    toast.error("No file available to download");
+    return;
+  }
+
+  try {
+    let url: string;
+
+    // Handle base64 data URL
+    if (fileReference.startsWith("data:")) {
+      url = fileReference;
+    }
+    // Handle relative API paths
+    else if (fileReference.startsWith("/")) {
+      url = `${axiosInstance.defaults.baseURL || ""}${fileReference}`;
+    }
+    // Handle absolute URLs
+    else if (fileReference.startsWith("http://") || fileReference.startsWith("https://")) {
+      url = fileReference;
+    }
+    // Otherwise treat as relative path
+    else {
+      url = `${axiosInstance.defaults.baseURL || ""}/${fileReference}`;
+    }
+
+    // Create and trigger download
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    toast.success("Download started");
+  } catch (err) {
+    console.error("download error", err);
+    toast.error("Failed to download file");
+  }
 }
 
 // helper: extract a usable file reference from uploadStrategyService response
@@ -183,10 +225,39 @@ export default function PhonesLettersScreen() {
   const [editingCall, setEditingCall] = useState<PhoneService.CallRecordItem | null>(null);
   const [letterDialogOpen, setLetterDialogOpen] = useState(false);
   const [editingLetter, setEditingLetter] = useState<LetterService.ELetterItem | null>(null);
+  const [selectedPrisoner, setSelectedPrisoner] = useState<any>(null);
 
   // forms
   const callForm = useForm<any>({ defaultValues: {} });
   const letterForm = useForm<any>({ defaultValues: {} });
+
+  // Watch letter_type and prisoner for auto-population logic
+  const watchedLetterType = letterForm.watch("letter_type");
+  const watchedPrisoner = letterForm.watch("prisoner");
+
+  // Auto-populate sender/recipient based on letter type and prisoner
+  useEffect(() => {
+    if (!selectedPrisoner?.full_name) return;
+    
+    // Find the actual letter type object to check its name/label
+    const letterTypeObj = letterTypes.find(lt => 
+      String(lt.id) === String(watchedLetterType) || 
+      String(lt.value) === String(watchedLetterType)
+    );
+    const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+
+    if (letterTypeName.includes("incoming")) {
+      // Incoming: prisoner is the recipient
+      letterForm.setValue("recipient_name", selectedPrisoner.full_name);
+      // Clear sender_name when switching to incoming
+      letterForm.setValue("sender_name", "");
+    } else if (letterTypeName.includes("outgoing")) {
+      // Outgoing: prisoner is the sender
+      letterForm.setValue("sender_name", selectedPrisoner.full_name);
+      // Clear recipient_name when switching to outgoing
+      letterForm.setValue("recipient_name", "");
+    }
+  }, [watchedLetterType, selectedPrisoner, letterTypes, letterForm]);
 
   // Map API item -> table row (if you need normalization)
   const mapCall = useCallback((it: any): PhoneService.CallRecordItem => ({ ...it }), []);
@@ -335,7 +406,7 @@ export default function PhonesLettersScreen() {
     { key: "relation_name", label: "Relation" },
     { key: "call_duration", label: "Duration" },
     { key: "call_notes", label: "Notes", render: (v: any) => (<div className="max-w-xs truncate">{v || "-"}</div>) },
-    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => {
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => {
         setEditingCall(r);
         // ensure call_date is in datetime-local format
         callForm.reset({ ...r, call_date: toDatetimeLocal(r?.call_date) });
@@ -357,7 +428,9 @@ export default function PhonesLettersScreen() {
           },
         };
         setConfirmOpen(true);
-      }}><Trash2 className="h-4 w-4" /></Button></div>) }
+      }}><Trash2 className="h-4 w-4" /></Button>{r.recorded_call && <Button variant="ghost" size="sm" title="Download recording" onClick={() => {
+        downloadFile(r.recorded_call, `call-${r.id}.mp3`);
+      }}><Download className="h-4 w-4" /></Button>}</div>) }
   ];
 
   const lettersColumns = [
@@ -367,8 +440,15 @@ export default function PhonesLettersScreen() {
     { key: "subject", label: "Subject" },
     { key: "letter_type_name", label: "Type" },
     { key: "relation_name", label: "Relation" },
-    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-2"><Button variant="ghost" size="sm" onClick={() => {
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => {
         setEditingLetter(r);
+        // Store prisoner info for edit mode
+        if (r.prisoner_id || r.prisoner) {
+          const prisonerForEdit = prisoners.find(p => 
+            String(p.id) === String(r.prisoner_id ?? r.prisoner)
+          ) ?? { id: r.prisoner_id ?? r.prisoner, full_name: r.prisoner_name };
+          setSelectedPrisoner(prisonerForEdit);
+        }
         // ensure letter_date is in datetime-local format
         letterForm.reset({
           ...r,
@@ -380,6 +460,13 @@ export default function PhonesLettersScreen() {
         });
         setLetterDialogOpen(true);
       }}><Edit className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => {
+        // Store prisoner info for edit mode
+        if (r.prisoner_id || r.prisoner) {
+          const prisonerForEdit = prisoners.find(p => 
+            String(p.id) === String(r.prisoner_id ?? r.prisoner)
+          );
+          if (prisonerForEdit) setSelectedPrisoner(prisonerForEdit);
+        }
         confirmActionRef.current = {
           title: "Delete Letter",
           description: `Delete letter "${r.subject ?? r.letter_tracking_number ?? r.id}" for "${r.prisoner_name ?? r.id}"? This action cannot be undone.`,
@@ -395,7 +482,9 @@ export default function PhonesLettersScreen() {
           },
         };
         setConfirmOpen(true);
-      }}><Trash2 className="h-4 w-4" /></Button></div>) }
+      }}><Trash2 className="h-4 w-4" /></Button>{r.letter_document && <Button variant="ghost" size="sm" title="Download letter" onClick={() => {
+        downloadFile(r.letter_document, `letter-${r.letter_tracking_number ?? r.id}.pdf`);
+      }}><Download className="h-4 w-4" /></Button>}</div>) }
   ];
 
   // wrapper that forwards current filter context to centralized service
@@ -592,17 +681,16 @@ export default function PhonesLettersScreen() {
         <p className="text-muted-foreground">Manage prisoner communications and correspondence</p>
       </div>
 
-      <div className="flex gap-4 items-center">
-        <div className="relative flex-1 max-w-md">
-          {/* <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input placeholder={`Search ${activeTab === "calls" ? "calls" : "letters"}...`} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-10" /> */}
-        </div>
-        <Button className="bg-primary" 
+      <div className="flex justify-end">
+        <Button className="bg-primary me-2" 
           onClick={() => { 
             if (activeTab === "calls") { 
               setEditingCall(null); callForm.reset({}); setCallDialogOpen(true); 
             } else { 
-              setEditingLetter(null); letterForm.reset({}); setLetterDialogOpen(true); 
+              setEditingLetter(null); 
+              setSelectedPrisoner(null); 
+              letterForm.reset({}); 
+              setLetterDialogOpen(true); 
             } 
           }}><Plus className="h-4 w-4 mr-2" />
           {activeTab === "calls" ? "Add Call Record" : "Add Letter"}
@@ -611,13 +699,19 @@ export default function PhonesLettersScreen() {
 
       {/* Restored original-style tabs with counts (icons + label + count). */}
       <Tabs value={activeTab} onValueChange={(v: Tab) => setActiveTab(v)}>
-        <TabsList className="grid w-full max-w-md grid-cols-2 mb-4">
-          <TabsTrigger value="calls" className="flex items-center gap-2">
-            <Phone className="h-4 w-4" />
+        <TabsList className="grid w-full grid-cols-2 h-12 bg-muted/50">
+          <TabsTrigger
+            value="calls"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            <Phone className="h-4 w-4 mr-2" />
             Phone Calls ({callsTotal ?? 0})
           </TabsTrigger>
-          <TabsTrigger value="letters" className="flex items-center gap-2">
-            <Mail className="h-4 w-4" />
+          <TabsTrigger
+            value="letters"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            <Mail className="h-4 w-4 mr-2" />
             Letters ({lettersTotal ?? 0})
           </TabsTrigger>
         </TabsList>
@@ -858,12 +952,6 @@ export default function PhonesLettersScreen() {
                 <Label htmlFor="call_notes">Call Notes <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="call_notes"
-                  {...callForm.register("call_notes")}
-                  placeholder="Enter any notes about the call"
-                  rows={6}
-                />
-                <Textarea
-                  id="call_notes"
                   {...callForm.register("call_notes", requiredValidation("Call notes"))}
                   placeholder="Enter any notes about the call"
                   rows={6}
@@ -904,6 +992,10 @@ export default function PhonesLettersScreen() {
                       onChange={(v) => field.onChange(v ?? null)}
                       onSelectItem={(p:any) => {
                         field.onChange(p?.id ?? p ?? null);
+                        setSelectedPrisoner(p); // Store full prisoner object
+                        // Clear sender/recipient fields when prisoner changes
+                        letterForm.setValue("sender_name", "");
+                        letterForm.setValue("recipient_name", "");
                         setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
                       }}
                       placeholder="Select prisoner"
@@ -933,14 +1025,18 @@ export default function PhonesLettersScreen() {
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
                       items={letterTypes}
-                      placeholder="Select letter type"
+                      placeholder={watchedPrisoner ? "Select letter type" : "Select prisoner first"}
                       idField="id"
                       labelField="name"
+                      disabled={!watchedPrisoner}
                     />
                   )}
                 />
                 {letterForm.formState.errors.letter_type && (
                   <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_type as any).message}</p>
+                )}
+                {!watchedPrisoner && (
+                  <p className="text-muted-foreground text-xs mt-1">Please select a prisoner first</p>
                 )}
               </div>
 
@@ -1040,22 +1136,41 @@ export default function PhonesLettersScreen() {
 
               {/* Sender Name */}
               <div>
-                {/* <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
-                <Input
-                  id="sender_name"
-                  {...letterForm.register("sender_name")}
-                  placeholder="Enter sender name"
-                /> */}
-
                 <Label htmlFor="sender_name">Sender Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="sender_name"
                   {...letterForm.register("sender_name", requiredValidation("Sender name"))}
                   placeholder="Enter sender name"
+                  disabled={(() => {
+                    const letterTypeObj = letterTypes.find(lt => 
+                      String(lt.id) === String(watchedLetterType) || 
+                      String(lt.value) === String(watchedLetterType)
+                    );
+                    const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                    return letterTypeName.includes("outgoing");
+                  })()}
+                  className={(() => {
+                    const letterTypeObj = letterTypes.find(lt => 
+                      String(lt.id) === String(watchedLetterType) || 
+                      String(lt.value) === String(watchedLetterType)
+                    );
+                    const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                    return letterTypeName.includes("outgoing") ? "bg-muted" : "";
+                  })()}
                 />
                 {letterForm.formState.errors.sender_name && (
                   <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.sender_name as any).message}</p>
                 )}
+                {(() => {
+                  const letterTypeObj = letterTypes.find(lt => 
+                    String(lt.id) === String(watchedLetterType) || 
+                    String(lt.value) === String(watchedLetterType)
+                  );
+                  const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                  return letterTypeName.includes("outgoing") && (
+                    <p className="text-muted-foreground text-xs mt-1">Auto-filled with prisoner name</p>
+                  );
+                })()}
               </div>
 
               {/* Sender Email */}
@@ -1076,22 +1191,41 @@ export default function PhonesLettersScreen() {
 
               {/* Recipient Name */}
               <div>
-                {/* <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
-                <Input
-                  id="recipient_name"
-                  {...letterForm.register("recipient_name")}
-                  placeholder="Enter recipient name"
-                /> */}
-
                 <Label htmlFor="recipient_name">Recipient Name <span className="text-red-500">*</span></Label>
                 <Input
                   id="recipient_name"
                   {...letterForm.register("recipient_name", requiredValidation("Recipient name"))}
                   placeholder="Enter recipient name"
+                  disabled={(() => {
+                    const letterTypeObj = letterTypes.find(lt => 
+                      String(lt.id) === String(watchedLetterType) || 
+                      String(lt.value) === String(watchedLetterType)
+                    );
+                    const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                    return letterTypeName.includes("incoming");
+                  })()}
+                  className={(() => {
+                    const letterTypeObj = letterTypes.find(lt => 
+                      String(lt.id) === String(watchedLetterType) || 
+                      String(lt.value) === String(watchedLetterType)
+                    );
+                    const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                    return letterTypeName.includes("incoming") ? "bg-muted" : "";
+                  })()}
                 />
                 {letterForm.formState.errors.recipient_name && (
                   <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.recipient_name as any).message}</p>
                 )}
+                {(() => {
+                  const letterTypeObj = letterTypes.find(lt => 
+                    String(lt.id) === String(watchedLetterType) || 
+                    String(lt.value) === String(watchedLetterType)
+                  );
+                  const letterTypeName = (letterTypeObj?.name ?? letterTypeObj?.label ?? "").toLowerCase();
+                  return letterTypeName.includes("incoming") && (
+                    <p className="text-muted-foreground text-xs mt-1">Auto-filled with prisoner name</p>
+                  );
+                })()}
               </div>
 
               {/* Recipient Email */}
@@ -1140,7 +1274,7 @@ export default function PhonesLettersScreen() {
                 <Label htmlFor="letter_document">Letter Document (Optional)</Label>
                 <div className="border-2 border-dashed rounded-lg p-4 text-center">
                   <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
-                  <p className="text-sm text-gray-600">Upload scanned letter or PDF (optional)</p>
+                  <p className="text-sm text-gray-600">Upload letter [image or document (PDF, DOC, etc.)] — (optional)</p>
 
                   {/* Reusable FileUploader with the centralized allowed extensions constant.
                       onChange updates react-hook-form value to the selected File (or null). */}
@@ -1166,7 +1300,7 @@ export default function PhonesLettersScreen() {
 
                    {/* UX hint listing allowed formats */}
                    <p className="text-xs text-muted-foreground mt-2">
-                     Allowed formats: {LETTER_ALLOWED_EXTS.join(", ")}. You can change the allowed list in code if needed.
+                     Allowed formats: {LETTER_ALLOWED_EXTS.join(", ")}.
                    </p>
                  </div>
                </div>

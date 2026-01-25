@@ -2,6 +2,7 @@ import axiosInstance from '../axiosInstance';
 
 const SHIFT_DEPLOYMENTS = '/station-management/api/shift-deployments/';
 const SHIFT_DETAILS = '/station-management/api/shift-details/';
+const SHIFTS = '/station-management/api/shifts/';
 const DEPLOYMENT_AREAS = '/station-management/api/deployment-areas/';
 const STAFF_PROFILES = '/auth/staff-profiles/';
 const STATIONS = '/system-administration/stations/';
@@ -94,4 +95,9 @@ export const fetchRegions = async (params?: Record<string, any>, signal?: AbortS
 export const fetchDistricts = async (params?: Record<string, any>, signal?: AbortSignal) => {
   const res = await axiosInstance.get(DISTRICTS, { params, signal });
   return res.data?.results ?? res.data ?? [];
+};
+
+export const fetchShifts = async (params?: Record<string, any>, signal?: AbortSignal) => {
+  const res = await axiosInstance.get(SHIFTS, { params, signal });
+  return res.data; // {count, results}
 };
