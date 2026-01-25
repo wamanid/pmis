@@ -302,13 +302,14 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
       const response = await addDischarge(formData)
       if (handleResponseError(response)) return;
 
-      if (!('id' in response)) {
+      console.log(response)
+      if (!('request' in response)) {
         toast.error("Failed to update the discharges table");
         return;
       }
 
       const newDischarge: PrisonerDischarge = {
-        id: response.id,
+        id: new Date().toISOString(),
         prisoner_name: "",
         prisoner_number: "",
         discharge_type_name: "",
@@ -333,8 +334,8 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
 
       setDischargeRecords([newDischarge, ...dischargeRecords]);
       toast.success('Discharge record created successfully');
-      setIsFormOpen(false);
-      setSelectedRecord(null);
+      // setIsFormOpen(false);
+      // setSelectedRecord(null);
     }
     catch (error){
       handleCatchError(error)
