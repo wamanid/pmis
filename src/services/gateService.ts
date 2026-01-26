@@ -64,6 +64,13 @@ export const deletegatepasses = async (id:String): Promise<GatePass[]> => {
 
 
 
+export const getprisonergatepass = async (id:String): Promise<WorkingParty[]> => {
+  const response = await axiosInstance.get<WorkingParty[]>(`/gate-management/gate-pass-prisoners/?prisoner=${id}`);
+  return response.data;
+};
+
+
+
 //get visitors here
 
 export const getvisitors = async (): Promise<WorkingPartyResponse[]> => {

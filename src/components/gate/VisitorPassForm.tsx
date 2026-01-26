@@ -55,7 +55,8 @@ let mockPrisoners = [
 const mockVisitors = [
 ];
 
-export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFields, onAddNewVisitor, visitors }: VisitorPassFormProps) {
+export default function VisitorPassForm(
+  { pass, onSubmit, onCancel, disabledFields, onAddNewVisitor, visitors }: VisitorPassFormProps) {
   const [formData, setFormData] = useState<Pass>({
     is_active: true,
     is_valid: true,

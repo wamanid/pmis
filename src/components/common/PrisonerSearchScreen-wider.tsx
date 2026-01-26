@@ -7,6 +7,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { toast } from 'sonner@2.0.3';
+import { getprisoners } from '../../services/gateService';
 import { 
   Search, 
   User, 
@@ -20,6 +21,7 @@ import {
   Church
 } from 'lucide-react';
 import { cn } from '../ui/utils';
+import { getPrisonerDetails } from '../../services/courtService';
 
 interface Prisoner {
   id: string;
@@ -69,132 +71,6 @@ const mockPrisoners: Prisoner[] = [
     religion: 'Christian',
     category: 'Remand',
     status: 'Active'
-  },
-  {
-    id: 'pr2',
-    prisoner_number: 'PRS-2024-002',
-    personal_number: 'CM023456789',
-    full_name: 'Sarah Jane Nakato',
-    first_name: 'Sarah',
-    middle_name: 'Jane',
-    last_name: 'Nakato',
-    date_of_birth: '1988-08-22',
-    id_number: 'CM88023456789N',
-    id_type: 'National ID',
-    gender: 'Female',
-    tribe: 'Muganda',
-    date_of_admission: '2024-02-10',
-    religion: 'Muslim',
-    category: 'Convict',
-    status: 'Active'
-  },
-  {
-    id: 'pr3',
-    prisoner_number: 'PRS-2024-003',
-    personal_number: 'CM034567890',
-    full_name: 'Michael Peter Okello',
-    first_name: 'Michael',
-    middle_name: 'Peter',
-    last_name: 'Okello',
-    date_of_birth: '1985-03-10',
-    id_number: 'CM85034567890N',
-    id_type: 'National ID',
-    gender: 'Male',
-    tribe: 'Acholi',
-    date_of_admission: '2024-01-20',
-    religion: 'Christian',
-    category: 'Awaiting Trial',
-    status: 'Active'
-  },
-  {
-    id: 'pr4',
-    prisoner_number: 'PRS-2024-004',
-    personal_number: 'PP987654321',
-    full_name: 'David Emmanuel Musoke',
-    first_name: 'David',
-    middle_name: 'Emmanuel',
-    last_name: 'Musoke',
-    date_of_birth: '1992-11-30',
-    id_number: 'PP45678912',
-    id_type: 'Passport',
-    gender: 'Male',
-    tribe: 'Muganda',
-    date_of_admission: '2024-03-05',
-    religion: 'Christian',
-    category: 'Convict',
-    status: 'Active'
-  },
-  {
-    id: 'pr5',
-    prisoner_number: 'PRS-2024-005',
-    personal_number: 'CM045678901',
-    full_name: 'Grace Mary Akello',
-    first_name: 'Grace',
-    middle_name: 'Mary',
-    last_name: 'Akello',
-    date_of_birth: '1995-07-18',
-    id_number: 'CM95045678901N',
-    id_type: 'National ID',
-    gender: 'Female',
-    tribe: 'Langi',
-    date_of_admission: '2024-02-28',
-    religion: 'Christian',
-    category: 'Remand',
-    status: 'Active'
-  },
-  {
-    id: 'pr6',
-    prisoner_number: 'PRS-2024-006',
-    personal_number: 'CM056789012',
-    full_name: 'Robert James Tumwine',
-    first_name: 'Robert',
-    middle_name: 'James',
-    last_name: 'Tumwine',
-    date_of_birth: '1987-12-05',
-    id_number: 'CM87056789012N',
-    id_type: 'National ID',
-    gender: 'Male',
-    tribe: 'Munyankole',
-    date_of_admission: '2024-01-10',
-    religion: 'Christian',
-    category: 'Civil Debtor',
-    status: 'Active'
-  },
-  {
-    id: 'pr7',
-    prisoner_number: 'PRS-2024-007',
-    personal_number: 'CM067890123',
-    full_name: 'Patricia Anne Nambi',
-    first_name: 'Patricia',
-    middle_name: 'Anne',
-    last_name: 'Nambi',
-    date_of_birth: '1993-04-25',
-    id_number: 'CM93067890123N',
-    id_type: 'National ID',
-    gender: 'Female',
-    tribe: 'Muganda',
-    date_of_admission: '2024-03-12',
-    religion: 'Muslim',
-    category: 'Remand',
-    status: 'Active'
-  },
-  {
-    id: 'pr8',
-    prisoner_number: 'PRS-2024-008',
-    personal_number: 'DL123456789',
-    full_name: 'Andrew Simon Kaweesi',
-    first_name: 'Andrew',
-    middle_name: 'Simon',
-    last_name: 'Kaweesi',
-    date_of_birth: '1989-09-14',
-    id_number: 'DL987654321',
-    id_type: 'Driving Permit',
-    gender: 'Male',
-    tribe: 'Muganda',
-    date_of_admission: '2024-02-18',
-    religion: 'Christian',
-    category: 'Awaiting Trial',
-    status: 'Active'
   }
 ];
 
@@ -218,13 +94,16 @@ export default function PrisonerSearchScreenWider({
     const fetchPrisoners = async () => {
       setIsLoading(true);
       try {
-        // TODO: Replace with actual API call
-        // const response = await fetch('/api/prisoners/');
-        // const data = await response.json();
-        // setPrisoners(data.results || data);
-        
-        // Using mock data for now
-        setPrisoners(mockPrisoners);
+       
+ getprisoners().then((data) => {
+      //alert(JSON.stringify(data.results));
+       //mockPrisoners = data.results;
+          setPrisoners(data.results);
+    }).catch((error) => {
+      alert(error);
+    
+    });
+     
       } catch (error) {
         console.error('Error fetching prisoners:', error);
         toast.error('Failed to load prisoners');
@@ -250,10 +129,21 @@ export default function PrisonerSearchScreenWider({
 
   // Handle prisoner selection
   const handleSelectPrisoner = (prisoner: Prisoner) => {
+
+    //hit the api here to get more details about the prisoner
+    getPrisonerDetails(prisoner.id).then((data) => {
+    //  alert(JSON.stringify(data));
+      // You can update the selected prisoner with more detailed data here if needed
+      setSelectedPrisoner(data);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
     setSelectedPrisonerId(prisoner.id);
-    setSelectedPrisoner(prisoner);
+    //setSelectedPrisoner(prisoner);
     setOpenDropdown(false);
-    
+
     if (onChange) {
       onChange(prisoner.id, prisoner);
     }
@@ -337,7 +227,7 @@ export default function PrisonerSearchScreenWider({
                       <div className="flex flex-col">
                         <span>{selectedPrisoner.full_name}</span>
                         <span className="text-xs text-gray-500">
-                          {selectedPrisoner.prisoner_number} | {selectedPrisoner.personal_number}
+                          {selectedPrisoner.prisoner_number_value} | {selectedPrisoner.personal_number_value}
                         </span>
                       </div>
                     </div>
@@ -356,7 +246,8 @@ export default function PrisonerSearchScreenWider({
                       {prisoners.map((prisoner) => (
                         <CommandItem
                           key={prisoner.id}
-                          value={`${prisoner.prisoner_number} ${prisoner.full_name} ${prisoner.personal_number} ${prisoner.id_number}`}
+                          value={`${prisoner.prisoner_number} ${prisoner.full_name} 
+                            ${prisoner.personal_number} ${prisoner.id_number}`}
                           onSelect={() => handleSelectPrisoner(prisoner)}
                           className="cursor-pointer"
                         >
@@ -382,9 +273,9 @@ export default function PrisonerSearchScreenWider({
                               </Badge>
                             </div>
                             <div className="flex items-center gap-4 text-xs text-gray-500 mt-1">
-                              <span>Prisoner: {prisoner.prisoner_number}</span>
-                              <span>Personal: {prisoner.personal_number}</span>
-                              <span>ID: {prisoner.id_number}</span>
+                              <span>Prisoner: {prisoner.prisoner_number_value}</span>
+                              <span>Personal: {prisoner.prisoner_personal_number_value}</span>
+                            
                             </div>
                           </div>
                         </CommandItem>
@@ -429,7 +320,7 @@ export default function PrisonerSearchScreenWider({
                   <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Prisoner Number</span>
                 </div>
-                <p className="font-medium text-sm">{selectedPrisoner.prisoner_number}</p>
+                <p className="font-medium text-sm">{selectedPrisoner.prisoner_number_value}</p>
               </div>
 
               {/* Row 1 - Column 2: Personal Number */}
@@ -438,7 +329,7 @@ export default function PrisonerSearchScreenWider({
                   <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
                   <span>Personal Number</span>
                 </div>
-                <p className="font-medium text-sm">{selectedPrisoner.personal_number}</p>
+                <p className="font-medium text-sm">{selectedPrisoner.prisoner_personal_number_value}</p>
               </div>
 
               {/* Row 1 - Column 3: Prisoner Name */}
