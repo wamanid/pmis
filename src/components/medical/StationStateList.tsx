@@ -11,13 +11,6 @@ import {
   TableRow,
 } from '../ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,148 +31,129 @@ import { Badge } from '../ui/badge';
 import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import StationStateForm from './StationStateForm';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 
 interface StationState {
   id: string;
-  prisoner_name: string;
   station_name: string;
-  medical_officer_name: string;
-  assessment_date: string;
-  station_type: string;
-  admission_reason: string;
-  current_health_status: string;
-  vital_signs: string;
-  treatment_administered: string;
-  medications_given: string;
-  medical_officer: string;
-  duration_days: string;
-  discharge_date: string;
-  discharge_status: string;
-  complications: string;
-  follow_up_required: string;
-  notes: string;
-  prisoner: string;
+  level_of_conjestion: string;
+  station: string;
+  state_of_buildings: string;
+  state_of_buildings_name?: string;
+  ventilation: string;
+  ventilation_name?: string;
+  lighting: string;
+  lighting_name?: string;
+  fencing: string;
+  fencing_name?: string;
+  general_environment: string;
+  general_environment_name?: string;
+  ward_environment: string;
+  ward_environment_name?: string;
 }
 
 interface StationStateListProps {
-  selectedPrisonerId?: string;
+  selectedStationId?: string;
 }
 
 // Mock data
 const mockStationStates: StationState[] = [
   {
     id: '1',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    station_type: 'Intensive Care Unit',
-    station_name: 'Intensive Care Unit',
-    medical_officer: '1',
-    medical_officer_name: 'Dr. David Makumbi',
-    assessment_date: '2024-11-10',
-    admission_reason: 'Severe pneumonia requiring intensive monitoring and respiratory support',
-    current_health_status: 'Improving',
-    vital_signs: 'BP: 130/85, Pulse: 78, Temp: 37.2°C, RR: 20, O2 Sat: 95%',
-    treatment_administered: 'IV antibiotics, oxygen therapy via nasal cannula, chest physiotherapy',
-    medications_given: 'Ceftriaxone 2g IV q12h, Paracetamol 1g q6h, Bronchodilators',
-    duration_days: '7',
-    discharge_date: '',
-    discharge_status: 'Ongoing',
-    complications: 'None observed',
-    follow_up_required: 'Yes',
-    notes: 'Patient showing good response to treatment, vitals stabilizing',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    station_name: 'Luzira Maximum Security Prison',
+    level_of_conjestion: '188',
+    state_of_buildings: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    state_of_buildings_name: 'Poor',
+    ventilation: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    ventilation_name: 'Fair',
+    lighting: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    lighting_name: 'Fair',
+    fencing: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    fencing_name: 'Good',
+    general_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    general_environment_name: 'Fair',
+    ward_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    ward_environment_name: 'Poor',
   },
   {
     id: '2',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    station_type: 'Isolation Ward',
-    station_name: 'Isolation Ward',
-    medical_officer: '5',
-    medical_officer_name: 'Dr. Richard Ssemakula',
-    assessment_date: '2024-11-08',
-    admission_reason: 'Active tuberculosis requiring isolation and treatment',
-    current_health_status: 'Stable',
-    vital_signs: 'BP: 120/80, Pulse: 72, Temp: 37.0°C, RR: 18',
-    treatment_administered: 'TB treatment regimen, isolation protocols, daily monitoring',
-    medications_given: 'Rifampicin 600mg, Isoniazid 300mg, Pyrazinamide 1500mg, Ethambutol 1200mg',
-    duration_days: '14',
-    discharge_date: '',
-    discharge_status: 'Ongoing',
-    complications: 'None',
-    follow_up_required: 'Yes',
-    notes: 'Patient compliant with medication, sputum test scheduled for day 14',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    station_name: 'Kigo Prison',
+    level_of_conjestion: '145',
+    state_of_buildings: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    state_of_buildings_name: 'Good',
+    ventilation: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    ventilation_name: 'Excellent',
+    lighting: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    lighting_name: 'Good',
+    fencing: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    fencing_name: 'Excellent',
+    general_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    general_environment_name: 'Good',
+    ward_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    ward_environment_name: 'Good',
   },
   {
     id: '3',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    station_type: 'Psychiatric Ward',
-    station_name: 'Psychiatric Ward',
-    medical_officer: '4',
-    medical_officer_name: 'Dr. Patricia Mutesi',
-    assessment_date: '2024-11-05',
-    admission_reason: 'Acute psychotic episode with aggressive behavior',
-    current_health_status: 'Discharged',
-    vital_signs: 'BP: 125/82, Pulse: 75, Temp: 36.8°C',
-    treatment_administered: 'Antipsychotic medication, daily counseling, behavioral therapy',
-    medications_given: 'Haloperidol 5mg TID, Diazepam 5mg PRN for agitation',
-    duration_days: '21',
-    discharge_date: '2024-11-26',
-    discharge_status: 'Discharged - Improved',
-    complications: 'Initial aggression controlled with medication',
-    follow_up_required: 'Yes',
-    notes: 'Patient stabilized, responding well to medication, discharged with follow-up plan',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
+    station_name: 'Murchison Bay Prison',
+    level_of_conjestion: '210',
+    state_of_buildings: '3fa85f64-5717-4562-b3fc-2c963f66afb5',
+    state_of_buildings_name: 'Critical',
+    ventilation: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    ventilation_name: 'Poor',
+    lighting: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    lighting_name: 'Poor',
+    fencing: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    fencing_name: 'Fair',
+    general_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    general_environment_name: 'Poor',
+    ward_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb5',
+    ward_environment_name: 'Critical',
   },
   {
     id: '4',
-    prisoner: '4',
-    prisoner_name: 'Emily Davis',
-    station_type: 'Surgical Ward',
-    station_name: 'Surgical Ward',
-    medical_officer: '3',
-    medical_officer_name: 'Dr. James Okello',
-    assessment_date: '2024-11-12',
-    admission_reason: 'Post-operative care following appendectomy',
-    current_health_status: 'Improving',
-    vital_signs: 'BP: 118/76, Pulse: 70, Temp: 36.9°C, RR: 16',
-    treatment_administered: 'Wound care, pain management, early mobilization',
-    medications_given: 'Tramadol 50mg q6h PRN, Cephalexin 500mg q8h, Paracetamol 1g q6h',
-    duration_days: '5',
-    discharge_date: '',
-    discharge_status: 'Ongoing',
-    complications: 'None, wound healing well',
-    follow_up_required: 'Yes',
-    notes: 'Surgical site clean and dry, patient ambulating well',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
+    station_name: 'Gulu Main Prison',
+    level_of_conjestion: '165',
+    state_of_buildings: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    state_of_buildings_name: 'Fair',
+    ventilation: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    ventilation_name: 'Good',
+    lighting: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    lighting_name: 'Fair',
+    fencing: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    fencing_name: 'Good',
+    general_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    general_environment_name: 'Fair',
+    ward_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    ward_environment_name: 'Fair',
   },
   {
     id: '5',
-    prisoner: '5',
-    prisoner_name: 'Robert Lee',
-    station_type: 'General Ward',
-    station_name: 'General Ward',
-    medical_officer: '2',
-    medical_officer_name: 'Dr. Sarah Kisakye',
-    assessment_date: '2024-11-13',
-    admission_reason: 'Gastroenteritis with dehydration requiring IV fluid therapy',
-    current_health_status: 'Stable',
-    vital_signs: 'BP: 115/75, Pulse: 68, Temp: 36.7°C',
-    treatment_administered: 'IV rehydration, anti-emetics, dietary modification',
-    medications_given: 'Normal Saline 1L IV q8h, Metoclopramide 10mg IV q8h, ORS',
-    duration_days: '3',
-    discharge_date: '',
-    discharge_status: 'Ongoing',
-    complications: 'None',
-    follow_up_required: 'No',
-    notes: 'Patient tolerating oral fluids, IV to be discontinued tomorrow',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
+    station_name: 'Mbarara Main Prison',
+    level_of_conjestion: '120',
+    state_of_buildings: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    state_of_buildings_name: 'Excellent',
+    ventilation: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    ventilation_name: 'Excellent',
+    lighting: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    lighting_name: 'Excellent',
+    fencing: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    fencing_name: 'Excellent',
+    general_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    general_environment_name: 'Excellent',
+    ward_environment: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    ward_environment_name: 'Excellent',
   },
 ];
 
-const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId }) => {
+const StationStateList: React.FC<StationStateListProps> = ({ selectedStationId }) => {
   const [records, setRecords] = useState<StationState[]>(mockStationStates);
   const [filteredRecords, setFilteredRecords] = useState<StationState[]>(mockStationStates);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -190,26 +164,21 @@ const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId 
 
   useEffect(() => {
     filterRecords();
-  }, [searchTerm, statusFilter, records, selectedPrisonerId]);
+  }, [searchTerm, records, selectedStationId]);
 
   const filterRecords = () => {
     let filtered = [...records];
 
-    if (selectedPrisonerId) {
-      filtered = filtered.filter((record) => record.prisoner === selectedPrisonerId);
+    if (selectedStationId) {
+      filtered = filtered.filter((record) => record.station === selectedStationId);
     }
 
     if (searchTerm) {
       filtered = filtered.filter(
         (record) =>
-          record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.station_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.admission_reason.toLowerCase().includes(searchTerm.toLowerCase())
+          record.station_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.level_of_conjestion.includes(searchTerm)
       );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((record) => record.current_health_status === statusFilter);
     }
 
     setFilteredRecords(filtered);
@@ -262,18 +231,41 @@ const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId 
     }
   };
 
-  const getHealthStatusBadge = (status: string) => {
+  const getCongestionBadge = (level: string) => {
+    const congestionLevel = parseInt(level);
+    let className = '';
+    
+    if (congestionLevel >= 200) {
+      className = 'bg-red-100 text-red-800';
+    } else if (congestionLevel >= 150) {
+      className = 'bg-orange-100 text-orange-800';
+    } else if (congestionLevel >= 100) {
+      className = 'bg-yellow-100 text-yellow-800';
+    } else {
+      className = 'bg-green-100 text-green-800';
+    }
+
+    return (
+      <Badge className={className}>
+        {level}%
+      </Badge>
+    );
+  };
+
+  const getRatingBadge = (ratingName?: string) => {
+    if (!ratingName) return <Badge>N/A</Badge>;
+
     const variants: { [key: string]: string } = {
-      Stable: 'bg-green-100 text-green-800',
-      Improving: 'bg-blue-100 text-blue-800',
-      Deteriorating: 'bg-orange-100 text-orange-800',
+      Excellent: 'bg-green-100 text-green-800',
+      Good: 'bg-blue-100 text-blue-800',
+      Fair: 'bg-yellow-100 text-yellow-800',
+      Poor: 'bg-orange-100 text-orange-800',
       Critical: 'bg-red-100 text-red-800',
-      Discharged: 'bg-gray-100 text-gray-800',
     };
 
     return (
-      <Badge className={variants[status] || 'bg-gray-100 text-gray-800'}>
-        {status}
+      <Badge className={variants[ratingName] || 'bg-gray-100 text-gray-800'}>
+        {ratingName}
       </Badge>
     );
   };
@@ -296,29 +288,12 @@ const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId 
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search by prisoner, station type, or reason..."
+                  placeholder="Search by station name or congestion level..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label htmlFor="status-filter">Health Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Stable">Stable</SelectItem>
-                  <SelectItem value="Improving">Improving</SelectItem>
-                  <SelectItem value="Deteriorating">Deteriorating</SelectItem>
-                  <SelectItem value="Critical">Critical</SelectItem>
-                  <SelectItem value="Discharged">Discharged</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="flex items-end">
@@ -338,33 +313,35 @@ const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId 
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Station Type</TableHead>
-                  <TableHead>Admission Reason</TableHead>
-                  <TableHead>Health Status</TableHead>
-                  <TableHead>Medical Officer</TableHead>
-                  <TableHead>Assessment Date</TableHead>
-                  <TableHead>Duration</TableHead>
+                  <TableHead>Station Name</TableHead>
+                  <TableHead>Congestion</TableHead>
+                  <TableHead>Buildings</TableHead>
+                  <TableHead>Ventilation</TableHead>
+                  <TableHead>Lighting</TableHead>
+                  <TableHead>Fencing</TableHead>
+                  <TableHead>General Env.</TableHead>
+                  <TableHead>Ward Env.</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                       No station state records found
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentRecords.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell>{record.station_type}</TableCell>
-                      <TableCell className="max-w-xs truncate">{record.admission_reason}</TableCell>
-                      <TableCell>{getHealthStatusBadge(record.current_health_status)}</TableCell>
-                      <TableCell>{record.medical_officer_name}</TableCell>
-                      <TableCell>{new Date(record.assessment_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{record.duration_days ? `${record.duration_days} days` : 'N/A'}</TableCell>
+                      <TableCell className="font-medium">{record.station_name}</TableCell>
+                      <TableCell>{getCongestionBadge(record.level_of_conjestion)}</TableCell>
+                      <TableCell>{getRatingBadge(record.state_of_buildings_name)}</TableCell>
+                      <TableCell>{getRatingBadge(record.ventilation_name)}</TableCell>
+                      <TableCell>{getRatingBadge(record.lighting_name)}</TableCell>
+                      <TableCell>{getRatingBadge(record.fencing_name)}</TableCell>
+                      <TableCell>{getRatingBadge(record.general_environment_name)}</TableCell>
+                      <TableCell>{getRatingBadge(record.ward_environment_name)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -434,6 +411,10 @@ const StationStateList: React.FC<StationStateListProps> = ({ selectedPrisonerId 
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Station State Form</DialogTitle>
+          <DialogDescription>
+            Manage station state assessment including congestion levels and facility ratings.
+          </DialogDescription>
           <StationStateForm
             stationState={selectedRecord}
             onSubmit={handleFormSubmit}

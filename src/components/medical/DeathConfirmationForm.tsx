@@ -5,34 +5,44 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { FileX, Save, X, Calendar as CalendarIcon } from 'lucide-react';
+import { FileX, Save, X, Calendar as CalendarIcon, Upload, FileText } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { Calendar } from '../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { format } from 'date-fns';
 
+interface Prisoner {
+  id: string;
+  prisoner_number: string;
+  full_name: string;
+}
+
+interface StaffProfile {
+  id: string;
+  name: string;
+  staff_number: string;
+  designation?: string;
+}
+
 interface DeathConfirmation {
   id?: string;
   prisoner_name?: string;
+  prisoner_number?: string;
+  officer_in_charge_name?: string;
   medical_officer_name?: string;
-  death_date: string;
-  death_time: string;
-  death_location: string;
+  pathologist_attachment: string;
+  other_attachment: string;
+  medical_form: string;
+  death_certificate: string;
+  presumed_cause_of_death: string;
+  actual_cause_of_death: string;
   cause_of_death: string;
-  death_category: string;
-  medical_officer: string;
-  post_mortem_required: string;
-  post_mortem_date: string;
-  post_mortem_findings: string;
-  autopsy_report_number: string;
-  death_certificate_number: string;
-  certificate_issued_date: string;
-  circumstances: string;
-  witnesses: string;
-  police_notified: string;
-  police_case_number: string;
+  place_of_death: string;
+  date_of_death: string;
   notes: string;
   prisoner: string;
+  officer_in_charge: string;
+  medial_officer: string; // Note: API has typo "medial"
 }
 
 interface DeathConfirmationFormProps {
@@ -44,33 +54,33 @@ interface DeathConfirmationFormProps {
 
 const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmation, onSubmit, onCancel, mode }) => {
   const [formData, setFormData] = useState<DeathConfirmation>({
-    death_date: '',
-    death_time: '',
-    death_location: '',
+    pathologist_attachment: '',
+    other_attachment: '',
+    medical_form: '',
+    death_certificate: '',
+    presumed_cause_of_death: '',
+    actual_cause_of_death: '',
     cause_of_death: '',
-    death_category: 'Natural',
-    medical_officer: '',
-    post_mortem_required: 'No',
-    post_mortem_date: '',
-    post_mortem_findings: '',
-    autopsy_report_number: '',
-    death_certificate_number: '',
-    certificate_issued_date: '',
-    circumstances: '',
-    witnesses: '',
-    police_notified: 'No',
-    police_case_number: '',
+    place_of_death: '',
+    date_of_death: '',
     notes: '',
     prisoner: '',
+    officer_in_charge: '',
+    medial_officer: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [medicalOfficers, setMedicalOfficers] = useState<any[]>([]);
+  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
+  const [officers, setOfficers] = useState<StaffProfile[]>([]);
+  const [medicalOfficers, setMedicalOfficers] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [deathDateOpen, setDeathDateOpen] = useState(false);
-  const [postMortemDateOpen, setPostMortemDateOpen] = useState(false);
-  const [certificateDateOpen, setCertificateDateOpen] = useState(false);
+
+  // File upload states
+  const [pathologistFile, setPathologistFile] = useState<File | null>(null);
+  const [otherFile, setOtherFile] = useState<File | null>(null);
+  const [medicalFormFile, setMedicalFormFile] = useState<File | null>(null);
+  const [deathCertificateFile, setDeathCertificateFile] = useState<File | null>(null);
 
   useEffect(() => {
     loadDropdownData();
@@ -83,20 +93,31 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
   }, [confirmation, dataLoaded]);
 
   const loadDropdownData = () => {
+    // Mock Prisoners
     setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
     ]);
 
+    // Mock Officers in Charge
+    setOfficers([
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'SSP David Okello', staff_number: 'OIC-001', designation: 'Senior Superintendent' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'SP Sarah Namuganza', staff_number: 'OIC-002', designation: 'Superintendent' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'ASP James Mutumba', staff_number: 'OIC-003', designation: 'Assistant Superintendent' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'IP Grace Nalwanga', staff_number: 'OIC-004', designation: 'Inspector' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'SSP Robert Ssemakula', staff_number: 'OIC-005', designation: 'Senior Superintendent' },
+    ]);
+
+    // Mock Medical Officers
     setMedicalOfficers([
-      { id: '1', name: 'Dr. David Makumbi', specialization: 'General Medicine', staff_number: 'MED-001' },
-      { id: '2', name: 'Dr. Sarah Kisakye', specialization: 'Internal Medicine', staff_number: 'MED-002' },
-      { id: '3', name: 'Dr. James Okello', specialization: 'Surgery', staff_number: 'MED-003' },
-      { id: '4', name: 'Dr. Patricia Mutesi', specialization: 'Psychiatry', staff_number: 'MED-004' },
-      { id: '5', name: 'Dr. Richard Ssemakula', specialization: 'Infectious Diseases', staff_number: 'MED-005' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc1', name: 'Dr. David Makumbi', staff_number: 'MED-001', designation: 'General Medicine' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc2', name: 'Dr. Sarah Kisakye', staff_number: 'MED-002', designation: 'Internal Medicine' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc3', name: 'Dr. James Okello', staff_number: 'MED-003', designation: 'Surgery' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc4', name: 'Dr. Patricia Mutesi', staff_number: 'MED-004', designation: 'Psychiatry' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc5', name: 'Dr. Richard Ssemakula', staff_number: 'MED-005', designation: 'Infectious Diseases' },
     ]);
 
     setDataLoaded(true);
@@ -106,6 +127,29 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  const handleFileChange = (field: string, file: File | null) => {
+    if (file) {
+      // In real app, this would upload to server and get back URL
+      const mockUrl = `uploads/${field}/${file.name}`;
+      handleInputChange(field as keyof DeathConfirmation, mockUrl);
+      
+      switch (field) {
+        case 'pathologist_attachment':
+          setPathologistFile(file);
+          break;
+        case 'other_attachment':
+          setOtherFile(file);
+          break;
+        case 'medical_form':
+          setMedicalFormFile(file);
+          break;
+        case 'death_certificate':
+          setDeathCertificateFile(file);
+          break;
+      }
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -113,20 +157,24 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
       toast.error('Please select a prisoner');
       return;
     }
-    if (!formData.medical_officer) {
+    if (!formData.officer_in_charge) {
+      toast.error('Please select an officer in charge');
+      return;
+    }
+    if (!formData.medial_officer) {
       toast.error('Please select a medical officer');
       return;
     }
-    if (!formData.death_date) {
-      toast.error('Please select the death date');
+    if (!formData.date_of_death) {
+      toast.error('Please select date of death');
       return;
     }
-    if (!formData.death_time) {
-      toast.error('Please enter the death time');
+    if (!formData.place_of_death) {
+      toast.error('Please enter place of death');
       return;
     }
     if (!formData.cause_of_death) {
-      toast.error('Please enter the cause of death');
+      toast.error('Please enter cause of death');
       return;
     }
 
@@ -134,12 +182,15 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
 
     setTimeout(() => {
       const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedOfficer = medicalOfficers.find((o) => o.id === formData.medical_officer);
+      const selectedOIC = officers.find((o) => o.id === formData.officer_in_charge);
+      const selectedMedical = medicalOfficers.find((m) => m.id === formData.medial_officer);
 
       const submitData: DeathConfirmation = {
         ...formData,
         prisoner_name: selectedPrisoner?.full_name || '',
-        medical_officer_name: selectedOfficer?.name || '',
+        prisoner_number: selectedPrisoner?.prisoner_number || '',
+        officer_in_charge_name: selectedOIC?.name || '',
+        medical_officer_name: selectedMedical?.name || '',
       };
 
       onSubmit(submitData);
@@ -148,25 +199,24 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
       if (mode === 'create') {
         toast.success('Death confirmation created successfully');
         setFormData({
-          death_date: '',
-          death_time: '',
-          death_location: '',
+          pathologist_attachment: '',
+          other_attachment: '',
+          medical_form: '',
+          death_certificate: '',
+          presumed_cause_of_death: '',
+          actual_cause_of_death: '',
           cause_of_death: '',
-          death_category: 'Natural',
-          medical_officer: '',
-          post_mortem_required: 'No',
-          post_mortem_date: '',
-          post_mortem_findings: '',
-          autopsy_report_number: '',
-          death_certificate_number: '',
-          certificate_issued_date: '',
-          circumstances: '',
-          witnesses: '',
-          police_notified: 'No',
-          police_case_number: '',
+          place_of_death: '',
+          date_of_death: '',
           notes: '',
           prisoner: '',
+          officer_in_charge: '',
+          medial_officer: '',
         });
+        setPathologistFile(null);
+        setOtherFile(null);
+        setMedicalFormFile(null);
+        setDeathCertificateFile(null);
       } else {
         toast.success('Death confirmation updated successfully');
       }
@@ -183,12 +233,67 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
       case 'prisoner':
         const prisoner = prisoners.find(p => p.id === id);
         return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'medical_officer':
-        const officer = medicalOfficers.find(o => o.id === id);
-        return officer ? `${officer.name} (${officer.specialization})` : id;
+      case 'officer_in_charge':
+        const officer = officers.find(o => o.id === id);
+        return officer ? `${officer.staff_number} - ${officer.name} (${officer.designation})` : id;
+      case 'medial_officer':
+        const medicalOfficer = medicalOfficers.find(m => m.id === id);
+        return medicalOfficer ? `${medicalOfficer.staff_number} - ${medicalOfficer.name} (${medicalOfficer.designation})` : id;
       default:
         return id;
     }
+  };
+
+  const renderFileUpload = (
+    label: string,
+    field: string,
+    file: File | null,
+    required: boolean = false
+  ) => {
+    const fieldValue = formData[field as keyof DeathConfirmation] as string;
+    
+    return (
+      <div className="space-y-2">
+        <Label htmlFor={field}>
+          {label} {required && <span className="text-red-500">*</span>}
+        </Label>
+        {isReadOnly ? (
+          <div className="p-2 bg-gray-50 rounded border">
+            {fieldValue ? (
+              <a href={fieldValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
+                <FileText className="h-4 w-4" />
+                View Document
+              </a>
+            ) : (
+              'No file uploaded'
+            )}
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <Input
+                id={field}
+                type="file"
+                onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                className="flex-1"
+              />
+              {file && (
+                <span className="text-sm text-green-600 flex items-center gap-1">
+                  <FileText className="h-4 w-4" />
+                  {file.name}
+                </span>
+              )}
+            </div>
+            {fieldValue && !file && (
+              <div className="text-sm text-gray-600">
+                Current file: <a href={fieldValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View</a>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    );
   };
 
   return (
@@ -207,60 +312,31 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Prisoner Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="prisoner">
-                  Prisoner <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('prisoner', formData.prisoner)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.prisoner}
-                    onValueChange={(value) => handleInputChange('prisoner', value)}
-                  >
-                    <SelectTrigger id="prisoner">
-                      <SelectValue placeholder="Select prisoner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {prisoners.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.prisoner_number} - {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="medical_officer">
-                  Certifying Medical Officer <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('medical_officer', formData.medical_officer)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.medical_officer}
-                    onValueChange={(value) => handleInputChange('medical_officer', value)}
-                  >
-                    <SelectTrigger id="medical_officer">
-                      <SelectValue placeholder="Select medical officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {medicalOfficers.map((officer) => (
-                        <SelectItem key={officer.id} value={officer.id}>
-                          {officer.name} ({officer.specialization})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="prisoner">
+                Prisoner <span className="text-red-500">*</span>
+              </Label>
+              {isReadOnly ? (
+                <div className="p-2 bg-gray-50 rounded border">
+                  {getDisplayValue('prisoner', formData.prisoner)}
+                </div>
+              ) : (
+                <Select
+                  value={formData.prisoner}
+                  onValueChange={(value) => handleInputChange('prisoner', value)}
+                >
+                  <SelectTrigger id="prisoner">
+                    <SelectValue placeholder="Select prisoner" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prisoners.map((p) => (
+                      <SelectItem key={p.id} value={p.id}>
+                        {p.prisoner_number} - {p.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -270,33 +346,32 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="death_date">
+                <Label htmlFor="date_of_death">
                   Date of Death <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.death_date ? format(new Date(formData.death_date), 'PPP') : 'N/A'}
+                    {formData.date_of_death || 'N/A'}
                   </div>
                 ) : (
                   <Popover open={deathDateOpen} onOpenChange={setDeathDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left"
+                        className="w-full justify-start text-left font-normal"
+                        id="date_of_death"
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.death_date ? format(new Date(formData.death_date), 'PPP') : 'Select date'}
+                        {formData.date_of_death ? format(new Date(formData.date_of_death), 'PPP') : 'Select date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
-                        selected={formData.death_date ? new Date(formData.death_date) : undefined}
+                        selected={formData.date_of_death ? new Date(formData.date_of_death) : undefined}
                         onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('death_date', format(date, 'yyyy-MM-dd'));
-                            setDeathDateOpen(false);
-                          }
+                          handleInputChange('date_of_death', date ? format(date, 'yyyy-MM-dd') : '');
+                          setDeathDateOpen(false);
                         }}
                         initialFocus
                       />
@@ -306,59 +381,16 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="death_time">
-                  Time of Death <span className="text-red-500">*</span>
+                <Label htmlFor="place_of_death">
+                  Place of Death <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="death_time"
-                  type="time"
-                  value={formData.death_time}
-                  onChange={(e) => handleInputChange('death_time', e.target.value)}
+                  id="place_of_death"
+                  value={formData.place_of_death}
+                  onChange={(e) => handleInputChange('place_of_death', e.target.value)}
+                  placeholder="e.g., Prison Hospital Ward, Cell Block A, etc."
                   disabled={isReadOnly}
                 />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="death_location">
-                  Location of Death <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="death_location"
-                  value={formData.death_location}
-                  onChange={(e) => handleInputChange('death_location', e.target.value)}
-                  placeholder="e.g., Prison Hospital, Cell Block A"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="death_category">
-                  Death Category <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.death_category || 'N/A'}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.death_category}
-                    onValueChange={(value) => handleInputChange('death_category', value)}
-                  >
-                    <SelectTrigger id="death_category">
-                      <SelectValue placeholder="Select death category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Natural">Natural</SelectItem>
-                      <SelectItem value="Unnatural">Unnatural</SelectItem>
-                      <SelectItem value="Suspicious">Suspicious</SelectItem>
-                      <SelectItem value="Suicide">Suicide</SelectItem>
-                      <SelectItem value="Accident">Accident</SelectItem>
-                      <SelectItem value="Homicide">Homicide</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
               </div>
             </div>
 
@@ -370,118 +402,31 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 id="cause_of_death"
                 value={formData.cause_of_death}
                 onChange={(e) => handleInputChange('cause_of_death', e.target.value)}
-                placeholder="Enter detailed cause of death..."
+                placeholder="Enter the primary cause of death..."
                 rows={3}
                 disabled={isReadOnly}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="circumstances">Circumstances Surrounding Death</Label>
+              <Label htmlFor="presumed_cause_of_death">Presumed Cause of Death</Label>
               <Textarea
-                id="circumstances"
-                value={formData.circumstances}
-                onChange={(e) => handleInputChange('circumstances', e.target.value)}
-                placeholder="Describe the circumstances..."
+                id="presumed_cause_of_death"
+                value={formData.presumed_cause_of_death}
+                onChange={(e) => handleInputChange('presumed_cause_of_death', e.target.value)}
+                placeholder="Enter the initial/presumed cause of death before investigation..."
                 rows={3}
                 disabled={isReadOnly}
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="witnesses">Witnesses</Label>
+              <Label htmlFor="actual_cause_of_death">Actual Cause of Death</Label>
               <Textarea
-                id="witnesses"
-                value={formData.witnesses}
-                onChange={(e) => handleInputChange('witnesses', e.target.value)}
-                placeholder="List witnesses present..."
-                rows={2}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Post-Mortem Details
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="post_mortem_required">Post-Mortem Required</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.post_mortem_required || 'N/A'}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.post_mortem_required}
-                    onValueChange={(value) => handleInputChange('post_mortem_required', value)}
-                  >
-                    <SelectTrigger id="post_mortem_required">
-                      <SelectValue placeholder="Select option" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="post_mortem_date">Post-Mortem Date</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.post_mortem_date ? format(new Date(formData.post_mortem_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={postMortemDateOpen} onOpenChange={setPostMortemDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.post_mortem_date ? format(new Date(formData.post_mortem_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.post_mortem_date ? new Date(formData.post_mortem_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('post_mortem_date', format(date, 'yyyy-MM-dd'));
-                            setPostMortemDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="autopsy_report_number">Autopsy Report Number</Label>
-              <Input
-                id="autopsy_report_number"
-                value={formData.autopsy_report_number}
-                onChange={(e) => handleInputChange('autopsy_report_number', e.target.value)}
-                placeholder="e.g., APR-2024-001"
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="post_mortem_findings">Post-Mortem Findings</Label>
-              <Textarea
-                id="post_mortem_findings"
-                value={formData.post_mortem_findings}
-                onChange={(e) => handleInputChange('post_mortem_findings', e.target.value)}
-                placeholder="Enter post-mortem findings..."
+                id="actual_cause_of_death"
+                value={formData.actual_cause_of_death}
+                onChange={(e) => handleInputChange('actual_cause_of_death', e.target.value)}
+                placeholder="Enter the confirmed/actual cause of death after post-mortem or investigation..."
                 rows={3}
                 disabled={isReadOnly}
               />
@@ -490,89 +435,74 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
 
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Death Certificate & Legal
+              Responsible Officers
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="death_certificate_number">Death Certificate Number</Label>
-                <Input
-                  id="death_certificate_number"
-                  value={formData.death_certificate_number}
-                  onChange={(e) => handleInputChange('death_certificate_number', e.target.value)}
-                  placeholder="e.g., DC-2024-001"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="certificate_issued_date">Certificate Issue Date</Label>
+                <Label htmlFor="officer_in_charge">
+                  Officer in Charge <span className="text-red-500">*</span>
+                </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.certificate_issued_date ? format(new Date(formData.certificate_issued_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={certificateDateOpen} onOpenChange={setCertificateDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.certificate_issued_date ? format(new Date(formData.certificate_issued_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.certificate_issued_date ? new Date(formData.certificate_issued_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('certificate_issued_date', format(date, 'yyyy-MM-dd'));
-                            setCertificateDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="police_notified">Police Notified</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.police_notified || 'N/A'}
+                    {getDisplayValue('officer_in_charge', formData.officer_in_charge)}
                   </div>
                 ) : (
                   <Select
-                    value={formData.police_notified}
-                    onValueChange={(value) => handleInputChange('police_notified', value)}
+                    value={formData.officer_in_charge}
+                    onValueChange={(value) => handleInputChange('officer_in_charge', value)}
                   >
-                    <SelectTrigger id="police_notified">
-                      <SelectValue placeholder="Select option" />
+                    <SelectTrigger id="officer_in_charge">
+                      <SelectValue placeholder="Select officer" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Yes">Yes</SelectItem>
-                      <SelectItem value="No">No</SelectItem>
-                      <SelectItem value="Pending">Pending</SelectItem>
+                      {officers.map((officer) => (
+                        <SelectItem key={officer.id} value={officer.id}>
+                          {officer.staff_number} - {officer.name} ({officer.designation})
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="police_case_number">Police Case Number</Label>
-                <Input
-                  id="police_case_number"
-                  value={formData.police_case_number}
-                  onChange={(e) => handleInputChange('police_case_number', e.target.value)}
-                  placeholder="e.g., CRB-2024-001"
-                  disabled={isReadOnly}
-                />
+                <Label htmlFor="medial_officer">
+                  Medical Officer <span className="text-red-500">*</span>
+                </Label>
+                {isReadOnly ? (
+                  <div className="p-2 bg-gray-50 rounded border">
+                    {getDisplayValue('medial_officer', formData.medial_officer)}
+                  </div>
+                ) : (
+                  <Select
+                    value={formData.medial_officer}
+                    onValueChange={(value) => handleInputChange('medial_officer', value)}
+                  >
+                    <SelectTrigger id="medial_officer">
+                      <SelectValue placeholder="Select medical officer" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {medicalOfficers.map((officer) => (
+                        <SelectItem key={officer.id} value={officer.id}>
+                          {officer.staff_number} - {officer.name} ({officer.designation})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+              Documents & Attachments
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {renderFileUpload('Death Certificate', 'death_certificate', deathCertificateFile)}
+              {renderFileUpload('Medical Form', 'medical_form', medicalFormFile)}
+              {renderFileUpload('Pathologist Attachment', 'pathologist_attachment', pathologistFile)}
+              {renderFileUpload('Other Attachment', 'other_attachment', otherFile)}
             </div>
           </div>
 
@@ -586,8 +516,8 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 id="notes"
                 value={formData.notes}
                 onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Enter additional notes..."
-                rows={3}
+                placeholder="Enter any additional notes, observations, or comments..."
+                rows={4}
                 disabled={isReadOnly}
               />
             </div>

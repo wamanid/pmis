@@ -2,33 +2,32 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Bed, Save, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Bed, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import { Calendar } from '../ui/calendar';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { format } from 'date-fns';
+
+interface Prisoner {
+  id: string;
+  prisoner_number: string;
+  full_name: string;
+}
+
+interface Ward {
+  id: string;
+  name: string;
+  capacity?: number;
+  location?: string;
+}
 
 interface WardRecommendation {
   id?: string;
   prisoner_name?: string;
-  ward_type_name?: string;
-  medical_officer_name?: string;
-  recommendation_date: string;
-  expected_duration: string;
-  ward_type: string;
-  medical_condition: string;
-  severity_level: string;
-  treatment_plan: string;
-  special_care_required: string;
-  medical_officer: string;
-  status: string;
-  actual_admission_date: string;
-  actual_discharge_date: string;
-  notes: string;
+  prisoner_number?: string;
+  ward_name?: string;
+  recommendation_notes: string;
   prisoner: string;
+  recommended_ward: string;
 }
 
 interface WardRecommendationFormProps {
@@ -40,29 +39,15 @@ interface WardRecommendationFormProps {
 
 const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recommendation, onSubmit, onCancel, mode }) => {
   const [formData, setFormData] = useState<WardRecommendation>({
-    recommendation_date: '',
-    expected_duration: '',
-    ward_type: '',
-    medical_condition: '',
-    severity_level: 'Moderate',
-    treatment_plan: '',
-    special_care_required: '',
-    medical_officer: '',
-    status: 'Pending',
-    actual_admission_date: '',
-    actual_discharge_date: '',
-    notes: '',
+    recommendation_notes: '',
     prisoner: '',
+    recommended_ward: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [wardTypes, setWardTypes] = useState<any[]>([]);
-  const [medicalOfficers, setMedicalOfficers] = useState<any[]>([]);
+  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
+  const [wards, setWards] = useState<Ward[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [recDateOpen, setRecDateOpen] = useState(false);
-  const [admissionDateOpen, setAdmissionDateOpen] = useState(false);
-  const [dischargeDateOpen, setDischargeDateOpen] = useState(false);
 
   useEffect(() => {
     loadDropdownData();
@@ -75,30 +60,25 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
   }, [recommendation, dataLoaded]);
 
   const loadDropdownData = () => {
+    // Mock Prisoners
     setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
     ]);
 
-    setWardTypes([
-      { id: '1', name: 'General Ward', capacity: 20, description: 'Standard medical care ward' },
-      { id: '2', name: 'Intensive Care Unit (ICU)', capacity: 5, description: 'Critical care ward' },
-      { id: '3', name: 'Isolation Ward', capacity: 10, description: 'For contagious diseases' },
-      { id: '4', name: 'Psychiatric Ward', capacity: 15, description: 'Mental health care' },
-      { id: '5', name: 'Recovery Ward', capacity: 12, description: 'Post-surgery recovery' },
-      { id: '6', name: 'Tuberculosis Ward', capacity: 8, description: 'TB treatment ward' },
-      { id: '7', name: 'HIV/AIDS Ward', capacity: 10, description: 'HIV/AIDS care ward' },
-    ]);
-
-    setMedicalOfficers([
-      { id: '1', name: 'Dr. David Makumbi', specialization: 'General Medicine', staff_number: 'MED-001' },
-      { id: '2', name: 'Dr. Sarah Kisakye', specialization: 'Internal Medicine', staff_number: 'MED-002' },
-      { id: '3', name: 'Dr. James Okello', specialization: 'Surgery', staff_number: 'MED-003' },
-      { id: '4', name: 'Dr. Patricia Mutesi', specialization: 'Psychiatry', staff_number: 'MED-004' },
-      { id: '5', name: 'Dr. Richard Ssemakula', specialization: 'Infectious Diseases', staff_number: 'MED-005' },
+    // Mock Wards
+    setWards([
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'General Ward A', capacity: 20, location: 'Block A' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'Intensive Care Unit (ICU)', capacity: 5, location: 'Block B' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'Isolation Ward', capacity: 10, location: 'Block C' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'Psychiatric Ward', capacity: 15, location: 'Block D' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'Recovery Ward', capacity: 12, location: 'Block A' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb6', name: 'Tuberculosis Ward', capacity: 8, location: 'Block E' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb7', name: 'HIV/AIDS Ward', capacity: 10, location: 'Block F' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb8', name: 'General Ward B', capacity: 25, location: 'Block G' },
     ]);
 
     setDataLoaded(true);
@@ -115,20 +95,8 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
       toast.error('Please select a prisoner');
       return;
     }
-    if (!formData.ward_type) {
-      toast.error('Please select a ward type');
-      return;
-    }
-    if (!formData.medical_officer) {
-      toast.error('Please select a medical officer');
-      return;
-    }
-    if (!formData.recommendation_date) {
-      toast.error('Please select a recommendation date');
-      return;
-    }
-    if (!formData.medical_condition) {
-      toast.error('Please enter the medical condition');
+    if (!formData.recommended_ward) {
+      toast.error('Please select a recommended ward');
       return;
     }
 
@@ -136,14 +104,13 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
 
     setTimeout(() => {
       const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedWard = wardTypes.find((w) => w.id === formData.ward_type);
-      const selectedOfficer = medicalOfficers.find((o) => o.id === formData.medical_officer);
+      const selectedWard = wards.find((w) => w.id === formData.recommended_ward);
 
       const submitData: WardRecommendation = {
         ...formData,
         prisoner_name: selectedPrisoner?.full_name || '',
-        ward_type_name: selectedWard?.name || '',
-        medical_officer_name: selectedOfficer?.name || '',
+        prisoner_number: selectedPrisoner?.prisoner_number || '',
+        ward_name: selectedWard?.name || '',
       };
 
       onSubmit(submitData);
@@ -152,19 +119,9 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
       if (mode === 'create') {
         toast.success('Ward recommendation created successfully');
         setFormData({
-          recommendation_date: '',
-          expected_duration: '',
-          ward_type: '',
-          medical_condition: '',
-          severity_level: 'Moderate',
-          treatment_plan: '',
-          special_care_required: '',
-          medical_officer: '',
-          status: 'Pending',
-          actual_admission_date: '',
-          actual_discharge_date: '',
-          notes: '',
+          recommendation_notes: '',
           prisoner: '',
+          recommended_ward: '',
         });
       } else {
         toast.success('Ward recommendation updated successfully');
@@ -182,12 +139,9 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
       case 'prisoner':
         const prisoner = prisoners.find(p => p.id === id);
         return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'ward_type':
-        const ward = wardTypes.find(w => w.id === id);
-        return ward ? `${ward.name} - ${ward.description}` : id;
-      case 'medical_officer':
-        const officer = medicalOfficers.find(o => o.id === id);
-        return officer ? `${officer.name} (${officer.specialization})` : id;
+      case 'recommended_ward':
+        const ward = wards.find(w => w.id === id);
+        return ward ? `${ward.name} (${ward.location}) - Capacity: ${ward.capacity}` : id;
       default:
         return id;
     }
@@ -207,7 +161,7 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Prisoner Information
+              Recommendation Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
@@ -238,86 +192,25 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">
-                  Status <span className="text-red-500">*</span>
+                <Label htmlFor="recommended_ward">
+                  Recommended Ward <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.status || 'N/A'}
+                    {getDisplayValue('recommended_ward', formData.recommended_ward)}
                   </div>
                 ) : (
                   <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleInputChange('status', value)}
+                    value={formData.recommended_ward}
+                    onValueChange={(value) => handleInputChange('recommended_ward', value)}
                   >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Select status" />
+                    <SelectTrigger id="recommended_ward">
+                      <SelectValue placeholder="Select ward" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Pending">Pending</SelectItem>
-                      <SelectItem value="Approved">Approved</SelectItem>
-                      <SelectItem value="Admitted">Admitted</SelectItem>
-                      <SelectItem value="Discharged">Discharged</SelectItem>
-                      <SelectItem value="Cancelled">Cancelled</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Ward and Medical Details
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="ward_type">
-                  Ward Type <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('ward_type', formData.ward_type)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.ward_type}
-                    onValueChange={(value) => handleInputChange('ward_type', value)}
-                  >
-                    <SelectTrigger id="ward_type">
-                      <SelectValue placeholder="Select ward type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wardTypes.map((ward) => (
+                      {wards.map((ward) => (
                         <SelectItem key={ward.id} value={ward.id}>
-                          {ward.name} - {ward.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="medical_officer">
-                  Medical Officer <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('medical_officer', formData.medical_officer)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.medical_officer}
-                    onValueChange={(value) => handleInputChange('medical_officer', value)}
-                  >
-                    <SelectTrigger id="medical_officer">
-                      <SelectValue placeholder="Select medical officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {medicalOfficers.map((officer) => (
-                        <SelectItem key={officer.id} value={officer.id}>
-                          {officer.name} ({officer.specialization})
+                          {ward.name} ({ward.location}) - Capacity: {ward.capacity}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -326,208 +219,14 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="severity_level">
-                  Severity Level <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.severity_level || 'N/A'}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.severity_level}
-                    onValueChange={(value) => handleInputChange('severity_level', value)}
-                  >
-                    <SelectTrigger id="severity_level">
-                      <SelectValue placeholder="Select severity level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Mild">Mild</SelectItem>
-                      <SelectItem value="Moderate">Moderate</SelectItem>
-                      <SelectItem value="Severe">Severe</SelectItem>
-                      <SelectItem value="Critical">Critical</SelectItem>
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expected_duration">Expected Duration (days)</Label>
-                <Input
-                  id="expected_duration"
-                  type="number"
-                  value={formData.expected_duration}
-                  onChange={(e) => handleInputChange('expected_duration', e.target.value)}
-                  placeholder="Enter expected duration"
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="medical_condition">
-                Medical Condition <span className="text-red-500">*</span>
-              </Label>
+              <Label htmlFor="recommendation_notes">Recommendation Notes</Label>
               <Textarea
-                id="medical_condition"
-                value={formData.medical_condition}
-                onChange={(e) => handleInputChange('medical_condition', e.target.value)}
-                placeholder="Enter medical condition details..."
-                rows={3}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="treatment_plan">Treatment Plan</Label>
-              <Textarea
-                id="treatment_plan"
-                value={formData.treatment_plan}
-                onChange={(e) => handleInputChange('treatment_plan', e.target.value)}
-                placeholder="Enter treatment plan..."
-                rows={3}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="special_care_required">Special Care Required</Label>
-              <Textarea
-                id="special_care_required"
-                value={formData.special_care_required}
-                onChange={(e) => handleInputChange('special_care_required', e.target.value)}
-                placeholder="Enter special care requirements..."
-                rows={2}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Dates and Timeline
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="recommendation_date">
-                  Recommendation Date <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.recommendation_date ? format(new Date(formData.recommendation_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={recDateOpen} onOpenChange={setRecDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.recommendation_date ? format(new Date(formData.recommendation_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.recommendation_date ? new Date(formData.recommendation_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('recommendation_date', format(date, 'yyyy-MM-dd'));
-                            setRecDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="actual_admission_date">Actual Admission Date</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.actual_admission_date ? format(new Date(formData.actual_admission_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={admissionDateOpen} onOpenChange={setAdmissionDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.actual_admission_date ? format(new Date(formData.actual_admission_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.actual_admission_date ? new Date(formData.actual_admission_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('actual_admission_date', format(date, 'yyyy-MM-dd'));
-                            setAdmissionDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="actual_discharge_date">Actual Discharge Date</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.actual_discharge_date ? format(new Date(formData.actual_discharge_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={dischargeDateOpen} onOpenChange={setDischargeDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.actual_discharge_date ? format(new Date(formData.actual_discharge_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.actual_discharge_date ? new Date(formData.actual_discharge_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('actual_discharge_date', format(date, 'yyyy-MM-dd'));
-                            setDischargeDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Additional Notes
-            </h3>
-            <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                value={formData.notes}
-                onChange={(e) => handleInputChange('notes', e.target.value)}
-                placeholder="Enter additional notes..."
-                rows={3}
+                id="recommendation_notes"
+                value={formData.recommendation_notes}
+                onChange={(e) => handleInputChange('recommendation_notes', e.target.value)}
+                placeholder="Enter reasons for recommending this ward, medical condition, required care level, treatment plan, special requirements, etc..."
+                rows={6}
                 disabled={isReadOnly}
               />
             </div>

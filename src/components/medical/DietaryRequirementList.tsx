@@ -11,13 +11,6 @@ import {
   TableRow,
 } from '../ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -34,28 +27,18 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import { Card, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
 import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import DietaryRequirementForm from './DietaryRequirementForm';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 
 interface DietaryRequirement {
   id: string;
-  prisoner_name: string;
-  diet_type_name: string;
-  allergy_name: string;
-  requirement_date: string;
-  expiry_date: string;
-  specific_requirements: string;
-  meal_plan: string;
-  prescribed_by: string;
-  is_active: boolean;
-  medical_condition: string;
-  special_instructions: string;
-  prisoner: string;
-  diet_type: string;
-  allergy: string;
+  dietary_requirement: string;
+  start_date: string;
+  end_date: string;
+  prisoner_restriction: string;
+  prisoner_restriction_info?: string;
 }
 
 interface DietaryRequirementListProps {
@@ -66,88 +49,59 @@ interface DietaryRequirementListProps {
 const mockRequirementRecords: DietaryRequirement[] = [
   {
     id: '1',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    diet_type: '2',
-    diet_type_name: 'Diabetic',
-    allergy: '2',
-    allergy_name: 'Dairy',
-    requirement_date: '2024-09-15',
-    expiry_date: '2025-09-15',
-    specific_requirements: 'Low sugar diet, no processed foods, limited carbohydrates',
-    meal_plan: 'Breakfast: Oatmeal with berries\nLunch: Grilled chicken with vegetables\nDinner: Fish with brown rice',
-    prescribed_by: 'Dr. David Makumbi',
-    is_active: true,
-    medical_condition: 'Type 2 Diabetes',
-    special_instructions: 'Monitor blood sugar levels before each meal',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    prisoner_restriction_info: 'PR-2024-001 - John Doe (Medical Condition)',
+    dietary_requirement: 'Low sugar diet, no processed foods, limited carbohydrates. Patient requires diabetic-friendly meals with controlled portions.',
+    start_date: '2024-09-15',
+    end_date: '2025-09-15',
   },
   {
     id: '2',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    diet_type: '1',
-    diet_type_name: 'Vegetarian',
-    allergy: '',
-    allergy_name: '',
-    requirement_date: '2024-08-01',
-    expiry_date: '',
-    specific_requirements: 'No meat, poultry, or fish. Plant-based protein sources only',
-    meal_plan: 'Breakfast: Beans and plantains\nLunch: Lentil stew with posho\nDinner: Vegetable curry with rice',
-    prescribed_by: 'Religious/Cultural Requirement',
-    is_active: true,
-    medical_condition: 'None',
-    special_instructions: 'Ensure adequate protein and iron intake',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    prisoner_restriction_info: 'PR-2024-002 - Jane Smith (Security Risk)',
+    dietary_requirement: 'Vegetarian diet required. No meat, poultry, or fish. Plant-based protein sources only with adequate iron and vitamin B12 supplementation.',
+    start_date: '2024-08-01',
+    end_date: '',
   },
   {
     id: '3',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    diet_type: '4',
-    diet_type_name: 'Gluten-Free',
-    allergy: '6',
-    allergy_name: 'Wheat',
-    requirement_date: '2024-10-01',
-    expiry_date: '2025-10-01',
-    specific_requirements: 'No wheat, barley, rye, or gluten-containing products',
-    meal_plan: 'Breakfast: Rice porridge\nLunch: Grilled meat with sweet potato\nDinner: Fish with cassava',
-    prescribed_by: 'Dr. Sarah Kisakye',
-    is_active: true,
-    medical_condition: 'Celiac Disease',
-    special_instructions: 'Strict gluten avoidance required to prevent intestinal damage',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
+    prisoner_restriction_info: 'PR-2024-003 - Michael Johnson (Behavioral Issues)',
+    dietary_requirement: 'Gluten-free diet mandatory. No wheat, barley, rye, or gluten-containing products. All meals must be prepared in gluten-free environment to prevent cross-contamination.',
+    start_date: '2024-10-01',
+    end_date: '2025-10-01',
   },
   {
     id: '4',
-    prisoner: '4',
-    prisoner_name: 'Emily Davis',
-    diet_type: '7',
-    diet_type_name: 'Soft Diet',
-    allergy: '',
-    allergy_name: '',
-    requirement_date: '2024-11-01',
-    expiry_date: '2024-12-01',
-    specific_requirements: 'Easy to chew and swallow, no hard or crunchy foods',
-    meal_plan: 'Breakfast: Soft porridge\nLunch: Mashed potatoes with soft vegetables\nDinner: Soft cooked rice with tender chicken',
-    prescribed_by: 'Dr. Patricia Mutesi',
-    is_active: true,
-    medical_condition: 'Post-dental surgery recovery',
-    special_instructions: 'Temporary requirement during healing period',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
+    prisoner_restriction_info: 'PR-2024-004 - Emily Davis (Injury Recovery)',
+    dietary_requirement: 'Soft diet required during recovery period. Easy to chew and swallow foods only. No hard, crunchy, or difficult to digest items.',
+    start_date: '2024-11-01',
+    end_date: '2024-12-01',
   },
   {
     id: '5',
-    prisoner: '5',
-    prisoner_name: 'Robert Lee',
-    diet_type: '3',
-    diet_type_name: 'Low Sodium',
-    allergy: '4',
-    allergy_name: 'Shellfish',
-    requirement_date: '2024-07-15',
-    expiry_date: '',
-    specific_requirements: 'Reduced salt intake, no processed foods, avoid high-sodium items',
-    meal_plan: 'Breakfast: Unsalted porridge with fruit\nLunch: Grilled chicken with fresh vegetables\nDinner: Fish (no shellfish) with rice',
-    prescribed_by: 'Dr. James Okello',
-    is_active: true,
-    medical_condition: 'Hypertension',
-    special_instructions: 'Monitor blood pressure regularly, no shellfish due to allergy',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
+    prisoner_restriction_info: 'PR-2024-005 - Robert Lee (Mental Health)',
+    dietary_requirement: 'Low sodium diet with no shellfish. Reduced salt intake essential for blood pressure management. Strictly avoid all shellfish products due to severe allergy.',
+    start_date: '2024-07-15',
+    end_date: '',
+  },
+  {
+    id: '6',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    prisoner_restriction_info: 'PR-2024-006 - Sarah Wilson (Medical Condition)',
+    dietary_requirement: 'Halal diet required. All meat must be halal certified. No pork or pork products. Islamic dietary requirements must be strictly followed.',
+    start_date: '2024-06-10',
+    end_date: '',
+  },
+  {
+    id: '7',
+    prisoner_restriction: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    prisoner_restriction_info: 'PR-2024-007 - David Brown (Injury Recovery)',
+    dietary_requirement: 'High protein diet for recovery. Increased protein intake necessary for wound healing and muscle recovery. Include lean meats, eggs, and legumes.',
+    start_date: '2024-10-15',
+    end_date: '2025-01-15',
   },
 ];
 
@@ -155,7 +109,6 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
   const [records, setRecords] = useState<DietaryRequirement[]>(mockRequirementRecords);
   const [filteredRecords, setFilteredRecords] = useState<DietaryRequirement[]>(mockRequirementRecords);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -166,27 +119,21 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
 
   useEffect(() => {
     filterRecords();
-  }, [searchTerm, statusFilter, records, selectedPrisonerId]);
+  }, [searchTerm, records, selectedPrisonerId]);
 
   const filterRecords = () => {
     let filtered = [...records];
 
     if (selectedPrisonerId) {
-      filtered = filtered.filter((record) => record.prisoner === selectedPrisonerId);
+      filtered = filtered.filter((record) => record.prisoner_restriction === selectedPrisonerId);
     }
 
     if (searchTerm) {
       filtered = filtered.filter(
         (record) =>
-          record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.diet_type_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.medical_condition.toLowerCase().includes(searchTerm.toLowerCase())
+          record.prisoner_restriction_info?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.dietary_requirement.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (statusFilter !== 'all') {
-      const isActive = statusFilter === 'active';
-      filtered = filtered.filter((record) => record.is_active === isActive);
     }
 
     setFilteredRecords(filtered);
@@ -226,12 +173,14 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
     setDialogOpen(false);
   };
 
-  const getStatusBadge = (isActive: boolean) => {
-    return (
-      <Badge className={isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
-        {isActive ? 'Active' : 'Inactive'}
-      </Badge>
-    );
+  const isActive = (record: DietaryRequirement) => {
+    const today = new Date();
+    const startDate = new Date(record.start_date);
+    const endDate = record.end_date ? new Date(record.end_date) : null;
+    
+    if (today < startDate) return false;
+    if (endDate && today > endDate) return false;
+    return true;
   };
 
   // Pagination
@@ -252,26 +201,12 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search by prisoner, diet type, or condition..."
+                  placeholder="Search by prisoner restriction or dietary requirement..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label htmlFor="status-filter">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="flex items-end">
@@ -291,12 +226,10 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Diet Type</TableHead>
-                  <TableHead>Allergy</TableHead>
-                  <TableHead>Medical Condition</TableHead>
-                  <TableHead>Requirement Date</TableHead>
-                  <TableHead>Expiry Date</TableHead>
+                  <TableHead>Prisoner Restriction</TableHead>
+                  <TableHead>Dietary Requirement</TableHead>
+                  <TableHead>Start Date</TableHead>
+                  <TableHead>End Date</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
@@ -304,22 +237,36 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
               <TableBody>
                 {currentRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       No dietary requirement records found
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentRecords.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell>{record.diet_type_name}</TableCell>
-                      <TableCell>{record.allergy_name || 'None'}</TableCell>
-                      <TableCell>{record.medical_condition || 'N/A'}</TableCell>
-                      <TableCell>{new Date(record.requirement_date).toLocaleDateString()}</TableCell>
-                      <TableCell>
-                        {record.expiry_date ? new Date(record.expiry_date).toLocaleDateString() : 'N/A'}
+                      <TableCell className="font-medium">
+                        {record.prisoner_restriction_info || record.prisoner_restriction}
                       </TableCell>
-                      <TableCell>{getStatusBadge(record.is_active)}</TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="line-clamp-2" title={record.dietary_requirement}>
+                          {record.dietary_requirement}
+                        </div>
+                      </TableCell>
+                      <TableCell>{new Date(record.start_date).toLocaleDateString()}</TableCell>
+                      <TableCell>
+                        {record.end_date ? new Date(record.end_date).toLocaleDateString() : 'Ongoing'}
+                      </TableCell>
+                      <TableCell>
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            isActive(record)
+                              ? 'bg-green-100 text-green-800'
+                              : 'bg-gray-100 text-gray-800'
+                          }`}
+                        >
+                          {isActive(record) ? 'Active' : 'Inactive'}
+                        </span>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -392,6 +339,10 @@ const DietaryRequirementList: React.FC<DietaryRequirementListProps> = ({ selecte
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Dietary Requirement Form</DialogTitle>
+          <DialogDescription>
+            Add or edit a dietary requirement for a prisoner restriction.
+          </DialogDescription>
           <DietaryRequirementForm
             requirement={selectedRecord}
             onSubmit={handleFormSubmit}

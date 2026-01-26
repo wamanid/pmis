@@ -11,13 +11,6 @@ import {
   TableRow,
 } from '../ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,29 +31,22 @@ import { Badge } from '../ui/badge';
 import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import TransferRecommendationForm from './TransferRecommendationForm';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 
 interface TransferRecommendation {
   id: string;
   prisoner_name: string;
-  from_facility_name: string;
-  to_facility_name: string;
-  medical_officer_name: string;
-  recommendation_date: string;
-  urgency_level: string;
-  medical_reason: string;
-  current_condition: string;
-  required_facility_type: string;
-  special_transport_needs: string;
-  medical_officer: string;
-  from_facility: string;
-  to_facility: string;
-  status: string;
-  transfer_date: string;
-  approval_date: string;
-  approved_by: string;
-  transfer_notes: string;
+  prisoner_number: string;
+  reason_name: string;
+  station_name: string;
+  hospital_name: string;
+  category_name: string;
+  recommendation_notes: string;
   prisoner: string;
+  reason_for_recommendation: string;
+  recommended_station: string;
+  refferal_hospital: string; // Note: API has typo "refferal"
+  referral_category: string;
 }
 
 interface TransferRecommendationListProps {
@@ -71,113 +57,108 @@ interface TransferRecommendationListProps {
 const mockTransferRecommendations: TransferRecommendation[] = [
   {
     id: '1',
-    prisoner: '1',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
     prisoner_name: 'John Doe',
-    from_facility: '1',
-    from_facility_name: 'Luzira Prison',
-    to_facility: '4',
-    to_facility_name: 'Mulago National Referral Hospital',
-    medical_officer: '3',
-    medical_officer_name: 'Dr. James Okello',
-    recommendation_date: '2024-11-10',
-    urgency_level: 'Emergency',
-    medical_reason: 'Acute appendicitis requiring immediate surgical intervention',
-    current_condition: 'Severe abdominal pain, elevated white blood cell count, suspected appendicitis',
-    required_facility_type: 'Surgical hospital with emergency capabilities',
-    special_transport_needs: 'Ambulance with medical escort, pain management during transport',
-    status: 'Completed',
-    transfer_date: '2024-11-10',
-    approval_date: '2024-11-10',
-    approved_by: 'Director General - Sarah Kisakye',
-    transfer_notes: 'Emergency transfer completed successfully. Surgery performed same day.',
+    prisoner_number: 'PR-2024-001',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    reason_name: 'Critical Medical Condition',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
+    station_name: 'Luzira Maximum Security Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd1',
+    hospital_name: 'Mulago National Referral Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe1',
+    category_name: 'Emergency',
+    recommendation_notes: 'Patient presenting with severe chest pain and respiratory distress. Suspected myocardial infarction. Requires immediate cardiac evaluation and intervention at specialized cardiac center. ECG shows ST elevation. Patient unstable, requires ambulance transport with medical escort.',
   },
   {
     id: '2',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    from_facility: '2',
-    from_facility_name: 'Kigo Prison',
-    to_facility: '5',
-    to_facility_name: 'Butabika National Psychiatric Hospital',
-    medical_officer: '4',
-    medical_officer_name: 'Dr. Patricia Mutesi',
-    recommendation_date: '2024-11-05',
-    urgency_level: 'High',
-    medical_reason: 'Severe psychiatric episode requiring specialized psychiatric care',
-    current_condition: 'Acute psychosis with violent tendencies, not responding to current medication',
-    required_facility_type: 'Specialized psychiatric facility',
-    special_transport_needs: 'Secure transport, psychiatric escort, restraints if necessary',
-    status: 'Approved',
-    transfer_date: '2024-11-15',
-    approval_date: '2024-11-06',
-    approved_by: 'Commissioner - James Okello',
-    transfer_notes: 'Transfer scheduled for November 15th, all documentation prepared',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    prisoner_name: 'Jane Smith',
+    prisoner_number: 'PR-2024-002',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    reason_name: 'Psychiatric Evaluation',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
+    station_name: 'Kigo Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd2',
+    hospital_name: 'Butabika National Psychiatric Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe2',
+    category_name: 'Urgent',
+    recommendation_notes: 'Prisoner exhibiting signs of acute psychotic episode with hallucinations and aggressive behavior. Immediate psychiatric assessment required. Risk of self-harm or harm to others. Requires secure transport and specialized psychiatric care.',
   },
   {
     id: '3',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    from_facility: '1',
-    from_facility_name: 'Luzira Prison',
-    to_facility: '4',
-    to_facility_name: 'Mulago National Referral Hospital',
-    medical_officer: '5',
-    medical_officer_name: 'Dr. Richard Ssemakula',
-    recommendation_date: '2024-11-08',
-    urgency_level: 'High',
-    medical_reason: 'Drug-resistant tuberculosis requiring specialized treatment',
-    current_condition: 'Multi-drug resistant TB confirmed, not responding to first-line treatment',
-    required_facility_type: 'TB specialized unit with isolation capabilities',
-    special_transport_needs: 'Isolation transport, N95 masks for escorts, infection control measures',
-    status: 'In Transit',
-    transfer_date: '2024-11-13',
-    approval_date: '2024-11-09',
-    approved_by: 'Director Medical Services - Dr. David Makumbi',
-    transfer_notes: 'Patient in transit to specialized TB unit at Mulago',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
+    prisoner_name: 'Michael Johnson',
+    prisoner_number: 'PR-2024-003',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    reason_name: 'Surgical Intervention',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc5',
+    station_name: 'Mbarara Main Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd3',
+    hospital_name: 'Mbarara Regional Referral Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe4',
+    category_name: 'Elective',
+    recommendation_notes: 'Patient diagnosed with inguinal hernia requiring elective surgical repair. Non-emergency but causing discomfort and limiting physical activities. Surgery scheduled for next month. Pre-operative assessment completed.',
   },
   {
     id: '4',
-    prisoner: '4',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
     prisoner_name: 'Emily Davis',
-    from_facility: '3',
-    from_facility_name: 'Kitalya Prison',
-    to_facility: '1',
-    to_facility_name: 'Luzira Prison',
-    medical_officer: '2',
-    medical_officer_name: 'Dr. Sarah Kisakye',
-    recommendation_date: '2024-11-12',
-    urgency_level: 'Medium',
-    medical_reason: 'Requires access to better medical facilities for chronic condition management',
-    current_condition: 'Chronic diabetes with complications, requires regular specialist consultation',
-    required_facility_type: 'Prison facility with hospital and diabetes management program',
-    special_transport_needs: 'Standard transport, medical file transfer, medication supply',
-    status: 'Pending',
-    transfer_date: '',
-    approval_date: '',
-    approved_by: '',
-    transfer_notes: 'Awaiting approval from Commissioner of Prisons',
+    prisoner_number: 'PR-2024-004',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb5',
+    reason_name: 'Diagnostic Testing',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc4',
+    station_name: 'Gulu Main Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd4',
+    hospital_name: 'Gulu Regional Referral Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe3',
+    category_name: 'Routine',
+    recommendation_notes: 'Patient requires advanced imaging studies (CT scan and MRI) to investigate persistent headaches and vision changes. Neurological examination suggests need for detailed brain imaging. Routine referral for diagnostic workup.',
   },
   {
     id: '5',
-    prisoner: '5',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
     prisoner_name: 'Robert Lee',
-    from_facility: '7',
-    from_facility_name: 'Gulu Prison',
-    to_facility: '6',
-    to_facility_name: 'Mbarara Prison',
-    medical_officer: '1',
-    medical_officer_name: 'Dr. David Makumbi',
-    recommendation_date: '2024-11-13',
-    urgency_level: 'Low',
-    medical_reason: 'Transfer for ongoing cardiac care follow-up',
-    current_condition: 'Stable post-cardiac event, requires quarterly cardiology consultations',
-    required_facility_type: 'Facility with cardiology services or nearby hospital access',
-    special_transport_needs: 'Comfortable transport, avoid excessive stress',
-    status: 'Cancelled',
-    transfer_date: '',
-    approval_date: '',
-    approved_by: '',
-    transfer_notes: 'Cancelled - Cardiology services now available at Gulu Regional Hospital',
+    prisoner_number: 'PR-2024-005',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    reason_name: 'Specialized Treatment Required',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
+    station_name: 'Luzira Maximum Security Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd7',
+    hospital_name: 'Kiruddu National Referral Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe2',
+    category_name: 'Urgent',
+    recommendation_notes: 'Patient diagnosed with pulmonary tuberculosis with multi-drug resistance. Current facility lacks specialized TB treatment capacity. Requires transfer to facility with MDR-TB treatment protocols and isolation capabilities.',
+  },
+  {
+    id: '6',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    prisoner_name: 'Jane Smith',
+    prisoner_number: 'PR-2024-002',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb7',
+    reason_name: 'Chronic Disease Management',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc6',
+    station_name: 'Kitalya Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd5',
+    hospital_name: 'Kampala International Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe5',
+    category_name: 'Follow-up',
+    recommendation_notes: 'Follow-up care for diabetes mellitus Type 2 with complications. Patient requires endocrinology consultation and adjustment of insulin regimen. Regular monitoring and diabetic foot care needed.',
+  },
+  {
+    id: '7',
+    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    prisoner_name: 'John Doe',
+    prisoner_number: 'PR-2024-001',
+    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb8',
+    reason_name: 'Rehabilitation Services',
+    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc3',
+    station_name: 'Murchison Bay Prison',
+    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd6',
+    hospital_name: 'Nakasero Hospital',
+    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe3',
+    category_name: 'Routine',
+    recommendation_notes: 'Patient recovering from stroke with right-sided weakness. Requires intensive physiotherapy and occupational therapy for functional recovery. Transfer to facility with rehabilitation services recommended.',
   },
 ];
 
@@ -185,7 +166,6 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
   const [records, setRecords] = useState<TransferRecommendation[]>(mockTransferRecommendations);
   const [filteredRecords, setFilteredRecords] = useState<TransferRecommendation[]>(mockTransferRecommendations);
   const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -196,7 +176,7 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
 
   useEffect(() => {
     filterRecords();
-  }, [searchTerm, statusFilter, records, selectedPrisonerId]);
+  }, [searchTerm, records, selectedPrisonerId]);
 
   const filterRecords = () => {
     let filtered = [...records];
@@ -209,14 +189,11 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
       filtered = filtered.filter(
         (record) =>
           record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.from_facility_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.to_facility_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.medical_reason.toLowerCase().includes(searchTerm.toLowerCase())
+          record.prisoner_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.reason_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.hospital_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.category_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter((record) => record.status === statusFilter);
     }
 
     setFilteredRecords(filtered);
@@ -256,33 +233,31 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
     setDialogOpen(false);
   };
 
-  const getStatusBadge = (status: string) => {
-    const variants: { [key: string]: string } = {
-      Pending: 'bg-yellow-100 text-yellow-800',
-      Approved: 'bg-blue-100 text-blue-800',
-      'In Transit': 'bg-purple-100 text-purple-800',
-      Completed: 'bg-green-100 text-green-800',
-      Cancelled: 'bg-red-100 text-red-800',
-    };
-
-    return (
-      <Badge className={variants[status] || 'bg-gray-100 text-gray-800'}>
-        {status}
-      </Badge>
-    );
+  const handleDelete = (id: string) => {
+    setRecordToDelete(id);
+    setShowDeleteDialog(true);
   };
 
-  const getUrgencyBadge = (urgency: string) => {
+  const confirmDelete = () => {
+    if (recordToDelete) {
+      setRecords(records.filter((record) => record.id !== recordToDelete));
+      toast.success('Transfer recommendation deleted successfully');
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const getCategoryBadge = (categoryName: string) => {
     const variants: { [key: string]: string } = {
-      Low: 'bg-green-100 text-green-800',
-      Medium: 'bg-yellow-100 text-yellow-800',
-      High: 'bg-orange-100 text-orange-800',
       Emergency: 'bg-red-100 text-red-800',
+      Urgent: 'bg-orange-100 text-orange-800',
+      Routine: 'bg-blue-100 text-blue-800',
+      Elective: 'bg-green-100 text-green-800',
+      'Follow-up': 'bg-purple-100 text-purple-800',
     };
 
     return (
-      <Badge className={variants[urgency] || 'bg-gray-100 text-gray-800'}>
-        {urgency}
+      <Badge className={variants[categoryName] || 'bg-gray-100 text-gray-800'}>
+        {categoryName}
       </Badge>
     );
   };
@@ -305,29 +280,12 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search by prisoner, facility, or reason..."
+                  placeholder="Search by prisoner, reason, hospital, or category..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label htmlFor="status-filter">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger id="status-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Pending">Pending</SelectItem>
-                  <SelectItem value="Approved">Approved</SelectItem>
-                  <SelectItem value="In Transit">In Transit</SelectItem>
-                  <SelectItem value="Completed">Completed</SelectItem>
-                  <SelectItem value="Cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="flex items-end">
@@ -348,32 +306,34 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
               <TableHeader>
                 <TableRow className="bg-gray-50">
                   <TableHead>Prisoner</TableHead>
-                  <TableHead>From Facility</TableHead>
-                  <TableHead>To Facility</TableHead>
-                  <TableHead>Medical Reason</TableHead>
-                  <TableHead>Urgency</TableHead>
-                  <TableHead>Rec. Date</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Number</TableHead>
+                  <TableHead>Reason</TableHead>
+                  <TableHead>Hospital</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
                       No transfer recommendation records found
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentRecords.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell>{record.from_facility_name}</TableCell>
-                      <TableCell>{record.to_facility_name}</TableCell>
-                      <TableCell className="max-w-xs truncate">{record.medical_reason}</TableCell>
-                      <TableCell>{getUrgencyBadge(record.urgency_level)}</TableCell>
-                      <TableCell>{new Date(record.recommendation_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{getStatusBadge(record.status)}</TableCell>
+                      <TableCell className="font-medium">{record.prisoner_name}</TableCell>
+                      <TableCell>{record.prisoner_number}</TableCell>
+                      <TableCell>{record.reason_name}</TableCell>
+                      <TableCell>{record.hospital_name}</TableCell>
+                      <TableCell>{getCategoryBadge(record.category_name)}</TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="line-clamp-2" title={record.recommendation_notes}>
+                          {record.recommendation_notes || 'No notes'}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -391,10 +351,7 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => {
-                                setRecordToDelete(record.id);
-                                setShowDeleteDialog(true);
-                              }}
+                              onClick={() => handleDelete(record.id)}
                               className="text-red-600 focus:text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -446,6 +403,10 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Transfer Recommendation Form</DialogTitle>
+          <DialogDescription>
+            Recommend a prisoner for transfer to another station or hospital for specialized care.
+          </DialogDescription>
           <TransferRecommendationForm
             recommendation={selectedRecord}
             onSubmit={handleFormSubmit}
@@ -461,24 +422,12 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the transfer recommendation.
+              This action cannot be undone. This will permanently delete the transfer recommendation record.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (recordToDelete) {
-                  setRecords(records.filter((record) => record.id !== recordToDelete));
-                  toast.success('Transfer recommendation deleted successfully');
-                }
-                setShowDeleteDialog(false);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

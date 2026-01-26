@@ -11,13 +11,6 @@ import {
   TableRow,
 } from '../ui/table';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -38,172 +31,109 @@ import { Badge } from '../ui/badge';
 import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import FoodAssessmentForm from './FoodAssessmentForm';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 
 interface FoodAssessment {
   id: string;
-  prisoner_name: string;
-  assessor_name: string;
-  assessment_date: string;
-  meal_type: string;
-  food_quality: string;
-  portion_size: string;
-  nutritional_adequacy: string;
-  food_temperature: string;
-  presentation: string;
-  taste_feedback: string;
-  hygiene_standards: string;
-  special_dietary_needs: string;
-  allergen_considerations: string;
-  appetite_level: string;
-  food_consumed_percentage: string;
-  waste_amount: string;
-  complaints: string;
-  assessor: string;
-  recommendations: string;
-  follow_up_required: string;
   notes: string;
-  prisoner: string;
+  station: string;
+  station_name: string;
+  item: string;
+  item_name: string;
+  item_category?: string;
+  quality: string;
+  quality_name: string;
 }
 
 interface FoodAssessmentListProps {
-  selectedPrisonerId?: string;
+  selectedStationId?: string;
 }
 
 // Mock data
 const mockFoodAssessments: FoodAssessment[] = [
   {
     id: '1',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    assessor: '1',
-    assessor_name: 'Nurse Mary Nakato',
-    assessment_date: '2024-11-13',
-    meal_type: 'Lunch',
-    food_quality: 'Good',
-    portion_size: 'Adequate',
-    nutritional_adequacy: 'Adequate',
-    food_temperature: 'Appropriate',
-    presentation: 'Good',
-    taste_feedback: 'Food was well-prepared and tasty',
-    hygiene_standards: 'Excellent',
-    special_dietary_needs: 'Low sodium diet due to hypertension',
-    allergen_considerations: 'No known allergies',
-    appetite_level: 'Good',
-    food_consumed_percentage: '85',
-    waste_amount: 'Minimal',
-    complaints: 'None',
-    recommendations: 'Continue current diet plan',
-    follow_up_required: 'No',
-    notes: 'Patient eating well and satisfied with meals',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    station_name: 'Luzira Maximum Security Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
+    item_name: 'Posho (Maize Meal)',
+    item_category: 'Staple',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
+    quality_name: 'Good',
+    notes: 'Well-prepared posho with good consistency. Properly cooked and served hot. Prisoners reported satisfaction with the quality and portion size.',
   },
   {
     id: '2',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    assessor: '2',
-    assessor_name: 'Nutritionist Peter Musoke',
-    assessment_date: '2024-11-12',
-    meal_type: 'Breakfast',
-    food_quality: 'Excellent',
-    portion_size: 'Adequate',
-    nutritional_adequacy: 'Excellent',
-    food_temperature: 'Appropriate',
-    presentation: 'Excellent',
-    taste_feedback: 'Breakfast was very good, enjoyed the porridge',
-    hygiene_standards: 'Excellent',
-    special_dietary_needs: 'High protein diet for recovery from TB',
-    allergen_considerations: 'Lactose intolerant - dairy alternatives provided',
-    appetite_level: 'Excellent',
-    food_consumed_percentage: '95',
-    waste_amount: 'None',
-    complaints: 'None',
-    recommendations: 'Continue high protein diet, monitor weight gain',
-    follow_up_required: 'Yes',
-    notes: 'Patient showing good appetite and weight improvement',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
+    station_name: 'Luzira Maximum Security Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
+    item_name: 'Beans',
+    item_category: 'Protein',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc3',
+    quality_name: 'Fair',
+    notes: 'Beans were slightly undercooked. Need to increase cooking time by 15-20 minutes. Some prisoners complained about hardness. Recommend quality improvement.',
   },
   {
     id: '3',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    assessor: '4',
-    assessor_name: 'Nurse Grace Atim',
-    assessment_date: '2024-11-13',
-    meal_type: 'Dinner',
-    food_quality: 'Fair',
-    portion_size: 'Adequate',
-    nutritional_adequacy: 'Adequate',
-    food_temperature: 'Too Cold',
-    presentation: 'Fair',
-    taste_feedback: 'Food was cold and not very appealing',
-    hygiene_standards: 'Good',
-    special_dietary_needs: 'None',
-    allergen_considerations: 'Allergic to peanuts',
-    appetite_level: 'Poor',
-    food_consumed_percentage: '45',
-    waste_amount: 'Moderate',
-    complaints: 'Food served cold, needs reheating',
-    recommendations: 'Ensure food is served at appropriate temperature, investigate kitchen timing',
-    follow_up_required: 'Yes',
-    notes: 'Patient appetite affected by medication, food temperature issue noted',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    station_name: 'Kigo Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
+    item_name: 'Matoke (Plantain)',
+    item_category: 'Staple',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
+    quality_name: 'Excellent',
+    notes: 'Perfectly steamed matoke, soft and well-prepared. Excellent taste and presentation. All prisoners satisfied with the meal.',
   },
   {
     id: '4',
-    prisoner: '4',
-    prisoner_name: 'Emily Davis',
-    assessor: '5',
-    assessor_name: 'Nutritionist Sarah Kizza',
-    assessment_date: '2024-11-11',
-    meal_type: 'Lunch',
-    food_quality: 'Good',
-    portion_size: 'Adequate',
-    nutritional_adequacy: 'Adequate',
-    food_temperature: 'Appropriate',
-    presentation: 'Good',
-    taste_feedback: 'Enjoyed the meal, good variety',
-    hygiene_standards: 'Excellent',
-    special_dietary_needs: 'Diabetic diet - controlled carbohydrates',
-    allergen_considerations: 'No known allergies',
-    appetite_level: 'Normal',
-    food_consumed_percentage: '80',
-    waste_amount: 'Minimal',
-    complaints: 'None',
-    recommendations: 'Continue diabetic meal plan, monitor blood glucose levels',
-    follow_up_required: 'Yes',
-    notes: 'Blood glucose levels stable, patient managing diet well',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
+    station_name: 'Murchison Bay Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
+    item_name: 'Rice',
+    item_category: 'Staple',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc4',
+    quality_name: 'Poor',
+    notes: 'Rice was overcooked and mushy. Temperature was too cold when served. Multiple complaints received. Immediate action required to improve preparation standards.',
   },
   {
     id: '5',
-    prisoner: '5',
-    prisoner_name: 'Robert Lee',
-    assessor: '3',
-    assessor_name: 'Dr. David Makumbi',
-    assessment_date: '2024-11-13',
-    meal_type: 'Breakfast',
-    food_quality: 'Good',
-    portion_size: 'Insufficient',
-    nutritional_adequacy: 'Needs Improvement',
-    food_temperature: 'Appropriate',
-    presentation: 'Good',
-    taste_feedback: 'Good taste but portion too small',
-    hygiene_standards: 'Good',
-    special_dietary_needs: 'High calorie diet for underweight patient',
-    allergen_considerations: 'None',
-    appetite_level: 'Excellent',
-    food_consumed_percentage: '100',
-    waste_amount: 'None',
-    complaints: 'Portion size too small, still hungry after meal',
-    recommendations: 'Increase portion sizes, add high-calorie supplements between meals',
-    follow_up_required: 'Yes',
-    notes: 'Patient underweight, needs nutritional support to gain weight',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
+    station_name: 'Kigo Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb6',
+    item_name: 'Vegetables (Greens)',
+    item_category: 'Vegetable',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
+    quality_name: 'Good',
+    notes: 'Fresh vegetables, properly washed and cooked. Good nutritional value maintained. Minor salt adjustment needed for better taste.',
+  },
+  {
+    id: '6',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
+    station_name: 'Gulu Main Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afb8',
+    item_name: 'Meat Stew',
+    item_category: 'Protein',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
+    quality_name: 'Excellent',
+    notes: 'Well-seasoned meat stew with tender meat. Adequate portion of meat per serving. Hygiene standards maintained throughout preparation.',
+  },
+  {
+    id: '7',
+    station: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
+    station_name: 'Mbarara Main Prison',
+    item: '3fa85f64-5717-4562-b3fc-2c963f66afbc',
+    item_name: 'Porridge',
+    item_category: 'Breakfast',
+    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
+    quality_name: 'Good',
+    notes: 'Nutritious morning porridge served at appropriate temperature. Good sweetness level. Prisoners reported satisfaction with breakfast meal.',
   },
 ];
 
-const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisonerId }) => {
+const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedStationId }) => {
   const [records, setRecords] = useState<FoodAssessment[]>(mockFoodAssessments);
   const [filteredRecords, setFilteredRecords] = useState<FoodAssessment[]>(mockFoodAssessments);
   const [searchTerm, setSearchTerm] = useState('');
-  const [qualityFilter, setQualityFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -214,26 +144,22 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
 
   useEffect(() => {
     filterRecords();
-  }, [searchTerm, qualityFilter, records, selectedPrisonerId]);
+  }, [searchTerm, records, selectedStationId]);
 
   const filterRecords = () => {
     let filtered = [...records];
 
-    if (selectedPrisonerId) {
-      filtered = filtered.filter((record) => record.prisoner === selectedPrisonerId);
+    if (selectedStationId) {
+      filtered = filtered.filter((record) => record.station === selectedStationId);
     }
 
     if (searchTerm) {
       filtered = filtered.filter(
         (record) =>
-          record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.meal_type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.taste_feedback.toLowerCase().includes(searchTerm.toLowerCase())
+          record.station_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          record.quality_name.toLowerCase().includes(searchTerm.toLowerCase())
       );
-    }
-
-    if (qualityFilter !== 'all') {
-      filtered = filtered.filter((record) => record.food_quality === qualityFilter);
     }
 
     setFilteredRecords(filtered);
@@ -273,33 +199,31 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
     setDialogOpen(false);
   };
 
-  const getQualityBadge = (quality: string) => {
+  const handleDelete = (id: string) => {
+    setRecordToDelete(id);
+    setShowDeleteDialog(true);
+  };
+
+  const confirmDelete = () => {
+    if (recordToDelete) {
+      setRecords(records.filter((record) => record.id !== recordToDelete));
+      toast.success('Food assessment deleted successfully');
+      setShowDeleteDialog(false);
+    }
+  };
+
+  const getQualityBadge = (qualityName: string) => {
     const variants: { [key: string]: string } = {
       Excellent: 'bg-green-100 text-green-800',
       Good: 'bg-blue-100 text-blue-800',
       Fair: 'bg-yellow-100 text-yellow-800',
-      Poor: 'bg-red-100 text-red-800',
-    };
-
-    return (
-      <Badge className={variants[quality] || 'bg-gray-100 text-gray-800'}>
-        {quality}
-      </Badge>
-    );
-  };
-
-  const getAppetiteBadge = (appetite: string) => {
-    const variants: { [key: string]: string } = {
-      Excellent: 'bg-green-100 text-green-800',
-      Good: 'bg-blue-100 text-blue-800',
-      Normal: 'bg-gray-100 text-gray-800',
       Poor: 'bg-orange-100 text-orange-800',
-      'No Appetite': 'bg-red-100 text-red-800',
+      Unacceptable: 'bg-red-100 text-red-800',
     };
 
     return (
-      <Badge className={variants[appetite] || 'bg-gray-100 text-gray-800'}>
-        {appetite}
+      <Badge className={variants[qualityName] || 'bg-gray-100 text-gray-800'}>
+        {qualityName}
       </Badge>
     );
   };
@@ -322,28 +246,12 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input
                   id="search"
-                  placeholder="Search by prisoner, meal type, or feedback..."
+                  placeholder="Search by station, food item, or quality..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="pl-10"
                 />
               </div>
-            </div>
-
-            <div className="w-full md:w-48">
-              <Label htmlFor="quality-filter">Food Quality</Label>
-              <Select value={qualityFilter} onValueChange={setQualityFilter}>
-                <SelectTrigger id="quality-filter">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Quality</SelectItem>
-                  <SelectItem value="Excellent">Excellent</SelectItem>
-                  <SelectItem value="Good">Good</SelectItem>
-                  <SelectItem value="Fair">Fair</SelectItem>
-                  <SelectItem value="Poor">Poor</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="flex items-end">
@@ -363,33 +271,35 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
             <Table>
               <TableHeader>
                 <TableRow className="bg-gray-50">
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Date</TableHead>
-                  <TableHead>Meal Type</TableHead>
-                  <TableHead>Food Quality</TableHead>
-                  <TableHead>Appetite</TableHead>
-                  <TableHead>Consumed</TableHead>
-                  <TableHead>Assessor</TableHead>
+                  <TableHead>Station</TableHead>
+                  <TableHead>Food Item</TableHead>
+                  <TableHead>Category</TableHead>
+                  <TableHead>Quality Rating</TableHead>
+                  <TableHead>Notes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {currentRecords.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
                       No food assessment records found
                     </TableCell>
                   </TableRow>
                 ) : (
                   currentRecords.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell>{new Date(record.assessment_date).toLocaleDateString()}</TableCell>
-                      <TableCell>{record.meal_type}</TableCell>
-                      <TableCell>{getQualityBadge(record.food_quality)}</TableCell>
-                      <TableCell>{getAppetiteBadge(record.appetite_level)}</TableCell>
-                      <TableCell>{record.food_consumed_percentage}%</TableCell>
-                      <TableCell>{record.assessor_name}</TableCell>
+                      <TableCell className="font-medium">{record.station_name}</TableCell>
+                      <TableCell>{record.item_name}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{record.item_category}</Badge>
+                      </TableCell>
+                      <TableCell>{getQualityBadge(record.quality_name)}</TableCell>
+                      <TableCell className="max-w-md">
+                        <div className="line-clamp-2" title={record.notes}>
+                          {record.notes || 'No notes'}
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -407,10 +317,7 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => {
-                                setRecordToDelete(record.id);
-                                setShowDeleteDialog(true);
-                              }}
+                              onClick={() => handleDelete(record.id)}
                               className="text-red-600 focus:text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
@@ -462,6 +369,10 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Food Assessment Form</DialogTitle>
+          <DialogDescription>
+            Assess food quality and record observations for station meals.
+          </DialogDescription>
           <FoodAssessmentForm
             assessment={selectedRecord}
             onSubmit={handleFormSubmit}
@@ -481,20 +392,8 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedPrisone
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setShowDeleteDialog(false)}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (recordToDelete) {
-                  setRecords(records.filter((record) => record.id !== recordToDelete));
-                  toast.success('Food assessment deleted successfully');
-                }
-                setShowDeleteDialog(false);
-              }}
-            >
-              Delete
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

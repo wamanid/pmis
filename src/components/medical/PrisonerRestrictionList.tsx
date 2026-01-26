@@ -38,7 +38,7 @@ import { Badge } from '../ui/badge';
 import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import PrisonerRestrictionForm from './PrisonerRestrictionForm';
-import { Dialog, DialogContent } from '../ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../ui/dialog';
 
 interface PrisonerRestriction {
   id: string;
@@ -394,6 +394,10 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({ selec
       {/* Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
+          <DialogTitle>Prisoner Restriction Form</DialogTitle>
+          <DialogDescription>
+            Add or edit a prisoner restriction record.
+          </DialogDescription>
           <PrisonerRestrictionForm
             restriction={selectedRecord}
             onSubmit={handleFormSubmit}

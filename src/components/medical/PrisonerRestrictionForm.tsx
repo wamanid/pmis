@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ShieldAlert, Save, X, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
@@ -14,18 +13,14 @@ import { format } from 'date-fns';
 interface PrisonerRestriction {
   id?: string;
   prisoner_name?: string;
-  restriction_type_name?: string;
-  restriction_category_name?: string;
+  reason_name?: string;
+  station_name?: string;
+  state_of_prisoner: string;
   start_date: string;
   end_date: string;
-  reason: string;
-  restrictions_details: string;
-  status: string;
-  approved_by: string;
-  remarks: string;
   prisoner: string;
-  restriction_type: string;
-  restriction_category: string;
+  reason: string;
+  place_of_medical_attention: string;
 }
 
 interface PrisonerRestrictionFormProps {
@@ -37,21 +32,17 @@ interface PrisonerRestrictionFormProps {
 
 const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restriction, onSubmit, onCancel, mode }) => {
   const [formData, setFormData] = useState<PrisonerRestriction>({
+    state_of_prisoner: '',
     start_date: '',
     end_date: '',
-    reason: '',
-    restrictions_details: '',
-    status: 'Active',
-    approved_by: '',
-    remarks: '',
     prisoner: '',
-    restriction_type: '',
-    restriction_category: '',
+    reason: '',
+    place_of_medical_attention: '',
   });
 
   const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [restrictionTypes, setRestrictionTypes] = useState<any[]>([]);
-  const [restrictionCategories, setRestrictionCategories] = useState<any[]>([]);
+  const [restrictionReasons, setRestrictionReasons] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
@@ -69,27 +60,28 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
 
   const loadDropdownData = () => {
     setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
     ]);
 
-    setRestrictionTypes([
-      { id: '1', name: 'Movement Restriction', description: 'Limited movement within facility' },
-      { id: '2', name: 'Communication Restriction', description: 'Limited phone/mail access' },
-      { id: '3', name: 'Activity Restriction', description: 'Restricted from certain activities' },
-      { id: '4', name: 'Visitor Restriction', description: 'Limited or no visitors' },
-      { id: '5', name: 'Work Restriction', description: 'Limited work assignments' },
+    setRestrictionReasons([
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'Medical Condition', code: 'MED-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'Security Risk', code: 'SEC-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'Behavioral Issues', code: 'BEH-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'Injury Recovery', code: 'INJ-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'Mental Health', code: 'MH-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb6', name: 'Infectious Disease', code: 'INF-001' },
     ]);
 
-    setRestrictionCategories([
-      { id: '1', name: 'Security Risk', code: 'SEC' },
-      { id: '2', name: 'Medical Reason', code: 'MED' },
-      { id: '3', name: 'Disciplinary Action', code: 'DIS' },
-      { id: '4', name: 'Protective Custody', code: 'PRO' },
-      { id: '5', name: 'Investigation', code: 'INV' },
+    setStations([
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc1', name: 'Central Prison Hospital', code: 'CPH-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc2', name: 'East Wing Medical Center', code: 'EWMC-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc3', name: 'West Block Infirmary', code: 'WBI-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc4', name: 'North Facility Clinic', code: 'NFC-001' },
+      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc5', name: 'South Station Medical Unit', code: 'SSMU-001' },
     ]);
 
     setDataLoaded(true);
@@ -106,20 +98,20 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
       toast.error('Please select a prisoner');
       return;
     }
-    if (!formData.restriction_type) {
-      toast.error('Please select a restriction type');
+    if (!formData.state_of_prisoner) {
+      toast.error('Please enter state of prisoner');
       return;
     }
-    if (!formData.restriction_category) {
-      toast.error('Please select a restriction category');
+    if (!formData.reason) {
+      toast.error('Please select a restriction reason');
       return;
     }
     if (!formData.start_date) {
       toast.error('Please select a start date');
       return;
     }
-    if (!formData.reason) {
-      toast.error('Please enter a reason');
+    if (!formData.place_of_medical_attention) {
+      toast.error('Please select place of medical attention');
       return;
     }
 
@@ -127,14 +119,14 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
 
     setTimeout(() => {
       const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedType = restrictionTypes.find((t) => t.id === formData.restriction_type);
-      const selectedCategory = restrictionCategories.find((c) => c.id === formData.restriction_category);
+      const selectedReason = restrictionReasons.find((r) => r.id === formData.reason);
+      const selectedStation = stations.find((s) => s.id === formData.place_of_medical_attention);
 
       const submitData: PrisonerRestriction = {
         ...formData,
         prisoner_name: selectedPrisoner?.full_name || '',
-        restriction_type_name: selectedType?.name || '',
-        restriction_category_name: selectedCategory?.name || '',
+        reason_name: selectedReason?.name || '',
+        station_name: selectedStation?.name || '',
       };
 
       onSubmit(submitData);
@@ -143,16 +135,12 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
       if (mode === 'create') {
         toast.success('Restriction created successfully');
         setFormData({
+          state_of_prisoner: '',
           start_date: '',
           end_date: '',
-          reason: '',
-          restrictions_details: '',
-          status: 'Active',
-          approved_by: '',
-          remarks: '',
           prisoner: '',
-          restriction_type: '',
-          restriction_category: '',
+          reason: '',
+          place_of_medical_attention: '',
         });
       } else {
         toast.success('Restriction updated successfully');
@@ -170,12 +158,12 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
       case 'prisoner':
         const prisoner = prisoners.find(p => p.id === id);
         return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'restriction_type':
-        const type = restrictionTypes.find(t => t.id === id);
-        return type ? type.name : id;
-      case 'restriction_category':
-        const category = restrictionCategories.find(c => c.id === id);
-        return category ? `${category.name} (${category.code})` : id;
+      case 'reason':
+        const reason = restrictionReasons.find(r => r.id === id);
+        return reason ? `${reason.name} (${reason.code})` : id;
+      case 'place_of_medical_attention':
+        const station = stations.find(s => s.id === id);
+        return station ? `${station.name} (${station.code})` : id;
       default:
         return id;
     }
@@ -226,28 +214,20 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="status">
-                  Status <span className="text-red-500">*</span>
+                <Label htmlFor="state_of_prisoner">
+                  State of Prisoner <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.status || 'N/A'}
+                    {formData.state_of_prisoner || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.status}
-                    onValueChange={(value) => handleInputChange('status', value)}
-                  >
-                    <SelectTrigger id="status">
-                      <SelectValue placeholder="Select status" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Active">Active</SelectItem>
-                      <SelectItem value="Inactive">Inactive</SelectItem>
-                      <SelectItem value="Suspended">Suspended</SelectItem>
-                      <SelectItem value="Expired">Expired</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input
+                    id="state_of_prisoner"
+                    value={formData.state_of_prisoner}
+                    onChange={(e) => handleInputChange('state_of_prisoner', e.target.value)}
+                    placeholder="Enter state of prisoner"
+                  />
                 )}
               </div>
             </div>
@@ -259,25 +239,25 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="restriction_type">
-                  Restriction Type <span className="text-red-500">*</span>
+                <Label htmlFor="reason">
+                  Restriction Reason <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('restriction_type', formData.restriction_type)}
+                    {getDisplayValue('reason', formData.reason)}
                   </div>
                 ) : (
                   <Select
-                    value={formData.restriction_type}
-                    onValueChange={(value) => handleInputChange('restriction_type', value)}
+                    value={formData.reason}
+                    onValueChange={(value) => handleInputChange('reason', value)}
                   >
-                    <SelectTrigger id="restriction_type">
-                      <SelectValue placeholder="Select restriction type" />
+                    <SelectTrigger id="reason">
+                      <SelectValue placeholder="Select restriction reason" />
                     </SelectTrigger>
                     <SelectContent>
-                      {restrictionTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name}
+                      {restrictionReasons.map((reason) => (
+                        <SelectItem key={reason.id} value={reason.id}>
+                          {reason.name} ({reason.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -286,25 +266,25 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="restriction_category">
-                  Restriction Category <span className="text-red-500">*</span>
+                <Label htmlFor="place_of_medical_attention">
+                  Place of Medical Attention <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('restriction_category', formData.restriction_category)}
+                    {getDisplayValue('place_of_medical_attention', formData.place_of_medical_attention)}
                   </div>
                 ) : (
                   <Select
-                    value={formData.restriction_category}
-                    onValueChange={(value) => handleInputChange('restriction_category', value)}
+                    value={formData.place_of_medical_attention}
+                    onValueChange={(value) => handleInputChange('place_of_medical_attention', value)}
                   >
-                    <SelectTrigger id="restriction_category">
-                      <SelectValue placeholder="Select category" />
+                    <SelectTrigger id="place_of_medical_attention">
+                      <SelectValue placeholder="Select place of medical attention" />
                     </SelectTrigger>
                     <SelectContent>
-                      {restrictionCategories.map((cat) => (
-                        <SelectItem key={cat.id} value={cat.id}>
-                          {cat.name} ({cat.code})
+                      {stations.map((station) => (
+                        <SelectItem key={station.id} value={station.id}>
+                          {station.name} ({station.code})
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -382,62 +362,6 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                     </PopoverContent>
                   </Popover>
                 )}
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="reason">
-                Reason <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="reason"
-                value={formData.reason}
-                onChange={(e) => handleInputChange('reason', e.target.value)}
-                placeholder="Enter reason for restriction..."
-                rows={3}
-                disabled={isReadOnly}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="restrictions_details">Restriction Details</Label>
-              <Textarea
-                id="restrictions_details"
-                value={formData.restrictions_details}
-                onChange={(e) => handleInputChange('restrictions_details', e.target.value)}
-                placeholder="Enter detailed restriction information..."
-                rows={3}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Additional Information
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="approved_by">Approved By</Label>
-                <Input
-                  id="approved_by"
-                  value={formData.approved_by}
-                  onChange={(e) => handleInputChange('approved_by', e.target.value)}
-                  placeholder="Enter approver name"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="remarks">Remarks</Label>
-                <Textarea
-                  id="remarks"
-                  value={formData.remarks}
-                  onChange={(e) => handleInputChange('remarks', e.target.value)}
-                  placeholder="Enter additional remarks..."
-                  rows={3}
-                  disabled={isReadOnly}
-                />
               </div>
             </div>
           </div>

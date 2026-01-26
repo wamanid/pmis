@@ -2,10 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
-import { Input } from '../ui/input';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Checkbox } from '../ui/checkbox';
 import { UtensilsCrossed, Save, X, Calendar as CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { Calendar } from '../ui/calendar';
@@ -14,20 +12,11 @@ import { format } from 'date-fns';
 
 interface DietaryRequirement {
   id?: string;
-  prisoner_name?: string;
-  diet_type_name?: string;
-  allergy_name?: string;
-  requirement_date: string;
-  expiry_date: string;
-  specific_requirements: string;
-  meal_plan: string;
-  prescribed_by: string;
-  is_active: boolean;
-  medical_condition: string;
-  special_instructions: string;
-  prisoner: string;
-  diet_type: string;
-  allergy: string;
+  prisoner_restriction_info?: string;
+  dietary_requirement: string;
+  start_date: string;
+  end_date: string;
+  prisoner_restriction: string;
 }
 
 interface DietaryRequirementFormProps {
@@ -39,26 +28,17 @@ interface DietaryRequirementFormProps {
 
 const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ requirement, onSubmit, onCancel, mode }) => {
   const [formData, setFormData] = useState<DietaryRequirement>({
-    requirement_date: '',
-    expiry_date: '',
-    specific_requirements: '',
-    meal_plan: '',
-    prescribed_by: '',
-    is_active: true,
-    medical_condition: '',
-    special_instructions: '',
-    prisoner: '',
-    diet_type: '',
-    allergy: '',
+    dietary_requirement: '',
+    start_date: '',
+    end_date: '',
+    prisoner_restriction: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [dietTypes, setDietTypes] = useState<any[]>([]);
-  const [allergies, setAllergies] = useState<any[]>([]);
+  const [prisonerRestrictions, setPrisonerRestrictions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
-  const [reqDateOpen, setReqDateOpen] = useState(false);
-  const [expiryDateOpen, setExpiryDateOpen] = useState(false);
+  const [startDateOpen, setStartDateOpen] = useState(false);
+  const [endDateOpen, setEndDateOpen] = useState(false);
 
   useEffect(() => {
     loadDropdownData();
@@ -71,34 +51,43 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
   }, [requirement, dataLoaded]);
 
   const loadDropdownData = () => {
-    setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
-
-    setDietTypes([
-      { id: '1', name: 'Vegetarian', description: 'Plant-based diet' },
-      { id: '2', name: 'Diabetic', description: 'Low sugar diet' },
-      { id: '3', name: 'Low Sodium', description: 'Reduced salt diet' },
-      { id: '4', name: 'Gluten-Free', description: 'No gluten products' },
-      { id: '5', name: 'Halal', description: 'Islamic dietary laws' },
-      { id: '6', name: 'Kosher', description: 'Jewish dietary laws' },
-      { id: '7', name: 'Soft Diet', description: 'Easy to chew/digest' },
-      { id: '8', name: 'Low Fat', description: 'Reduced fat content' },
-    ]);
-
-    setAllergies([
-      { id: '1', name: 'Peanuts', severity: 'Severe' },
-      { id: '2', name: 'Dairy', severity: 'Moderate' },
-      { id: '3', name: 'Eggs', severity: 'Moderate' },
-      { id: '4', name: 'Shellfish', severity: 'Severe' },
-      { id: '5', name: 'Soy', severity: 'Mild' },
-      { id: '6', name: 'Wheat', severity: 'Moderate' },
-      { id: '7', name: 'Fish', severity: 'Severe' },
-      { id: '8', name: 'Tree Nuts', severity: 'Severe' },
+    // Mock Prisoner Restrictions data
+    setPrisonerRestrictions([
+      { 
+        id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', 
+        prisoner_name: 'John Doe',
+        prisoner_number: 'PR-2024-001',
+        reason_name: 'Medical Condition',
+        state_of_prisoner: 'Under medical observation'
+      },
+      { 
+        id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', 
+        prisoner_name: 'Jane Smith',
+        prisoner_number: 'PR-2024-002',
+        reason_name: 'Security Risk',
+        state_of_prisoner: 'Restricted movement'
+      },
+      { 
+        id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', 
+        prisoner_name: 'Michael Johnson',
+        prisoner_number: 'PR-2024-003',
+        reason_name: 'Behavioral Issues',
+        state_of_prisoner: 'Under monitoring'
+      },
+      { 
+        id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', 
+        prisoner_name: 'Emily Davis',
+        prisoner_number: 'PR-2024-004',
+        reason_name: 'Injury Recovery',
+        state_of_prisoner: 'Post-surgery care'
+      },
+      { 
+        id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', 
+        prisoner_name: 'Robert Lee',
+        prisoner_number: 'PR-2024-005',
+        reason_name: 'Mental Health',
+        state_of_prisoner: 'Psychiatric evaluation'
+      },
     ]);
 
     setDataLoaded(true);
@@ -111,35 +100,29 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
+    if (!formData.prisoner_restriction) {
+      toast.error('Please select a prisoner restriction');
       return;
     }
-    if (!formData.diet_type) {
-      toast.error('Please select a diet type');
+    if (!formData.dietary_requirement) {
+      toast.error('Please enter dietary requirement');
       return;
     }
-    if (!formData.requirement_date) {
-      toast.error('Please select a requirement date');
-      return;
-    }
-    if (!formData.specific_requirements) {
-      toast.error('Please enter specific requirements');
+    if (!formData.start_date) {
+      toast.error('Please select a start date');
       return;
     }
 
     setLoading(true);
 
     setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedDietType = dietTypes.find((d) => d.id === formData.diet_type);
-      const selectedAllergy = allergies.find((a) => a.id === formData.allergy);
+      const selectedRestriction = prisonerRestrictions.find((r) => r.id === formData.prisoner_restriction);
 
       const submitData: DietaryRequirement = {
         ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        diet_type_name: selectedDietType?.name || '',
-        allergy_name: selectedAllergy?.name || '',
+        prisoner_restriction_info: selectedRestriction 
+          ? `${selectedRestriction.prisoner_number} - ${selectedRestriction.prisoner_name} (${selectedRestriction.reason_name})`
+          : '',
       };
 
       onSubmit(submitData);
@@ -148,17 +131,10 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
       if (mode === 'create') {
         toast.success('Dietary requirement created successfully');
         setFormData({
-          requirement_date: '',
-          expiry_date: '',
-          specific_requirements: '',
-          meal_plan: '',
-          prescribed_by: '',
-          is_active: true,
-          medical_condition: '',
-          special_instructions: '',
-          prisoner: '',
-          diet_type: '',
-          allergy: '',
+          dietary_requirement: '',
+          start_date: '',
+          end_date: '',
+          prisoner_restriction: '',
         });
       } else {
         toast.success('Dietary requirement updated successfully');
@@ -173,15 +149,11 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
     if (!id) return 'N/A';
     
     switch (field) {
-      case 'prisoner':
-        const prisoner = prisoners.find(p => p.id === id);
-        return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'diet_type':
-        const dietType = dietTypes.find(d => d.id === id);
-        return dietType ? `${dietType.name} - ${dietType.description}` : id;
-      case 'allergy':
-        const allergy = allergies.find(a => a.id === id);
-        return allergy ? `${allergy.name} (${allergy.severity})` : id;
+      case 'prisoner_restriction':
+        const restriction = prisonerRestrictions.find(r => r.id === id);
+        return restriction 
+          ? `${restriction.prisoner_number} - ${restriction.prisoner_name} (${restriction.reason_name})`
+          : id;
       default:
         return id;
     }
@@ -201,55 +173,33 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Prisoner Information
+              Prisoner Restriction
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="prisoner">
-                  Prisoner <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('prisoner', formData.prisoner)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.prisoner}
-                    onValueChange={(value) => handleInputChange('prisoner', value)}
-                  >
-                    <SelectTrigger id="prisoner">
-                      <SelectValue placeholder="Select prisoner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {prisoners.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.prisoner_number} - {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="is_active">Status</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.is_active ? 'Active' : 'Inactive'}
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2 h-10">
-                    <Checkbox
-                      id="is_active"
-                      checked={formData.is_active}
-                      onCheckedChange={(checked) => handleInputChange('is_active', checked)}
-                    />
-                    <Label htmlFor="is_active" className="cursor-pointer">
-                      Active Requirement
-                    </Label>
-                  </div>
-                )}
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="prisoner_restriction">
+                Prisoner Restriction <span className="text-red-500">*</span>
+              </Label>
+              {isReadOnly ? (
+                <div className="p-2 bg-gray-50 rounded border">
+                  {getDisplayValue('prisoner_restriction', formData.prisoner_restriction)}
+                </div>
+              ) : (
+                <Select
+                  value={formData.prisoner_restriction}
+                  onValueChange={(value) => handleInputChange('prisoner_restriction', value)}
+                >
+                  <SelectTrigger id="prisoner_restriction">
+                    <SelectValue placeholder="Select prisoner restriction" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {prisonerRestrictions.map((restriction) => (
+                      <SelectItem key={restriction.id} value={restriction.id}>
+                        {restriction.prisoner_number} - {restriction.prisoner_name} ({restriction.reason_name})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
           </div>
 
@@ -257,196 +207,89 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Dietary Details
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="diet_type">
-                  Diet Type <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('diet_type', formData.diet_type)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.diet_type}
-                    onValueChange={(value) => handleInputChange('diet_type', value)}
-                  >
-                    <SelectTrigger id="diet_type">
-                      <SelectValue placeholder="Select diet type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {dietTypes.map((type) => (
-                        <SelectItem key={type.id} value={type.id}>
-                          {type.name} - {type.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="allergy">Allergy</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('allergy', formData.allergy)}
-                  </div>
-                ) : (
-                  <Select
-                    value={formData.allergy}
-                    onValueChange={(value) => handleInputChange('allergy', value)}
-                  >
-                    <SelectTrigger id="allergy">
-                      <SelectValue placeholder="Select allergy (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {allergies.map((allergy) => (
-                        <SelectItem key={allergy.id} value={allergy.id}>
-                          {allergy.name} ({allergy.severity})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="requirement_date">
-                  Requirement Date <span className="text-red-500">*</span>
-                </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.requirement_date ? format(new Date(formData.requirement_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={reqDateOpen} onOpenChange={setReqDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.requirement_date ? format(new Date(formData.requirement_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.requirement_date ? new Date(formData.requirement_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('requirement_date', format(date, 'yyyy-MM-dd'));
-                            setReqDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="expiry_date">Expiry Date</Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.expiry_date ? format(new Date(formData.expiry_date), 'PPP') : 'N/A'}
-                  </div>
-                ) : (
-                  <Popover open={expiryDateOpen} onOpenChange={setExpiryDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.expiry_date ? format(new Date(formData.expiry_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.expiry_date ? new Date(formData.expiry_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('expiry_date', format(date, 'yyyy-MM-dd'));
-                            setExpiryDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                )}
-              </div>
-            </div>
-
             <div className="space-y-2">
-              <Label htmlFor="specific_requirements">
-                Specific Requirements <span className="text-red-500">*</span>
+              <Label htmlFor="dietary_requirement">
+                Dietary Requirement <span className="text-red-500">*</span>
               </Label>
               <Textarea
-                id="specific_requirements"
-                value={formData.specific_requirements}
-                onChange={(e) => handleInputChange('specific_requirements', e.target.value)}
-                placeholder="Enter specific dietary requirements..."
-                rows={3}
+                id="dietary_requirement"
+                value={formData.dietary_requirement}
+                onChange={(e) => handleInputChange('dietary_requirement', e.target.value)}
+                placeholder="Enter dietary requirement details..."
+                rows={4}
                 disabled={isReadOnly}
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="meal_plan">Meal Plan</Label>
-              <Textarea
-                id="meal_plan"
-                value={formData.meal_plan}
-                onChange={(e) => handleInputChange('meal_plan', e.target.value)}
-                placeholder="Enter meal plan details..."
-                rows={3}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Medical Information
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="medical_condition">Medical Condition</Label>
-                <Input
-                  id="medical_condition"
-                  value={formData.medical_condition}
-                  onChange={(e) => handleInputChange('medical_condition', e.target.value)}
-                  placeholder="Enter related medical condition"
-                  disabled={isReadOnly}
-                />
+                <Label htmlFor="start_date">
+                  Start Date <span className="text-red-500">*</span>
+                </Label>
+                {isReadOnly ? (
+                  <div className="p-2 bg-gray-50 rounded border">
+                    {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'N/A'}
+                  </div>
+                ) : (
+                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.start_date ? new Date(formData.start_date) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            handleInputChange('start_date', format(date, 'yyyy-MM-dd'));
+                            setStartDateOpen(false);
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="prescribed_by">Prescribed By</Label>
-                <Input
-                  id="prescribed_by"
-                  value={formData.prescribed_by}
-                  onChange={(e) => handleInputChange('prescribed_by', e.target.value)}
-                  placeholder="Enter prescriber name"
-                  disabled={isReadOnly}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="special_instructions">Special Instructions</Label>
-                <Textarea
-                  id="special_instructions"
-                  value={formData.special_instructions}
-                  onChange={(e) => handleInputChange('special_instructions', e.target.value)}
-                  placeholder="Enter any special instructions..."
-                  rows={3}
-                  disabled={isReadOnly}
-                />
+                <Label htmlFor="end_date">End Date</Label>
+                {isReadOnly ? (
+                  <div className="p-2 bg-gray-50 rounded border">
+                    {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'N/A'}
+                  </div>
+                ) : (
+                  <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className="w-full justify-start text-left"
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'Select date'}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0">
+                      <Calendar
+                        mode="single"
+                        selected={formData.end_date ? new Date(formData.end_date) : undefined}
+                        onSelect={(date) => {
+                          if (date) {
+                            handleInputChange('end_date', format(date, 'yyyy-MM-dd'));
+                            setEndDateOpen(false);
+                          }
+                        }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                )}
               </div>
             </div>
           </div>
