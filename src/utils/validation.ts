@@ -269,7 +269,6 @@ export const pastOrTodayDateValidation = {
     if (!value) return true;
     const selectedDate = new Date(value);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
     return selectedDate <= today || "Date cannot be in the future";
   },
 };
