@@ -1,5 +1,7 @@
 import React, {useEffect, useState} from "react";
+import { useForm, Controller } from "react-hook-form";
 import {getCurrentUser} from "../../services";
+import { phoneNumberValidation, requiredValidation, nationalIdValidation } from "../../utils/validation";
 import {
   addNextOfKin,
   County,
@@ -13,11 +15,7 @@ import {
 import {Separator} from "../ui/separator";
 import {Label} from "../ui/label";
 import {Input} from "../ui/input";
-import {Popover, PopoverContent, PopoverTrigger} from "../ui/popover";
 import {Button} from "../ui/button";
-import {Check, ChevronsUpDown} from "lucide-react";
-import {Command, CommandEmpty, CommandGroup, CommandItem, CommandList} from "../ui/command";
-import {cn} from "../ui/utils";
 import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "../ui/select";
 import {Checkbox} from "../ui/checkbox";
 import {DialogFooter} from "../ui/dialog";
@@ -36,6 +34,8 @@ import {
   RelationShipItem
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {toast} from "sonner";
+import SearchableSelect from "../common/SearchableSelect";
+import LocationSelect from "../common/LocationSelect";
 
 interface ChildProps {
   setNewDialogLoader: React.Dispatch<React.SetStateAction<boolean>>;
@@ -44,9 +44,37 @@ interface ChildProps {
   setNextOfKins: React.Dispatch<React.SetStateAction<NextOfKinResponse[]>>
   isNextCreateDialogOpen: boolean
   prisoner: string
+  prisonerName?: string
+  prisonerNumber?: string
 }
 
-const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, setIsNextCreateDialogOpen, isNextCreateDialogOpen, prisoner, setNextOfKins }) => {
+const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, setIsNextCreateDialogOpen, isNextCreateDialogOpen, prisoner, setNextOfKins, prisonerName, prisonerNumber }) => {
+
+    // React Hook Form setup
+    const { register, handleSubmit, formState: { errors }, setValue, watch, control, reset, clearErrors, trigger } = useForm<NextOfKin>({
+      defaultValues: {
+        is_active: true,
+        first_name: "",
+        middle_name: "",
+        surname: "",
+        phone_number: "",
+        alternate_phone_number: "",
+        id_number: "",
+        lc1: "",
+        discharge_property: false,
+        created_by: getCurrentUser().id,
+        prisoner: prisoner,
+        relationship: "",
+        sex: "",
+        id_type: "",
+        address_region: "",
+        address_district: "",
+        address_county: "",
+        address_sub_county: "",
+        address_parish: "",
+        address_village: "",
+      }
+    });
 
     const [sexes, setSexes] = useState<Item[]>([])
     const [relationships, setRelationships] = useState<RelationShipItem[]>([])
@@ -57,50 +85,79 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
     const [subCounties, setSubCounties] = useState<SubCounty[]>([])
     const [parishes, setParishes] = useState<Parish[]>([])
     const [villages, setVillages] = useState<Village[]>([])
-    const [openPrisoner, setOpenPrisoner] = useState(false);
-    const [openRelationship, setOpenRelationship] = useState(false);
-    const [openSex, setOpenSex] = useState(false);
-    const [openIdType, setOpenIdType] = useState(false);
-    const [formData1, setFormData1] = useState<NextOfKin>({
-      is_active: true,
-      deleted_datetime: null,
-      first_name: "",
-      middle_name: "",
-      surname: "",
-      phone_number: "",
-      alternate_phone_number: "",
-      id_number: "",
-      lc1: "",
-      discharge_property: false,
-      created_by: getCurrentUser().id,
-      updated_by: null,
-      deleted_by: null,
-      prisoner: "",
-      relationship: "",
-      sex: "",
-      id_type: "",
-      address_region: "",
-      address_district: "",
-      address_county: "",
-      address_sub_county: "",
-      address_parish: "",
-      address_village: "",
-    });
+    const [dataReady, setDataReady] = useState(false)
+
+    // Watch id_type to conditionally require id_number
+    const selectedIdType = watch("id_type");
+    const idNumber = watch("id_number");
+    
+    // Watch location fields for cascading dropdowns
+    const selectedRegion = watch("address_region");
+    const selectedDistrict = watch("address_district");
+    const selectedCounty = watch("address_county");
+    const selectedSubCounty = watch("address_sub_county");
+    const selectedParish = watch("address_parish");
+
+    // Compute ID number validation rules dynamically
+    const idNumberValidationRules = React.useMemo(() => ({
+      ...(selectedIdType ? requiredValidation("ID number") : {}),
+      ...(idTypes.find(t => t.id === selectedIdType)?.name === "National ID" ? nationalIdValidation : {})
+    }), [selectedIdType, idTypes]);
 
     useEffect(() => {
       if (isNextCreateDialogOpen){
+        setDataReady(false); // Reset data ready flag
         setNewDialogLoader(true)
         setLoaderText("Fetching Next of Kin Information, please wait")
         fetchKinData()
+      } else {
+        // Clear all data when dialog closes to prevent stale data
+        setSexes([]);
+        setRelationships([]);
+        setIdTypes([]);
+        setRegions([]);
+        setDistricts([]);
+        setCounties([]);
+        setSubCounties([]);
+        setParishes([]);
+        setVillages([]);
+        setDataReady(false);
       }
     }, [isNextCreateDialogOpen]);
+
+    // Update prisoner value when prop changes
+    useEffect(() => {
+      setValue("prisoner", prisoner);
+    }, [prisoner, setValue]);
+
+    // Debug: Monitor districts state changes
+    useEffect(() => {
+      console.log('Districts state changed:', districts);
+    }, [districts]);
+
+    // Re-validate ID number when ID type changes
+    useEffect(() => {
+      // Clear ID number field and errors when ID type changes
+      if (selectedIdType) {
+        // Clear any existing errors
+        clearErrors("id_number");
+        // Re-trigger validation if field has value
+        if (idNumber) {
+          trigger("id_number");
+        }
+      } else {
+        // If no ID type selected, clear the field and errors
+        setValue("id_number", "");
+        clearErrors("id_number");
+      }
+    }, [selectedIdType, clearErrors, trigger, setValue, idNumber]);
 
     function populateList(response: any, msg: string, setData: any) {
     if(handleServerError(response, setNewDialogLoader)) return
 
     if ("results" in response) {
       const data = response.results
-      // console.log(data)
+      console.log("populateList received data:", data);
       if (handleEmptyList(data, msg, setNewDialogLoader)) return
       setData(data)
     }
@@ -120,7 +177,10 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
       const response4 = await getRegions()
       populateList(response4, "There are no regions, you can't create the Next of Kin without regions", setRegions)
 
-      setFormData1({...formData1, prisoner})
+      setValue("prisoner", prisoner);
+
+      // Mark data as ready after all initial fetches complete
+      setDataReady(true);
 
     }catch (error) {
       handleCatchError(error)
@@ -131,36 +191,82 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
   }
 
     async function handleLocationChange (name: string, value: string) {
-      setFormData1({...formData1, [name]: value})
+      console.log(`handleLocationChange called with name: ${name}, value: ${value}`);
+      setValue(name as any, value);
       if (name === "address_region"){
+        console.log(`Fetching districts for region: ${value}`);
+        // Clear all child selections and data
+        setValue("address_district", "");
+        setValue("address_county", "");
+        setValue("address_sub_county", "");
+        setValue("address_parish", "");
+        setValue("address_village", "");
+        setDistricts([]); // Clear before fetching
+        setCounties([]);
+        setSubCounties([]);
+        setParishes([]);
+        setVillages([]);
         await fetchDistricts(setDistricts, setNewDialogLoader, setLoaderText, value)
+        console.log('Districts state after fetch:', districts);
       }
       else if (name === "address_district") {
+        console.log(`Fetching counties for district: ${value}`);
+        // Clear child selections and data
+        setValue("address_county", "");
+        setValue("address_sub_county", "");
+        setValue("address_parish", "");
+        setValue("address_village", "");
+        setCounties([]); // Clear before fetching
+        setSubCounties([]);
+        setParishes([]);
+        setVillages([]);
         await fetchCounties(setCounties, setNewDialogLoader, setLoaderText, value)
       }
       else if (name === "address_county") {
+        console.log(`Fetching sub counties for county: ${value}`);
+        // Clear child selections and data
+        setValue("address_sub_county", "");
+        setValue("address_parish", "");
+        setValue("address_village", "");
+        setSubCounties([]); // Clear before fetching
+        setParishes([]);
+        setVillages([]);
         await fetchSubCounties(setSubCounties, setNewDialogLoader, setLoaderText, value)
       }
       else if (name === "address_sub_county") {
+        console.log(`Fetching parishes for sub county: ${value}`);
+        // Clear child selections and data
+        setValue("address_parish", "");
+        setValue("address_village", "");
+        setParishes([]); // Clear before fetching
+        setVillages([]);
         await fetchParishes(setParishes, setNewDialogLoader, setLoaderText, value)
       }
       else if (name === "address_parish") {
+        console.log(`Fetching villages for parish: ${value}`);
+        // Clear child selection and data
+        setValue("address_village", "");
+        setVillages([]); // Clear before fetching
         await fetchVillages(setVillages, setNewDialogLoader, setLoaderText, value)
       }
-
     }
 
-    const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-      // console.log(formData1)
+    const onSubmit = async (data: NextOfKin) => {
       try {
-        const response = await addNextOfKin(formData1)
-        if (handleResponseError(response)) return
+        const payload = {
+          ...data,
+          is_active: true,
+          created_by: getCurrentUser().id,
+        };
+        
+        const response = await addNextOfKin(payload);
+        if (handleResponseError(response)) return;
 
-         setNextOfKins(prev => ([response, ...prev]))
-        resetForm();
+        if ('id' in response) {
+          setNextOfKins(prev => ([response as NextOfKinResponse, ...prev]));
+        }
         toast.success('Next of Kin added successfully');
+        resetForm(); // Reset form and close dialog
 
       } catch (error) {
         handleCatchError(error)
@@ -169,9 +275,8 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
   };
 
     function resetForm() {
-      setFormData1({
+      reset({
       is_active: true,
-      deleted_datetime: null,
       first_name: "",
       middle_name: "",
       surname: "",
@@ -181,8 +286,6 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
       lc1: "",
       discharge_property: false,
       created_by: getCurrentUser().id,
-      updated_by: null,
-      deleted_by: null,
       prisoner: "",
       relationship: "",
       sex: "",
@@ -198,13 +301,26 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
     }
 
 
+     // Don't render form until initial data is loaded
+     if (!dataReady) {
+       return null;
+     }
+
      return (
-      <form onSubmit={onSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
         {/* Prisoner Information */}
-        {/*<div className="space-y-4">*/}
-        {/*  <h3 className="text-lg" style={{ color: '#650000' }}>Prisoner Information</h3>*/}
-        {/*  <Separator />*/}
-        {/*</div>*/}
+        <div className="space-y-4">
+          <h3 className="text-lg" style={{ color: '#650000' }}>Prisoner Information</h3>
+          <Separator />
+          <div className="space-y-2">
+            <Label>Prisoner</Label>
+            <Input
+              value={prisonerName ? `${prisonerName}${prisonerNumber && !prisonerNumber.includes('-') ? ` | ${prisonerNumber}` : ''}` : 'No prisoner selected'}
+              disabled
+              className="bg-gray-100"
+            />
+          </div>
+        </div>
 
         {/* Personal Information */}
         <div className="space-y-4">
@@ -216,19 +332,19 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
               <Label htmlFor="first_name">First Name <span className="text-red-500">*</span></Label>
               <Input
                 id="first_name"
-                value={formData1.first_name}
-                onChange={(e) => setFormData1({...formData1, first_name: e.target.value})}
+                {...register("first_name", requiredValidation("First name"))}
                 placeholder="Enter first name"
-                required
               />
+              {errors.first_name && (
+                <p className="text-red-500 text-sm mt-1">{errors.first_name.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="middle_name">Middle Name</Label>
               <Input
                 id="middle_name"
-                value={formData1.middle_name}
-                onChange={(e) => setFormData1({...formData1, middle_name: e.target.value})}
+                {...register("middle_name")}
                 placeholder="Enter middle name"
               />
             </div>
@@ -237,107 +353,66 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
               <Label htmlFor="surname">Surname <span className="text-red-500">*</span></Label>
               <Input
                 id="surname"
-                value={formData1.surname}
-                onChange={(e) => setFormData1({...formData1, surname: e.target.value})}
+                {...register("surname", requiredValidation("Surname"))}
                 placeholder="Enter surname"
-                required
               />
+              {errors.surname && (
+                <p className="text-red-500 text-sm mt-1">{errors.surname.message}</p>
+              )}
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="sex_type">Sex <span className="text-red-500">*</span></Label>
-              <Popover open={openSex} onOpenChange={setOpenSex}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openSex}
-                    className="w-full justify-between"
-                    type="button"
+              <Controller
+                name="sex"
+                control={control}
+                rules={requiredValidation("Sex")}
+                render={({ field }) => (
+                  <Select
+                    value={field.value}
+                    onValueChange={field.onChange}
                   >
-                    {formData1.sex
-                      ? sexes.find((s) => s.id === formData1.sex)?.name
-                      : "Select sex..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty>No sex found.</CommandEmpty>
-                      <CommandGroup>
-                        {sexes.map((sex) => (
-                          <CommandItem
-                            key={sex.id}
-                            value={sex.name}
-                            onSelect={() => {
-                              setFormData1({...formData1, sex: sex.id});
-                              setOpenSex(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                formData1.sex === sex.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {sex.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select sex" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sexes.map((sex) => (
+                        <SelectItem key={sex.id} value={sex.id}>
+                          {sex.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              />
+              {errors.sex && (
+                <p className="text-red-500 text-sm mt-1">{errors.sex.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="relationship_type">Relationship <span className="text-red-500">*</span></Label>
-              <Popover open={openRelationship} onOpenChange={setOpenRelationship}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openRelationship}
-                    className="w-full justify-between"
-                    type="button"
-                  >
-                    {formData1.relationship
-                      ? relationships.find((r) => r.id === formData1.relationship)?.name
-                      : "Select relationship..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty>No relationship found.</CommandEmpty>
-                      <CommandGroup>
-                        {relationships.map((relationship) => (
-                          <CommandItem
-                            key={relationship.id}
-                            value={relationship.name}
-                            onSelect={() => {
-                              setFormData1({...formData1, relationship: relationship.id});
-                              setOpenRelationship(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                formData1.relationship === relationship.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {relationship.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Controller
+                name="relationship"
+                control={control}
+                rules={requiredValidation("Relationship")}
+                render={({ field }) => (
+                  <SearchableSelect
+                    items={relationships}
+                    value={field.value}
+                    onChange={field.onChange}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select relationship..."
+                    className="w-full"
+                  />
+                )}
+              />
+              {errors.relationship && (
+                <p className="text-red-500 text-sm mt-1">{errors.relationship.message}</p>
+              )}
             </div>
           </div>
         </div>
@@ -352,21 +427,26 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
               <Label htmlFor="phone_number">Phone Number <span className="text-red-500">*</span></Label>
               <Input
                 id="phone_number"
-                value={formData1.phone_number}
-                onChange={(e) => setFormData1({...formData1, phone_number: e.target.value})}
-                placeholder="Enter phone number"
-                required
+                type="tel"
+                {...register("phone_number", { ...phoneNumberValidation, ...requiredValidation("Phone number") })}
+                placeholder="+256700000000"
               />
+              {errors.phone_number && (
+                <p className="text-red-500 text-sm mt-1">{errors.phone_number.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="alternate_phone_number">Alternate Phone Number</Label>
               <Input
                 id="alternate_phone_number"
-                value={formData1.alternate_phone_number}
-                onChange={(e) => setFormData1({...formData1, alternate_phone_number: e.target.value})}
-                placeholder="Enter alternate phone number"
+                type="tel"
+                {...register("alternate_phone_number", phoneNumberValidation)}
+                placeholder="+256700000000"
               />
+              {errors.alternate_phone_number && (
+                <p className="text-red-500 text-sm mt-1">{errors.alternate_phone_number.message}</p>
+              )}
             </div>
           </div>
         </div>
@@ -379,59 +459,44 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="id_type_value">ID Type</Label>
-              <Popover open={openIdType} onOpenChange={setOpenIdType}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={openIdType}
-                    className="w-full justify-between"
-                    type="button"
-                  >
-                    {formData1.id_type
-                      ? idTypes.find((it) => it.id === formData1.id_type)?.name
-                      : "Select ID type..."}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-full p-0">
-                  <Command>
-                    <CommandList>
-                      <CommandEmpty>No ID type found.</CommandEmpty>
-                      <CommandGroup>
-                        {idTypes.map((idType) => (
-                          <CommandItem
-                            key={idType.id}
-                            value={idType.name}
-                            onSelect={() => {
-                              setFormData1({...formData1, id_type: idType.id});
-                              setOpenIdType(false);
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                "mr-2 h-4 w-4",
-                                formData1.id_type === idType.id ? "opacity-100" : "opacity-0"
-                              )}
-                            />
-                            {idType.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <Controller
+                name="id_type"
+                control={control}
+                render={({ field }) => (
+                  <SearchableSelect
+                    items={idTypes}
+                    value={field.value}
+                    onChange={field.onChange}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select ID type..."
+                    className="w-full"
+                  />
+                )}
+              />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="id_number">ID Number</Label>
-              <Input
-                id="id_number"
-                value={formData1.id_number}
-                onChange={(e) => setFormData1({...formData1, id_number: e.target.value})}
-                placeholder="Enter ID number"
+              <Label htmlFor="id_number">
+                ID Number {selectedIdType && <span className="text-red-500">*</span>}
+              </Label>
+              <Controller
+                name="id_number"
+                control={control}
+                rules={idNumberValidationRules}
+                render={({ field }) => (
+                  <Input
+                    id="id_number"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    placeholder="Enter ID number"
+                  />
+                )}
               />
+              {errors.id_number && (
+                <p className="text-red-500 text-sm mt-1">{errors.id_number.message}</p>
+              )}
             </div>
           </div>
         </div>
@@ -443,118 +508,146 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="address_region">Region</Label>
-              <Select
-                value={formData1.address_region}
-                onValueChange={(value) => handleLocationChange("address_region", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select region" />
-                </SelectTrigger>
-                <SelectContent>
-                  {regions.map((region) => (
-                    <SelectItem key={region.id} value={region.id}>
-                      {region.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address_region">Region <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_region"
+                control={control}
+                rules={requiredValidation("Region")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={regions}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_region", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select region..."
+                    className="w-full"
+                  />
+                )}
+              />
+              {errors.address_region && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_region.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address_district">District</Label>
-              <Select
-                value={formData1.address_district}
-                onValueChange={(value) => handleLocationChange("address_district", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select district" />
-                </SelectTrigger>
-                <SelectContent>
-                  {districts.map((district) => (
-                    <SelectItem key={district.id} value={district.id}>
-                      {district.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address_district">District <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_district"
+                control={control}
+                rules={requiredValidation("District")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={districts}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_district", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select district..."
+                    className="w-full"
+                    disabled={!selectedRegion}
+                  />
+                )}
+              />
+              {errors.address_district && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_district.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address_county">County</Label>
-              <Select
-                value={formData1.address_county}
-                onValueChange={(value) => handleLocationChange("address_county", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select county" />
-                </SelectTrigger>
-                <SelectContent>
-                  {counties.map((county) => (
-                    <SelectItem key={county.id} value={county.id}>
-                      {county.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
+              <Label htmlFor="address_county">County <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_county"
+                control={control}
+                rules={requiredValidation("County")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={counties}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_county", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select county..."
+                    className="w-full"
+                    disabled={!selectedDistrict}
+                  />
+                )}
+              />
+              {errors.address_county && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_county.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address_sub_county">Sub County</Label>
-              <Select
-                value={formData1.address_sub_county}
-                onValueChange={(value) => handleLocationChange("address_sub_county", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select sub county" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subCounties.map((county) => (
-                    <SelectItem key={county.id} value={county.id}>
-                      {county.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address_sub_county">Sub County <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_sub_county"
+                control={control}
+                rules={requiredValidation("Sub County")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={subCounties}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_sub_county", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select sub county..."
+                    className="w-full"
+                    disabled={!selectedCounty}
+                  />
+                )}
+              />
+              {errors.address_sub_county && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_sub_county.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address_parish">Parish</Label>
-              <Select
-                value={formData1.address_parish}
-                onValueChange={(value) => handleLocationChange("address_parish", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select parish" />
-                </SelectTrigger>
-                <SelectContent>
-                  {parishes.map((county) => (
-                    <SelectItem key={county.id} value={county.id}>
-                      {county.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address_parish">Parish <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_parish"
+                control={control}
+                rules={requiredValidation("Parish")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={parishes}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_parish", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select parish..."
+                    className="w-full"
+                    disabled={!selectedSubCounty}
+                  />
+                )}
+              />
+              {errors.address_parish && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_parish.message}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="address_village">Village</Label>
-              <Select
-                value={formData1.address_village}
-                onValueChange={(value) => handleLocationChange("address_village", value)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select village" />
-                </SelectTrigger>
-                <SelectContent>
-                  {villages.map((county) => (
-                    <SelectItem key={county.id} value={county.id}>
-                      {county.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label htmlFor="address_village">Village <span className="text-red-500">*</span></Label>
+              <Controller
+                name="address_village"
+                control={control}
+                rules={requiredValidation("Village")}
+                render={({ field }) => (
+                  <LocationSelect
+                    items={villages}
+                    value={field.value}
+                    onChange={(value) => handleLocationChange("address_village", value)}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select village..."
+                    className="w-full"
+                    disabled={!selectedParish}
+                  />
+                )}
+              />
+              {errors.address_village && (
+                <p className="text-red-500 text-sm mt-1">{errors.address_village.message}</p>
+              )}
             </div>
           </div>
         </div>
@@ -569,17 +662,25 @@ const NextOfKin: React.FC<ChildProps> = ({ setNewDialogLoader, setLoaderText, se
             <Input
               id="lc1"
               type="text"
-              value={formData1.lc1}
-              onChange={(e) => setFormData1({...formData1, lc1: e.target.value})}
+              {...register("lc1")}
               placeholder="Enter LC1 chairman name"
             />
+            {errors.lc1 && (
+              <p className="text-red-500 text-sm mt-1">{errors.lc1.message}</p>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            <Checkbox
-              id="discharge_property"
-              checked={formData1.discharge_property}
-              onCheckedChange={(checked) => setFormData1({...formData1, discharge_property: checked as boolean})}
+            <Controller
+              name="discharge_property"
+              control={control}
+              render={({ field }) => (
+                <Checkbox
+                  id="discharge_property"
+                  checked={field.value}
+                  onCheckedChange={field.onChange}
+                />
+              )}
             />
             <Label htmlFor="discharge_property" className="cursor-pointer">
               Authorized to Collect Discharge Property

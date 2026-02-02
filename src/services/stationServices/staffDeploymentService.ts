@@ -1,5 +1,12 @@
 import axiosInstance from "../axiosInstance";
 
+// API endpoint constants for staff deployment module (centralized management)
+export const STAFF_DEPLOYMENT_API_ENDPOINTS = {
+  STAFF_PROFILES: '/auth/staff-profiles/',
+  STAFF_DEPLOYMENTS: '/station-management/api/staff-deployments/',
+  STATIONS: '/system-administration/stations/',
+} as const;
+
 export interface Region {
   id: string;
   created_datetime: string;
@@ -142,18 +149,18 @@ export type StaffDeploymentResp = StaffDeploymentResponse | ErrorResponse;
 export type StaffDeploymentRespList = StaffDeploymentList | ErrorResponse;
 
 export const getStaffProfile = async (station?: string) : Promise<StaffResponse> => {
-  const response = await axiosInstance.get<StaffResponse>('/auth/staff-profiles/', {
+  const response = await axiosInstance.get<StaffResponse>(STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_PROFILES, {
     params: station ? { station } : undefined
   });
   return response.data;
 }
 
 export const addStaffDeployment = async (deployment: StaffDeployment) : Promise<StaffDeploymentResp> => {
-  const response = await axiosInstance.post<StaffDeploymentResp>('/station-management/api/staff-deployments/', deployment);
+  const response = await axiosInstance.post<StaffDeploymentResp>(STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_DEPLOYMENTS, deployment);
   return response.data;
 }
 
 export const getStaffDeployment = async () : Promise<StaffDeploymentRespList> => {
-  const response = await axiosInstance.get<StaffDeploymentRespList>('/station-management/api/staff-deployments/');
+  const response = await axiosInstance.get<StaffDeploymentRespList>(STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_DEPLOYMENTS);
   return response.data;
 }

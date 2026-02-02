@@ -3,6 +3,19 @@ import axiosInstance from "../axiosInstance";
 import {Paginated} from "./utils";
 import {PrisonerProperty, PropertiesResponse} from "../propertyServices/propertyService";
 
+/**
+ * Centralized API endpoints for Housing Allocation module
+ * Single source of truth for all housing-related API paths
+ */
+export const HOUSING_API_ENDPOINTS = {
+  ASSIGNMENTS: '/admission/prisoner-housing-assignments/',
+  WARDS: '/station-management/api/wards/',
+  CELLS: '/station-management/api/cells/',
+  BLOCKS: '/station-management/api/blocks/',
+  WARD_TYPES: '/system-administration/ward-types/',
+  SECURITY_CLASSIFICATIONS: '/system-administration/security-classifications/',
+} as const;
+
 export interface Ward {
   id: string;
   station_name: string;
@@ -92,27 +105,37 @@ export type CellsResponse = Cells | ErrorResponse;
 export type PrisonAssignmentResponse = HousingAssignment | ErrorResponse;
 export type AssignmentsResponse<T> = Paginated<T> | ErrorResponse
 
+export interface AssignmentResponse extends HousingAssignment {
+  prisoner_number?: string;
+  block_name?: string;
+}
+
 export const addHousingAssignment = async (assignment: Assignment) : Promise<PrisonAssignmentResponse> => {
-  const response = await axiosInstance.post<PrisonAssignmentResponse>('/admission/prisoner-housing-assignments/', assignment);
+  const response = await axiosInstance.post<PrisonAssignmentResponse>(HOUSING_API_ENDPOINTS.ASSIGNMENTS, assignment);
   return response.data;
 }
 
 export const updateHousingAssignment = async (assignment: Assignment, id: string) : Promise<PrisonAssignmentResponse> => {
-  const response = await axiosInstance.put<PrisonAssignmentResponse>(`/admission/prisoner-housing-assignments/${id}/`, assignment);
+  const response = await axiosInstance.put<PrisonAssignmentResponse>(`${HOUSING_API_ENDPOINTS.ASSIGNMENTS}${id}/`, assignment);
   return response.data;
 }
 
 export const deleteHousingAssignment = async (id: string) : Promise<void> => {
-  await axiosInstance.delete<void>(`/admission/prisoner-housing-assignments/${id}`);
+  await axiosInstance.delete<void>(`${HOUSING_API_ENDPOINTS.ASSIGNMENTS}${id}`);
 }
 
 export const getHousingAssignments = async <T = HousingAssignment>() : Promise<AssignmentsResponse<T>> => {
-  const response = await axiosInstance.get<Paginated<T>>('/admission/prisoner-housing-assignments/');
+  const response = await axiosInstance.get<Paginated<T>>(HOUSING_API_ENDPOINTS.ASSIGNMENTS);
+  return response.data;
+}
+
+export const fetchAssignmentById = async (id: string): Promise<HousingAssignment> => {
+  const response = await axiosInstance.get<HousingAssignment>(`${HOUSING_API_ENDPOINTS.ASSIGNMENTS}${id}/`);
   return response.data;
 }
 
 export const getStationWards = async (stationId: string) : Promise<WardsResponse> => {
-  const response = await axiosInstance.get<WardsResponse>('/station-management/api/wards/', {
+  const response = await axiosInstance.get<WardsResponse>(HOUSING_API_ENDPOINTS.WARDS, {
       params: {
           station: stationId
       }
@@ -120,12 +143,17 @@ export const getStationWards = async (stationId: string) : Promise<WardsResponse
   return response.data;
 }
 
+export const fetchWardById = async (id: string): Promise<Ward> => {
+  const response = await axiosInstance.get<Ward>(`${HOUSING_API_ENDPOINTS.WARDS}${id}/`);
+  return response.data;
+}
+
 export const deleteWardById = async (id: string) : Promise<void> => {
-  await axiosInstance.delete<void>(`/station-management/api/wards/${id}`);
+  await axiosInstance.delete<void>(`${HOUSING_API_ENDPOINTS.WARDS}${id}`);
 }
 
 export const getWardCells = async (wardId: string) : Promise<CellsResponse> => {
-  const response = await axiosInstance.get<CellsResponse>('/station-management/api/cells/', {
+  const response = await axiosInstance.get<CellsResponse>(HOUSING_API_ENDPOINTS.CELLS, {
       params: {
           ward: wardId
       }

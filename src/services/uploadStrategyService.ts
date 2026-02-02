@@ -29,7 +29,8 @@ error?: any;
 export const AUDIO_EXTS = ["mp3", "wav", "m4a", "aac", "ogg", "flac", "mpeg"];
 export const IMAGE_EXTS = ["jpg","jpeg","png","gif","tif","tiff","bmp","webp","svg"];
 export const DOCUMENT_EXTS = ["pdf","doc","docx","txt","odt","rtf","xls","xlsx","ppt","pptx"];
-export const LETTER_ALLOWED_EXTS = Array.from(new Set([...IMAGE_EXTS, ...DOCUMENT_EXTS]));
+// Put documents first so PDF becomes the default file filter (letters are typically PDFs/documents, not images)
+export const LETTER_ALLOWED_EXTS = Array.from(new Set([...DOCUMENT_EXTS, ...IMAGE_EXTS]));
 
 // small audio extension fallback (kept local to avoid circular deps)
 const AUDIO_EXTS_FALLBACK = AUDIO_EXTS;

@@ -11,7 +11,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Loader2
+  Loader2,
+  ChevronDown,
+  ChevronRight as ChevronRightIcon
 } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -52,6 +54,7 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(mergedConfig.lengthMenu?.[0] || 10);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   // Fetch data from URL
   const fetchData = useCallback(async () => {
@@ -119,6 +122,60 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
     const startIndex = (currentPage - 1) * pageSize;
     return sortedData.slice(startIndex, startIndex + pageSize);
   }, [sortedData, currentPage, pageSize, mergedConfig.pagination]);
+
+  // Group data if grouping is enabled
+  const groupedData = useMemo(() => {
+    if (!mergedConfig.grouping) return null;
+
+    const groupKey = mergedConfig.grouping.groupBy;
+    const groups = new Map<string, any[]>();
+
+    paginatedData.forEach(row => {
+      const groupValue = String(row[groupKey] || 'Unknown');
+      if (!groups.has(groupValue)) {
+        groups.set(groupValue, []);
+      }
+      groups.get(groupValue)!.push(row);
+    });
+
+    return groups;
+  }, [paginatedData, mergedConfig.grouping]);
+
+  // Initialize expanded groups when data changes or config changes
+  useEffect(() => {
+    if (mergedConfig.grouping?.defaultExpanded && data.length > 0) {
+      const groupKey = mergedConfig.grouping.groupBy;
+      const uniqueGroups = new Set(data.map(row => String(row[groupKey] || 'Unknown')));
+      setExpandedGroups(uniqueGroups);
+    } else {
+      setExpandedGroups(new Set());
+    }
+  }, [data, mergedConfig.grouping?.defaultExpanded, mergedConfig.grouping?.groupBy]);
+
+  // Toggle group expansion
+  const toggleGroup = useCallback((groupValue: string) => {
+    setExpandedGroups(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupValue)) {
+        newSet.delete(groupValue);
+      } else {
+        newSet.add(groupValue);
+      }
+      return newSet;
+    });
+  }, []);
+
+  // Expand all groups
+  const expandAll = useCallback(() => {
+    if (groupedData) {
+      setExpandedGroups(new Set(groupedData.keys()));
+    }
+  }, [groupedData]);
+
+  // Collapse all groups
+  const collapseAll = useCallback(() => {
+    setExpandedGroups(new Set());
+  }, []);
 
   const totalPages = pageSize === -1 ? 1 : Math.ceil(sortedData.length / pageSize);
   const startRecord = sortedData.length === 0 ? 0 : (currentPage - 1) * (pageSize === -1 ? sortedData.length : pageSize) + 1;
@@ -283,6 +340,30 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
 
           {/* Search and Export */}
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Expand/Collapse All for Grouped Data */}
+            {mergedConfig.grouping && groupedData && groupedData.size > 0 && (
+              <div className="flex items-center gap-2 mr-2 pr-2 border-r">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={expandAll}
+                  className="gap-2"
+                >
+                  <ChevronsRight className="h-4 w-4" />
+                  Expand All
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={collapseAll}
+                  className="gap-2"
+                >
+                  <ChevronsLeft className="h-4 w-4" />
+                  Collapse All
+                </Button>
+              </div>
+            )}
+
             {/* Search */}
             {mergedConfig.search && (
               <div className="relative">
@@ -346,37 +427,100 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
           <table className="w-full">
             <thead>
               <tr className="border-b bg-muted/50">
-                {columns.map((column) => (
-                  <th
-                    key={column.key}
-                    className={`px-4 py-3 text-left text-sm font-medium ${
-                      column.sortable ? 'cursor-pointer hover:bg-muted select-none' : ''
-                    }`}
-                    onClick={() => column.sortable && handleSort(column.key)}
-                  >
-                    <div className="flex items-center gap-2">
-                      {column.label}
-                      {column.sortable && sortConfig?.key === column.key && (
-                        <span className="text-xs">
-                          {sortConfig.direction === 'asc' ? '↑' : '↓'}
-                        </span>
-                      )}
-                    </div>
-                  </th>
-                ))}
+                {mergedConfig.grouping && (
+                  <th className="px-4 py-3 w-10"></th>
+                )}
+                {columns.map((column) => {
+                  // Hide the groupBy column in table header when grouping is enabled
+                  if (mergedConfig.grouping && column.key === mergedConfig.grouping.groupBy) {
+                    return null;
+                  }
+                  return (
+                    <th
+                      key={column.key}
+                      className={`px-4 py-3 text-left text-sm font-medium ${
+                        column.sortable ? 'cursor-pointer hover:bg-muted select-none' : ''
+                      }`}
+                      onClick={() => column.sortable && handleSort(column.key)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {column.label}
+                        {column.sortable && sortConfig?.key === column.key && (
+                          <span className="text-xs">
+                            {sortConfig.direction === 'asc' ? '↑' : '↓'}
+                          </span>
+                        )}
+                      </div>
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
               {paginatedData.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={columns.length}
+                    colSpan={columns.length + (mergedConfig.grouping ? 1 : 0)}
                     className="px-4 py-8 text-center text-muted-foreground"
                   >
                     No data available
                   </td>
                 </tr>
+              ) : mergedConfig.grouping && groupedData ? (
+                // Render grouped data
+                Array.from(groupedData.entries()).map(([groupValue, items]) => {
+                  const isExpanded = expandedGroups.has(groupValue);
+                  return (
+                    <React.Fragment key={groupValue}>
+                      {/* Group Header Row */}
+                      <tr
+                        className="border-b bg-muted/50 hover:bg-muted/70 cursor-pointer transition-colors sticky top-0"
+                        onClick={() => toggleGroup(groupValue)}
+                      >
+                        <td className="px-4 py-3">
+                          {isExpanded ? (
+                            <ChevronDown className="h-4 w-4 text-primary" />
+                          ) : (
+                            <ChevronRightIcon className="h-4 w-4 text-primary" />
+                          )}
+                        </td>
+                        <td colSpan={columns.filter(col => col.key !== mergedConfig.grouping!.groupBy).length} className="px-4 py-3">
+                          {mergedConfig.grouping.renderGroupHeader ? (
+                            mergedConfig.grouping.renderGroupHeader(groupValue, items, isExpanded)
+                          ) : (
+                            <span className="font-semibold">
+                              {groupValue} <span className="text-muted-foreground font-normal">({items.length} {items.length === 1 ? 'item' : 'items'})</span>
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                      {/* Group Items */}
+                      {isExpanded && items.map((row, rowIndex) => (
+                        <tr
+                          key={`${groupValue}-${rowIndex}`}
+                          className="border-b hover:bg-muted/30 transition-colors"
+                        >
+                          <td className="px-4 py-3 bg-muted/20"></td>
+                          {columns.map((column) => {
+                            // Hide the groupBy column data in child rows (redundant)
+                            if (column.key === mergedConfig.grouping!.groupBy) {
+                              return null;
+                            }
+                            return (
+                              <td key={column.key} className="px-4 py-3 text-sm">
+                                {column.render
+                                  ? column.render(row[column.key], row)
+                                  : row[column.key]}
+                              </td>
+                            );
+                          })}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })
               ) : (
+                // Render ungrouped data
                 paginatedData.map((row, rowIndex) => (
                   <tr
                     key={rowIndex}

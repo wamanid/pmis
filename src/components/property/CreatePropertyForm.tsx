@@ -1,27 +1,40 @@
-import React, {useEffect, useState} from "react";
+import React, {useEffect, useState, useRef, useMemo, useCallback} from "react";
+import { useForm, Controller } from 'react-hook-form';
+import { requiredValidation } from '../../utils/validation';
+import axiosInstance from "../../services/axiosInstance";
 import {
   getStationVisitors2,
   PrisonerItem,
-  Visitor
+  Visitor,
+  fetchVisitorsPaginated
 } from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
   addProperty,
-  DefaultPropertyItem, getPropertyBags,
+  DefaultPropertyItem,
   getPropertyStatuses,
   getPropertyTypes, PrisonerProperty, Property,
-  PropertyBag, updateProperty
+  PropertyBag, updateProperty,
+  fetchPropertyStatusesPaginated,
+  fetchPropertyTypesPaginated,
+  fetchPropertyBagsPaginated,
+  fetchItemCategoriesPaginated,
+  fetchMeasurementUnitsPaginated,
+  fetchPropertyById
 } from "../../services/propertyServices/propertyService";
 import PropertyItem from "./PropertyItem";
-import {getNextOfKins, NextOfKinResponse} from "../../services/admission/nextOfKinService";
+import {getNextOfKins, NextOfKinResponse, fetchNextOfKinPaginated} from "../../services/admission/nextOfKinService";
 import {
   getItemCategories, getUnits,
   getVisitorItems2,
   ItemCategory, ItemStatus,
   Unit,
-  VisitorItem
+  VisitorItem,
+  fetchVisitorItemsPaginated
 } from "../../services/stationServices/visitorsServices/visitorItem";
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import BiometricCapture from '../common/BiometricCapture';
+import SearchableSelect from '../common/SearchableSelect';
+import CustomPrisonerSearch from '../common/CustomPrisonerSearch';
 import PropertyStatusChangeForm from './PropertyStatusChangeForm';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -31,7 +44,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { DialogFooter } from '../ui/dialog';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import {
   Search,
   Plus,
@@ -68,79 +81,183 @@ interface ChildProps {
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   setProperties: React.Dispatch<React.SetStateAction<PrisonerProperty[]>>;
   selectedProperty: PrisonerProperty
-  propertyStatuses: Unit
-  propertyTypes: Unit
+  propertyStatuses: Unit[]
+  propertyTypes: Unit[]
+  setDataTableRefreshKey: React.Dispatch<React.SetStateAction<number>>;
+  setPrisonerInfo: React.Dispatch<React.SetStateAction<{prisoner: string; prisonerName: string; prisonerNumber: string}>>;
 }
 
 
 const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialogOpen, setNewDialogLoader,
                                                     setLoaderText, setIsNextCreateDialogOpen,
-                                                    setProperties, selectedProperty, propertyStatuses, propertyTypes}) => {
-    const [openPrisoner, setOpenPrisoner] = useState(false);
-    const [openVisitor, setOpenVisitor] = useState(false);
-    const [prisonerInfo, setPrisonerInfo] = useState({
-    prisoner: ''
-  });
-    const [visitorInfo, setVisitorInfo] = useState({
-    visitor: ''
-  });
+                                                    setProperties, selectedProperty, propertyStatuses, propertyTypes, setDataTableRefreshKey, setPrisonerInfo: setParentPrisonerInfo}) => {
+    // Edit mode detection
+    const mode = selectedProperty ? "edit" : "add";
+    const isOpen = true; // Form is open when component is rendered
+    
+    // React Hook Form setup
+    const { control, formState: { errors }, trigger, clearErrors, setError, handleSubmit } = useForm({
+      mode: 'onSubmit',
+      reValidateMode: 'onChange'
+    });
+    
+    // Initialization refs
+    const isPrisonerInitialized = useRef(false);
+    const isVisitorInitialized = useRef(false);
+    const propertyItemRef = useRef<{ syncTextFields: () => any; getData: () => DefaultPropertyItem }>(null);
+    
+    // Store complete prisoner details for Next of Kin dialog
+    const [selectedPrisonerDetails, setSelectedPrisonerDetails] = useState<{id: string, name: string, number: string} | null>(null);
+    
+    // Prisoner state with edit mode initialization
+    const [prisonerInfo, setPrisonerInfo] = useState(() => ({
+      prisoner: selectedProperty?.prisoner || ''
+    }));
+    const [localPrisonerValue, setLocalPrisonerValue] = useState<string | null>(() => {
+      if (selectedProperty && selectedProperty.prisoner) {
+        isPrisonerInitialized.current = true;
+        return selectedProperty.prisoner;
+      }
+      return null;
+    });
+    
+    // Visitor state with edit mode initialization
+    const [visitorInfo, setVisitorInfo] = useState(() => ({
+      visitor: selectedProperty?.visitor || ''
+    }));
+    const [localVisitorValue, setLocalVisitorValue] = useState<string | null>(() => {
+      if (selectedProperty && selectedProperty.visitor) {
+        isVisitorInitialized.current = true;
+        return selectedProperty.visitor;
+      }
+      return null;
+    });
+    
+    // Remove old client-side state arrays - now using server-side pagination
+    // const [visitors, setVisitors] = useState<Visitor[]>([]); // REMOVED
+    // Temporarily keep these until PropertyItem is converted to SearchableSelect
+    const [itemCategories, setItemCategories] = useState<ItemCategory[]>([]);
+    const [units, setUnits] = useState<Unit[]>([]);
+    const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([]);
+    
     const [loading, setLoading] = useState({ visitor: false, property: false, type: false })
-    const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
-    const [visitors, setVisitors] = useState<Visitor[]>([]);
     const [nextOfKins, setNextOfKins] = useState<NextOfKinResponse[]>([])
     const [isPropertyItemsOpen, setIsPropertyItemsOpen] = useState(true);
-    // const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
-    //   id: '1',
-    //   property_type: getPropertyTypeUtil(propertyTypes),
-    //   property_category: '',
-    //   property_item: '',
-    //   measurement_unit: '',
-    //   property_bag: '',
-    //   next_of_kin: '',
-    //   property_status: '',
-    //   quantity: '',
-    //   amount: '',
-    //   note: '',
-    //   destination: '',
-    //   visitor_item: '',
-    // }]);
-   const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>([{
-      id: '1',
-      property_type: "",
-      property_category: '',
-      property_item: '',
-      measurement_unit: '',
-      property_bag: '',
-      next_of_kin: '',
-      property_status: '',
-      quantity: '',
-      amount: '',
-      note: '',
-      destination: '',
-      visitor_item: '',
-    }]);
+    
+    // Track validation errors per property item
+    const [propertyItemValidationErrors, setPropertyItemValidationErrors] = useState<Record<string, Record<string, string>>>({});
+    
+   // Initialize propertyItems with selectedProperty data if in edit mode
+   const [propertyItems, setPropertyItems] = useState<DefaultPropertyItem[]>(() => {
+      if (selectedProperty) {
+        return [{
+          id: '1',
+          property_type: selectedProperty.property_type,
+          property_category: '', // Property category will be fetched when property_item is loaded
+          property_item: selectedProperty.property_item,
+          measurement_unit: selectedProperty.measurement_unit,
+          property_bag: selectedProperty.property_bag,
+          next_of_kin: selectedProperty.next_of_kin,
+          property_status: selectedProperty.property_status,
+          quantity: selectedProperty.quantity,
+          amount: selectedProperty.amount || '',
+          note: selectedProperty.note,
+          destination: selectedProperty.destination,
+          visitor_item: selectedProperty.visitor_item || '',
+          currency: selectedProperty.currency || '',
+        }];
+      }
+      return [{
+        id: '1',
+        property_type: "",
+        property_category: '',
+        property_item: '',
+        measurement_unit: '',
+        property_bag: '',
+        next_of_kin: '',
+        property_status: '',
+        quantity: '',
+        amount: '',
+        note: '',
+        destination: '',
+        visitor_item: '',
+        currency: '',
+      }];
+    });
     const [visitorItems, setVisitorItems] = useState<VisitorItem[]>([])
     const [typeLoader, setTypeLoader] = useState(false)
-    // const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
-    // const [propertyItems, setPropertyItems] = useState<PropertyItem[]>([])
-    // const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
-    const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
     const [biometricData, setBiometricData] = useState('');
-    const [itemCategories, setItemCategories] = useState<ItemCategory[]>([])
-    const [units, setUnits] = useState<Unit[]>([])
 
-
-    const handleUpdatePropertyItem = (itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
+    // Memoize handleUpdatePropertyItem to prevent unnecessary re-renders
+    const handleUpdatePropertyItem = useCallback((itemId: string, updatedFields: Partial<typeof propertyItems[0]>) => {
       setPropertyItems(prevItems =>
         prevItems.map(item =>
           item.id === itemId ? { ...item, ...updatedFields } : item
         )
       );
-    };
+    }, []); // Empty deps - function never changes
 
-    const onSubmit = async (event: React.FormEvent) => {
-        event.preventDefault()
-        const item = propertyItems[0]
+    const onSubmit = async () => {
+        // Validate required fields
+        if (!prisonerInfo.prisoner) {
+          setError('prisoner', { 
+            type: 'manual', 
+            message: 'Prisoner is required' 
+          });
+          toast.error("Prisoner is required");
+          return;
+        }
+        
+        // Get all field data from PropertyItem ref (avoids parent state entirely)
+        let item = propertyItems[0];
+        if (propertyItemRef.current) {
+          const itemData = propertyItemRef.current.getData();
+          item = { ...item, ...itemData };
+        }
+        
+        // Validate property item required fields and build error object
+        const validationErrors: string[] = [];
+        const itemErrors: Record<string, string> = {};
+        
+        if (!item.property_type) {
+          validationErrors.push("Property Type is required");
+          itemErrors.property_type = "Property Type is required";
+        }
+        // Only validate property_category in add mode (not edit mode)
+        if (!selectedProperty && !item.property_category) {
+          validationErrors.push("Property Category is required");
+          itemErrors.property_category = "Property Category is required";
+        }
+        if (!item.property_item) {
+          validationErrors.push("Property Item is required");
+          itemErrors.property_item = "Property Item is required";
+        }
+        if (!item.measurement_unit) {
+          validationErrors.push("Measurement Unit is required");
+          itemErrors.measurement_unit = "Measurement Unit is required";
+        }
+        if (!item.property_bag) {
+          validationErrors.push("Property Bag is required");
+          itemErrors.property_bag = "Property Bag is required";
+        }
+        if (!item.property_status) {
+          validationErrors.push("Property Status is required");
+          itemErrors.property_status = "Property Status is required";
+        }
+        if (!item.quantity || item.quantity.trim() === '') {
+          validationErrors.push("Quantity is required");
+          itemErrors.quantity = "Quantity is required";
+        }
+        
+        if (validationErrors.length > 0) {
+          // Set validation errors for this property item
+          setPropertyItemValidationErrors({ [item.id]: itemErrors });
+          toast.error(validationErrors.join(", "));
+          return;
+        }
+        
+        // Clear validation errors if all fields are valid
+        setPropertyItemValidationErrors({});
 
         const property: Property = {
           prisoner: prisonerInfo.prisoner,
@@ -153,6 +270,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
           property_item: item.property_item,
           measurement_unit: item.measurement_unit,
           property_bag: item.property_bag,
+          currency: item.currency,
           next_of_kin: item.next_of_kin,
           property_status: item.property_status,
           quantity: item.quantity,
@@ -167,16 +285,38 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
              const response = await addProperty(property)
               if (handleResponseError(response)) return
 
-             setProperties(prev => ([response, ...prev]))
+             // Fetch the complete property with all _name fields for display
+             const createdProperty = response as PrisonerProperty;
+             const fullPropertyResponse = await fetchPropertyById(createdProperty.id);
+             
+             if ('error' in fullPropertyResponse) {
+               // Fallback to response if fetch fails
+               setProperties(prev => ([createdProperty, ...prev]));
+             } else {
+               // Use the full property with all display names
+               setProperties(prev => ([fullPropertyResponse, ...prev]));
+             }
+             
+             // Trigger DataTable refresh by incrementing key
+             setDataTableRefreshKey(prev => prev + 1);
              toast.success("Property created successfully");
           }
           else {
              const response = await updateProperty(property, selectedProperty.id)
+             
+             // Fetch the updated property with all _name fields
+             const fullPropertyResponse = await fetchPropertyById(selectedProperty.id);
+             
              setProperties(prev =>
                 prev.map(item =>
-                  item.id === selectedProperty.id ? response : item
+                  item.id === selectedProperty.id ? 
+                    ('error' in fullPropertyResponse ? response as PrisonerProperty : fullPropertyResponse) : 
+                    item
                 )
              );
+             
+             // Trigger DataTable refresh by incrementing key
+             setDataTableRefreshKey(prev => prev + 1);
              toast.success("Property updated successfully");
           }
 
@@ -204,73 +344,75 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
         note: '',
         destination: '',
         visitor_item: '',
+        currency: '',
       }])
       setBiometricData("")
     }
 
+    // Sync prisoner details to parent whenever they change
     useEffect(() => {
-      if (prisonerInfo.prisoner) {
-        setLoaderText("Fetching Visitor Information, Please wait...")
-        setNewDialogLoader(true)
-        // setLoading({visitor: false, property: false, type: false})
-        setVisitors([])
-        fetchVisitorData(prisonerInfo.prisoner)
+      if (selectedPrisonerDetails) {
+        setParentPrisonerInfo({
+          prisoner: selectedPrisonerDetails.id,
+          prisonerName: selectedPrisonerDetails.name,
+          prisonerNumber: selectedPrisonerDetails.number
+        });
+      } else {
+        setParentPrisonerInfo({
+          prisoner: '',
+          prisonerName: '',
+          prisonerNumber: ''
+        });
       }
-    }, [prisonerInfo]);
+    }, [selectedPrisonerDetails]);
 
+    // Sync local state with record data (edit mode)
     useEffect(() => {
+      if (selectedProperty && mode === "edit") {
+        if (selectedProperty.prisoner) {
+          setLocalPrisonerValue(selectedProperty.prisoner);
+          setPrisonerInfo(prev => ({ ...prev, prisoner: selectedProperty.prisoner }));
+          isPrisonerInitialized.current = true;
+          // Set prisoner details for Next of Kin dialog in edit mode
+          setSelectedPrisonerDetails({
+            id: selectedProperty.prisoner,
+            name: selectedProperty.prisoner_name || '',
+            number: '' // Prisoner number not available in property response
+          });
+        }
+        if (selectedProperty.visitor) {
+          setLocalVisitorValue(selectedProperty.visitor);
+          setVisitorInfo(prev => ({ ...prev, visitor: selectedProperty.visitor }));
+          isVisitorInitialized.current = true;
+        }
+      } else if (mode === "add") {
+        // Reset for add mode
+        setLocalPrisonerValue(null);
+        setLocalVisitorValue(null);
+        setPrisonerInfo({ prisoner: '' });
+        setVisitorInfo({ visitor: '' });
+        isPrisonerInitialized.current = false;
+        isVisitorInitialized.current = false;
+        setSelectedPrisonerDetails(null);
+      }
+    }, [selectedProperty, mode]);
+
+    // Clear visitor and related fields when prisoner changes (except during initial edit mode load)
+    useEffect(() => {
+      if (!prisonerInfo.prisoner) return;
+      
+      // Skip if this is the initial edit mode load
+      if (mode === "edit" && selectedProperty?.prisoner === prisonerInfo.prisoner && isPrisonerInitialized.current) {
+        return;
+      }
+      
+      // Clear visitor selection when prisoner changes
       if (visitorInfo.visitor) {
-        setLoaderText("Fetching Visitor items, Please wait...")
-        setNewDialogLoader(true)
-        // setLoading(prev =>({...prev, property: false}))
-        setVisitorItems([])
-        fetchVisitorItems(visitorInfo.visitor)
-      }
-      else {
-          setPropertyItems([{
-              id: '1',
-              property_type: '',
-              property_category: '',
-              property_item: '',
-              measurement_unit: '',
-              property_bag: '',
-              next_of_kin: '',
-              property_status: '',
-              quantity: '',
-              amount: '',
-              note: '',
-              destination: '',
-              visitor_item: '',
-            }])
-      }
-    }, [visitorInfo]);
-
-    async function fetchVisitorData(prisonerId) {
-      try {
-          const response2 = await getNextOfKins(prisonerInfo.prisoner)
-          populateList(response2, "There are no next of kins for this prisoner", setNextOfKins)
-
-          const response = await getStationVisitors2(prisonerId)
-          populateList(response, "There are no visitors for the selected prisoner", setVisitors)
-
-         const response11 = await getItemCategories()
-         populateLists(response11, "There are no item categories", setItemCategories)
-
-         const response41 = await getUnits()
-         populateLists(response41, "There are no item categories", setUnits)
-
-         const response42 = await getPropertyBags(prisonerInfo.prisoner)
-         populateLists(response42, "There are no property bags for this prisoner", setPropertyBags)
-
-      }catch (error) {
-        handleCatchError(error)
-      }finally {
-         setNewDialogLoader(false)
-      }
-    }
-
-    async function fetchVisitorItems(visitorId) {
-      if (selectedProperty === null){
+        setLocalVisitorValue(null);
+        setVisitorInfo({ visitor: '' });
+        setVisitorItems([]);
+        
+        // Clear all property item fields when prisoner changes
         setPropertyItems([{
           id: '1',
           property_type: '',
@@ -285,156 +427,188 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
           note: '',
           destination: '',
           visitor_item: '',
-        }])
-      }
-
-      try {
-          const response = await getVisitorItems2(visitorId)
-          if(handleServerError(response, setNewDialogLoader)) return
-          populateList(response, "There are no visitor items for the selected visitor", setVisitorItems)
-
-      }catch (error) {
-        handleCatchError(error)
-      }finally {
-         setNewDialogLoader(false)
-      }
-    }
-
-  function populateList(response: any, msg: string, setData: any) {
-    if(handleServerError(response, setNewDialogLoader)) return
-
-    if ("results" in response) {
-      const data = response.results
-      handleEmptyList(data, msg, setNewDialogLoader)
-      // if (msg === "There are no visitors for the selected prisoner" && data.length) {
-      //   // setLoading(prev => ({...prev, visitor: true}))
-      // }
-      // if (msg === "There are no visitor items for the selected visitor" && data.length) {
-      //   // setLoading(prev => ({...prev, property: true}))
-      // }
-      setData(data)
-    }
-  }
-
-  function populateLists(response: any, msg: string, setData: any) {
-    if(handleServerError(response, setNewDialogLoader)) return
-
-    if ("results" in response) {
-      const data = response.results
-      setData(data)
-    }
-  }
-
-  useEffect(() => {
-    if (selectedProperty !== null){
-        setPrisonerInfo({ prisoner: selectedProperty.prisoner })
-        setVisitorInfo({ visitor: selectedProperty.visitor })
-        setPropertyItems(prevItems => {
-          if (prevItems.length === 0) return prevItems; // nothing to update
-
-          return [
-            {
-              ...prevItems[0],
-              visitor_item: selectedProperty.visitor_item,
-              property_type: selectedProperty.property_type,
-              property_item: selectedProperty.property_item,
-              measurement_unit: selectedProperty.measurement_unit,
-              property_bag: selectedProperty.property_bag,
-              next_of_kin: selectedProperty.next_of_kin,
-              property_status: selectedProperty.property_status,
-              quantity: selectedProperty.quantity,
-              amount: selectedProperty.amount,
-              note: selectedProperty.note,
-              destination: selectedProperty.destination,
-            },
-            ...prevItems.slice(1), // keep the rest unchanged
-          ];
-        });
+          currency: '',
+        }]);
         
-    }
-  }, [selectedProperty]);
+        toast.info("Visitor and property details cleared. Please enter details for the new prisoner.");
+      } else {
+        // Even if no visitor was selected, clear all fields when prisoner changes
+        setPropertyItems([{
+          id: '1',
+          property_type: '',
+          property_category: '',
+          property_item: '',
+          measurement_unit: '',
+          property_bag: '',
+          next_of_kin: '',
+          property_status: '',
+          quantity: '',
+          amount: '',
+          note: '',
+          destination: '',
+          visitor_item: '',
+          currency: '',
+        }]);
+      }
+    }, [prisonerInfo.prisoner]);
+
+    // Fetch next of kin when prisoner changes
+    useEffect(() => {
+      if (!prisonerInfo.prisoner) return;
+      
+      // Skip if editing and value hasn't changed
+      if (mode === "edit" && selectedProperty?.prisoner === prisonerInfo.prisoner) return;
+
+      const controller = new AbortController();
+      
+      const fetchNextOfKin = async () => {
+        try {
+          const response = await getNextOfKins(prisonerInfo.prisoner);
+          if (handleServerError(response, setNewDialogLoader)) return;
+          if ("results" in response) {
+            setNextOfKins(response.results);
+            if (response.results.length === 0) {
+              toast.info("The selected prisoner has no registered next of kin.");
+            }
+          }
+        } catch (error: any) {
+          // Silence cancellation errors
+          if (error.name === 'CanceledError' || error.name === 'AbortError' || 
+              error.code === 'ERR_CANCELED') return;
+          handleCatchError(error);
+        }
+      };
+
+      fetchNextOfKin();
+
+      return () => controller.abort();
+    }, [prisonerInfo.prisoner, mode, selectedProperty?.prisoner]);
+
+    // Check if selected prisoner has visitors
+    useEffect(() => {
+      if (!prisonerInfo.prisoner) return;
+      
+      // Skip if editing
+      if (mode === "edit" && selectedProperty?.prisoner === prisonerInfo.prisoner) return;
+
+      const checkVisitors = async () => {
+        try {
+          const response = await fetchVisitorsPaginated(1, '', prisonerInfo.prisoner);
+          if (response.count === 0 || !response.results || response.results.length === 0) {
+            toast.info("The selected prisoner has no registered visitors.");
+          }
+        } catch (error: any) {
+          // Silence errors - just a notification check
+        }
+      };
+
+      // Small delay to avoid showing notification too early
+      const timer = setTimeout(checkVisitors, 500);
+      return () => clearTimeout(timer);
+    }, [prisonerInfo.prisoner, mode, selectedProperty?.prisoner]);
+
+    // Fetch visitor items when visitor changes
+    useEffect(() => {
+      if (!visitorInfo.visitor) {
+        setVisitorItems([]);
+        // Clear visitor_item selection in property items when visitor is cleared
+        setPropertyItems(prevItems => 
+          prevItems.map(item => ({
+            ...item,
+            visitor_item: ''
+          }))
+        );
+        return;
+      }
+
+      const controller = new AbortController();
+      
+      const fetchItems = async () => {
+        try {
+          setLoaderText("Fetching Visitor items, Please wait...");
+          setNewDialogLoader(true);
+          const response = await getVisitorItems2(visitorInfo.visitor);
+          if (handleServerError(response, setNewDialogLoader)) return;
+          if ("results" in response) {
+            setVisitorItems(response.results);
+            if (response.results.length === 0 && mode === "add") {
+              toast.info("The selected visitor has no registered items.");
+            }
+          }
+        } catch (error: any) {
+          // Silence cancellation errors
+          if (error.name === 'CanceledError' || error.name === 'AbortError' || 
+              error.code === 'ERR_CANCELED') return;
+          handleCatchError(error);
+        } finally {
+          setNewDialogLoader(false);
+        }
+      };
+
+      fetchItems();
+
+      return () => controller.abort();
+    }, [visitorInfo.visitor, mode]);
+
+  // Derive initialItem for prisoner dropdown (edit mode)
+  const initialPrisonerItem = (selectedProperty && mode === "edit" && selectedProperty.prisoner && selectedProperty.prisoner_name)
+    ? { id: selectedProperty.prisoner, full_name: selectedProperty.prisoner_name }
+    : undefined;
+
+  // Derive initialItem for visitor dropdown (edit mode)
+  const initialVisitorItem = (selectedProperty && mode === "edit" && selectedProperty.visitor && selectedProperty.visitor_name)
+    ? { id: selectedProperty.visitor, first_name: selectedProperty.visitor_name.split(' ')[0] || '', middle_name: selectedProperty.visitor_name.split(' ')[1] || '', last_name: selectedProperty.visitor_name.split(' ')[2] || '' }
+    : undefined;
 
   return (
       <div className="h-full" style={{marginTop: '10px'}}>
-        <form onSubmit={onSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Prisoner Information Section */}
           <Card className="border-2" style={{borderColor: '#650000'}}>
             <div className="p-4">
               <h3 className="mb-4" style={{color: '#650000'}}>Prisoner Information</h3>
               <div className="space-y-2">
                 <Label htmlFor="prisoner">Prisoner <span className="text-red-500">*</span></Label>
-                <Popover open={openPrisoner} onOpenChange={setOpenPrisoner}>
-                  <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openPrisoner}
-                        className="w-full justify-between"
-                        type="button"
-                        disabled={selectedProperty}
-                    >
-                      {prisonerInfo.prisoner ? (
-                          (() => {
-                            const prisoner = prisoners.find((p) => p.id === prisonerInfo.prisoner);
-                            return prisoner ? (
-                                <div className="flex items-center gap-2">
-                                  <span>{prisoner.full_name}</span>
-                                  <span className="text-gray-500">({prisoner.prisoner_number_value})</span>
-                                </div>
-                            ) : "Select prisoner...";
-                          })()
-                      ) : "Select prisoner..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Search prisoner..."/>
-                      <CommandList>
-                        <CommandEmpty>No prisoner found.</CommandEmpty>
-                        <CommandGroup>
-                          {prisoners.map((prisoner) => (
-                              <CommandItem
-                                  key={prisoner.id}
-                                  value={prisoner.full_name + ' ' + prisoner.prisoner_number_value}
-                                  onSelect={() => {
-                                    setPrisonerInfo({prisoner: prisoner.id});
-                                    setOpenPrisoner(false);
-                                  }}
-                              >
-                                <Check
-                                    className={cn(
-                                        "mr-2 h-4 w-4",
-                                        prisonerInfo.prisoner === prisoner.id ? "opacity-100" : "opacity-0"
-                                    )}
-                                />
-                                <div className="flex flex-col">
-                                  <span>{prisoner.full_name}</span>
-                                  <span
-                                      className="text-xs text-gray-500">Prisoner Number: {prisoner.prisoner_number_value}</span>
-                                </div>
-                              </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {prisonerInfo.prisoner && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-600">Prisoner Number:</span>
-                          <span
-                              className="ml-2">{prisoners.find((p) => p.id === prisonerInfo.prisoner)?.prisoner_number_value}</span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Full Name:</span>
-                          <span
-                              className="ml-2">{prisoners.find((p) => p.id === prisonerInfo.prisoner)?.full_name}</span>
-                        </div>
-                      </div>
-                    </div>
+                <Controller
+                  name="prisoner"
+                  control={control}
+                  rules={requiredValidation("Prisoner")}
+                  defaultValue={selectedProperty?.prisoner || null}
+                  render={({ field }) => (
+                    <CustomPrisonerSearch
+                      key={`prisoner-${isOpen}-${selectedProperty?.id}`}
+                      value={localPrisonerValue}
+                      onChange={(v) => {
+                        setLocalPrisonerValue(v ?? null);
+                        setPrisonerInfo(prev => ({ ...prev, prisoner: v || '' }));
+                        field.onChange(v ?? null);
+                        if (v) clearErrors('prisoner');
+                        
+                        // Clear prisoner details when prisoner is cleared
+                        if (!v) {
+                          setSelectedPrisonerDetails(null);
+                        }
+                      }}
+                      onSelectItem={(prisoner: any) => {
+                        if (prisoner) {
+                          // Store complete prisoner details directly from selection
+                          setSelectedPrisonerDetails({
+                            id: prisoner.id,
+                            name: prisoner.full_name || '',
+                            number: prisoner.prisoner_number_value || prisoner.prisoner_number || ''
+                          });
+                        } else {
+                          setSelectedPrisonerDetails(null);
+                        }
+                      }}
+                      disabled={mode === "edit"}
+                      placeholder="Search prisoner by name or number..."
+                      initialItems={initialPrisonerItem ? [initialPrisonerItem] : []}
+                    />
+                  )}
+                />
+                {errors.prisoner && (
+                  <p className="text-red-500 text-sm mt-1">{(errors.prisoner as any).message}</p>
                 )}
               </div>
             </div>
@@ -445,106 +619,42 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
             <div className="p-4">
               <h3 className="mb-4" style={{color: '#650000'}}>Visitor Information</h3>
               <div className="space-y-2">
-                <Label htmlFor="visitor">Visitor</Label>
-                <Popover open={openVisitor} onOpenChange={setOpenVisitor}>
-                  <PopoverTrigger asChild>
-                    <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openVisitor}
-                        className="w-full justify-between"
-                        type="button"
-                        disabled={isLoadingVisitors}
-                    >
-                      {visitorInfo.visitor ? (
-                          (() => {
-                            const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                            return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : "Select visitor...";
-                          })()
-                      ) : "Select visitor..."}
-                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50"/>
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-full p-0">
-                    <Command>
-                      <CommandInput placeholder="Search by name, ID, or phone..."/>
-                      <CommandList>
-                        <CommandEmpty>
-                          {isLoadingVisitors ? "Loading visitors..." : "No visitor found."}
-                        </CommandEmpty>
-                        <CommandGroup>
-                          <CommandItem
-                              value="none"
-                              onSelect={() => {
-                                setVisitorInfo({visitor: ''});
-                                setOpenVisitor(false);
-                              }}
-                          >
-                            <Check
-                                className={cn(
-                                    "mr-2 h-4 w-4",
-                                    visitorInfo.visitor === '' ? "opacity-100" : "opacity-0"
-                                )}
-                            />
-                            None
-                          </CommandItem>
-                          {visitors.map((visitor) => {
-                            const fullName = `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim();
-                            const searchValue = `${fullName} ${visitor.id_number} ${visitor.contact_no}`;
-                            return (
-                                <CommandItem
-                                    key={visitor.id}
-                                    value={searchValue}
-                                    onSelect={() => {
-                                      setVisitorInfo({visitor: visitor.id});
-                                      setOpenVisitor(false);
-                                    }}
-                                >
-                                  <Check
-                                      className={cn(
-                                          "mr-2 h-4 w-4",
-                                          visitorInfo.visitor === visitor.id ? "opacity-100" : "opacity-0"
-                                      )}
-                                  />
-                                  <div className="flex flex-col">
-                                    <span>{fullName}</span>
-                                    <span className="text-xs text-gray-500">
-                                    ID: {visitor.id_number} | Phone: {visitor.contact_no}
-                                  </span>
-                                  </div>
-                                </CommandItem>
-                            );
-                          })}
-                        </CommandGroup>
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {visitorInfo.visitor && (
-                    <div className="mt-2 p-3 bg-gray-50 rounded-md">
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        <div>
-                          <span className="text-gray-600">Visitor Name:</span>
-                          <span className="ml-2">
-                          {(() => {
-                            const visitor = visitors.find((v) => v.id === visitorInfo.visitor);
-                            return visitor ? `${visitor.first_name} ${visitor.middle_name} ${visitor.last_name}`.replace(/\s+/g, ' ').trim() : '';
-                          })()}
+                <Label htmlFor="visitor">Visitor (Optional)</Label>
+                <SearchableSelect
+                  key={`visitor-${isOpen}-${selectedProperty?.id}`}
+                  value={localVisitorValue}
+                  onChange={(v) => {
+                    setLocalVisitorValue(v ?? null);
+                    setVisitorInfo(prev => ({ ...prev, visitor: v || '' }));
+                  }}
+                  disabled={!prisonerInfo.prisoner}
+                  fetchPaginated={async (opts, signal) => {
+                    const response = await fetchVisitorsPaginated(
+                      opts.page || 1, 
+                      opts.search || '', 
+                      prisonerInfo.prisoner
+                    );
+                    return {
+                      items: response.results || [],
+                      count: response.count,
+                      next: response.next
+                    };
+                  }}
+                  renderItem={(visitor: any) => {
+                    const fullName = `${visitor.first_name || ''} ${visitor.middle_name || ''} ${visitor.last_name || ''}`.replace(/\s+/g, ' ').trim();
+                    return (
+                      <div className="flex flex-col">
+                        <span>{fullName}</span>
+                        <span className="text-xs text-gray-500">
+                          ID: {visitor.id_number || 'N/A'} | Phone: {visitor.contact_no || 'N/A'}
                         </span>
-                        </div>
-                        <div>
-                          <span className="text-gray-600">Phone Number:</span>
-                          <span
-                              className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.contact_no}</span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-gray-600">ID Number:</span>
-                          <span
-                              className="ml-2">{visitors.find((v) => v.id === visitorInfo.visitor)?.id_number}</span>
-                        </div>
                       </div>
-                    </div>
-                )}
+                    );
+                  }}
+                  labelField="first_name"
+                  placeholder="Search visitor by name, ID, or phone..."
+                  initialItem={initialVisitorItem}
+                />
               </div>
             </div>
           </Card>
@@ -584,6 +694,7 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
                   <div className="p-4 pt-0 space-y-4">
                     {propertyItems.map((item, index) => (
                         <PropertyItem
+                            ref={propertyItemRef}
                             key={item.id}
                             item={item}
                             propertyItems={propertyItems}
@@ -605,6 +716,9 @@ const CreatePropertyForm: React.FC<ChildProps> = ({ prisoners, setIsCreateDialog
                             units={units}
                             selectedProperty={selectedProperty}
                             propertyBags={propertyBags}
+                            validationErrorsFromParent={propertyItemValidationErrors[item.id]}
+                            selectedPrisonerDetails={selectedPrisonerDetails}
+                            setParentPrisonerInfo={setParentPrisonerInfo}
                         />
                     ))}
                   </div>

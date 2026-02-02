@@ -1,83 +1,56 @@
-import { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Input } from '../ui/input';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import axiosInstance from '../../services/axiosInstance';
+import SearchableSelect from '../common/SearchableSelect';
 
-const mockLockupTypes = [
-  { id: '660e8400-e29b-41d4-a716-446655440001', name: 'Morning Lockup' },
-  { id: '660e8400-e29b-41d4-a716-446655440002', name: 'Midday' },
-  { id: '660e8400-e29b-41d4-a716-446655440003', name: 'Evening Lockup' },
-];
-
-const mockStations = [
-  { id: '550e8400-e29b-41d4-a716-446655440001', name: 'Central Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440002', name: 'East Wing Station' },
-  { id: '550e8400-e29b-41d4-a716-446655440003', name: 'West Wing Station' },
-];
-
-// Category and sex mappings
-const categoryMap: Record<string, string> = {
-  'convict': '770e8400-e29b-41d4-a716-446655440001',
-  'remand': '770e8400-e29b-41d4-a716-446655440002',
-  'debtor': '770e8400-e29b-41d4-a716-446655440003',
-  'lodger': '770e8400-e29b-41d4-a716-446655440004', // Using Awaiting Trial ID
+// API ENDPOINTS - Centralized for easy management
+const API_ENDPOINTS = {
+  LOCATIONS: '/system-administration/locations/',
+  SEXES: '/system-administration/sexes/',
+  PRISONER_CATEGORIES: '/system-administration/prisoner-categories/',
+  LOCKUP_TYPES: '/station-management/api/lockup-types/',
+  STATIONS: '/system-administration/stations/',
+  BULK_CREATE: '/station-management/api/manual-lockups/bulk-create/',
 };
 
-const sexMap: Record<string, string> = {
-  'male': '880e8400-e29b-41d4-a716-446655440001',
-  'female': '880e8400-e29b-41d4-a716-446655440002',
-};
-
-interface ManualLockup {
+interface Location {
   id: string;
-  is_active: boolean;
-  date: string;
-  lockup_time: string;
-  location: 'court' | 'labour' | 'station';
-  count: number;
-  station: string;
-  type: string;
-  prisoner_category: string;
-  sex: string;
+  name: string;
+  slug?: string;
+  description?: string;
 }
 
-interface LockupCounts {
-  station: {
-    convict_male: string;
-    convict_female: string;
-    remand_male: string;
-    remand_female: string;
-    debtor_male: string;
-    debtor_female: string;
-    lodger_male: string;
-    lodger_female: string;
-  };
-  court: {
-    convict_male: string;
-    convict_female: string;
-    remand_male: string;
-    remand_female: string;
-    debtor_male: string;
-    debtor_female: string;
-    lodger_male: string;
-    lodger_female: string;
-  };
-  labour: {
-    convict_male: string;
-    convict_female: string;
-    remand_male: string;
-    remand_female: string;
-    debtor_male: string;
-    debtor_female: string;
-    lodger_male: string;
-    lodger_female: string;
-  };
+interface Sex {
+  id: string;
+  name: string;
+  description?: string;
 }
+
+interface PrisonerCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface LockupType {
+  id: string;
+  name: string;
+}
+
+interface Station {
+  id: string;
+  name: string;
+}
+
+// Dynamic counts structure: Record<locationId, Record<categoryId_sexId, count>>
+type LockupCounts = Record<string, Record<string, string>>;
 
 interface ManualLockupTableFormProps {
-  onRecordsCreated?: (records: ManualLockup[]) => void;
+  onRecordsCreated?: () => void;
   selectedStation?: string;
 }
 
@@ -87,46 +60,135 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
   const [time, setTime] = useState('');
   const [station, setStation] = useState(selectedStation || '');
   const [loading, setLoading] = useState(false);
+  
+  // API-driven reference data
+  const [locations, setLocations] = useState<Location[]>([]);
+  const [sexes, setSexes] = useState<Sex[]>([]);
+  const [prisonerCategories, setPrisonerCategories] = useState<PrisonerCategory[]>([]);
+  const [lockupTypes, setLockupTypes] = useState<LockupType[]>([]);
+  // NOTE: stations not stored in state - SearchableSelect handles them via paginated fetch
+  const [dataLoading, setDataLoading] = useState(true);
 
-  const [counts, setCounts] = useState<LockupCounts>({
-    station: {
-      convict_male: '',
-      convict_female: '',
-      remand_male: '',
-      remand_female: '',
-      debtor_male: '',
-      debtor_female: '',
-      lodger_male: '',
-      lodger_female: '',
-    },
-    court: {
-      convict_male: '',
-      convict_female: '',
-      remand_male: '',
-      remand_female: '',
-      debtor_male: '',
-      debtor_female: '',
-      lodger_male: '',
-      lodger_female: '',
-    },
-    labour: {
-      convict_male: '',
-      convict_female: '',
-      remand_male: '',
-      remand_female: '',
-      debtor_male: '',
-      debtor_female: '',
-      lodger_male: '',
-      lodger_female: '',
-    },
-  });
+  // Dynamic counts structure
+  const [counts, setCounts] = useState<LockupCounts>({});
 
-  const handleCountChange = (location: keyof LockupCounts, field: string, value: string) => {
+  // Memoize fetchPaginated to prevent infinite re-renders
+  const fetchStationsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    const response = await axiosInstance.get(API_ENDPOINTS.STATIONS, {
+      params: {
+        search: opts.search || '',
+        page: opts.page || 1,
+        page_size: opts.page_size || 50,
+      },
+      signal,
+    });
+    return {
+      items: response.data?.results || [],
+      count: response.data?.count || 0,
+      next: response.data?.next || null,
+    };
+  }, []); // Empty dependency array - function never changes
+
+  // Fetch locations from API
+  useEffect(() => {
+    const fetchLocations = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.LOCATIONS, {
+          params: { page_size: -1 }
+        });
+        const items = response.data?.results || [];
+        setLocations(items);
+      } catch (error) {
+        console.error('Failed to fetch locations:', error);
+        toast.error('Failed to load locations');
+        setLocations([]);
+      }
+    };
+    fetchLocations();
+  }, []);
+
+  // Fetch sexes from API
+  useEffect(() => {
+    const fetchSexes = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.SEXES, {
+          params: { page_size: -1 }
+        });
+        const items = response.data?.results || [];
+        setSexes(items);
+      } catch (error) {
+        console.error('Failed to fetch sexes:', error);
+        toast.error('Failed to load sexes');
+        setSexes([]);
+      }
+    };
+    fetchSexes();
+  }, []);
+
+  // Fetch prisoner categories from API
+  useEffect(() => {
+    const fetchPrisonerCategories = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.PRISONER_CATEGORIES, {
+          params: { page_size: -1 }
+        });
+        const items = response.data?.results || [];
+        setPrisonerCategories(items);
+      } catch (error) {
+        console.error('Failed to fetch prisoner categories:', error);
+        toast.error('Failed to load prisoner categories');
+        setPrisonerCategories([]);
+      }
+    };
+    fetchPrisonerCategories();
+  }, []);
+
+  // Fetch lockup types from API
+  useEffect(() => {
+    const fetchLockupTypes = async () => {
+      try {
+        const response = await axiosInstance.get(API_ENDPOINTS.LOCKUP_TYPES, {
+          params: { page_size: -1 }
+        });
+        const items = response.data?.results || [];
+        setLockupTypes(items);
+      } catch (error) {
+        console.error('Failed to fetch lockup types:', error);
+        toast.error('Failed to load lockup types');
+        setLockupTypes([]);
+      } finally {
+        setDataLoading(false);
+      }
+    };
+    fetchLockupTypes();
+  }, []);
+
+  // NOTE: Stations are fetched via SearchableSelect's paginated mode, not here
+  // Removed duplicate stations fetch to prevent conflicts
+
+  // Initialize counts structure when reference data is loaded
+  useEffect(() => {
+    if (locations.length > 0 && prisonerCategories.length > 0 && sexes.length > 0) {
+      const initialCounts: LockupCounts = {};
+      locations.forEach(location => {
+        initialCounts[location.id] = {};
+        prisonerCategories.forEach(category => {
+          sexes.forEach(sex => {
+            const key = `${category.id}_${sex.id}`;
+            initialCounts[location.id][key] = '';
+          });
+        });
+      });
+      setCounts(initialCounts);
+    }
+  }, [locations, prisonerCategories, sexes]);
+
+  const handleCountChange = (locationId: string, key: string, value: string) => {
     setCounts({
       ...counts,
-      [location]: {
-        ...counts[location],
-        [field]: value,
+      [locationId]: {
+        ...counts[locationId],
+        [key]: value,
       },
     });
   };
@@ -134,23 +196,14 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
   // Calculate how many records will be created
   const calculateRecordCount = () => {
     let count = 0;
-    const locations: Array<keyof LockupCounts> = ['station', 'court', 'labour'];
-    const categories = ['convict', 'remand', 'debtor', 'lodger'];
-    const sexes = ['male', 'female'];
-
-    locations.forEach((location) => {
-      categories.forEach((category) => {
-        sexes.forEach((sex) => {
-          const fieldName = `${category}_${sex}` as keyof typeof counts[typeof location];
-          const value = counts[location][fieldName];
-          const cellCount = value ? parseInt(value) : 0;
-          if (cellCount > 0) {
-            count++;
-          }
-        });
+    Object.values(counts).forEach(locationCounts => {
+      Object.values(locationCounts).forEach(value => {
+        const cellCount = value ? parseInt(value) : 0;
+        if (cellCount > 0) {
+          count++;
+        }
       });
     });
-
     return count;
   };
 
@@ -169,92 +222,72 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
     setLoading(true);
 
     try {
-      // Build individual records for each non-empty/non-zero cell
-      const records: ManualLockup[] = [];
-      let recordCount = 0;
+      // Build counts array for bulk-create API
+      const countsArray: Array<{
+        count: number;
+        location: string;
+        prisoner_category: string;
+        sex: string;
+      }> = [];
 
       // Process each location
-      const locations: Array<keyof LockupCounts> = ['station', 'court', 'labour'];
-      const categories = ['convict', 'remand', 'debtor', 'lodger'];
-      const sexes = ['male', 'female'];
-
-      locations.forEach((location) => {
-        categories.forEach((category) => {
-          sexes.forEach((sex) => {
-            const fieldName = `${category}_${sex}` as keyof typeof counts[typeof location];
-            const value = counts[location][fieldName];
-            const count = value ? parseInt(value) : 0;
-
-            if (count > 0) {
-              records.push({
-                id: `${Date.now()}-${recordCount++}`,
-                is_active: true,
-                date,
-                lockup_time: time,
-                location: location as 'court' | 'labour' | 'station',
-                count,
-                station,
-                type: lockupType,
-                prisoner_category: categoryMap[category],
-                sex: sexMap[sex],
-              });
-            }
-          });
+      Object.entries(counts).forEach(([locationId, locationCounts]) => {
+        Object.entries(locationCounts).forEach(([key, value]) => {
+          const count = value ? parseInt(value) : 0;
+          if (count > 0) {
+            // Extract category and sex IDs from key (format: categoryId_sexId)
+            const [categoryId, sexId] = key.split('_');
+            countsArray.push({
+              count,
+              location: locationId,
+              prisoner_category: categoryId,
+              sex: sexId,
+            });
+          }
         });
       });
 
-      if (records.length === 0) {
+      if (countsArray.length === 0) {
         toast.error('Please enter at least one count');
         setLoading(false);
         return;
       }
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // API payload
+      const payload = {
+        station,
+        type: lockupType,
+        date,
+        lockup_time: time,
+        counts: countsArray,
+      };
 
-      // Call the parent callback with the created records
-      if (onRecordsCreated) {
-        onRecordsCreated(records);
-      }
+      // Make API call to bulk-create endpoint
+      await axiosInstance.post(API_ENDPOINTS.BULK_CREATE, payload);
 
-      toast.success(`Successfully created ${records.length} lockup record${records.length > 1 ? 's' : ''}`);
+      toast.success(`Successfully created ${countsArray.length} lockup record${countsArray.length > 1 ? 's' : ''}`);
       
       // Reset form
-      setCounts({
-        station: {
-          convict_male: '',
-          convict_female: '',
-          remand_male: '',
-          remand_female: '',
-          debtor_male: '',
-          debtor_female: '',
-          lodger_male: '',
-          lodger_female: '',
-        },
-        court: {
-          convict_male: '',
-          convict_female: '',
-          remand_male: '',
-          remand_female: '',
-          debtor_male: '',
-          debtor_female: '',
-          lodger_male: '',
-          lodger_female: '',
-        },
-        labour: {
-          convict_male: '',
-          convict_female: '',
-          remand_male: '',
-          remand_female: '',
-          debtor_male: '',
-          debtor_female: '',
-          lodger_male: '',
-          lodger_female: '',
-        },
+      const resetCounts: LockupCounts = {};
+      locations.forEach(location => {
+        resetCounts[location.id] = {};
+        prisonerCategories.forEach(category => {
+          sexes.forEach(sex => {
+            const key = `${category.id}_${sex.id}`;
+            resetCounts[location.id][key] = '';
+          });
+        });
       });
-    } catch (error) {
-      toast.error('Failed to save lockup records');
-      console.error(error);
+      setCounts(resetCounts);
+      
+      // Notify parent to refresh
+      if (onRecordsCreated) {
+        onRecordsCreated();
+      }
+    } catch (error: any) {
+      console.error('Failed to save lockup records:', error);
+      const errorMsg = error.response?.data?.message || error.response?.data?.detail || 'Failed to save lockup records';
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -262,346 +295,152 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
 
   return (
     <div className="space-y-6">
-      {/* Top Controls */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-lg border">
-        {/* <div className="space-y-2">
-          <Label htmlFor="station">
-            Station <span className="text-red-500">*</span>
-          </Label>
-          <Select value={station} onValueChange={setStation}>
-            <SelectTrigger id="station">
-              <SelectValue placeholder="Select station" />
-            </SelectTrigger>
-            <SelectContent>
-              {mockStations.map((s) => (
-                <SelectItem key={s.id} value={s.id}>
-                  {s.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div> */}
+      {dataLoading ? (
+        <div className="text-center p-8">Loading reference data...</div>
+      ) : (
+        <>
+          {/* Top Controls */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-white p-4 rounded-lg border">
+            <div className="space-y-2">
+              <Label htmlFor="station">
+                Station <span className="text-red-500">*</span>
+              </Label>
+              <SearchableSelect
+                value={station}
+                onChange={(id) => setStation(id || '')}
+                fetchPaginated={fetchStationsPaginated}
+                placeholder="Search station..."
+                idField="id"
+                labelField="name"
+                pageSize={50}
+                minQueryLength={0}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="lockup_type">
-            Lockup Type <span className="text-red-500">*</span>
-          </Label>
-          <Select value={lockupType} onValueChange={setLockupType}>
-            <SelectTrigger id="lockup_type">
-              <SelectValue placeholder="Select lockup type" />
-            </SelectTrigger>
-            <SelectContent>
-              {mockLockupTypes.map((type) => (
-                <SelectItem key={type.id} value={type.id}>
-                  {type.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="lockup_type">
+                Lockup Type <span className="text-red-500">*</span>
+              </Label>
+              <Select value={lockupType} onValueChange={setLockupType}>
+                <SelectTrigger id="lockup_type">
+                  <SelectValue placeholder="Select lockup type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {lockupTypes.map((type) => (
+                    <SelectItem key={type.id} value={type.id}>
+                      {type.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="date">
-            Date <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="date"
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="date">
+                Date <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="time">
-            Time <span className="text-red-500">*</span>
-          </Label>
-          <Input
-            id="time"
-            type="time"
-            value={time}
-            onChange={(e) => setTime(e.target.value)}
-          />
-        </div>
-      </div>
+            <div className="space-y-2">
+              <Label htmlFor="time">
+                Time <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="time"
+                type="time"
+                value={time}
+                onChange={(e) => setTime(e.target.value)}
+              />
+            </div>
+          </div>
 
-      {/* Lockup Count Table */}
-      <div className="bg-white rounded-lg border overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr className="border-b bg-muted/50">
-              <th className="border-r p-3 text-left min-w-[120px]">Location</th>
-              <th className="border-r p-3 text-center" colSpan={2}>Convict</th>
-              <th className="border-r p-3 text-center" colSpan={2}>Remand</th>
-              <th className="border-r p-3 text-center" colSpan={2}>Debtor</th>
-              <th className="p-3 text-center" colSpan={2}>Lodger</th>
-            </tr>
-            <tr className="border-b bg-muted/30">
-              <th className="border-r p-2"></th>
-              <th className="border-r p-2 text-center text-sm">Male</th>
-              <th className="border-r p-2 text-center text-sm">Female</th>
-              <th className="border-r p-2 text-center text-sm">Male</th>
-              <th className="border-r p-2 text-center text-sm">Female</th>
-              <th className="border-r p-2 text-center text-sm">Male</th>
-              <th className="border-r p-2 text-center text-sm">Female</th>
-              <th className="border-r p-2 text-center text-sm">Male</th>
-              <th className="p-2 text-center text-sm">Female</th>
-            </tr>
-          </thead>
-          <tbody>
-            {/* Station Row */}
-            <tr className="border-b hover:bg-muted/20">
-              <td className="border-r p-3">Station</td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.convict_male}
-                  onChange={(e) => handleCountChange('station', 'convict_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.convict_female}
-                  onChange={(e) => handleCountChange('station', 'convict_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.remand_male}
-                  onChange={(e) => handleCountChange('station', 'remand_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.remand_female}
-                  onChange={(e) => handleCountChange('station', 'remand_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.debtor_male}
-                  onChange={(e) => handleCountChange('station', 'debtor_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.debtor_female}
-                  onChange={(e) => handleCountChange('station', 'debtor_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.lodger_male}
-                  onChange={(e) => handleCountChange('station', 'lodger_male', e.target.value)}
-                />
-              </td>
-              <td className="p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.station.lodger_female}
-                  onChange={(e) => handleCountChange('station', 'lodger_female', e.target.value)}
-                />
-              </td>
-            </tr>
+          {/* Lockup Count Table - Dynamically Generated */}
+          <div className="bg-white rounded-lg border overflow-x-auto">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="border-r p-3 text-left min-w-[120px]">Location</th>
+                  {/* Dynamic category columns */}
+                  {prisonerCategories.map(category => (
+                    <th key={category.id} className="border-r p-3 text-center capitalize" colSpan={sexes.length}>
+                      {category.name}
+                    </th>
+                  ))}
+                </tr>
+                <tr className="border-b bg-muted/30">
+                  <th className="border-r p-2"></th>
+                  {/* Dynamic sex sub-columns for each category */}
+                  {prisonerCategories.map(category => (
+                    <React.Fragment key={category.id}>
+                      {sexes.map((sex, idx) => (
+                        <th 
+                          key={`${category.id}-${sex.id}`} 
+                          className={`${idx < sexes.length - 1 ? 'border-r' : ''} p-2 text-center text-sm capitalize`}
+                        >
+                          {sex.name}
+                        </th>
+                      ))}
+                    </React.Fragment>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {/* Dynamic Location Rows */}
+                {locations.map(location => (
+                  <tr key={location.id} className="border-b hover:bg-muted/20">
+                    <td className="border-r p-3 capitalize">{location.name}</td>
+                    {/* Dynamic input cells for each category_sex combination */}
+                    {prisonerCategories.map(category => (
+                      <React.Fragment key={category.id}>
+                        {sexes.map((sex, idx) => {
+                          const key = `${category.id}_${sex.id}`;
+                          return (
+                            <td key={`${category.id}-${sex.id}`} className={`${idx < sexes.length - 1 ? 'border-r' : ''} p-2`}>
+                              <Input
+                                type="number"
+                                min="0"
+                                className="h-9 text-center"
+                                value={counts[location.id]?.[key] || ''}
+                                onChange={(e) => handleCountChange(location.id, key, e.target.value)}
+                              />
+                            </td>
+                          );
+                        })}
+                      </React.Fragment>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
 
-            {/* Court Row */}
-            <tr className="border-b hover:bg-muted/20">
-              <td className="border-r p-3">Court</td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.convict_male}
-                  onChange={(e) => handleCountChange('court', 'convict_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.convict_female}
-                  onChange={(e) => handleCountChange('court', 'convict_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.remand_male}
-                  onChange={(e) => handleCountChange('court', 'remand_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.remand_female}
-                  onChange={(e) => handleCountChange('court', 'remand_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.debtor_male}
-                  onChange={(e) => handleCountChange('court', 'debtor_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.debtor_female}
-                  onChange={(e) => handleCountChange('court', 'debtor_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.lodger_male}
-                  onChange={(e) => handleCountChange('court', 'lodger_male', e.target.value)}
-                />
-              </td>
-              <td className="p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.court.lodger_female}
-                  onChange={(e) => handleCountChange('court', 'lodger_female', e.target.value)}
-                />
-              </td>
-            </tr>
+          {/* Record Count Info */}
+          {calculateRecordCount() > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+              <p className="text-sm text-blue-800">
+                {calculateRecordCount()} record{calculateRecordCount() > 1 ? 's' : ''} will be created
+              </p>
+            </div>
+          )}
 
-            {/* Labour Row */}
-            <tr className="hover:bg-muted/20">
-              <td className="border-r p-3">Labour</td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.convict_male}
-                  onChange={(e) => handleCountChange('labour', 'convict_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.convict_female}
-                  onChange={(e) => handleCountChange('labour', 'convict_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.remand_male}
-                  onChange={(e) => handleCountChange('labour', 'remand_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.remand_female}
-                  onChange={(e) => handleCountChange('labour', 'remand_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.debtor_male}
-                  onChange={(e) => handleCountChange('labour', 'debtor_male', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.debtor_female}
-                  onChange={(e) => handleCountChange('labour', 'debtor_female', e.target.value)}
-                />
-              </td>
-              <td className="border-r p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.lodger_male}
-                  onChange={(e) => handleCountChange('labour', 'lodger_male', e.target.value)}
-                />
-              </td>
-              <td className="p-2">
-                <Input
-                  type="number"
-                  min="0"
-                  className="h-9 text-center"
-                  value={counts.labour.lodger_female}
-                  onChange={(e) => handleCountChange('labour', 'lodger_female', e.target.value)}
-                />
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* Record Count Info */}
-      {calculateRecordCount() > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-          <p className="text-sm text-blue-800">
-            {calculateRecordCount()} record{calculateRecordCount() > 1 ? 's' : ''} will be created
-          </p>
-        </div>
+          {/* Save Button */}
+          <div className="flex justify-center">
+            <Button
+              onClick={handleSave}
+              disabled={loading || dataLoading}
+              className="bg-primary hover:bg-primary/90 min-w-[200px]"
+            >
+              {loading ? 'Saving...' : 'SAVE'}
+            </Button>
+          </div>
+        </>
       )}
-
-      {/* Save Button */}
-      <div className="flex justify-center">
-        <Button
-          onClick={handleSave}
-          disabled={loading}
-          className="bg-primary hover:bg-primary/90 min-w-[200px]"
-        >
-          {loading ? 'Saving...' : 'SAVE'}
-        </Button>
-      </div>
     </div>
   );
 }

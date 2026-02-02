@@ -194,11 +194,6 @@ export function StaffEntryExitScreen() {
     return () => { if (summaryAbortRef.current) try { summaryAbortRef.current.abort(); } catch {} };
   }, [fetchSummary]);
 
-  const loadStations = useCallback(async () => {
-    const s = await StaffEntryService.fetchStations();
-    setStationOptions(s || []);
-  }, []);
-
   // helpers
   // when staffDetails is set, initialize selectedStation and reset fetchFailed
   useEffect(() => {
@@ -234,6 +229,11 @@ export function StaffEntryExitScreen() {
     setStationSearch('');
     if (stationSearchRef.current) stationSearchRef.current.blur();
   };
+
+  const loadStations = useCallback(async () => {
+    const s = await StaffEntryService.fetchStations();
+    setStationOptions(s || []);
+  }, []);
 
   const getCurrentUserId = () => {
     try {
@@ -830,6 +830,7 @@ export function StaffEntryExitScreen() {
                       <Select
                         value={selectedStation}
                         onValueChange={(v) => { setSelectedStation(v || ''); setFormErrors(null); }}
+                        disabled={true}
                         // focus the internal search input when the menu opens
                         onOpenChange={(open) => {
                           if (open) {
@@ -1068,8 +1069,18 @@ export function StaffEntryExitScreen() {
 
           <div className="space-y-4 py-2">
             <div className="space-y-2">
+              <Label>Staff Name</Label>
+              <Input value={editingRecord?.staff_name ?? ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
+              <Label>Force Number</Label>
+              <Input value={editingRecord?.staff_force_number ?? ''} disabled className="bg-muted" />
+            </div>
+
+            <div className="space-y-2">
               <Label>Station <span className="text-red-500">*</span></Label>
-              <Select value={editSelectedStation} onValueChange={(v) => { setEditSelectedStation(v || ''); setFormErrors(null); }}>
+              <Select value={editSelectedStation} onValueChange={(v) => { setEditSelectedStation(v || ''); setFormErrors(null); }} disabled={true}>
                 <SelectTrigger><SelectValue placeholder="Select a station" /></SelectTrigger>
                 <SelectContent>
                   {stationOptions.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -1101,7 +1112,7 @@ export function StaffEntryExitScreen() {
             <div className="flex gap-2 justify-end mt-4">
               <Button variant="outline" onClick={() => setEditDialogOpen(false)} disabled={editSubmitLoading}>Cancel</Button>
               <Button onClick={handleEditSave} className="bg-primary hover:bg-primary/90" disabled={editSubmitLoading}>
-                {editSubmitLoading ? 'Saving...' : 'Save'}
+                {editSubmitLoading ? 'Updating...' : 'Update'}
               </Button>
             </div>
           </div>

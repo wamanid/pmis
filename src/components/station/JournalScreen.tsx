@@ -37,19 +37,9 @@ interface JournalRow {
 }
 
 export function JournalScreen() {
-  // table controls (DataTable will perform fetch from the provided url)
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState<number>(10);
-  const [sortField, setSortField] = useState<string | undefined>(undefined);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc' | undefined>(undefined);
+  // table controls (DataTable handles pagination, sorting internally - searchTerm used in URL)
   const [searchTerm, setSearchTerm] = useState('');
   const [reloadKey, setReloadKey] = useState<number>(Date.now());
-
-  // lookups
-  const [journalTypes, setJournalTypes] = useState<any[]>([]);
-  const [stations, setStations] = useState<any[]>([]);
-  const [dutyOfficers, setDutyOfficers] = useState<any[]>([]);
-  const [lookupLoading, setLookupLoading] = useState(false);
 
   // stats/sample
   const [sampleJournals, setSampleJournals] = useState<JournalRow[]>([]);
@@ -83,36 +73,83 @@ export function JournalScreen() {
     rank_name: '',  // ✅ holds rank label for UI only
   });
 
+  // global filters (from app) drive reloads and are included in DataTable url below
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
+  useFilterRefresh(() => {
+    setReloadKey(() => Date.now());
+  }, [globalRegion, globalDistrict, globalStation]);
+
+  // Server-side paginated fetch callbacks (14M+ ready)
+  const fetchJournalTypesPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await JournalService.fetchJournalTypes({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          region: globalRegion || undefined,
+          district: globalDistrict || undefined,
+          station: globalStation || undefined,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        // Silently ignore cancellation errors
+        if (
+          error?.name === 'AbortError' ||
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchJournalTypesPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    [globalRegion, globalDistrict, globalStation]
+  );
+
+  const fetchStationsPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await JournalService.fetchStations({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          region: globalRegion || undefined,
+          district: globalDistrict || undefined,
+          station: globalStation || undefined,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        // Silently ignore cancellation errors
+        if (
+          error?.name === 'AbortError' ||
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchStationsPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    [globalRegion, globalDistrict, globalStation]
+  );
+
   // refs
   const abortRef = useRef<AbortController | null>(null);
-  const [dutyQuery, setDutyQuery] = useState('');
-  const [stationQuery, setStationQuery] = useState('');
-
-  // load lookups
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-    setLookupLoading(true);
-    (async () => {
-      try {
-        const [types, stns, officers] = await Promise.all([
-          JournalService.fetchJournalTypes(undefined, controller.signal),
-          JournalService.fetchStations(undefined, controller.signal),
-          JournalService.fetchDutyOfficers(undefined, controller.signal),
-        ]);
-        if (!mounted) return;
-        setJournalTypes(types ?? []);
-        setStations(stns ?? []);
-        setDutyOfficers(officers ?? []);
-      } catch (err) {
-        console.error('lookup load error', err);
-        toast.error('Failed to load lookup data');
-      } finally {
-        setLookupLoading(false);
-      }
-    })();
-    return () => { mounted = false; controller.abort(); };
-  }, []);
 
   // sample for stats
   useEffect(() => {
@@ -155,26 +192,6 @@ export function JournalScreen() {
     ...it,
   }), []);
 
-  // (search is handled directly by DataTable via journalsUrl() and externalSearch)
-
-  // global filters (from app) drive reloads and are included in DataTable url below
-  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
-  useFilterRefresh(() => {
-    setReloadKey(() => Date.now());
-  }, [globalRegion, globalDistrict, globalStation]);
-
-  // DataTable now fetches directly from the URL returned by journalsUrl()
-  // reloadKey and filters drive the URL so DataTable will refetch automatically.
-  // useEffect(() => {
-  //   loadTable(page, pageSize, sortField, sortDir, debouncedSearch);
-  // }, [page, pageSize, sortField, sortDir, reloadKey, selectedJournalTypes, selectedStations, debouncedSearch, loadTable]);
-
-  // datatable callbacks
-  const onSearch = (q: string) => { setSearchTerm(q); setPage(1); };
-  const onPageChange = (p: number) => { setPage(p); };
-  const onPageSizeChange = (s: number) => { setPageSize(s); setPage(1); };
-  const onSort = (f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); };
-
   // build DataTable url with global + local filters and reload key to force refetch when needed
   const journalsUrl = useCallback(() => {
     const base = '/station-management/api/journals/';
@@ -189,22 +206,59 @@ export function JournalScreen() {
     return `${base}?${params.join('&')}`;
   }, [reloadKey, searchTerm, selectedJournalTypes, selectedStations, globalRegion, globalDistrict, globalStation]);
 
-  // duty selection autofill
-  const handleDutyOfficerSelect = (id: string) => {
-    const o = dutyOfficers.find(d => String(d.id) === String(id));
-    if (o) {
-      setFormData(prev => ({
-        ...prev,
-        duty_officer: String(o.id),
-        force_number: o.force_number ?? prev.force_number,
-
-        // ✅ FIX: Save rank ID for backend, and rank_name for display
-        rank: o.rank ?? prev.rank,                 // <-- ID sent to API
-        rank_name: o.rank_name ?? prev.rank_name,  // <-- Name shown in UI
-      }));
-    } else {
-      setFormData(prev => ({ ...prev, duty_officer: id }));
+  // duty selection autofill - fetch officer details when duty_officer changes
+  useEffect(() => {
+    if (!formData.duty_officer) {
+      return; // Don't clear fields, just skip fetching
     }
+
+    let mounted = true;
+    const controller = new AbortController();
+    
+    (async () => {
+      try {
+        // Fetch officer details using id parameter (not search)
+        const response = await JournalService.fetchDutyOfficers({
+          id: formData.duty_officer, // Use id parameter to fetch specific officer
+          page: 1,
+          page_size: 1,
+        }, controller.signal);
+        
+        if (!mounted) return;
+        
+        const results = response?.results ?? [];
+        const officer = results.length > 0 ? results[0] : null;
+        
+        if (officer) {
+          setFormData(prev => ({
+            ...prev,
+            force_number: officer.force_number ?? '',
+            rank: officer.rank ?? '',
+            rank_name: officer.rank_name ?? '',
+          }));
+        }
+      } catch (err: any) {
+        // Ignore cancellation errors
+        if (
+          err?.name === 'AbortError' ||
+          err?.name === 'CanceledError' ||
+          err?.code === 'ERR_CANCELED' ||
+          String(err?.message).toLowerCase().includes('canceled')
+        ) {
+          return;
+        }
+        console.error('Failed to fetch officer details:', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [formData.duty_officer]);
+
+  const handleDutyOfficerSelect = (id: string | null) => {
+    setFormData(prev => ({ ...prev, duty_officer: id ?? '' }));
   };
 
 
@@ -281,10 +335,10 @@ export function JournalScreen() {
         rank: '',
        rank_name: '',
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('save error', err?.response ?? err);
       // show validation messages from backend when available
-      const data = (err as any)?.response?.data;
+      const data = err?.response?.data;
       if (data) {
         if (typeof data === 'string') {
           toast.error(data);
@@ -328,14 +382,12 @@ export function JournalScreen() {
 
   const toggleJournalType = (id: string) => {
     const newSelected = selectedJournalTypes.includes(id) ? selectedJournalTypes.filter(x => x !== id) : [...selectedJournalTypes, id];
-    setPage(1);
     setSelectedJournalTypes(newSelected);
     // don't clear tableData here — keep current rows until new response arrives
   };
 
   const toggleStation = (id: string) => {
     const newSelected = selectedStations.includes(id) ? selectedStations.filter(x => x !== id) : [...selectedStations, id];
-    setPage(1);
     setSelectedStations(newSelected);
   };
 
@@ -343,29 +395,20 @@ export function JournalScreen() {
     setSelectedJournalTypes([]);
     setSelectedStations([]);
     setSearchTerm('');
-    setPage(1);
   };
   
   const activeFiltersCount = selectedJournalTypes.length + selectedStations.length;
 
-  const getJournalTypeName = (id: string) => journalTypes.find(t => String(t.id) === String(id))?.name ?? String(id);
-  const getStationName = (id: string) => stations.find(s => String(s.id) === String(id))?.name ?? String(id);
-  // const getRankName = (idOrName?: string) => idOrName ?? '';
-  // helper to get officer name from dutyOfficers lookup
-  // const getOfficerName = (id?: string) => {
-  //   if (!id) return '';
-  //   const o = dutyOfficers.find(d => String(d.id) === String(id));
-  //   if (!o) return '';
-  //   const name = `${o.first_name ?? ''} ${o.last_name ?? ''}`.trim();
-  //   return name || String(o.id);
-  // };
+  // Note: Helper functions removed since we're using server-side pagination
+  // Filter badges will show IDs until filter system is updated to use SearchableSelect
+
   
-  // build details content for delete confirm (prefer server-provided name fields, fallback to lookups)
+  // build details content for delete confirm (prefer server-provided name fields, fallback to IDs)
   const deleteDialogDetails = journalToDelete
     ? (() => {
         const j = sampleJournals.find(s => String(s.id) === String(journalToDelete)) ?? null;
-        const jt = j?.type_of_journal_name ?? getJournalTypeName(j?.type_of_journal ?? '');
-        const st = j?.station_name ?? getStationName(j?.station ?? '');
+        const jt = j?.type_of_journal_name ?? String(j?.type_of_journal ?? '');
+        const st = j?.station_name ?? String(j?.station ?? '');
         const dt = j?.journal_date ?? '';
         const at = j?.activity ?? '';
         // const sts = j?.is_active ?? '';
@@ -401,7 +444,7 @@ export function JournalScreen() {
       label: 'Journal Type',
       sortable: true,
       render: (_v: any, journal: JournalRow) => (
-        <Badge variant="outline">{getJournalTypeName(journal.type_of_journal)}</Badge>
+        <Badge variant="outline">{journal.type_of_journal_name || journal.type_of_journal}</Badge>
       ),
     },
     { key: 'station_name', label: 'Station', sortable: true },
@@ -439,7 +482,7 @@ export function JournalScreen() {
       sortable: false,
       render: (_v: any, row: JournalRow) => (
         <div className="flex items-center justify-end gap-2">
-          <Button variant="ghost" size="sm" onClick={() => handleView(row)}><Eye className="h-4 w-4 text-green-600" /></Button>
+          <Button variant="ghost" size="sm" onClick={() => handleView(row)}><Eye className="h-4 w-4 text-secondary-600" /></Button>
           <Button variant="ghost" size="sm" onClick={() => handleEdit(row)}><Edit className="h-4 w-4 text-blue-600" /></Button>
           <Button variant="ghost" size="sm" onClick={() => handleDeleteConfirm(row.id)}><Trash2 className="h-4 w-4 text-red-600" /></Button>
         </div>
@@ -462,24 +505,49 @@ export function JournalScreen() {
           <p className="text-muted-foreground">Record and manage station journals and reports</p>
         </div>
 
-        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) { setEditingJournal(null); setFormData(prev => ({ ...prev, is_active: true })); } }}>
+        <Dialog open={dialogOpen} onOpenChange={(open) => { 
+          if (!open) {
+            // Only reset when dialog is actually closing
+            setDialogOpen(false);
+            setEditingJournal(null);
+            setFormData({
+              is_active: true,
+              activity: '',
+              state_of_prisoners: '',
+              state_of_prison: '',
+              remark: '',
+              force_number: '',
+              journal_date: new Date().toISOString().split('T')[0],
+              station: '',
+              type_of_journal: '',
+              duty_officer: '',
+              rank: '',
+              rank_name: '',
+            });
+          } else {
+            setDialogOpen(true);
+          }
+        }}>
           <DialogTrigger asChild>
             <Button className="bg-primary hover:bg-primary/90"><Plus className="mr-2 h-4 w-4" /> Add Journal Entry</Button>
           </DialogTrigger>
-          <DialogContent className="max-w-[95vw] w-[1100px] max-h-[95vh] overflow-y-auto">
+          <DialogContent className="max-w-[95vw] w-[1000px] max-h-[95vh] overflow-y-auto" onInteractOutside={(e) => {
+            // Prevent dialog from closing when clicking on dropdown portals
+            e.preventDefault();
+          }}>
             <DialogHeader>
               <DialogTitle>{editingJournal ? 'Edit Journal Entry' : 'Add New Journal Entry'}</DialogTitle>
               <DialogDescription>{editingJournal ? 'Update the journal entry details below' : 'Fill in the details for the new journal entry'}</DialogDescription>
             </DialogHeader>
 
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} key={editingJournal?.id || 'new'}>
               <div className="grid gap-4 py-4">
                 <div className="flex items-center justify-between">
                   <div className="space-y-0.5">
                     <Label htmlFor="is_active">Active Status</Label>
                     <p className="text-sm text-muted-foreground">Mark this journal entry as active</p>
                   </div>
-                  <Switch id="is_active" checked={formData.is_active} onCheckedChange={(c) => setFormData({ ...formData, is_active: !!c })} />
+                  <Switch id="is_active" checked={formData.is_active} onCheckedChange={(c: boolean) => setFormData(prev => ({ ...prev, is_active: !!c }))} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -493,7 +561,7 @@ export function JournalScreen() {
                       label="Journal Date"
                       required
                       value={formData.journal_date ? new Date(formData.journal_date) : null}
-                      onChange={(d) => setFormData({ ...formData, journal_date: d ? d.toISOString().split('T')[0] : '' })}
+                      onChange={(d) => setFormData(prev => ({ ...prev, journal_date: d ? d.toISOString().split('T')[0] : '' }))}
                       placeholder="Pick a date"
                     />
                   </div>
@@ -501,12 +569,14 @@ export function JournalScreen() {
                   <div>
                     <Label className="mb-2">Station <span className="text-red-500">*</span></Label>
                     <SearchableSelect
+                      key={`station-${dialogOpen}`}
                       value={formData.station}
-                      onChange={(v) => setFormData({ ...formData, station: v ?? '' })}
-                      items={stations.map(s => ({ ...s, name: s.name ?? s.station_name ?? s.id }))}
+                      onChange={(v) => setFormData(prev => ({ ...prev, station: v ?? '' }))}
+                      fetchPaginated={fetchStationsPaginated}
                       idField="id"
                       labelField="name"
                       placeholder="Select station"
+                      pageSize={50}
                     />
                   </div>
                 </div>
@@ -515,22 +585,24 @@ export function JournalScreen() {
                   <div>
                     <Label className="mb-2">Journal Type <span className="text-red-500">*</span></Label>
                     <SearchableSelect
+                      key={`journal-type-${dialogOpen}`}
                       value={formData.type_of_journal}
-                      onChange={(v) => setFormData({ ...formData, type_of_journal: v ?? '' })}
-                      items={journalTypes.map(t => ({ ...t, name: t.name ?? t.type_of_journal_name ?? t.id }))}
+                      onChange={(v) => setFormData(prev => ({ ...prev, type_of_journal: v ?? '' }))}
+                      fetchPaginated={fetchJournalTypesPaginated}
                       idField="id"
                       labelField="name"
                       placeholder="Select journal type"
+                      pageSize={50}
                     />
                   </div>
 
                   <div>
                     <Label className="mb-2">Duty Officer <span className="text-red-500">*</span></Label>
                     <StaffProfileSelect
+                      key={`duty-officer-${dialogOpen}`}
                       value={formData.duty_officer || null}
-                      onChange={(v) => handleDutyOfficerSelect(v ?? '')}
+                      onChange={handleDutyOfficerSelect}
                       placeholder="Select duty officer"
-                      initialItems={dutyOfficers}
                     />
                   </div>
                 </div>
@@ -538,41 +610,58 @@ export function JournalScreen() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="mb-2">Force Number <span className="text-red-500">*</span></Label>
-                    <Input value={formData.force_number} readOnly className="bg-muted" placeholder="Auto-populated" required />
+                    <Input value={formData.force_number} readOnly disabled className="bg-muted" placeholder="Auto-populated" required />
                   </div>
                   <div>
                     {/* <Label>Rank <span className="text-red-500">*</span></Label>
                     <Input value={formData.rank} readOnly className="bg-muted" placeholder="Auto-populated" required /> */}
                     <Label className="mb-2">Rank <span className="text-red-500">*</span></Label>
-                    <Input value={formData.rank_name} readOnly className="bg-muted" placeholder="Auto-populated" required />
+                    <Input value={formData.rank_name} readOnly disabled className="bg-muted" placeholder="Auto-populated" required />
 
                   </div>
                 </div>
 
                 <div>
                   <Label className="mb-2">Activity <span className="text-red-500">*</span></Label>
-                  <Textarea value={formData.activity} onChange={(e) => setFormData({ ...formData, activity: e.target.value })} required />
+                  <Textarea value={formData.activity} onChange={(e) => setFormData(prev => ({ ...prev, activity: e.target.value }))} required />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="mb-2">State of Prisoners <span className="text-red-500">*</span></Label>
-                    <Textarea value={formData.state_of_prisoners} onChange={(e) => setFormData({ ...formData, state_of_prisoners: e.target.value })} required />
+                    <Textarea value={formData.state_of_prisoners} onChange={(e) => setFormData(prev => ({ ...prev, state_of_prisoners: e.target.value }))} required />
                   </div>
                   <div>
                     <Label className="mb-2">State of Prison <span className="text-red-500">*</span></Label>
-                    <Textarea value={formData.state_of_prison} onChange={(e) => setFormData({ ...formData, state_of_prison: e.target.value })} required />
+                    <Textarea value={formData.state_of_prison} onChange={(e) => setFormData(prev => ({ ...prev, state_of_prison: e.target.value }))} required />
                   </div>
                 </div>
 
                 <div>
                   <Label className="mb-2">Remarks</Label>
-                  <Textarea value={formData.remark} onChange={(e) => setFormData({ ...formData, remark: e.target.value })} />
+                  <Textarea value={formData.remark} onChange={(e) => setFormData(prev => ({ ...prev, remark: e.target.value }))} />
                 </div>
               </div>
 
               <DialogFooter>
-                <Button type="button" variant="outline" onClick={() => { setDialogOpen(false); setEditingJournal(null); }}>
+                <Button type="button" variant="outline" onClick={() => { 
+                  setDialogOpen(false); 
+                  setEditingJournal(null);
+                  setFormData({
+                    is_active: true,
+                    activity: '',
+                    state_of_prisoners: '',
+                    state_of_prison: '',
+                    remark: '',
+                    force_number: '',
+                    journal_date: new Date().toISOString().split('T')[0],
+                    station: '',
+                    type_of_journal: '',
+                    duty_officer: '',
+                    rank: '',
+                    rank_name: '',
+                  });
+                }}>
                   Cancel
                 </Button>
                 <Button type="submit" disabled={submitLoading} className="bg-primary hover:bg-primary/90">
@@ -603,7 +692,8 @@ export function JournalScreen() {
                 <Input placeholder="Search journals..." className="pl-9" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
               </div> */}
 
-              <div className="flex gap-2">
+              {/* Filter popovers commented out - would need to be converted to SearchableSelect-based filters for server-side pagination */}
+              {/* <div className="flex gap-2">
                 <Popover>
                   <PopoverTrigger asChild><Button variant="outline" className="relative"><Filter className="mr-2 h-4 w-4" />Journal Type{selectedJournalTypes.length > 0 && <Badge className="ml-2">{selectedJournalTypes.length}</Badge>}</Button></PopoverTrigger>
                   <PopoverContent className="w-64" align="end">
@@ -625,17 +715,17 @@ export function JournalScreen() {
                 </Popover>
 
                 {activeFiltersCount > 0 && (<Button variant="ghost" size="sm" onClick={clearFilters}><X className="mr-1 h-4 w-4" /> Clear All</Button>)}
-              </div>
+              </div> */}
             </div>
           </div>
 
-          {activeFiltersCount > 0 && (
+          {/* {activeFiltersCount > 0 && (
             <div className="flex items-center gap-2 mt-4">
               <span className="text-sm text-muted-foreground">Active filters:</span>
-              {selectedJournalTypes.map(typeId => (<Badge key={typeId} variant="secondary" className="gap-1">{getJournalTypeName(typeId)}<button onClick={() => toggleJournalType(typeId)} className="ml-1"><X className="h-3 w-3" /></button></Badge>))}
-              {selectedStations.map(stationId => (<Badge key={stationId} variant="secondary" className="gap-1">{getStationName(stationId)}<button onClick={() => toggleStation(stationId)} className="ml-1"><X className="h-3 w-3" /></button></Badge>))}
+              {selectedJournalTypes.map(typeId => (<Badge key={typeId} variant="secondary" className="gap-1">{typeId}<button onClick={() => toggleJournalType(typeId)} className="ml-1"><X className="h-3 w-3" /></button></Badge>))}
+              {selectedStations.map(stationId => (<Badge key={stationId} variant="secondary" className="gap-1">{stationId}<button onClick={() => toggleStation(stationId)} className="ml-1"><X className="h-3 w-3" /></button></Badge>))}
             </div>
-          )}
+          )} */}
         </CardHeader>
 
         <CardContent>
@@ -644,11 +734,6 @@ export function JournalScreen() {
               url={journalsUrl()}
               title="Journal Entries"
               columns={journalColumns}
-              externalSearch={searchTerm}
-              onSearch={onSearch}
-              onPageChange={onPageChange}
-              onPageSizeChange={onPageSizeChange}
-              onSort={onSort}
             />
           </div>
         </CardContent>

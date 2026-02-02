@@ -10,6 +10,7 @@ import { Label } from '../ui/label';
 import { cn } from '../ui/utils';
 import { ManualLockUpItem } from "../../services/stationServices/manualLockupIntegration";
 import { getStationsAndTypes } from "../../services/stationServices/utils";
+import axiosInstance from '../../services/axiosInstance';
  
 interface GroupedLockup {
   station: string;
@@ -19,34 +20,37 @@ interface GroupedLockup {
   date: string;
   time: string;
   records: ManualLockUpItem[];
-  convictTotal: number;
-  remandTotal: number;
-  debtorTotal: number;
-  lodgerTotal: number;
+  categoryTotals: Record<string, number>; // Dynamic: category_name -> total
   grandTotal: number;
 }
- 
-interface DetailGrid {
-  station: { convict_male: number; convict_female: number; remand_male: number; remand_female: number; debtor_male: number; debtor_female: number; lodger_male: number; lodger_female: number };
-  court: { convict_male: number; convict_female: number; remand_male: number; remand_female: number; debtor_male: number; debtor_female: number; lodger_male: number; lodger_female: number };
-  labour: { convict_male: number; convict_female: number; remand_male: number; remand_female: number; debtor_male: number; debtor_female: number; lodger_male: number; lodger_female: number };
+
+interface Location {
+  id: string;
+  name: string;
+  slug?: string;
+  description?: string;
 }
+
+interface Sex {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+interface PrisonerCategory {
+  id: string;
+  name: string;
+  description?: string;
+}
+
+// Fully dynamic: keys are "category_sex" like "convict_male", "remand_female"
+type CategorySexCounts = Record<string, number>;
+
+type DetailGrid = Record<string, CategorySexCounts>; // location_name -> CategorySexCounts
  
 interface ManualLockupTableViewProps {
-  lockups: ManualLockUpItem[]; // NOTE: expect server-provided array of items
+  lockups: ManualLockUpItem[];
 }
- 
-const categoryIds = {
-  convict: '770e8400-e29b-41d4-a716-446655440001',
-  remand: '770e8400-e29b-41d4-a716-446655440002',
-  debtor: '770e8400-e29b-41d4-a716-446655440003',
-  lodger: '770e8400-e29b-41d4-a716-446655440004',
-};
- 
-const sexIds = {
-  male: '880e8400-e29b-41d4-a716-446655440001',
-  female: '880e8400-e29b-41d4-a716-446655440002',
-};
  
 export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
    const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -56,7 +60,73 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
    const [stationSearchOpen, setStationSearchOpen] = useState(false);
    const [mockStations, setMockStations] = useState<{id:string;name:string}[]>([]);
    const [mockLockupTypes, setMockLockupTypes] = useState<{id:string;name:string}[]>([]);
+   const [locations, setLocations] = useState<Location[]>([]);
+   const [locationsLoading, setLocationsLoading] = useState(true);
+   const [sexes, setSexes] = useState<Sex[]>([]);
+   const [sexesLoading, setSexesLoading] = useState(true);
+   const [prisonerCategories, setPrisonerCategories] = useState<PrisonerCategory[]>([]);
+   const [categoriesLoading, setCategoriesLoading] = useState(true);
  
+   // Fetch locations from API
+   useEffect(() => {
+     const fetchLocations = async () => {
+       try {
+         setLocationsLoading(true);
+         const response = await axiosInstance.get('/system-administration/locations/', {
+           params: { page_size: -1 }
+         });
+         const items = response.data?.results || [];
+         setLocations(items);
+       } catch (error) {
+         console.error('Failed to fetch locations:', error);
+         setLocations([]);
+       } finally {
+         setLocationsLoading(false);
+       }
+     };
+     fetchLocations();
+   }, []);
+
+   // Fetch sexes from API
+   useEffect(() => {
+     const fetchSexes = async () => {
+       try {
+         setSexesLoading(true);
+         const response = await axiosInstance.get('/system-administration/sexes/', {
+           params: { page_size: -1 }
+         });
+         const items = response.data?.results || [];
+         setSexes(items);
+       } catch (error) {
+         console.error('Failed to fetch sexes:', error);
+         setSexes([]);
+       } finally {
+         setSexesLoading(false);
+       }
+     };
+     fetchSexes();
+   }, []);
+
+   // Fetch prisoner categories from API
+   useEffect(() => {
+     const fetchPrisonerCategories = async () => {
+       try {
+         setCategoriesLoading(true);
+         const response = await axiosInstance.get('/system-administration/prisoner-categories/', {
+           params: { page_size: -1 }
+         });
+         const items = response.data?.results || [];
+         setPrisonerCategories(items);
+       } catch (error) {
+         console.error('Failed to fetch prisoner categories:', error);
+         setPrisonerCategories([]);
+       } finally {
+         setCategoriesLoading(false);
+       }
+     };
+     fetchPrisonerCategories();
+   }, []);
+
    useEffect(() => {
      if (Array.isArray(lockups) && lockups.length > 0) {
        const data = getStationsAndTypes(lockups);
@@ -99,10 +169,7 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
            date: lockup.date ?? '',
            time: lockup.lockup_time ?? '',
            records: [],
-           convictTotal: 0,
-           remandTotal: 0,
-           debtorTotal: 0,
-           lodgerTotal: 0,
+           categoryTotals: {},
            grandTotal: 0,
          };
        }
@@ -112,15 +179,13 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
        // Normalize count
        const cnt = Number((lockup as any).count) || 0;
  
-       // Calculate category totals using either uuid (prisoner_category) or name (prisoner_category_name)
-       if (lockup.prisoner_category === categoryIds.convict || (lockup as any).prisoner_category_name === "Convict") {
-         grouped[key].convictTotal += cnt;
-       } else if (lockup.prisoner_category === categoryIds.remand || (lockup as any).prisoner_category_name === "Remand") {
-         grouped[key].remandTotal += cnt;
-       } else if (lockup.prisoner_category === categoryIds.debtor || (lockup as any).prisoner_category_name === "Civil Debtor") {
-         grouped[key].debtorTotal += cnt;
-       } else if (lockup.prisoner_category === categoryIds.lodger || (lockup as any).prisoner_category_name === "Lodger") {
-         grouped[key].lodgerTotal += cnt;
+       // Dynamically accumulate category totals
+       const categoryName = ((lockup as any).prisoner_category_name || '').toLowerCase().trim();
+       if (categoryName) {
+         if (!grouped[key].categoryTotals[categoryName]) {
+           grouped[key].categoryTotals[categoryName] = 0;
+         }
+         grouped[key].categoryTotals[categoryName] += cnt;
        }
  
        grouped[key].grandTotal += cnt;
@@ -129,55 +194,78 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
      return Object.values(grouped);
    };
  
-   // Build detail grid from records
+   // Build detail grid from records with dynamic locations, categories, and sexes
    const buildDetailGrid = (records: ManualLockUpItem[]): DetailGrid => {
-     const grid: DetailGrid = {
-       station: { convict_male: 0, convict_female: 0, remand_male: 0, remand_female: 0, debtor_male: 0, debtor_female: 0, lodger_male: 0, lodger_female: 0 },
-       court: { convict_male: 0, convict_female: 0, remand_male: 0, remand_female: 0, debtor_male: 0, debtor_female: 0, lodger_male: 0, lodger_female: 0 },
-       labour: { convict_male: 0, convict_female: 0, remand_male: 0, remand_female: 0, debtor_male: 0, debtor_female: 0, lodger_male: 0, lodger_female: 0 },
-     };
+     // Initialize grid with all locations from API
+     const grid: DetailGrid = {};
+     locations.forEach(loc => {
+       const locationKey = loc.name.toLowerCase().trim();
+       grid[locationKey] = {};
+       
+       // Initialize all category_sex combinations to 0
+       prisonerCategories.forEach(cat => {
+         sexes.forEach(sex => {
+           const catKey = cat.name.toLowerCase().trim();
+           const sexKey = sex.name.toLowerCase().trim();
+           const fieldKey = `${catKey}_${sexKey}`;
+           grid[locationKey][fieldKey] = 0;
+         });
+       });
+     });
  
      records.forEach(record => {
-       const location = record.location;
-       let category = '';
-       let sex = '';
- 
-      // determine category (uuid or name)
-      if (record.prisoner_category === categoryIds.convict || (record as any).prisoner_category_name === 'Convict') category = 'convict';
-      else if (record.prisoner_category === categoryIds.remand || (record as any).prisoner_category_name === 'Remand') category = 'remand';
-      else if (record.prisoner_category === categoryIds.debtor || (record as any).prisoner_category_name === 'Civil Debtor') category = 'debtor';
-      else if (record.prisoner_category === categoryIds.lodger || (record as any).prisoner_category_name === 'Lodger') category = 'lodger';
- 
-      if (record.sex === sexIds.male || (record as any).sex_name === 'Male') sex = 'male';
-      else if (record.sex === sexIds.female || (record as any).sex_name === 'Female') sex = 'female';
- 
-      if (category && sex && (grid as any)[location]) {
-        const fieldName = `${category}_${sex}` as keyof typeof grid[typeof location];
-        const cnt = Number((record as any).count) || 0;
-        (grid as any)[location][fieldName] += cnt;
+       // Use location_name from API response
+       const locationName = ((record as any).location_name || '').toLowerCase().trim();
+       
+       // Get category from prisoner_category_name
+       const categoryName = ((record as any).prisoner_category_name || '').toLowerCase().trim();
+       
+       // Get sex from sex_name using fetched sexes data
+       const sexNameFromRecord = ((record as any).sex_name || '').toLowerCase().trim();
+       const matchedSex = sexes.find(s => s.name.toLowerCase().trim() === sexNameFromRecord);
+       
+       // Update grid if location exists and we have valid category/sex
+       if (categoryName && matchedSex && grid[locationName]) {
+         const sexKey = matchedSex.name.toLowerCase().trim();
+         const fieldName = `${categoryName}_${sexKey}`;
+         
+         if (fieldName in grid[locationName]) {
+           const cnt = Number((record as any).count) || 0;
+           grid[locationName][fieldName] += cnt;
+         }
        }
      });
  
      return grid;
    };
  
-   // Calculate row totals for detail grid
-   const calculateRowTotal = (row: { convict_male: number; convict_female: number; remand_male: number; remand_female: number; debtor_male: number; debtor_female: number; lodger_male: number; lodger_female: number }) => {
-     return row.convict_male + row.convict_female + row.remand_male + row.remand_female + row.debtor_male + row.debtor_female + row.lodger_male + row.lodger_female;
+   // Calculate row totals for detail grid (sum all values in the record)
+   const calculateRowTotal = (row: CategorySexCounts): number => {
+     return Object.values(row).reduce((sum, val) => sum + val, 0);
    };
  
-   // Calculate column totals for detail grid
-   const calculateColumnTotals = (grid: DetailGrid) => {
-     return {
-       convict_male: grid.station.convict_male + grid.court.convict_male + grid.labour.convict_male,
-       convict_female: grid.station.convict_female + grid.court.convict_female + grid.labour.convict_female,
-       remand_male: grid.station.remand_male + grid.court.remand_male + grid.labour.remand_male,
-       remand_female: grid.station.remand_female + grid.court.remand_female + grid.labour.remand_female,
-       debtor_male: grid.station.debtor_male + grid.court.debtor_male + grid.labour.debtor_male,
-       debtor_female: grid.station.debtor_female + grid.court.debtor_female + grid.labour.debtor_female,
-       lodger_male: grid.station.lodger_male + grid.court.lodger_male + grid.labour.lodger_male,
-       lodger_female: grid.station.lodger_female + grid.court.lodger_female + grid.labour.lodger_female,
-     };
+   // Calculate column totals for detail grid (sum across all locations for each category_sex)
+   const calculateColumnTotals = (grid: DetailGrid): CategorySexCounts => {
+     const totals: CategorySexCounts = {};
+     
+     // Initialize totals for all category_sex combinations
+     prisonerCategories.forEach(cat => {
+       sexes.forEach(sex => {
+         const catKey = cat.name.toLowerCase().trim();
+         const sexKey = sex.name.toLowerCase().trim();
+         const fieldKey = `${catKey}_${sexKey}`;
+         totals[fieldKey] = 0;
+       });
+     });
+     
+     // Sum across all locations
+     Object.values(grid).forEach(locationCounts => {
+       Object.entries(locationCounts).forEach(([key, value]) => {
+         totals[key] = (totals[key] || 0) + value;
+       });
+     });
+     
+     return totals;
    };
  
    const toggleRow = (key: string) => {
@@ -323,10 +411,12 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
                <TableHead>Station</TableHead>
                <TableHead>Lockup Type</TableHead>
                <TableHead>Date & Time</TableHead>
-               <TableHead className="text-right">Convict</TableHead>
-               <TableHead className="text-right">Remand</TableHead>
-               <TableHead className="text-right">Debtor</TableHead>
-               <TableHead className="text-right">Lodger</TableHead>
+               {/* Dynamic category columns */}
+               {prisonerCategories.map(category => (
+                 <TableHead key={category.id} className="text-right capitalize">
+                   {category.name}
+                 </TableHead>
+               ))}
                <TableHead className="text-right">Total</TableHead>
              </TableRow>
            </TableHeader>
@@ -360,10 +450,16 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
                        <TableCell>{group.stationName}</TableCell>
                        <TableCell>{group.typeName}</TableCell>
                        <TableCell>{group.date} {group.time}</TableCell>
-                       <TableCell className="text-right">{group.convictTotal}</TableCell>
-                       <TableCell className="text-right">{group.remandTotal}</TableCell>
-                       <TableCell className="text-right">{group.debtorTotal}</TableCell>
-                       <TableCell className="text-right">{group.lodgerTotal}</TableCell>
+                       {/* Dynamic category totals */}
+                       {prisonerCategories.map(category => {
+                         const categoryKey = category.name.toLowerCase().trim();
+                         const total = group.categoryTotals[categoryKey] || 0;
+                         return (
+                           <TableCell key={category.id} className="text-right">
+                             {total}
+                           </TableCell>
+                         );
+                       })}
                        <TableCell className="text-right">{group.grandTotal}</TableCell>
                      </TableRow>
  
@@ -375,79 +471,79 @@ export function ManualLockupTableView({ lockups }: ManualLockupTableViewProps) {
                                <thead>
                                  <tr className="border-b bg-muted/50">
                                    <th className="border-r p-3 text-left min-w-[120px]">Location</th>
-                                   <th className="border-r p-3 text-center" colSpan={2}>Convict</th>
-                                   <th className="border-r p-3 text-center" colSpan={2}>Remand</th>
-                                   <th className="border-r p-3 text-center" colSpan={2}>Debtor</th>
-                                   <th className="border-r p-3 text-center" colSpan={2}>Lodger</th>
+                                   {/* Dynamic category columns with sex subheaders */}
+                                   {prisonerCategories.map(category => (
+                                     <th key={category.id} className="border-r p-3 text-center capitalize" colSpan={sexes.length}>
+                                       {category.name}
+                                     </th>
+                                   ))}
                                    <th className="p-3 text-center bg-primary/10">Total</th>
                                  </tr>
                                  <tr className="border-b bg-muted/30">
                                    <th className="border-r p-2"></th>
-                                   <th className="border-r p-2 text-center text-sm">Male</th>
-                                   <th className="border-r p-2 text-center text-sm">Female</th>
-                                   <th className="border-r p-2 text-center text-sm">Male</th>
-                                   <th className="border-r p-2 text-center text-sm">Female</th>
-                                   <th className="border-r p-2 text-center text-sm">Male</th>
-                                   <th className="border-r p-2 text-center text-sm">Female</th>
-                                   <th className="border-r p-2 text-center text-sm">Male</th>
-                                   <th className="border-r p-2 text-center text-sm">Female</th>
+                                   {/* Dynamic sex sub-columns for each category */}
+                                   {prisonerCategories.map(category => (
+                                     <React.Fragment key={category.id}>
+                                       {sexes.map(sex => (
+                                         <th key={`${category.id}-${sex.id}`} className="border-r p-2 text-center text-sm capitalize">
+                                           {sex.name}
+                                         </th>
+                                       ))}
+                                     </React.Fragment>
+                                   ))}
                                    <th className="p-2 text-center text-sm bg-primary/10"></th>
                                  </tr>
                                </thead>
                                <tbody>
-                                 {/* Station Row */}
-                                 <tr className="border-b">
-                                   <td className="border-r p-3">Station</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.convict_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.convict_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.remand_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.remand_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.debtor_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.debtor_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.lodger_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.station.lodger_female || 0}</td>
-                                   <td className="p-2 text-center bg-primary/10">{calculateRowTotal(detailGrid.station)}</td>
-                                 </tr>
- 
-                                 {/* Court Row */}
-                                 <tr className="border-b">
-                                   <td className="border-r p-3">Court</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.convict_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.convict_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.remand_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.remand_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.debtor_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.debtor_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.lodger_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.court.lodger_female || 0}</td>
-                                   <td className="p-2 text-center bg-primary/10">{calculateRowTotal(detailGrid.court)}</td>
-                                 </tr>
- 
-                                 {/* Labour Row */}
-                                 <tr className="border-b">
-                                   <td className="border-r p-3">Labour</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.convict_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.convict_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.remand_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.remand_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.debtor_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.debtor_female || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.lodger_male || 0}</td>
-                                   <td className="border-r p-2 text-center bg-gray-50">{detailGrid.labour.lodger_female || 0}</td>
-                                   <td className="p-2 text-center bg-primary/10">{calculateRowTotal(detailGrid.labour)}</td>
-                                 </tr>
+                                 {/* Dynamic Location Rows */}
+                                 {locations.map(location => {
+                                   const locationKey = location.name.toLowerCase().trim();
+                                   const locationData = detailGrid[locationKey];
+                                   if (!locationData) return null;
+                                   
+                                   return (
+                                     <tr key={location.id} className="border-b">
+                                       <td className="border-r p-3 capitalize">{location.name}</td>
+                                       {/* Dynamic category_sex cells */}
+                                       {prisonerCategories.map(category => (
+                                         <React.Fragment key={category.id}>
+                                           {sexes.map(sex => {
+                                             const catKey = category.name.toLowerCase().trim();
+                                             const sexKey = sex.name.toLowerCase().trim();
+                                             const fieldKey = `${catKey}_${sexKey}`;
+                                             const value = locationData[fieldKey] || 0;
+                                             return (
+                                               <td key={`${category.id}-${sex.id}`} className="border-r p-2 text-center bg-gray-50">
+                                                 {value}
+                                               </td>
+                                             );
+                                           })}
+                                         </React.Fragment>
+                                       ))}
+                                       <td className="p-2 text-center bg-primary/10">{calculateRowTotal(locationData)}</td>
+                                     </tr>
+                                   );
+                                 })}
  
                                  {/* Total Row */}
                                  <tr className="bg-primary/10">
                                    <td className="border-r p-3">Total</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.convict_male}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.convict_female}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.remand_male}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.remand_female}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.debtor_male}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.debtor_female}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.lodger_male}</td>
-                                   <td className="border-r p-2 text-center">{columnTotals.lodger_female}</td>
+                                   {/* Dynamic totals for each category_sex */}
+                                   {prisonerCategories.map(category => (
+                                     <React.Fragment key={category.id}>
+                                       {sexes.map(sex => {
+                                         const catKey = category.name.toLowerCase().trim();
+                                         const sexKey = sex.name.toLowerCase().trim();
+                                         const fieldKey = `${catKey}_${sexKey}`;
+                                         const value = columnTotals[fieldKey] || 0;
+                                         return (
+                                           <td key={`${category.id}-${sex.id}`} className="border-r p-2 text-center">
+                                             {value}
+                                           </td>
+                                         );
+                                       })}
+                                     </React.Fragment>
+                                   ))}
                                    <td className="p-2 text-center">{group.grandTotal || 0}</td>
                                  </tr>
                                </tbody>

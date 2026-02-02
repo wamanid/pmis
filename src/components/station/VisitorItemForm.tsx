@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Switch } from '../ui/switch';
+import SearchableSelect from '../common/SearchableSelect';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Check, ChevronsUpDown, AlertCircle, Upload, X } from 'lucide-react';
@@ -15,16 +16,23 @@ import {
   ItemCategories,
   ItemCategory, ItemStatus,
   ItemStatuses,
-  StationItem, Unit
+  StationItem, Unit,
+  VISITOR_ITEM_API_ENDPOINTS
 } from "../../services/stationServices/visitorsServices/visitorItem";
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {fileToBinaryString} from "../../services/stationServices/utils";
+import axiosInstance from "../../services/axiosInstance";
+
+// NOTE: API endpoints now centralized in service files (VISITOR_ITEM_API_ENDPOINTS imported above)
 
 interface VisitorItem {
   id?: string;
   visitor_name?: string;
   item_name?: string;
   category_name?: string;
+  measurement_unit_name?: string;
+  currency_name?: string;
+  item_status_name?: string;
   quantity: number;
   currency: string;
   amount: string;
@@ -51,38 +59,188 @@ interface VisitorItemFormProps {
   units: Unit[];
   visitors: Visitor[];
   loading: boolean;
+  isEditing?: boolean;
 }
 
-const mockCurrencies = [
-  { code: 'UGX', name: 'Uganda Shillings (UGX)' },
-  { code: 'USD', name: 'US Dollars (USD)' },
-  { code: 'EUR', name: 'Euros (EUR)' },
-  { code: 'GBP', name: 'British Pounds (GBP)' }
-];
+export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses, itemsX, itemCategories, units, visitors, loading, isEditing }: VisitorItemFormProps) {
+  // Paginated fetch callbacks for dropdowns
+  const fetchVisitorsPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.STATION_VISITORS, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      // Map visitors to include searchable full name display
+      const visitorsWithDisplay = (res.data?.results ?? []).map((v: any) => ({
+        ...v,
+        full_name_display: `${v.first_name} ${v.last_name || ''} (${v.id_number})`
+      }));
+      return {
+        items: visitorsWithDisplay,
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        // Request was cancelled (user typed quickly, navigated away, etc.) - this is expected
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load visitors');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
 
-export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses, itemsX, itemCategories, units, visitors, loading }: VisitorItemFormProps) {
-  const [formData, setFormData] = useState<Item>({
-    quantity: 1,
-    currency: 'UGX',
-    amount: '0',
-    bag_no: '',
-    photo: '',
-    remarks: '',
-    is_collected: false,
-    for_prisoner: true,
-    visitor: '',
-    item_category: '',
-    item: '',
-    measurement_unit: '',
-    item_status: '',
-    is_active: true,
-    deleted_datetime: null,
-    deleted_by: null,
+  const fetchItemCategoriesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.ITEM_CATEGORIES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load item categories');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchItemsPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; item_category?: string; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const params: any = { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 };
+      if (opts.item_category) params.category = opts.item_category;
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.ITEMS, {
+        params,
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load items');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchUnitsPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.UNITS, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load units');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchItemStatusesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.ITEM_STATUSES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load item statuses');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchCurrenciesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.CURRENCIES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load currencies');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const [formData, setFormData] = useState<Item>(() => {
+    // Initialize with item values if editing, prevents timing issues
+    if (item && isEditing) {
+      return {
+        quantity: item.quantity || 1,
+        currency: item.currency || '',
+        amount: item.amount || '0',
+        bag_no: item.bag_no || '',
+        photo: item.photo || '',
+        remarks: item.remarks || '',
+        is_collected: item.is_collected ?? false,
+        for_prisoner: item.for_prisoner ?? true,
+        visitor: item.visitor || '',
+        item_category: item.item_category || '',
+        item: item.item || '',
+        measurement_unit: item.measurement_unit || '',
+        item_status: item.item_status || '',
+        is_active: true,
+        deleted_datetime: null,
+        deleted_by: null,
+      };
+    }
+    // Default empty form
+    return {
+      quantity: 1,
+      currency: '',
+      amount: '0',
+      bag_no: '',
+      photo: '',
+      remarks: '',
+      is_collected: false,
+      for_prisoner: true,
+      visitor: '',
+      item_category: '',
+      item: '',
+      measurement_unit: '',
+      item_status: '',
+      is_active: true,
+      deleted_datetime: null,
+      deleted_by: null,
+    };
   });
 
-  const [photoPreview, setPhotoPreview] = useState<string>('');
+  const [photoPreview, setPhotoPreview] = useState<string>(() => item?.photo || '');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  
+  // Force remount of SearchableSelect components when switching between add/edit
+  const [selectsKey, setSelectsKey] = useState(0);
 
   // Combobox states
   const [visitorOpen, setVisitorOpen] = useState(false);
@@ -90,14 +248,13 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
   const [itemOpen, setItemOpen] = useState(false);
   const [unitOpen, setUnitOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [currencyOpen, setCurrencyOpen] = useState(false);
 
   useEffect(() => {
     if (item) {
+      // When editing, item has the ID fields we need (visitor, item_category, item, etc.)
       setFormData({
-        ...item,
         quantity: item.quantity || 1,
-        currency: item.currency || 'UGX',
+        currency: item.currency || '',
         amount: item.amount || '0',
         bag_no: item.bag_no || '',
         deleted_by: null,
@@ -116,6 +273,8 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
       if (item.photo) {
         setPhotoPreview(item.photo);
       }
+      // Force remount of SearchableSelect components
+      setSelectsKey(k => k + 1);
     }
   }, [item]);
 
@@ -128,8 +287,6 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
     if (!formData.measurement_unit) newErrors.measurement_unit = 'Measurement unit is required';
     if (!formData.item_status) newErrors.item_status = 'Item status is required';
     if (!formData.quantity || formData.quantity <= 0) newErrors.quantity = 'Quantity must be greater than 0';
-    if (!formData.currency) newErrors.currency = 'Currency is required';
-    if (!formData.amount || parseFloat(formData.amount) < 0) newErrors.amount = 'Amount must be 0 or greater';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -149,7 +306,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
     //   formDataToSubmit.append('photo', photoFile);
     // }
 
-    onSubmit(formData);
+    onSubmit(formData as any);
   };
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +314,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
     if (file) {
 
       const binaryString = await fileToBinaryString(file);
-      setFormData({ ...formData, photo: binaryString });
+      setFormData(prev => ({ ...prev, photo: binaryString }));
 
       const reader = new FileReader();
       reader.onloadend = () => {
@@ -171,7 +328,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
   const handleRemovePhoto = () => {
     setPhotoFile(null);
     setPhotoPreview('');
-    setFormData({ ...formData, photo: '' });
+    setFormData(prev => ({ ...prev, photo: '' }));
   };
 
   // Filter items based on selected category
@@ -184,7 +341,6 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
   const selectedItem = itemsX.find(i => i.id === formData.item);
   const selectedUnit = units.find(u => u.id === formData.measurement_unit);
   const selectedStatus = itemStatuses.find(s => s.id === formData.item_status);
-  const selectedCurrency = mockCurrencies.find(c => c.code === formData.currency);
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,50 +352,27 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Label>
               Visitor <span className="text-red-500">*</span>
             </Label>
-            <Popover open={visitorOpen} onOpenChange={setVisitorOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={visitorOpen}
-                  className={`w-full justify-between ${errors.visitor ? 'border-red-500' : ''}`}
-                >
-                  {selectedVisitor
-                    ? `${selectedVisitor.first_name} (${selectedVisitor.id_number})`
-                    : 'Select visitor...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search visitor..." />
-                  <CommandList>
-                    <CommandEmpty>No visitor found.</CommandEmpty>
-                    <CommandGroup>
-                      {visitors.map((visitor) => (
-                        <CommandItem
-                          key={visitor.id}
-                          value={`${visitor.first_name} ${visitor.last_name} ${visitor.id_number}`}
-                          onSelect={() => {
-                            setFormData({ ...formData, visitor: visitor.id });
-                            setVisitorOpen(false);
-                            setErrors({ ...errors, visitor: '' });
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              formData.visitor === visitor.id ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
-                          {visitor.first_name} {visitor.last_name} ({visitor.id_number})
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <SearchableSelect
+              key={`visitor-${selectsKey}-${item?.id || 'new'}`}
+              value={formData.visitor}
+              onChange={(val) => {
+                if (!isEditing) {
+                  setFormData(prev => ({ ...prev, visitor: String(val ?? "") }));
+                  setErrors(prev => ({ ...prev, visitor: '' }));
+                }
+              }}
+              fetchPaginated={fetchVisitorsPaginated}
+              idField="id"
+              labelField="full_name_display"
+              placeholder={isEditing ? "Visitor (cannot be changed)" : "Select visitor..."}
+              pageSize={50}
+              minQueryLength={0}
+              className={`${errors.visitor ? 'border-red-500' : ''} ${isEditing ? 'opacity-60 cursor-not-allowed' : ''}`}
+              initialItem={item && isEditing ? {
+                id: item.visitor,
+                full_name_display: item.visitor_name || 'Unknown Visitor'
+              } as any : undefined}
+            />
             {errors.visitor && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
@@ -253,48 +386,25 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Label>
               Item Category <span className="text-red-500">*</span>
             </Label>
-            <Popover open={categoryOpen} onOpenChange={setCategoryOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={categoryOpen}
-                  className={`w-full justify-between ${errors.item_category ? 'border-red-500' : ''}`}
-                >
-                  {selectedCategory ? selectedCategory.name : 'Select category...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search category..." />
-                  <CommandList>
-                    <CommandEmpty>No category found.</CommandEmpty>
-                    <CommandGroup>
-                      {itemCategories.map((category) => (
-                        <CommandItem
-                          key={category.id}
-                          value={category.name}
-                          onSelect={() => {
-                            setFormData({ ...formData, item_category: category.id, item: '' });
-                            setCategoryOpen(false);
-                            setErrors({ ...errors, item_category: '' });
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              formData.item_category === category.id ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
-                          {category.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <SearchableSelect
+              key={`category-${selectsKey}-${item?.id || 'new'}`}
+              value={formData.item_category}
+              onChange={(val) => {
+                setFormData(prev => ({ ...prev, item_category: String(val ?? ""), item: "" }));
+                setErrors(prev => ({ ...prev, item_category: '' }));
+              }}
+              fetchPaginated={fetchItemCategoriesPaginated}
+              idField="id"
+              labelField="name"
+              placeholder="Select category..."
+              pageSize={50}
+              minQueryLength={0}
+              className={errors.item_category ? 'border-red-500' : ''}
+              initialItem={item && isEditing && item.category_name ? {
+                id: item.item_category,
+                name: item.category_name
+              } as any : undefined}
+            />
             {errors.item_category && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
@@ -308,49 +418,30 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Label>
               Item <span className="text-red-500">*</span>
             </Label>
-            <Popover open={itemOpen} onOpenChange={setItemOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={itemOpen}
-                  disabled={!formData.item_category}
-                  className={`w-full justify-between ${errors.item ? 'border-red-500' : ''}`}
-                >
-                  {selectedItem ? selectedItem.name : 'Select item...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search item..." />
-                  <CommandList>
-                    <CommandEmpty>No item found.</CommandEmpty>
-                    <CommandGroup>
-                      {filteredItems.map((item) => (
-                        <CommandItem
-                          key={item.id}
-                          value={item.name}
-                          onSelect={() => {
-                            setFormData({ ...formData, item: item.id });
-                            setItemOpen(false);
-                            setErrors({ ...errors, item: '' });
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              formData.item === item.id ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
-                          {item.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <SearchableSelect
+              key={`item-${selectsKey}-${item?.id || 'new'}`}
+              value={formData.item}
+              onChange={(val) => {
+                setFormData(prev => ({ ...prev, item: String(val ?? "") }));
+                setErrors(prev => ({ ...prev, item: '' }));
+              }}
+              fetchPaginated={(opts, signal) => {
+                if (!formData.item_category) {
+                  return Promise.resolve({ items: [], count: 0, next: null });
+                }
+                return fetchItemsPaginated({ ...opts, item_category: formData.item_category }, signal);
+              }}
+              idField="id"
+              labelField="name"
+              placeholder={formData.item_category ? "Select item..." : "Select category first..."}
+              pageSize={50}
+              minQueryLength={0}
+              className={errors.item ? 'border-red-500' : ''}
+              initialItem={item && isEditing && item.item_name ? {
+                id: item.item,
+                name: item.item_name
+              } as any : undefined}
+            />
             {errors.item && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
@@ -372,8 +463,8 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
                 step="1"
                 value={formData.quantity}
                 onChange={(e) => {
-                  setFormData({ ...formData, quantity: parseInt(e.target.value) || 0 });
-                  setErrors({ ...errors, quantity: '' });
+                  setFormData(prev => ({ ...prev, quantity: parseInt(e.target.value) || 0 }));
+                  setErrors(prev => ({ ...prev, quantity: '' }));
                 }}
                 className={errors.quantity ? 'border-red-500' : ''}
               />
@@ -389,48 +480,25 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
               <Label>
                 Unit <span className="text-red-500">*</span>
               </Label>
-              <Popover open={unitOpen} onOpenChange={setUnitOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={unitOpen}
-                    className={`w-full justify-between ${errors.measurement_unit ? 'border-red-500' : ''}`}
-                  >
-                    {selectedUnit ? selectedUnit.name : 'Select unit...'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[200px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search unit..." />
-                    <CommandList>
-                      <CommandEmpty>No unit found.</CommandEmpty>
-                      <CommandGroup>
-                        {units.map((unit) => (
-                          <CommandItem
-                            key={unit.id}
-                            value={unit.name}
-                            onSelect={() => {
-                              setFormData({ ...formData, measurement_unit: unit.id });
-                              setUnitOpen(false);
-                              setErrors({ ...errors, measurement_unit: '' });
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                formData.measurement_unit === unit.id ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            {unit.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
+              <SearchableSelect
+                key={`unit-${selectsKey}-${item?.id || 'new'}`}
+                value={formData.measurement_unit}
+                onChange={(val) => {
+                  setFormData(prev => ({ ...prev, measurement_unit: String(val ?? "") }));
+                  setErrors(prev => ({ ...prev, measurement_unit: '' }));
+                }}
+                fetchPaginated={fetchUnitsPaginated}
+                idField="id"
+                labelField="name"
+                placeholder="Select unit..."
+                pageSize={50}
+                minQueryLength={0}
+                className={errors.measurement_unit ? 'border-red-500' : ''}
+                initialItem={item && isEditing && item.measurement_unit_name ? {
+                  id: item.measurement_unit,
+                  name: item.measurement_unit_name
+                } as any : undefined}
+              />
               {errors.measurement_unit && (
                 <p className="text-sm text-red-500 flex items-center gap-1">
                   <AlertCircle className="h-3 w-3" />
@@ -444,61 +512,32 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>
-                Currency <span className="text-red-500">*</span>
+                Currency
               </Label>
-              <Popover open={currencyOpen} onOpenChange={setCurrencyOpen}>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    role="combobox"
-                    aria-expanded={currencyOpen}
-                    className={`w-full justify-between ${errors.currency ? 'border-red-500' : ''}`}
-                  >
-                    {selectedCurrency ? selectedCurrency.name : 'Select currency...'}
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[250px] p-0">
-                  <Command>
-                    <CommandInput placeholder="Search currency..." />
-                    <CommandList>
-                      <CommandEmpty>No currency found.</CommandEmpty>
-                      <CommandGroup>
-                        {mockCurrencies.map((currency) => (
-                          <CommandItem
-                            key={currency.code}
-                            value={currency.name}
-                            onSelect={() => {
-                              setFormData({ ...formData, currency: currency.code });
-                              setCurrencyOpen(false);
-                              setErrors({ ...errors, currency: '' });
-                            }}
-                          >
-                            <Check
-                              className={cn(
-                                'mr-2 h-4 w-4',
-                                formData.currency === currency.code ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                            {currency.name}
-                          </CommandItem>
-                        ))}
-                      </CommandGroup>
-                    </CommandList>
-                  </Command>
-                </PopoverContent>
-              </Popover>
-              {errors.currency && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.currency}
-                </p>
-              )}
+              <SearchableSelect
+                key={`currency-${selectsKey}-${item?.id || 'new'}`}
+                value={formData.currency}
+                onChange={(val) => {
+                  setFormData(prev => ({ ...prev, currency: String(val ?? "") }));
+                  setErrors(prev => ({ ...prev, currency: '' }));
+                }}
+                fetchPaginated={fetchCurrenciesPaginated}
+                idField="id"
+                labelField="name"
+                placeholder="Select currency..."
+                pageSize={50}
+                minQueryLength={0}
+                className={errors.currency ? 'border-red-500' : ''}
+                initialItem={item && isEditing && item.currency ? {
+                  id: item.currency,
+                  name: item.currency_name || item.currency
+                } as any : undefined}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="amount">
-                Amount <span className="text-red-500">*</span>
+                Amount
               </Label>
               <Input
                 id="amount"
@@ -507,17 +546,11 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
                 step="0.01"
                 value={formData.amount}
                 onChange={(e) => {
-                  setFormData({ ...formData, amount: e.target.value });
-                  setErrors({ ...errors, amount: '' });
+                  setFormData(prev => ({ ...prev, amount: e.target.value }));
+                  setErrors(prev => ({ ...prev, amount: '' }));
                 }}
                 className={errors.amount ? 'border-red-500' : ''}
               />
-              {errors.amount && (
-                <p className="text-sm text-red-500 flex items-center gap-1">
-                  <AlertCircle className="h-3 w-3" />
-                  {errors.amount}
-                </p>
-              )}
             </div>
           </div>
 
@@ -527,7 +560,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Input
               id="bag_no"
               value={formData.bag_no}
-              onChange={(e) => setFormData({ ...formData, bag_no: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, bag_no: e.target.value }))}
               placeholder="e.g., BAG-001"
             />
           </div>
@@ -540,48 +573,25 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Label>
               Item Status <span className="text-red-500">*</span>
             </Label>
-            <Popover open={statusOpen} onOpenChange={setStatusOpen}>
-              <PopoverTrigger asChild>
-                <Button
-                  variant="outline"
-                  role="combobox"
-                  aria-expanded={statusOpen}
-                  className={`w-full justify-between ${errors.item_status ? 'border-red-500' : ''}`}
-                >
-                  {selectedStatus ? selectedStatus.name : 'Select status...'}
-                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[400px] p-0">
-                <Command>
-                  <CommandInput placeholder="Search status..." />
-                  <CommandList>
-                    <CommandEmpty>No status found.</CommandEmpty>
-                    <CommandGroup>
-                      {itemStatuses.map((status) => (
-                        <CommandItem
-                          key={status.id}
-                          value={status.name}
-                          onSelect={() => {
-                            setFormData({ ...formData, item_status: status.id });
-                            setStatusOpen(false);
-                            setErrors({ ...errors, item_status: '' });
-                          }}
-                        >
-                          <Check
-                            className={cn(
-                              'mr-2 h-4 w-4',
-                              formData.item_status === status.id ? 'opacity-100' : 'opacity-0'
-                            )}
-                          />
-                          {status.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+            <SearchableSelect
+              key={`status-${selectsKey}-${item?.id || 'new'}`}
+              value={formData.item_status}
+              onChange={(val) => {
+                setFormData(prev => ({ ...prev, item_status: String(val ?? "") }));
+                setErrors(prev => ({ ...prev, item_status: '' }));
+              }}
+              fetchPaginated={fetchItemStatusesPaginated}
+              idField="id"
+              labelField="name"
+              placeholder="Select status..."
+              pageSize={50}
+              minQueryLength={0}
+              className={errors.item_status ? 'border-red-500' : ''}
+              initialItem={item && isEditing && item.item_status_name ? {
+                id: item.item_status,
+                name: item.item_status_name
+              } as any : undefined}
+            />
             {errors.item_status && (
               <p className="text-sm text-red-500 flex items-center gap-1">
                 <AlertCircle className="h-3 w-3" />
@@ -634,7 +644,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
             <Textarea
               id="remarks"
               value={formData.remarks}
-              onChange={(e) => setFormData({ ...formData, remarks: e.target.value })}
+              onChange={(e) => setFormData(prev => ({ ...prev, remarks: e.target.value }))}
               placeholder="Additional notes or remarks"
               rows={3}
             />
@@ -667,7 +677,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
               <Switch
                 id="for_prisoner"
                 checked={formData.for_prisoner}
-                onCheckedChange={(checked) => setFormData({ ...formData, for_prisoner: checked })}
+                onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, for_prisoner: checked }))}
               />
             </div>
 
@@ -681,7 +691,7 @@ export default function VisitorItemForm({ item, onSubmit, onCancel, itemStatuses
               <Switch
                 id="is_collected"
                 checked={formData.is_collected}
-                onCheckedChange={(checked) => setFormData({ ...formData, is_collected: checked })}
+                onCheckedChange={(checked: boolean) => setFormData(prev => ({ ...prev, is_collected: checked }))}
               />
             </div>
           </div>

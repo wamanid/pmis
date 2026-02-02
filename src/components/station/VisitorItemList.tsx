@@ -1,16 +1,10 @@
 import React, {useEffect, useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
-import { Input } from '../ui/input';
 import { Badge } from '../ui/badge';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../ui/table';
+import { DataTable } from '../common/DataTable';
+import type { DataTableColumn } from '../common/DataTable.types';
+import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import {
   Dialog,
   DialogContent,
@@ -19,13 +13,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '../ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '../ui/select';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,26 +24,37 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Plus, 
-  Search, 
   Edit, 
   Trash2, 
   Eye, 
   Package, 
-  Filter,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  Image
 } from 'lucide-react';
 import VisitorItemForm from './VisitorItemForm';
 import {Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
-  addVisitorItem, deleteVisitorItem,
-  getItemCategories, getItemStatuses, getStationItems, getUnits, Item, ItemCategory, ItemStatus,
+  addVisitorItem, 
+  deleteVisitorItem,
+  fetchVisitorItem,
+  getItemCategories, 
+  getItemStatuses, 
+  getStationItems, 
+  getUnits, 
+  Item, 
+  ItemCategory, 
+  ItemStatus,
   StationItem,
-  StationItems, Unit, updateVisitorItem, VisitorItem
+  StationItems, 
+  Unit, 
+  updateVisitorItem, 
+  VisitorItem, 
+  VISITOR_ITEM_API_ENDPOINTS
 } from "../../services/stationServices/visitorsServices/visitorItem";
 import {handleResponseError} from "../../services/stationServices/utils";
 
@@ -191,8 +190,14 @@ interface VisitorListProps {
 // ];
 
 export default function VisitorItemList({ visitors, items, setItems }: VisitorListProps) {
+  // DataTable reload trigger - increment when data changes
+  const [reloadKey, setReloadKey] = useState(0);
 
-  const [searchQuery, setSearchQuery] = useState('');
+  // useFilterRefresh triggers DataTable reload when global filters change
+  useFilterRefresh(() => {
+    setReloadKey(prev => prev + 1);
+  });
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingItem, setEditingItem] = useState<VisitorItem | null>(null);
   const [viewingItem, setViewingItem] = useState<VisitorItem | null>(null);
@@ -200,31 +205,10 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
   const [deleteItem, setDeleteItem] = useState<VisitorItem | null>(null);
   const [loading, setLoading] = useState(false);
   
-  // Filters
-  const [filterCategory, setFilterCategory] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterCollected, setFilterCollected] = useState<string>('all');
+  // Photo viewing state
+  const [isPhotoDialogOpen, setIsPhotoDialogOpen] = useState(false);
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState<string>('');
 
-  // Filter items
-  const filteredItems = items.filter((item) => {
-    const matchesSearch = searchQuery
-      ? item.visitor_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.item_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.category_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.bag_no.toLowerCase().includes(searchQuery.toLowerCase())
-      : true;
-
-    const matchesCategory = filterCategory === 'all' || item.category_name === filterCategory;
-    const matchesCollected = 
-      filterCollected === 'all' || 
-      (filterCollected === 'collected' && item.is_collected) ||
-      (filterCollected === 'pending' && !item.is_collected);
-
-    return matchesSearch && matchesCategory && matchesCollected;
-  });
-
-
-  const [itemInfoLoading, setItemInfoLoading] = useState(false)
   const [itemsX, setItemsX] = useState<StationItem[]>([])
   const [itemCategories, setItemCategories] = useState<ItemCategory[]>([])
   const [itemStatuses, setItemStatuses] = useState<ItemStatus[]>([])
@@ -247,6 +231,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
         if (handleResponseError(response)) return
         const visitorItem = response as VisitorItem;
         setItems(items.map((item) => (item.id === visitorItem.id ? { ...data, id: item.id } : item)));
+        setReloadKey(prev => prev + 1); // Trigger DataTable reload
         toast.success('Item updated successfully');
       }
       else {
@@ -260,6 +245,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
         if (handleResponseError(response)) return
         const visitorItem = response as VisitorItem;
         setItems([visitorItem, ...items])
+        setReloadKey(prev => prev + 1); // Trigger DataTable reload
         toast.success('Item added successfully');
       }
 
@@ -272,9 +258,23 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
     }
   };
 
-  const handleEdit = (item: VisitorItem) => {
-    setEditingItem(item);
-    setIsDialogOpen(true);
+  const handleEdit = async (item: VisitorItem) => {
+    // Prevent editing collected items
+    if (item.is_collected) {
+      toast.error('Cannot edit collected items. Item has already been collected by the prisoner.');
+      return;
+    }
+    
+    try {
+      // Option B: Fetch fresh visitor item data from API
+      const freshItem = await fetchVisitorItem(item.id);
+      if (handleResponseError(freshItem)) return;
+      setEditingItem(freshItem as VisitorItem);
+      setIsDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch visitor item details:', error);
+      toast.error('Failed to load item details. Please try again.');
+    }
   };
 
   const handleView = (item: VisitorItem) => {
@@ -284,12 +284,20 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
 
   const handleDelete = async () => {
     if (!deleteItem) return;
+    
+    // Prevent deleting collected items
+    if (deleteItem.is_collected) {
+      toast.error('Cannot delete collected items. Item has already been collected by the prisoner.');
+      setDeleteItem(null);
+      return;
+    }
 
     setLoading(true);
 
     const response = await deleteVisitorItem(deleteItem.id)
     if (handleResponseError(response)) return;
     setItems(items.filter((item) => item.id !== deleteItem.id));
+    setReloadKey(prev => prev + 1); // Trigger DataTable reload
     toast.success('Item deleted successfully');
     setDeleteItem(null);
     setLoading(false);
@@ -305,14 +313,141 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
     return <Badge variant="secondary">Pending</Badge>;
   };
 
-  const uniqueCategories = Array.from(new Set(items.map(i => i.category_name)));
+  // DataTable columns definition
+  const columns: DataTableColumn[] = [
+    {
+      key: 'visitor_name',
+      label: 'Visitor',
+      sortable: true,
+      render: (value: any, row: VisitorItem) => (
+        <div>
+          <p>{row.visitor_name}</p>
+          {row.for_prisoner && (
+            <Badge 
+              variant={row.is_collected ? "default" : "outline"} 
+              className={`mt-1 text-xs ${row.is_collected ? 'bg-green-600 text-white' : ''}`}
+            >
+              For Prisoner
+            </Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'item_name',
+      label: 'Item',
+      sortable: true,
+    },
+    {
+      key: 'category_name',
+      label: 'Category',
+      sortable: true,
+      render: (value: any) => <Badge variant="secondary">{value}</Badge>,
+    },
+    {
+      key: 'quantity',
+      label: 'Quantity',
+      sortable: true,
+      render: (value: any, row: VisitorItem) => (
+        <span>{value} {row.measurement_unit_name || ''}</span>
+      ),
+    },
+    {
+      key: 'amount',
+      label: 'Value',
+      sortable: true,
+      render: (value: any, row: VisitorItem) => {
+        const amount = parseFloat(row.amount || '0');
+        const formattedAmount = amount.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+        const currency = row.currency_symbol || row.currency_name || '';
+        return currency ? `${currency} ${formattedAmount}` : formattedAmount;
+      },
+    },
+    {
+      key: 'item_status_name',
+      label: 'Status',
+      sortable: true,
+      filterable: true,
+      render: (value: any, row: VisitorItem) => {
+        if (!row.is_allowed) {
+          return <Badge variant="destructive">Not Allowed</Badge>;
+        }
+        if (row.is_collected) {
+          return <Badge className="bg-green-600">Collected</Badge>;
+        }
+        return <Badge variant="secondary" className="bg-yellow-500">Pending</Badge>;
+      },
+    },
+    {
+      key: 'bag_no',
+      label: 'Bag No.',
+      sortable: true,
+      render: (value: any) => value || '-',
+    },
+    {
+      key: 'created_datetime',
+      label: 'Registered',
+      sortable: true,
+      render: (value: any) => {
+        if (!value) return '-';
+        const date = new Date(value);
+        return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+      },
+    },
+    {
+      key: 'actions',
+      label: 'Actions',
+      sortable: false,
+      render: (_: any, row: VisitorItem) => (
+        <div className="flex gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleView(row)}
+            title="View details"
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(row)}
+            title={row.is_collected ? "Cannot edit collected items" : "Edit item"}
+            disabled={row.is_collected}
+            className={row.is_collected ? "opacity-50 cursor-not-allowed" : ""}
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setDeleteItem(row)}
+            title={row.is_collected ? "Cannot delete collected items" : "Delete item"}
+            disabled={row.is_collected}
+            className={row.is_collected ? "opacity-50 cursor-not-allowed text-gray-400" : "text-red-600 hover:text-red-700"}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+          {row.photo && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => { setSelectedPhotoUrl(row.photo); setIsPhotoDialogOpen(true); }}
+              title="View photo"
+            >
+              <Image className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   // API integration
 
   function handleServerError (response: any) {
     if ('error' in response){
-          setIsDialogOpen(false)
-          setItemInfoLoading(false)
+          setIsDialogOpen(false);
           toast.error(response.error);
           return true
     }
@@ -321,8 +456,7 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
 
   function handleEmptyList (data: any, msg: string) {
     if (!data.length){
-          setIsDialogOpen(false)
-          setItemInfoLoading(false)
+          setIsDialogOpen(false);
           toast.error(msg);
           return true
     }
@@ -338,44 +472,28 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
     }
   }
 
+  // Load dropdown data in parallel (non-blocking) when dialog opens
   useEffect(() => {
     if (isDialogOpen){
-      async function fetchData(){
-        setItemInfoLoading(true)
-        try{
-
-          if (!visitors){
-            setIsDialogOpen(false)
-            setItemInfoLoading(false)
-            toast.error("There are no visitors");
-            return true
-          }
-
-          const response1 = await getItemCategories()
-          populateList(response1, "There are no item categories", setItemCategories)
-
-          const response2 = await getStationItems()
-          populateList(response2, "There are no items", setItemsX)
-
-          const response3 = await getItemStatuses()
-          populateList(response3, "There are no item statuses", setItemStatuses)
-
-          const response4 = await getUnits()
-          populateList(response4, "There are no item categories", setUnits)
-
-          setItemInfoLoading(false)
-
-        }catch (error) {
-           if (!error?.response) {
-            toast.error('Failed to connect to server. Please try again.');
-          }
-          setIsDialogOpen(false);
-          setItemInfoLoading(false)
-        }
+      if (!visitors){
+        setIsDialogOpen(false);
+        toast.error("There are no visitors");
+        return;
       }
-      fetchData()
+
+      // Load all data in parallel instead of sequentially
+      Promise.all([
+        getItemCategories().then(r => populateList(r, "There are no item categories", setItemCategories)),
+        getStationItems().then(r => populateList(r, "There are no items", setItemsX)),
+        getItemStatuses().then(r => populateList(r, "There are no item statuses", setItemStatuses)),
+        getUnits().then(r => populateList(r, "There are no units", setUnits)),
+      ]).catch(error => {
+        if (!error?.response) {
+          toast.error('Failed to load some dropdown data. Please try again.');
+        }
+      });
     }
-  }, [isDialogOpen]);
+  }, [isDialogOpen, visitors]);
 
 
   return (
@@ -407,199 +525,57 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-[95vw] w-[10vw] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
-            {
-                itemInfoLoading ? (
-                    <div className="flex-1 overflow-y-auto p-6">
-                      <DialogHeader>
-                        <DialogTitle style={{ color: '#650000' }}></DialogTitle>
-                        <DialogDescription></DialogDescription>
-                      </DialogHeader>
-                      <div className="size-full flex items-center justify-center mt-6">
-                        <div className="text-center">
-                          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                          <p className="text-muted-foreground text-sm">
-                            Fetching some data, Please wait...
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                ) : (
-                    <div className="flex-1 overflow-y-auto p-6">
-                      <DialogHeader>
-                        <DialogTitle style={{ color: '#650000' }}>
-                          {editingItem ? 'Edit Visitor Item' : 'Add Visitor Item'}
-                        </DialogTitle>
-                        <DialogDescription>
-                          {editingItem
-                            ? 'Update visitor item information'
-                            : 'Add a new item brought by a visitor'}
-                        </DialogDescription>
-                      </DialogHeader>
-                      <div className="mt-6">
-                        <VisitorItemForm
-                          item={editingItem}
-                          onSubmit={handleSubmit}
-                          onCancel={() => {
-                            setIsDialogOpen(false);
-                            setEditingItem(null);
-                          }}
-                          itemStatuses={itemStatuses}
-                          itemsX={itemsX}
-                          itemCategories={itemCategories}
-                          units={units}
-                          visitors={visitors}
-                          loading={loading}
-                        />
-                      </div>
-                    </div>
-                )
-              }
-
+            <div className="flex-1 overflow-y-auto p-6">
+              <DialogHeader>
+                <DialogTitle style={{ color: '#650000' }}>
+                  {editingItem ? 'Edit Visitor Item' : 'Add Visitor Item'}
+                </DialogTitle>
+                <DialogDescription>
+                  {editingItem
+                    ? 'Update visitor item information'
+                    : 'Add a new item brought by a visitor'}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="mt-6">
+                <VisitorItemForm
+                  item={editingItem}
+                  onSubmit={handleSubmit}
+                  onCancel={() => {
+                    setIsDialogOpen(false);
+                    setEditingItem(null);
+                  }}
+                  itemStatuses={itemStatuses}
+                  itemsX={itemsX}
+                  itemCategories={itemCategories}
+                  units={units}
+                  visitors={visitors}
+                  loading={loading}
+                  isEditing={!!editingItem}
+                />
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Filters */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Filter className="h-5 w-5" />
-            Filters & Search
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            {/* Search */}
-            <div className="md:col-span-2">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Search by visitor, item, category, or bag number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
-
-            {/* Category Filter */}
-            <div>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map((category) => (
-                    <SelectItem key={category} value={category}>
-                      {category}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Collection Status Filter */}
-            <div>
-              <Select value={filterCollected} onValueChange={setFilterCollected}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Collection Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Items</SelectItem>
-                  <SelectItem value="collected">Collected</SelectItem>
-                  <SelectItem value="pending">Pending Collection</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Items Table */}
-      <Card>
-        <CardContent className="p-0">
-          <div className="rounded-md border">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Visitor</TableHead>
-                  <TableHead>Item</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Quantity</TableHead>
-                  <TableHead>Value</TableHead>
-                  <TableHead>Bag No.</TableHead>
-                  {/*<TableHead>Status</TableHead>*/}
-                  <TableHead>Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredItems.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
-                      No visitor items found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredItems.map((item) => (
-                    <TableRow key={item.id}>
-                      <TableCell>
-                        <div>
-                          <p>{item.visitor_name}</p>
-                          {item.for_prisoner && (
-                            <Badge variant="outline" className="mt-1 text-xs">
-                              For Prisoner
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell>{item.item_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="secondary">{item.category_name}</Badge>
-                      </TableCell>
-                      <TableCell>{item.quantity}</TableCell>
-                      <TableCell>
-                        {item.currency} {parseFloat(item.amount).toLocaleString()}
-                      </TableCell>
-                      <TableCell>{item.bag_no || '-'}</TableCell>
-                      {/*<TableCell>{getStatusBadge(item)}</TableCell>*/}
-                      <TableCell>
-                        <div className="flex gap-1">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleView(item)}
-                            title="View details"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleEdit(item)}
-                            title="Edit item"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setDeleteItem(item)}
-                            title="Delete item"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+      {/* DataTable with built-in search, pagination, and export */}
+      <DataTable
+        key={reloadKey}
+        url={VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}
+        title="Visitor Items"
+        columns={columns}
+        config={{
+          search: true,
+          export: {
+            pdf: true,
+            csv: true,
+            print: true,
+          },
+          lengthMenu: [10, 50, 100],
+          pagination: true,
+          summary: true,
+        }}
+      />
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setIsViewDialogOpen}>
@@ -630,7 +606,10 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
                 <div>
                   <p className="text-sm text-muted-foreground">Amount</p>
                   <p>
-                    {viewingItem.currency} {parseFloat(viewingItem.amount).toLocaleString()}
+                    {parseFloat(viewingItem.amount).toLocaleString('en-US', {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2
+                    })} {viewingItem.currency}
                   </p>
                 </div>
                 <div>
@@ -681,11 +660,17 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
               {viewingItem.photo && (
                 <div>
                   <p className="text-sm text-muted-foreground mb-2">Photo</p>
-                  <img
-                    src={viewingItem.photo}
-                    alt="Item"
-                    className="max-h-64 rounded border"
-                  />
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedPhotoUrl(viewingItem.photo);
+                      setIsPhotoDialogOpen(true);
+                    }}
+                    className="gap-2"
+                  >
+                    <Image className="h-4 w-4" />
+                    View Item Photo
+                  </Button>
                 </div>
               )}
             </div>
@@ -743,6 +728,26 @@ export default function VisitorItemList({ visitors, items, setItems }: VisitorLi
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Photo Viewing Dialog */}
+      <Dialog open={isPhotoDialogOpen} onOpenChange={setIsPhotoDialogOpen}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle style={{ color: '#650000' }}>Item Photo</DialogTitle>
+          </DialogHeader>
+          <div className="flex justify-center items-center p-4">
+            {selectedPhotoUrl ? (
+              <img 
+                src={selectedPhotoUrl} 
+                alt="Item photo" 
+                className="max-w-full max-h-[70vh] object-contain rounded-lg"
+              />
+            ) : (
+              <p className="text-muted-foreground">No photo available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
