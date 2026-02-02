@@ -3,7 +3,7 @@ import {ErrorResponse} from "../stationServices/visitorsServices/VisitorsService
 import axiosInstance from "../axiosInstance";
 import {Unit} from "../stationServices/visitorsServices/visitorItem";
 
-// DisCharge
+// DisCharge Request
 
 export interface DischargeType {
   id: string;
@@ -455,4 +455,46 @@ export const updateHandover = async (handover: Handover, id: string) : Promise<H
 
 export const deleteHandover = async (id: string) : Promise<void> => {
   await axiosInstance.delete(`/discharge-management/child-handovers/${id}/`);
+}
+
+// Discharge
+
+export interface DischargeDocument {
+  document_type: string
+  description: string;
+  document_file: File | string;
+}
+
+export interface DeceasedData {
+  date_of_death: string;
+  morgue_details: string;
+  next_of_kin_available: boolean;
+  next_of_kin: string;
+  post_mortem_report: File | string;
+}
+
+export interface ExecutionData {
+  datetime_of_execution: string; // ISO datetime
+  approving_authority: string; // UUID
+}
+
+export interface DischargePayload {
+  request: string; // UUID
+  prisoner: string; // UUID
+  discharge_reason: string; // UUID
+  discharge_datetime: string; // ISO datetime
+  discharge_type: string; // UUID
+  remarks: string;
+  intended_place_of_stay: string;
+  deceased?: DeceasedData; // optional depending on discharge type
+  execution?: ExecutionData; // optional depending on discharge type
+  discharge_officers: string[]; // array of UUIDs
+  discharge_documents: DischargeDocument[];
+}
+
+export type DischargePayloadResponse = DischargePayload | ErrorResponse
+
+export const addDischarge = async (formData: FormData) : Promise<DischargeRequestResponse> => {
+  const response = await axiosInstance.post<DischargeRequestResponse>('/discharge-management/discharges/', formData);
+  return response.data;
 }
