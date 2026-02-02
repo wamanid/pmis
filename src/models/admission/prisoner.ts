@@ -1,44 +1,37 @@
 /**
  * Prisoner Models
- * Models for prisoner data from admission API
+ * Represents basic prisoner information
  */
 
-/**
- * User details embedded in prisoner records
- */
-export interface UserDetails {
-  id: number;
-  username: string;
-  email: string;
-  first_name: string;
-  last_name: string;
-}
-
-/**
- * Prisoner model
- */
 export interface Prisoner {
   id: string;
   prisoner_number: string;
   prisoner_number_value: string;
   prisoner_personal_number: string;
   prisoner_personal_number_value: string;
+  admission_status: string | null;
   first_name: string;
   last_name: string;
   full_name: string;
-  current_station: string;
-  current_station_name: string;
+  current_station: string | null;
+  current_station_name: string | null;
   is_active: boolean;
   created_datetime: string;
   created_by: number;
-  created_by_details: UserDetails;
+  created_by_details: {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+  };
   updated_datetime: string;
   updated_by: number;
+  avg_security_rating?: number;
+  habitual?: boolean;
+  is_dangerous?: boolean;
 }
 
-/**
- * Paginated prisoner list response
- */
 export interface PrisonerListResponse {
   count: number;
   next: string | null;
@@ -46,14 +39,9 @@ export interface PrisonerListResponse {
   results: Prisoner[];
 }
 
-/**
- * Prisoner list filters
- */
 export interface PrisonerFilters {
   is_active?: boolean;
   ordering?: string;
   page?: number;
-  prisoner_number?: string;
-  prisoner_personal_number?: string;
   search?: string;
 }
