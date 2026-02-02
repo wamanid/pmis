@@ -19,13 +19,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-} from "../ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { Calendar } from "../ui/calendar";
 import DatePicker from "../common/DatePicker";
@@ -39,8 +32,6 @@ import {
   Users,
   Calendar as CalendarIcon,
   Upload,
-  Check,
-  ChevronsUpDown,
   UserPlus,
 } from "lucide-react";
 import { format } from "date-fns";
@@ -52,6 +43,7 @@ import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import { useFilters } from '../../contexts/FilterContext';
 import { phoneNumberValidation, emailValidation, requiredValidation, nameValidation } from "../../utils/validation";
 import SearchableSelect from '../common/SearchableSelect';
+import StaffProfileSelect from '../common/StaffProfileSelect';
 import { cn } from "../ui/utils";
 
 import axiosInstance from '../../services/axiosInstance';
@@ -232,7 +224,6 @@ const [stations, setStations] = useState<Station[]>([]);
 const [staff, setStaff] = useState<Staff[]>([]);
 const [shifts, setShifts] = useState<Shift[]>([]);
 const [shiftsForStaffForm, setShiftsForStaffForm] = useState<Shift[]>([]);
-const [shiftsForSelectedStation, setShiftsForSelectedStation] = useState<Shift[]>([]);
 const [deploymentAreas, setDeploymentAreas] = useState<DeploymentArea[]>([]);
 const [shiftDetails, setShiftDetails] = useState<ShiftDetail[]>([]);
 const [shiftDeployments, setShiftDeployments] = useState<ShiftDeployment[]>([]);
@@ -282,20 +273,6 @@ const [staffForm, setStaffForm] = useState({
   report: "",
 });
 
-// Combobox states
-const [openStationCombo, setOpenStationCombo] = useState(false);
-const [openShiftCombo, setOpenShiftCombo] = useState(false);
-const [openStaffCombo, setOpenStaffCombo] = useState(false);
-const [openDeploymentAreaCombo, setOpenDeploymentAreaCombo] = useState(false);
-const [openShiftLeaderCombo, setOpenShiftLeaderCombo] = useState(false);
-
-// Custom searchable station dropdown states
-const [openStationSearch, setOpenStationSearch] = useState(false);
-const [stationSearchQuery, setStationSearchQuery] = useState("");
-const [stationSearchResults, setStationSearchResults] = useState<Station[]>([]);
-const [stationSearchLoading, setStationSearchLoading] = useState(false);
-const stationSearchTimeoutRef = useRef<number | null>(null);
-
 // Dates for calendar
 const [shiftDateOpen, setShiftDateOpen] = useState(false);
 const [endDateOpen, setEndDateOpen] = useState(false);
@@ -326,16 +303,18 @@ useEffect(() => {
       ]);
       if (!mounted) return;
 
-      setRegions(regs ?? []);
-      setStations(stns ?? []);
-      setStaff(stf ?? []);
-      setDeploymentAreas(areas ?? []);
+      // Extract results arrays from paginated responses
+      setRegions(regs?.results ?? regs ?? []);
+      setStations(stns?.results ?? stns ?? []);
+      setStaff(stf?.results ?? stf ?? []);
+      setDeploymentAreas(areas?.results ?? areas ?? []);
 
       // Normalize using the staff list returned above (stf) so we can resolve shift_leader name/username
       const allDetails = details?.results ?? [];
+      const staffArray = stf?.results ?? stf ?? [];
       const normalized = (allDetails || []).map((raw: any) => {
         const leaderId = raw?.shift_leader;
-        const leaderObj = Array.isArray(stf) ? stf.find((s: any) => String(s.id) === String(leaderId)) : undefined;
+        const leaderObj = Array.isArray(staffArray) ? staffArray.find((s: any) => String(s.id) === String(leaderId)) : undefined;
         return {
           ...raw,
           shift_leader_full_name: raw.shift_leader_full_name ?? raw.shift_leader_name ?? leaderObj?.name ?? leaderObj?.full_name ?? '',
@@ -379,7 +358,7 @@ useEffect(() => {
     try {
       const ds = await svc.fetchDistricts({ region: regionToUse }, c.signal);
       if (!mounted) return;
-      setDistricts(ds ?? []);
+      setDistricts(ds?.results ?? ds ?? []);
       // if global district is present, set it
       setSelectedDistrict(globalDistrict || "");
       setSelectedStation(globalStation || "");
@@ -407,7 +386,7 @@ useEffect(() => {
       }
       const stns = await svc.fetchStations({ district: districtToUse, region: globalRegion }, c.signal);
       if (!mounted) return;
-      setStations(stns ?? []);
+      setStations(stns?.results ?? stns ?? []);
       setSelectedStation(globalStation || "");
     } catch (err) {
       if ((err as any)?.name === 'AbortError' || (err as any)?.code === 'ERR_CANCELED') return;
@@ -470,58 +449,6 @@ useEffect(() => {
   return () => { mounted = false; c.abort(); };
 }, [staffForm.station, selectedStation, globalStation]);
 
-// Shifts for Add Staff form are now populated from shift_details API when station is selected
-
-// Debounced station search for staff form - handles server-side search efficiently
-useEffect(() => {
-  if (!openStationSearch) return;
-
-  // Clear previous timeout
-  if (stationSearchTimeoutRef.current) {
-    window.clearTimeout(stationSearchTimeoutRef.current);
-  }
-
-  // Debounce search by 500ms
-  stationSearchTimeoutRef.current = window.setTimeout(async () => {
-    setStationSearchLoading(true);
-    try {
-      const params: any = { page_size: 50 };
-      
-      // Add search filter if query exists
-      if (stationSearchQuery.trim()) {
-        params.station_name__icontains = stationSearchQuery.trim();
-      }
-      
-      const res = await svc.fetchShiftDetails(params);
-      const details = res?.results ?? [];
-      
-      // Extract unique stations
-      const stationMap: Record<string, Station> = {};
-      details.forEach((detail: any) => {
-        if (detail.station && detail.station_name && !stationMap[detail.station]) {
-          stationMap[detail.station] = {
-            id: detail.station,
-            name: detail.station_name,
-          };
-        }
-      });
-      
-      setStationSearchResults(Object.values(stationMap));
-    } catch (err) {
-      console.error('Station search error:', err);
-      setStationSearchResults([]);
-    } finally {
-      setStationSearchLoading(false);
-    }
-  }, 500); // 500ms debounce
-
-  return () => {
-    if (stationSearchTimeoutRef.current) {
-      window.clearTimeout(stationSearchTimeoutRef.current);
-    }
-  };
-}, [stationSearchQuery, openStationSearch]);
-
 // NOTE: Shift Details DataTable is server-driven via its `url` prop.
 // We no longer perform manual server fetches for table rows here.
 
@@ -538,8 +465,8 @@ useFilterRefresh(() => {
         svc.fetchStations({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
         svc.fetchStaffProfiles({ region: globalRegion, district: globalDistrict, station: globalStation }, c.signal),
       ]);
-      setStations(stns ?? []);
-      setStaff(stf ?? []);
+      setStations(stns?.results ?? stns ?? []);
+      setStaff(stf?.results ?? stf ?? []);
     } catch (e) { /* ignore */ }
   })();
   return Promise.resolve();
@@ -851,6 +778,145 @@ const handleDeleteDeployment = async () => {
   }
 };
 
+  // Fetch paginated callbacks for SearchableSelect components
+  const fetchStationsPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await svc.fetchStations({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          region: globalRegion || undefined,
+          district: globalDistrict || undefined,
+          station: globalStation || undefined,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchStationsPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    [globalRegion, globalDistrict, globalStation]
+  );
+
+  const fetchShiftsPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const stationFilter = shiftForm.station || globalStation || '';
+        if (!stationFilter) {
+          return { items: [], count: 0, next: null };
+        }
+        const response = await svc.fetchShifts({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          station: stationFilter,
+          is_global: true, // Include global shifts
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchShiftsPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    [shiftForm.station, globalStation]
+  );
+
+  const fetchShiftsForStaffFormPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const stationFilter = staffForm.station || globalStation || '';
+        if (!stationFilter) {
+          return { items: [], count: 0, next: null };
+        }
+        // Fetch shift-details for the station (these are the shifts we want)
+        const response = await svc.fetchShiftDetails({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          station: stationFilter,
+          is_global: true, // Include global shifts
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        // Map shift-details to shift objects
+        const shiftItems = (payload?.results ?? []).map((detail: any) => ({
+          id: detail.id, // Use shift-detail ID
+          shift_name: detail.shift_name,
+          station: stationFilter,
+        }));
+        return {
+          items: shiftItems,
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchShiftsForStaffFormPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    [staffForm.station, globalStation]
+  );
+
+  const fetchDeploymentAreasPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await svc.fetchDeploymentAreas({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchDeploymentAreasPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    []
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -881,7 +947,10 @@ const handleDeleteDeployment = async () => {
                 Create Shift
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col">
+            <DialogContent 
+              className="max-w-md w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col"
+              onInteractOutside={(e) => e.preventDefault()}
+            >
               <div className="flex-1 overflow-y-auto p-6">
               <DialogHeader>
                 <DialogTitle>{isEditMode ? 'Edit Shift' : 'Create New Shift'}</DialogTitle>
@@ -893,145 +962,45 @@ const handleDeleteDeployment = async () => {
                 {/* Station - Searchable */}
                 <div className="space-y-2">
                   <Label>Station <span className="text-red-500">*</span></Label>
-                  <Popover open={openStationCombo} onOpenChange={setOpenStationCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openStationCombo}
-                        className="w-full justify-between"
-                      >
-                        {shiftForm.station
-                          ? stations.find((s) => s.id === shiftForm.station)?.name
-                          : "Select station..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search station..." />
-                        <CommandEmpty>No station found.</CommandEmpty>
-                        <CommandGroup>
-                          {stations.map((station) => (
-                            <CommandItem
-                              key={station.id}
-                              value={station.name}
-                              onSelect={() => {
-                                setShiftForm({ ...shiftForm, station: station.id, shift: "" });
-                                setOpenStationCombo(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  shiftForm.station === station.id
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {station.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <SearchableSelect
+                    key={`station-${isShiftDialogOpen}`}
+                    value={shiftForm.station}
+                    onChange={(v) => setShiftForm(prev => ({ ...prev, station: v ?? '', shift: '' }))}
+                    fetchPaginated={fetchStationsPaginated}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select station..."
+                    pageSize={50}
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Shift - Searchable */}
                 <div className="space-y-2">
                   <Label>Shift <span className="text-red-500">*</span></Label>
-                  <Popover open={openShiftCombo} onOpenChange={setOpenShiftCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openShiftCombo}
-                        className="w-full justify-between"
-                      >
-                        {shiftForm.shift
-                          ? shifts.find((s) => s.id === shiftForm.shift)?.shift_name
-                          : "Select shift..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search shift..." />
-                        <CommandEmpty>No shift found.</CommandEmpty>
-                        <CommandGroup>
-                          {shifts.map((shift) => (
-                            <CommandItem
-                              key={shift.id}
-                              value={shift.shift_name}
-                              onSelect={() => {
-                                setShiftForm({ ...shiftForm, shift: shift.id });
-                                setOpenShiftCombo(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  shiftForm.shift === shift.id
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {shift.shift_name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <SearchableSelect
+                    key={`shift-${isShiftDialogOpen}`}
+                    value={shiftForm.shift}
+                    onChange={(v) => setShiftForm(prev => ({ ...prev, shift: v ?? '' }))}
+                    fetchPaginated={fetchShiftsPaginated}
+                    idField="id"
+                    labelField="shift_name"
+                    placeholder={shiftForm.station ? "Select shift..." : "Select station first..."}
+                    pageSize={50}
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Shift Leader - Searchable */}
                 <div className="space-y-2">
                   <Label>Shift Leader <span className="text-red-500">*</span></Label>
-                  <Popover open={openShiftLeaderCombo} onOpenChange={setOpenShiftLeaderCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openShiftLeaderCombo}
-                        className="w-full justify-between"
-                      >
-                        {shiftForm.shift_leader
-                          ? staff.find((s) => String(s.id) === String(shiftForm.shift_leader))?.name
-                          : "Select shift leader..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search staff..." />
-                        <CommandEmpty>No staff found.</CommandEmpty>
-                        <CommandGroup>
-                          {staff.map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              value={s.name}
-                              onSelect={() => {
-                                setShiftForm({ ...shiftForm, shift_leader: String(s.id) });
-                                setOpenShiftLeaderCombo(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  shiftForm.shift_leader === String(s.id)
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {s.name} ({s.force_number}) - {s.rank_name ?? s.rank}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <StaffProfileSelect
+                    key={`shift-leader-${isShiftDialogOpen}`}
+                    value={shiftForm.shift_leader}
+                    onChange={(v) => setShiftForm(prev => ({ ...prev, shift_leader: v ?? '' }))}
+                    placeholder="Select shift leader..."
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Handover Report */}
@@ -1106,7 +1075,10 @@ const handleDeleteDeployment = async () => {
                 Add Staff to Shift
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col">
+            <DialogContent 
+              className="max-w-md w-[1200px] max-h-[95vh] overflow-hidden p-0 flex flex-col"
+              onInteractOutside={(e) => e.preventDefault()}
+            >
               <div className="flex-1 overflow-y-auto p-6">
               <DialogHeader>
                 <DialogTitle>Add Staff Member to Shift</DialogTitle>
@@ -1115,93 +1087,20 @@ const handleDeleteDeployment = async () => {
                 </DialogDescription>
               </DialogHeader>
               <form onSubmit={handleAddStaffToShift} className="space-y-4 mt-4">
-                {/* Station - Custom server-side searchable dropdown */}
+                {/* Station - Server-side searchable */}
                 <div className="space-y-2">
                   <Label>Station <span className="text-red-500">*</span></Label>
-                  <Popover open={openStationSearch} onOpenChange={(open: boolean) => {
-                    setOpenStationSearch(open);
-                    if (open && stationSearchResults.length === 0) {
-                      // Trigger initial load
-                      setStationSearchQuery("");
-                    }
-                  }}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openStationSearch}
-                        className="w-full justify-between"
-                      >
-                        {staffForm.station
-                          ? stationSearchResults.find((s) => s.id === staffForm.station)?.name || "Station selected"
-                          : "Search station..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0" align="start">
-                      <Command shouldFilter={false}>
-                        <div className="flex items-center border-b px-3">
-                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <input
-                            className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50"
-                            placeholder="Type to search stations..."
-                            value={stationSearchQuery}
-                            onChange={(e) => setStationSearchQuery(e.target.value)}
-                          />
-                        </div>
-                        {stationSearchLoading ? (
-                          <div className="p-4 text-sm text-center text-muted-foreground">
-                            Searching...
-                          </div>
-                        ) : stationSearchResults.length === 0 ? (
-                          <div className="p-4 text-sm text-center text-muted-foreground">
-                            {stationSearchQuery ? "No stations found" : "Type to search"}
-                          </div>
-                        ) : (
-                          <CommandGroup className="max-h-[300px] overflow-auto">
-                            {stationSearchResults.map((station) => (
-                              <CommandItem
-                                key={station.id}
-                                value={station.id}
-                                onSelect={async () => {
-                                  setStaffForm({ ...staffForm, station: station.id, shift: '' });
-                                  setOpenStationSearch(false);
-                                  
-                                  // Fetch shifts for selected station from shift-details API
-                                  try {
-                                    const res = await svc.fetchShiftDetails({ station: station.id, page_size: -1 });
-                                    const details = res?.results ?? [];
-                                    // Map shift-details to dropdown options (use shift-detail ID, not shift ID)
-                                    const shiftOptions = details.map((detail: any) => ({
-                                      id: detail.id, // shift-detail ID (what backend expects)
-                                      shift_name: detail.shift_name,
-                                      start_time: '',
-                                      end_time: '',
-                                      station: station.id,
-                                    }));
-                                    setShiftsForSelectedStation(shiftOptions);
-                                  } catch (err) {
-                                    console.error('Failed to fetch shifts for station', err);
-                                    setShiftsForSelectedStation([]);
-                                  }
-                                }}
-                              >
-                                <Check
-                                  className={cn(
-                                    "mr-2 h-4 w-4",
-                                    staffForm.station === station.id
-                                      ? "opacity-100"
-                                      : "opacity-0"
-                                  )}
-                                />
-                                {station.name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        )}
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <SearchableSelect
+                    key={`staff-station-${isStaffDialogOpen}`}
+                    value={staffForm.station}
+                    onChange={(v) => setStaffForm(prev => ({ ...prev, station: v ?? '', shift: '' }))}
+                    fetchPaginated={fetchStationsPaginated}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select station..."
+                    pageSize={50}
+                    className="w-full"
+                  />
                   {staffFormErrors.station && (
                     <p className="text-red-500 text-sm mt-1">{staffFormErrors.station}</p>
                   )}
@@ -1210,22 +1109,17 @@ const handleDeleteDeployment = async () => {
                 {/* Shift - Populated from selected station's shift_details */}
                 <div className="space-y-2">
                   <Label>Shift <span className="text-red-500">*</span></Label>
-                  <Select 
-                    value={staffForm.shift} 
-                    onValueChange={(value) => setStaffForm({ ...staffForm, shift: value })}
-                    disabled={!staffForm.station || shiftsForSelectedStation.length === 0}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder={!staffForm.station ? "Select station first..." : "Select shift..."} />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {shiftsForSelectedStation.map((shift) => (
-                        <SelectItem key={shift.id} value={shift.id}>
-                          {shift.shift_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    key={`staff-shift-${isStaffDialogOpen}`}
+                    value={staffForm.shift}
+                    onChange={(v) => setStaffForm(prev => ({ ...prev, shift: v ?? '' }))}
+                    fetchPaginated={fetchShiftsForStaffFormPaginated}
+                    idField="id"
+                    labelField="shift_name"
+                    placeholder={staffForm.station ? "Select shift..." : "Select station first..."}
+                    pageSize={50}
+                    className="w-full"
+                  />
                   {staffFormErrors.shift && (
                     <p className="text-red-500 text-sm mt-1">{staffFormErrors.shift}</p>
                   )}
@@ -1234,97 +1128,29 @@ const handleDeleteDeployment = async () => {
                 {/* Staff - Searchable */}
                 <div className="space-y-2">
                   <Label>Staff Member <span className="text-red-500">*</span></Label>
-                  <Popover open={openStaffCombo} onOpenChange={setOpenStaffCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openStaffCombo}
-                        className="w-full justify-between"
-                      >
-                        {staffForm.staff
-                          ? staff.find((s) => String(s.id) === staffForm.staff)?.name
-                          : "Select staff..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search staff..." />
-                        <CommandEmpty>No staff found.</CommandEmpty>
-                        <CommandGroup>
-                          {staff.map((s) => (
-                            <CommandItem
-                              key={s.id}
-                              value={s.name}
-                              onSelect={() => {
-                                setStaffForm({ ...staffForm, staff: String(s.id) });
-                                setOpenStaffCombo(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  staffForm.staff === String(s.id)
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {s.name} ({s.force_number}) - {s.rank_name ?? s.rank}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <StaffProfileSelect
+                    key={`staff-member-${isStaffDialogOpen}`}
+                    value={staffForm.staff}
+                    onChange={(v) => setStaffForm(prev => ({ ...prev, staff: v ?? '' }))}
+                    placeholder="Select staff member..."
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Deployment Area - Searchable */}
                 <div className="space-y-2">
                   <Label>Deployment Area <span className="text-red-500">*</span></Label>
-                  <Popover open={openDeploymentAreaCombo} onOpenChange={setOpenDeploymentAreaCombo}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={openDeploymentAreaCombo}
-                        className="w-full justify-between"
-                      >
-                        {staffForm.deployment_area
-                          ? deploymentAreas.find((a) => a.id === staffForm.deployment_area)?.name
-                          : "Select deployment area..."}
-                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search area..." />
-                        <CommandEmpty>No area found.</CommandEmpty>
-                        <CommandGroup>
-                          {deploymentAreas.map((area) => (
-                            <CommandItem
-                              key={area.id}
-                              value={area.name}
-                              onSelect={() => {
-                                setStaffForm({ ...staffForm, deployment_area: area.id });
-                                setOpenDeploymentAreaCombo(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  staffForm.deployment_area === area.id
-                                    ? "opacity-100"
-                                    : "opacity-0"
-                                )}
-                              />
-                              {area.name}
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <SearchableSelect
+                    key={`deployment-area-${isStaffDialogOpen}`}
+                    value={staffForm.deployment_area}
+                    onChange={(v) => setStaffForm(prev => ({ ...prev, deployment_area: v ?? '' }))}
+                    fetchPaginated={fetchDeploymentAreasPaginated}
+                    idField="id"
+                    labelField="name"
+                    placeholder="Select deployment area..."
+                    pageSize={50}
+                    className="w-full"
+                  />
                 </div>
 
                 {/* Shift Date */}

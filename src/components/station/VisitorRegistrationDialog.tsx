@@ -40,7 +40,7 @@ import {
    getIdTypes,
    getPrisoners, getRelationships, getVisitorStatus,
    getVisitorTypes, IdType, Prisoner, PrisonerItem, RelationShipItem,
-   StationVisitor, updateStationVisitor, VisitorStatusItem, VisitorTypeItem
+   StationVisitor, updateStationVisitor, Visitor, VisitorStatusItem, VisitorTypeItem
  } from "../../services/stationServices/visitorsServices/VisitorsService";
 // validation utils
 import {
@@ -56,34 +56,6 @@ import {
  import {getStaffProfile, StaffItem} from "../../services/stationServices/staffDeploymentService";
  import {fileToBinaryString, handleResponseError} from "../../services/stationServices/utils";
 import axiosInstance from "../../services/axiosInstance";
-
-// Types
-interface Visitor {
-  id?: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  organisation: string;
-  vehicle_no: string;
-  reason_of_visitation: string;
-  id_number: string;
-  address: string;
-  contact_no: string;
-  place_visited: string;
-  remarks: string;
-  blacklist_reason: string;
-  photo: File | null;
-  gate: string;
-  prisoner: string;
-  visitor_type: string;
-  gate_keeper: string;
-  relation: string;
-  id_type: string;
-  visitor_status: string;
-  visitation_datetime: Date;
-  time_in: string;
-  time_out: string;
-}
 
 interface VisitorRegistrationDialogProps {
   open: boolean;
@@ -151,7 +123,6 @@ export default function VisitorRegistrationDialog({
   const [openIDTypeCombo, setOpenIDTypeCombo] = useState(false);
   const [openVisitorStatusCombo, setOpenVisitorStatusCombo] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [formDataLoading, setFormDataLoading] = useState(false)
 
   // APIs declarations
   const [mockIDTypes, setMockIDTypes] = useState<IdType[]>([])
@@ -456,8 +427,7 @@ export default function VisitorRegistrationDialog({
   // APIS begin from here
   function handleServerError (response: any) {
     if ('error' in response){
-          onOpenChange(false)
-          setFormDataLoading(false)
+          onOpenChange(false);
           toast.error(response.error);
           return true
     }
@@ -466,8 +436,7 @@ export default function VisitorRegistrationDialog({
 
   function handleEmptyList (data: any, msg: string) {
     if (!data.length){
-          onOpenChange(false)
-          setFormDataLoading(false)
+          onOpenChange(false);
           toast.error(msg);
           return true
     }
@@ -484,49 +453,23 @@ export default function VisitorRegistrationDialog({
     }
   }
 
+  // Load dropdown data in parallel (non-blocking) - each dropdown fetches independently
   useEffect(() => {
     if (open){
-      const fetchData =  async () => {
-        setFormDataLoading(true)
-        try {
-          const response1 = await getIdTypes()
-          populateList(response1, "There are no ID Types", setMockIDTypes)
-        
-          const response2 = await getPrisoners()
-          populateList(response2, "There are no Prisoners", setMockPrisoners)
-          // console.log(response2)
-        
-          const response3 = await getGates()
-          populateList(response3, "There are no gates", setMockGates)
-        
-          const response4 = await getStaffProfile()
-          populateList(response4, "There are no staff", setMockStaff)
-          // console.log(response4)
-        
-          const response5 = await getVisitorTypes()
-          populateList(response5, "There are no visitor types", setMockVisitorTypes)
-          // console.log(response5)
-        
-          const response6 = await getVisitorStatus()
-          populateList(response6, "There are no visitor statuses", setMockVisitorStatuses)
-          // console.log(response6)
-        
-          const response7 = await getRelationships()
-          populateList(response7, "There are no visitor-prisoner relationships", setMockRelationships)
-          // console.log(response7)
-
-          setFormDataLoading(false)
-
-        }catch (error) {
-          if (!error?.response) {
-            toast.error('Failed to connect to server. Please try again.');
-          }
-          onOpenChange(false);
-          setFormDataLoading(false)
+      // Load all data in parallel instead of sequentially
+      Promise.all([
+        getIdTypes().then(r => populateList(r, "There are no ID Types", setMockIDTypes)),
+        getPrisoners().then(r => populateList(r, "There are no Prisoners", setMockPrisoners)),
+        getGates().then(r => populateList(r, "There are no gates", setMockGates)),
+        getStaffProfile().then(r => populateList(r, "There are no staff", setMockStaff)),
+        getVisitorTypes().then(r => populateList(r, "There are no visitor types", setMockVisitorTypes)),
+        getVisitorStatus().then(r => populateList(r, "There are no visitor statuses", setMockVisitorStatuses)),
+        getRelationships().then(r => populateList(r, "There are no visitor-prisoner relationships", setMockRelationships)),
+      ]).catch(error => {
+        if (!error?.response) {
+          toast.error('Failed to load some dropdown data. Please try again.');
         }
-      }
-
-      fetchData()
+      });
     }
   }, [open]);
 
@@ -547,35 +490,18 @@ export default function VisitorRegistrationDialog({
       }
     }}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        {
-          formDataLoading ? (
-              <div className="flex-1 max-h-[90vh] p-6">
-                <DialogHeader>
-                      <DialogTitle></DialogTitle>
-                      <DialogDescription></DialogDescription>
-                    </DialogHeader>
-                <div className="size-full flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-                    <p className="text-muted-foreground text-sm">
-                      Fetching some data, Please wait...
-                    </p>
-                  </div>
-                </div>
-              </div>
-          ) : (
-              <div className="flex-1 max-h-[90vh] p-6">
-                <DialogHeader>
-                  <DialogTitle>
-                    {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
-                  </DialogTitle>
-                  <DialogDescription>
-                    {editingVisitor
-                      ? "Update visitor information"
-                      : "Register a new visitor and manage check-in/check-out"}
-                  </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-6 mt-4">
+        <div className="flex-1 max-h-[90vh] p-6">
+          <DialogHeader>
+            <DialogTitle>
+              {editingVisitor ? "Edit Visitor" : "Register New Visitor"}
+            </DialogTitle>
+            <DialogDescription>
+              {editingVisitor
+                ? "Update visitor information"
+                : "Register a new visitor and manage check-in/check-out"}
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-6 mt-4">
                   <Tabs defaultValue="personal" className="w-full">
                     <TabsList className="flex w-full">
                       <TabsTrigger value="personal">Personal Info</TabsTrigger>
@@ -1228,9 +1154,6 @@ export default function VisitorRegistrationDialog({
                   </div>
                 </form>
               </div>
-          )
-        }
-
       </DialogContent>
     </Dialog>
   );

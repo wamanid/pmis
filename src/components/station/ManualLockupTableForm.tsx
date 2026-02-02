@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -66,11 +66,28 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
   const [sexes, setSexes] = useState<Sex[]>([]);
   const [prisonerCategories, setPrisonerCategories] = useState<PrisonerCategory[]>([]);
   const [lockupTypes, setLockupTypes] = useState<LockupType[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
+  // NOTE: stations not stored in state - SearchableSelect handles them via paginated fetch
   const [dataLoading, setDataLoading] = useState(true);
 
   // Dynamic counts structure
   const [counts, setCounts] = useState<LockupCounts>({});
+
+  // Memoize fetchPaginated to prevent infinite re-renders
+  const fetchStationsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    const response = await axiosInstance.get(API_ENDPOINTS.STATIONS, {
+      params: {
+        search: opts.search || '',
+        page: opts.page || 1,
+        page_size: opts.page_size || 50,
+      },
+      signal,
+    });
+    return {
+      items: response.data?.results || [],
+      count: response.data?.count || 0,
+      next: response.data?.next || null,
+    };
+  }, []); // Empty dependency array - function never changes
 
   // Fetch locations from API
   useEffect(() => {
@@ -146,23 +163,8 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
     fetchLockupTypes();
   }, []);
 
-  // Fetch stations from API
-  useEffect(() => {
-    const fetchStations = async () => {
-      try {
-        const response = await axiosInstance.get(API_ENDPOINTS.STATIONS, {
-          params: { page_size: -1 }
-        });
-        const items = response.data?.results || [];
-        setStations(items);
-      } catch (error) {
-        console.error('Failed to fetch stations:', error);
-        toast.error('Failed to load stations');
-        setStations([]);
-      }
-    };
-    fetchStations();
-  }, []);
+  // NOTE: Stations are fetched via SearchableSelect's paginated mode, not here
+  // Removed duplicate stations fetch to prevent conflicts
 
   // Initialize counts structure when reference data is loaded
   useEffect(() => {
@@ -304,13 +306,14 @@ export function ManualLockupTableForm({ onRecordsCreated, selectedStation }: Man
                 Station <span className="text-red-500">*</span>
               </Label>
               <SearchableSelect
-                items={stations}
                 value={station}
                 onChange={(id) => setStation(id || '')}
-                placeholder="Select station"
+                fetchPaginated={fetchStationsPaginated}
+                placeholder="Search station..."
                 idField="id"
                 labelField="name"
-                className="w-full"
+                pageSize={50}
+                minQueryLength={0}
               />
             </div>
 

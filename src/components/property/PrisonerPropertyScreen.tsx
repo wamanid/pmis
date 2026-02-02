@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import BiometricCapture from '../common/BiometricCapture';
 import PropertyStatusChangeForm from './PropertyStatusChangeForm';
@@ -13,7 +13,7 @@ import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Search, 
   Plus, 
@@ -47,7 +47,7 @@ import {
   getProperties, getPropertyBags,
   getPropertyItems, getPropertyStatuses,
   getPropertyTypes,
-  PrisonerProperty, PropertyBag, PropertyItem
+  PrisonerProperty, PropertyBag, PropertyItem, fetchPropertyById
 } from "../../services/propertyServices/propertyService";
 import {
   getIdTypes,
@@ -75,6 +75,8 @@ import {getCurrentUser} from "../../services";
 import NextOfKinScreen from "./NextOfKin";
 import PropertyItemX from "./PropertyItem"
 import CreatePropertyForm from "./CreatePropertyForm";
+import { DataTable } from '../common/DataTable';
+import type { DataTableColumn } from '../common/DataTable.types';
 
 interface Property {
   id: string;
@@ -477,10 +479,6 @@ export default function PrisonerPropertyScreen() {
   const [properties, setProperties] = useState<PrisonerProperty[]>([]);
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [visitors, setVisitors] = useState<Visitor[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [typeFilter, setTypeFilter] = useState<string>('all');
-  const [currentPage, setCurrentPage] = useState(1);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isNextCreateDialogOpen, setIsNextCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
@@ -490,6 +488,7 @@ export default function PrisonerPropertyScreen() {
   const [isStatusChangeDialogOpen, setIsStatusChangeDialogOpen] = useState(false);
   const [selectedProperty, setSelectedProperty] = useState<PrisonerProperty | null>(null);
   const [isLoadingVisitors, setIsLoadingVisitors] = useState(false);
+  const [dataTableRefreshKey, setDataTableRefreshKey] = useState(0);
   const [previousPropertyStatus, setPreviousPropertyStatus] = useState('');
   const [statusChangeData, setStatusChangeData] = useState<any>(null);
 
@@ -505,7 +504,9 @@ export default function PrisonerPropertyScreen() {
 
   // Separate state for prisoner and visitor info (for create mode)
   const [prisonerInfo, setPrisonerInfo] = useState({
-    prisoner: ''
+    prisoner: '',
+    prisonerName: '',
+    prisonerNumber: ''
   });
 
   const [visitorInfo, setVisitorInfo] = useState({
@@ -553,8 +554,6 @@ export default function PrisonerPropertyScreen() {
     destination: ''
   });
 
-  const itemsPerPage = 10;
-
   // Fetch visitors from API
   // useEffect(() => {
   //   const fetchVisitors = async () => {
@@ -574,26 +573,6 @@ export default function PrisonerPropertyScreen() {
   //   };
   //   fetchVisitors();
   // }, []);
-
-  // Filter properties
-  const filteredProperties = properties.filter(property => {
-    const matchesSearch = 
-      property.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.property_item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.property_bag_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.note.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesStatus = statusFilter === 'all' || property.property_status === statusFilter;
-    const matchesType = typeFilter === 'all' || property.property_type === typeFilter;
-
-    return matchesSearch && matchesStatus && matchesType;
-  });
-
-  const totalPages = Math.ceil(filteredProperties.length / itemsPerPage);
-  const paginatedProperties = filteredProperties.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
 
   const handleCreate = () => {
     setPrisonerInfo({ prisoner: '' });
@@ -626,9 +605,23 @@ export default function PrisonerPropertyScreen() {
   //   }
   // };
 
-  const handleEdit = (property: PrisonerProperty) => {
-    setSelectedProperty(property);
-    setIsCreateDialogOpen(true)
+  const handleEdit = async (property: PrisonerProperty) => {
+    try {
+      // Fetch fresh property data from API (Option B pattern)
+      const response = await fetchPropertyById(property.id);
+      
+      if ('error' in response) {
+        toast.error(`Failed to fetch property data: ${response.error}`);
+        return;
+      }
+      
+      // Set the property data and open dialog
+      setSelectedProperty(response);
+      setIsCreateDialogOpen(true);
+    } catch (error) {
+      console.error('Error fetching property:', error);
+      toast.error('Failed to load property data for editing');
+    }
 
     // setPreviousPropertyStatus(property.property_status); // Store the original status
     // setFormData({
@@ -674,6 +667,9 @@ export default function PrisonerPropertyScreen() {
     const response = await deleteProperty(selectedProperty.id)
     if (handleResponseError(response)) return;
     setProperties(properties.filter(p => p.id !== selectedProperty.id));
+    
+    // Trigger DataTable refresh by incrementing key
+    setDataTableRefreshKey(prev => prev + 1);
     toast.success('Property deleted successfully');
     setIsDeleteDialogOpen(false);
     setSelectedProperty(null);
@@ -708,11 +704,132 @@ export default function PrisonerPropertyScreen() {
     );
   };
 
-  // Calculate statistics
-  const totalProperties = properties.length;
-  const storedProperties = properties.filter(p => p.property_status_name === 'Stored').length;
-  const releasedProperties = properties.filter(p => p.property_status_name === 'Released').length;
-  const totalValue = properties.reduce((sum, p) => sum + parseInt(p.amount || '0'), 0);
+  // Calculate statistics with memoization for performance
+  const { totalProperties, storedProperties, releasedProperties, totalValueDisplay } = useMemo(() => {
+    const total = properties.length;
+    const stored = properties.filter(p => p.property_status_name === 'Stored').length;
+    const released = properties.filter(p => p.property_status_name === 'Released').length;
+    
+    // Calculate totals per currency
+    const currencyTotals: Record<string, { symbol: string; total: number }> = {};
+    properties.forEach((property) => {
+      if (property.currency_name && property.amount) {
+        const currencyName = property.currency_name;
+        const currencySymbol = property.currency_symbol || currencyName;
+        const amount = parseFloat(property.amount) || 0;
+        
+        if (!currencyTotals[currencyName]) {
+          currencyTotals[currencyName] = { symbol: currencySymbol, total: 0 };
+        }
+        currencyTotals[currencyName].total += amount;
+      }
+    });
+    
+    // Format totals display
+    const currencyKeys = Object.keys(currencyTotals);
+    let display = '';
+    if (currencyKeys.length > 0) {
+      display = currencyKeys
+        .map(currencyName => {
+          const { symbol, total } = currencyTotals[currencyName];
+          const formattedTotal = total.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+          return `${symbol} ${formattedTotal}`;
+        })
+        .join(' | ');
+    } else {
+      display = 'No value';
+    }
+    
+    return {
+      totalProperties: total,
+      storedProperties: stored,
+      releasedProperties: released,
+      totalValueDisplay: display
+    };
+  }, [properties]); // Only recalculate when properties array changes
+
+  // Define DataTable columns
+  const columns: DataTableColumn[] = [
+    // Prisoner name column hidden when grouping is enabled (redundant)
+    { 
+      key: 'prisoner_name', 
+      label: 'Prisoner', 
+      sortable: true,
+      filterable: true
+    },
+    { 
+      key: 'property_type_name', 
+      label: 'Property Type', 
+      sortable: true,
+      filterable: true
+    },
+    { 
+      key: 'property_item_name', 
+      label: 'Item', 
+      sortable: true,
+      filterable: true
+    },
+    { 
+      key: 'property_bag_number', 
+      label: 'Bag Number', 
+      sortable: true,
+      render: (value) => (
+        <Badge variant="outline">{value}</Badge>
+      )
+    },
+    { 
+      key: 'quantity', 
+      label: 'Quantity', 
+      sortable: true,
+      render: (value, row) => `${value} ${row.measurement_unit_name}`
+    },
+    { 
+      key: 'amount', 
+      label: 'Amount', 
+      sortable: true,
+      render: (value, row) => {
+        const amount = formatCurrency(value);
+        const symbol = row.currency_symbol || '';
+        return symbol ? `${symbol} ${amount}` : amount;
+      }
+    },
+    { 
+      key: 'property_status_name', 
+      label: 'Status', 
+      sortable: true,
+      filterable: true,
+      render: (value) => getStatusBadge(value)
+    },
+    { 
+      key: 'actions', 
+      label: 'Actions', 
+      render: (_, row) => (
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleView(row)}
+          >
+            <Eye className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleEdit(row)}
+          >
+            <Pencil className="h-4 w-4" />
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => handleDelete(row)}
+          >
+            <Trash2 className="h-4 w-4 text-red-600" />
+          </Button>
+        </div>
+      )
+    },
+  ];
 
 
   // APIs integration
@@ -792,12 +909,15 @@ export default function PrisonerPropertyScreen() {
         toast.error("There are no prisoners, You can't create a property without prisoners");
         return
       }
-
     }
   }, [isCreateDialogOpen]);
 
   useEffect(() => {
-    console.log(isNextCreateDialogOpen)
+    console.log("Next of Kin dialog state:", isNextCreateDialogOpen)
+    // Stop unnecessary API calls when Next of Kin dialog is open
+    if (isNextCreateDialogOpen) {
+      console.log("Next of Kin dialog opened - property screen should minimize API calls")
+    }
   }, [isNextCreateDialogOpen]);
 
 
@@ -824,7 +944,7 @@ export default function PrisonerPropertyScreen() {
         ) : (
           <>
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
               <Card>
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
@@ -867,13 +987,13 @@ export default function PrisonerPropertyScreen() {
                 </CardContent>
               </Card>
 
-              <Card>
+              <Card className="md:col-span-2">
                 <CardContent className="p-6">
                   <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm text-gray-600">Total Value</p>
-                      <p className="text-xl" style={{ color: '#650000' }}>
-                        {formatCurrency(totalValue.toString())}
+                    <div className="flex-1">
+                      <p className="text-sm text-gray-600 mb-2">Total Value</p>
+                      <p className="text-lg font-semibold" style={{ color: '#650000' }}>
+                        {totalValueDisplay}
                       </p>
                     </div>
                     <DollarSign className="h-8 w-8 text-gray-400" />
@@ -882,171 +1002,98 @@ export default function PrisonerPropertyScreen() {
               </Card>
             </div>
 
-            {/* Tabs */}
-            <Tabs defaultValue="properties" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="properties">Properties</TabsTrigger>
-        </TabsList>
+            {/* Add Property Button */}
+            <div className="flex justify-end">
+              <Button onClick={handleCreate} style={{ backgroundColor: '#650000' }}>
+                <Plus className="h-4 w-4 mr-2" />
+                Add Property
+              </Button>
+            </div>
 
-        <TabsContent value="properties" className="space-y-4">
-          {/* Filters and Actions */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex flex-col md:flex-row gap-4 items-end">
-                <div className="flex-1 relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search by prisoner, item, bag number..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
+            {/* Properties DataTable */}
+            <DataTable
+              key={dataTableRefreshKey}
+              url="/property-management/properties/"
+              title="Property Records"
+              columns={columns}
+              config={{
+                search: true,
+                export: {
+                  pdf: true,
+                  csv: true,
+                  print: true,
+                },
+                lengthMenu: [10, 25, 50, 100, -1],
+                pagination: true,
+                summary: true,
+                grouping: {
+                  groupBy: 'prisoner_name',
+                  defaultExpanded: false,
 
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    {propertyStatuses.map(status => (
-                      <SelectItem key={status.id} value={status.id}>{status.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                  <SelectTrigger className="w-full md:w-48">
-                    <SelectValue placeholder="Filter by Type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Types</SelectItem>
-                    {propertyTypes.map(type => (
-                      <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Button onClick={handleCreate} style={{ backgroundColor: '#650000' }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Property
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Properties Table */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Property Records</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow style={{ backgroundColor: '#650000' }}>
-                      <TableHead className="text-white">Prisoner</TableHead>
-                      <TableHead className="text-white">Property Type</TableHead>
-                      <TableHead className="text-white">Item</TableHead>
-                      <TableHead className="text-white">Bag Number</TableHead>
-                      <TableHead className="text-white">Quantity</TableHead>
-                      <TableHead className="text-white">Amount</TableHead>
-                      <TableHead className="text-white">Status</TableHead>
-                      <TableHead className="text-right text-white">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {paginatedProperties.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={8} className="text-center py-8 text-gray-500">
-                          No properties found
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      paginatedProperties.map((property) => (
-                        <TableRow key={property.id}>
-                          <TableCell>
-                            <div>
-                              <p>{property.prisoner_name}</p>
-                            </div>
-                          </TableCell>
-                          <TableCell>{property.property_type_name}</TableCell>
-                          <TableCell>{property.property_item_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{property.property_bag_number}</Badge>
-                          </TableCell>
-                          <TableCell>
-                            {property.quantity} {property.measurement_unit_name}
-                          </TableCell>
-                          <TableCell>{formatCurrency(property.amount)}</TableCell>
-                          <TableCell>
-                            {getStatusBadge(property.property_status_name)}
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleView(property)}
-                              >
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleEdit(property)}
-                              >
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(property)}
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4">
-                  <p className="text-sm text-gray-600">
-                    Showing {((currentPage - 1) * itemsPerPage) + 1} to {Math.min(currentPage * itemsPerPage, filteredProperties.length)} of {filteredProperties.length} results
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage - 1)}
-                      disabled={currentPage === 1}
-                    >
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <span className="px-4 py-2 text-sm">
-                      Page {currentPage} of {totalPages}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setCurrentPage(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                    >
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                renderGroupHeader: (prisonerName, items) => {
+                  // Calculate totals per currency
+                  const currencyTotals: Record<string, { symbol: string; total: number }> = {};
+                  
+                  items.forEach((item: any) => {
+                    if (item.currency_name && item.amount) {
+                      const currencyName = item.currency_name;
+                      const currencySymbol = item.currency_symbol || currencyName;
+                      const amount = parseFloat(item.amount) || 0;
+                      
+                      if (!currencyTotals[currencyName]) {
+                        currencyTotals[currencyName] = { symbol: currencySymbol, total: 0 };
+                      }
+                      currencyTotals[currencyName].total += amount;
+                    }
+                  });
+                  
+                  // Format totals display
+                  const currencyKeys = Object.keys(currencyTotals);
+                  let totalsDisplay = '';
+                  
+                  if (currencyKeys.length > 0) {
+                    totalsDisplay = currencyKeys.map(currencyName => {
+                      const { symbol, total } = currencyTotals[currencyName];
+                      const formattedTotal = new Intl.NumberFormat('en-US').format(total);
+                      return `${symbol} ${formattedTotal}`;
+                    }).join(' | ');
+                  } else {
+                    totalsDisplay = 'No currency items';
+                  }
+                  
+                  const statusCounts = items.reduce((acc, item) => {
+                    acc[item.property_status_name] = (acc[item.property_status_name] || 0) + 1;
+                    return acc;
+                  }, {} as Record<string, number>);
+                  
+                  return (
+                    <div className="flex items-center justify-between w-full py-1">
+                      <div className="flex items-center gap-4">
+                        <span className="font-semibold text-base" style={{ color: '#650000' }}>
+                          {prisonerName}
+                        </span>
+                        <span className="text-sm text-muted-foreground font-normal">
+                          {items.length} {items.length === 1 ? 'property' : 'properties'}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium">
+                          Total: {totalsDisplay}
+                        </span>
+                        <div className="flex gap-2">
+                          {Object.entries(statusCounts).map(([status, count]) => (
+                            <Badge key={status} variant="outline" className="text-xs">
+                              {status}: {count}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                },
+              },
+            }}
+          />
           </>
         )
       }
@@ -1058,16 +1105,19 @@ export default function PrisonerPropertyScreen() {
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <div className="flex-1 max-h-[90vh] p-6">
           <DialogHeader>
-            <DialogTitle style={{ color: '#650000' }}>Create New Property</DialogTitle>
+            <DialogTitle style={{ color: '#650000' }}>
+              {selectedProperty ? 'Edit Property' : 'Create New Property'}
+            </DialogTitle>
             <DialogDescription>
-              Add property items for a prisoner and visitor
+              {selectedProperty ? 'Update property information' : 'Add property items for a prisoner and visitor'}
             </DialogDescription>
           </DialogHeader>
           {/*<CreatePropertyForm onSubmit={handleSubmitCreate} />*/}
             <CreatePropertyForm prisoners={prisoners} setIsCreateDialogOpen={setIsCreateDialogOpen}
               setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText}
               setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} setProperties={setProperties}
-              selectedProperty={selectedProperty} propertyTypes={propertyTypes} propertyStatuses={propertyStatuses}/>
+              selectedProperty={selectedProperty} propertyTypes={propertyTypes} propertyStatuses={propertyStatuses}
+              setDataTableRefreshKey={setDataTableRefreshKey} setPrisonerInfo={setPrisonerInfo}/>
           </div>
         </DialogContent>
       </Dialog>
@@ -1291,7 +1341,7 @@ export default function PrisonerPropertyScreen() {
 
       {/* Loading Dialog */}
       <Dialog open={newDialogLoader} onOpenChange={setNewDialogLoader}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-sm max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
             <DialogHeader>
               <DialogTitle style={{ color: '#650000' }}></DialogTitle>
@@ -1317,8 +1367,16 @@ export default function PrisonerPropertyScreen() {
               <DialogTitle>Add Next of Kin</DialogTitle>
               <DialogDescription>Add a new next of kin contact for a prisoner</DialogDescription>
             </DialogHeader>
-            <NextOfKinScreen setNewDialogLoader={setNewDialogLoader} setLoaderText={setLoaderText} isNextCreateDialogOpen={isNextCreateDialogOpen}
-                             setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} prisoner={prisonerInfo.prisoner} setNextOfKins={setNextOfKins}/>
+            <NextOfKinScreen 
+              setNewDialogLoader={setNewDialogLoader} 
+              setLoaderText={setLoaderText} 
+              isNextCreateDialogOpen={isNextCreateDialogOpen}
+              setIsNextCreateDialogOpen={setIsNextCreateDialogOpen} 
+              prisoner={prisonerInfo.prisoner} 
+              setNextOfKins={setNextOfKins}
+              prisonerName={prisonerInfo.prisonerName || selectedProperty?.prisoner_name}
+              prisonerNumber={prisonerInfo.prisonerNumber}
+            />
           </div>
         </DialogContent>
       </Dialog>

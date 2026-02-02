@@ -101,7 +101,7 @@ function downloadFile(fileReference: string | null | undefined, filename: string
 
     toast.success("Download started");
   } catch (err) {
-    console.error("download error", err);
+    // console.error("download error", err);
     toast.error("Failed to download file");
   }
 }
@@ -187,7 +187,7 @@ export default function PhonesLettersScreen() {
       } catch (err: any) {
         // ignore abort / cancel noise
         if ((err as any)?.name === "AbortError" || (err as any)?.code === "ERR_CANCELED") return;
-        console.error("prefetch staffProfiles", err);
+        // console.error("prefetch staffProfiles", err);
       }
     })();
     return () => { mounted = false; c.abort(); };
@@ -223,8 +223,12 @@ export default function PhonesLettersScreen() {
   // dialog / form state
   const [callDialogOpen, setCallDialogOpen] = useState(false);
   const [editingCall, setEditingCall] = useState<PhoneService.CallRecordItem | null>(null);
+  const [existingRecordedCall, setExistingRecordedCall] = useState<string | null>(null);
+  const [callDialogKey, setCallDialogKey] = useState(0);
   const [letterDialogOpen, setLetterDialogOpen] = useState(false);
   const [editingLetter, setEditingLetter] = useState<LetterService.ELetterItem | null>(null);
+  const [existingLetterDocument, setExistingLetterDocument] = useState<string | null>(null);
+  const [letterDialogKey, setLetterDialogKey] = useState(0);
   const [selectedPrisoner, setSelectedPrisoner] = useState<any>(null);
 
   // forms
@@ -237,6 +241,9 @@ export default function PhonesLettersScreen() {
 
   // Auto-populate sender/recipient based on letter type and prisoner
   useEffect(() => {
+    // Don't auto-populate if we're editing - preserve the existing values
+    if (editingLetter?.id) return;
+    
     if (!selectedPrisoner?.full_name) return;
     
     // Find the actual letter type object to check its name/label
@@ -257,7 +264,7 @@ export default function PhonesLettersScreen() {
       // Clear recipient_name when switching to outgoing
       letterForm.setValue("recipient_name", "");
     }
-  }, [watchedLetterType, selectedPrisoner, letterTypes, letterForm]);
+  }, [watchedLetterType, selectedPrisoner, letterTypes, letterForm, editingLetter]);
 
   // Map API item -> table row (if you need normalization)
   const mapCall = useCallback((it: any): PhoneService.CallRecordItem => ({ ...it }), []);
@@ -275,7 +282,7 @@ export default function PhonesLettersScreen() {
       const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
       setCallsTotal(count);
     } catch (err) {
-      console.error("fetchCallsTotal error", err);
+      // console.error("fetchCallsTotal error", err);
     }
   }, [debouncedSearch, station, district, region]);
 
@@ -290,7 +297,7 @@ export default function PhonesLettersScreen() {
       const count = Number(res?.count ?? (Array.isArray(res) ? res.length : 0) ?? 0);
       setLettersTotal(count);
     } catch (err) {
-      console.error("fetchLettersTotal error", err);
+      // console.error("fetchLettersTotal error", err);
     }
   }, [debouncedSearch, station, district, region]);
 
@@ -333,12 +340,12 @@ export default function PhonesLettersScreen() {
           label: x.name ?? x.label ?? x.relation ?? String(x),
           raw: x,
         }));
-         console.debug("loaded letterTypes:", normLetterTypes);
-         console.debug("loaded relationships:", normRelationships);
+        //  console.debug("loaded letterTypes:", normLetterTypes);
+        //  console.debug("loaded relationships:", normRelationships);
          setLetterTypes(normLetterTypes);
          setRelationships(normRelationships);
        } catch (err) {
-         console.error("lookup error", err);
+        //  console.error("lookup error", err);
        }
      })();
      return () => { mounted = false; c.abort(); };
@@ -363,7 +370,7 @@ export default function PhonesLettersScreen() {
         setCallTypes(norm);
       } catch (err) {
         if ((err as any)?.name === "AbortError") return;
-        console.error("prefetch call types", err);
+        // console.error("prefetch call types", err);
       }
     })();
     return () => { mounted = false; c.abort(); };
@@ -406,23 +413,41 @@ export default function PhonesLettersScreen() {
     { key: "relation_name", label: "Relation" },
     { key: "call_duration", label: "Duration" },
     { key: "call_notes", label: "Notes", render: (v: any) => (<div className="max-w-xs truncate">{v || "-"}</div>) },
-    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => {
-        setEditingCall(r);
-        // ensure call_date is in datetime-local format
-        callForm.reset({ ...r, call_date: toDatetimeLocal(r?.call_date) });
-        setCallDialogOpen(true);
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={async () => {
+        // Option B: Fetch fresh data from API
+        try {
+          const freshCall = await PhoneService.fetchCallById(r.id);
+          setEditingCall(freshCall);
+          // Store existing file reference
+          setExistingRecordedCall(freshCall.recorded_call || null);
+          // ensure call_date is in datetime-local format
+          callForm.reset({ ...freshCall, call_date: toDatetimeLocal(freshCall?.call_date), recorded_call: null });
+          setCallDialogOpen(true);
+        } catch (error) {
+          console.error('Failed to fetch call record details:', error);
+          toast.error('Failed to load call details. Please try again.');
+        }
       }}><Edit className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => {
         // open confirm dialog for delete
         confirmActionRef.current = {
           title: "Delete Call Record",
-          description: `Delete call record for "${r.prisoner_name ?? r.caller ?? r.id}"? This action cannot be undone.`,
+          description: "Are you sure you want to delete this call record? This action cannot be undone.",
+          details: (
+            <div className="space-y-2">
+              <div><strong>Prisoner:</strong> {r.prisoner_name || '—'}</div>
+              <div><strong>Caller:</strong> {r.caller || '—'}</div>
+              <div><strong>Phone:</strong> {r.phone_number || '—'}</div>
+              <div><strong>Date:</strong> {r.call_date ? new Date(r.call_date).toLocaleString() : '—'}</div>
+              <div><strong>Duration:</strong> {r.call_duration ? `${r.call_duration} min` : '—'}</div>
+            </div>
+          ),
           onConfirm: async () => {
             try {
               await PhoneService.deleteCallRecord(r.id);
               toast.success("Call record deleted");
               loadCalls(page, pageSize);
             } catch (err) {
-              console.error("delete call error", err);
+              // console.error("delete call error", err);
               toast.error("Failed to delete call record");
             }
           },
@@ -440,25 +465,37 @@ export default function PhonesLettersScreen() {
     { key: "subject", label: "Subject" },
     { key: "letter_type_name", label: "Type" },
     { key: "relation_name", label: "Relation" },
-    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={() => {
-        setEditingLetter(r);
-        // Store prisoner info for edit mode
-        if (r.prisoner_id || r.prisoner) {
-          const prisonerForEdit = prisoners.find(p => 
-            String(p.id) === String(r.prisoner_id ?? r.prisoner)
-          ) ?? { id: r.prisoner_id ?? r.prisoner, full_name: r.prisoner_name };
-          setSelectedPrisoner(prisonerForEdit);
+    { key: "id", label: "Actions", sortable: false, render: (_v: any, r: any) => (<div className="flex gap-1"><Button variant="ghost" size="sm" onClick={async () => {
+        // Option B: Fetch fresh data from API
+        try {
+          const freshLetter = await LetterService.fetchLetterById(r.id);
+          setEditingLetter(freshLetter);
+          // Store existing file reference
+          setExistingLetterDocument(freshLetter.letter_document || null);
+          // Store prisoner info for edit mode
+          if (freshLetter.prisoner_id || freshLetter.prisoner) {
+            const prisonerForEdit = prisoners.find(p => 
+              String(p.id) === String(freshLetter.prisoner_id ?? freshLetter.prisoner)
+            ) ?? { id: freshLetter.prisoner_id ?? freshLetter.prisoner, full_name: freshLetter.prisoner_name };
+            setSelectedPrisoner(prisonerForEdit);
+          }
+          // ensure letter_date is in datetime-local format and include sender/recipient names
+          letterForm.reset({
+            ...freshLetter,
+            prisoner: normalizeSelectToId(freshLetter.prisoner),
+            letter_type: normalizeSelectToId(freshLetter.letter_type),
+            relation_to_prisoner: normalizeSelectToId(freshLetter.relation_to_prisoner),
+            welfare_officer: normalizeSelectToId(freshLetter.welfare_officer),
+            letter_date: toDatetimeLocal(freshLetter?.letter_date),
+            sender_name: freshLetter.sender_name || "",
+            recipient_name: freshLetter.recipient_name || "",
+            letter_document: null,
+          });
+          setLetterDialogOpen(true);
+        } catch (error) {
+          console.error('Failed to fetch letter details:', error);
+          toast.error('Failed to load letter details. Please try again.');
         }
-        // ensure letter_date is in datetime-local format
-        letterForm.reset({
-          ...r,
-          prisoner: normalizeSelectToId(r.prisoner),
-          letter_type: normalizeSelectToId(r.letter_type),
-          relation_to_prisoner: normalizeSelectToId(r.relation_to_prisoner),
-          welfare_officer: normalizeSelectToId(r.welfare_officer),
-          letter_date: toDatetimeLocal(r?.letter_date),
-        });
-        setLetterDialogOpen(true);
       }}><Edit className="h-4 w-4" /></Button><Button variant="destructive" size="sm" onClick={() => {
         // Store prisoner info for edit mode
         if (r.prisoner_id || r.prisoner) {
@@ -469,14 +506,23 @@ export default function PhonesLettersScreen() {
         }
         confirmActionRef.current = {
           title: "Delete Letter",
-          description: `Delete letter "${r.subject ?? r.letter_tracking_number ?? r.id}" for "${r.prisoner_name ?? r.id}"? This action cannot be undone.`,
+          description: "Are you sure you want to delete this letter? This action cannot be undone.",
+          details: (
+            <div className="space-y-2">
+              <div><strong>Prisoner:</strong> {r.prisoner_name || '—'}</div>
+              <div><strong>Subject:</strong> {r.subject || '—'}</div>
+              <div><strong>Tracking No:</strong> {r.letter_tracking_number || '—'}</div>
+              <div><strong>Type:</strong> {r.letter_type_name || '—'}</div>
+              <div><strong>Date:</strong> {r.letter_date ? new Date(r.letter_date).toLocaleString() : '—'}</div>
+            </div>
+          ),
           onConfirm: async () => {
             try {
               await LetterService.deleteLetter(r.id);
               toast.success("Letter deleted");
               loadLetters(page, pageSize);
             } catch (err) {
-              console.error("delete letter error", err);
+              // console.error("delete letter error", err);
               toast.error("Failed to delete letter");
             }
           },
@@ -511,25 +557,143 @@ export default function PhonesLettersScreen() {
       });
     } catch (err: any) {
       if (err?.name === "AbortError" || err?.code === "ERR_CANCELED") return [];
-      console.error("prisoners lookup error", err);
+      // console.error("prisoners lookup error", err);
       toast.error("Failed to load prisoners (network).");
       // toast.error("Failed to load prisoners (network). Check CORS / backend or use dev proxy.");
       return [];
     }
   }, [station, district, region]);
 
-  // small wrappers for preloaded lists (relationships, letterTypes)
-  const fetchRelationshipsLocal = useCallback(async (q = "") => {
-    if (!q) return relationships;
-    const qlc = q.toLowerCase();
-    return relationships.filter((r:any) => String(r.name ?? "").toLowerCase().includes(qlc));
-  }, [relationships]);
+  // Paginated fetch callbacks for server-side mode (14M+ ready)
+  
+  // Prisoners - paginated wrapper that forwards current filter context to centralized service
+  const fetchPrisonersPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const res = await PrisonerService.searchPrisoners({
+        search: opts?.search || "",
+        page: opts?.page || 1,
+        page_size: opts?.page_size || 50,
+        region: region || undefined,
+        district: district || undefined,
+        station: station || undefined,
+      }, signal);
+      // res is { items: [...], count: number }
+      const items = res?.items ?? [];
+      const mapped = items.map((x:any) => ({
+        ...x,
+        id: x.id ?? x.value,
+        value: x.id ?? x.value,
+        label: x.full_name ?? x.prisoner_name ?? x.label ?? String(x.id ?? x.value)
+      }));
+      return {
+        items: mapped,
+        count: res?.count ?? 0,
+        next: res?.next ?? null
+      };
+    } catch (err: any) {
+      if (err?.name === "AbortError" || err?.name === "CanceledError" || err?.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      // console.error("fetchPrisonersPaginated error", err);
+      return { items: [], count: 0, next: null };
+    }
+  }, [station, district, region]);
 
-  const fetchLetterTypesLocal = useCallback(async (q = "") => {
-    if (!q) return letterTypes;
-    const qlc = q.toLowerCase();
-    return letterTypes.filter((t:any) => String(t.name ?? "").toLowerCase().includes(qlc));
-  }, [letterTypes]);
+  // Call Types - paginated fetch with region/district/station filters
+  const fetchCallTypesPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get("/rehabilitation/call-types/", {
+        params: {
+          search: opts?.search || "",
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          region: region || undefined,
+          district: district || undefined,
+          station: station || undefined,
+        },
+        signal,
+      });
+      const payload = response?.data ?? response ?? {};
+      const items = (payload?.results ?? []).map((x: any) => ({
+        ...x,
+        id: x.id ?? x.value,
+        label: x.name ?? x.label ?? String(x.id)
+      }));
+      return {
+        items,
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      // console.error("fetchCallTypesPaginated error", error);
+      return { items: [], count: 0, next: null };
+    }
+  }, [region, district, station]);
+
+  // Relationships - paginated fetch with region/district/station filters
+  const fetchRelationshipsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await LetterService.fetchRelationships({
+        search: opts?.search || "",
+        page: opts?.page || 1,
+        page_size: opts?.page_size || 50,
+        region: region || undefined,
+        district: district || undefined,
+        station: station || undefined,
+      }, signal);
+      const items = (Array.isArray(response) ? response : response?.results ?? []).map((x: any) => ({
+        ...x,
+        id: x.id ?? x.value,
+        label: x.name ?? x.label ?? String(x.id)
+      }));
+      return {
+        items,
+        count: response?.count ?? items.length,
+        next: response?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      // console.error("fetchRelationshipsPaginated error", error);
+      return { items: [], count: 0, next: null };
+    }
+  }, [region, district, station]);
+
+  // Letter Types - paginated fetch with region/district/station filters
+  const fetchLetterTypesPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await LetterService.fetchLetterTypes({
+        search: opts?.search || "",
+        page: opts?.page || 1,
+        page_size: opts?.page_size || 50,
+        region: region || undefined,
+        district: district || undefined,
+        station: station || undefined,
+      }, signal);
+      const items = (Array.isArray(response) ? response : response?.results ?? []).map((x: any) => ({
+        ...x,
+        id: x.id ?? x.value,
+        label: x.name ?? x.label ?? String(x.id)
+      }));
+      return {
+        items,
+        count: response?.count ?? items.length,
+        next: response?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      // console.error("fetchLetterTypesPaginated error", error);
+      return { items: [], count: 0, next: null };
+    }
+  }, [region, district, station]);
+
+  // Note: Removed fetchRelationshipsLocal and fetchLetterTypesLocal - now using paginated versions
 
   // form submit handlers
   const onSubmitCall = async (data: any) => {
@@ -559,7 +723,7 @@ export default function PhonesLettersScreen() {
         });
 
         if (!sendRes.ok) {
-          console.error("call file upload failed", sendRes.error ?? sendRes);
+          // console.error("call file upload failed", sendRes.error ?? sendRes);
           toast.error("Failed to upload recorded call");
           return;
         }
@@ -582,12 +746,20 @@ export default function PhonesLettersScreen() {
           }
         }
       } else {
-        // No file -> send JSON via existing service
+        // No new file uploaded
+        // Create clean payload
+        const payload = { ...data };
+        
+        // When editing: don't send file field at all if not changing it (let backend keep existing value)
+        // When creating: remove the field if no file
+        delete payload.recorded_call;
+        
+        // Send JSON via existing service
         if (editingCall?.id) {
-          await PhoneService.updateCallRecord(editingCall.id, data);
+          await PhoneService.updateCallRecord(editingCall.id, payload);
           toast.success("Call updated");
         } else {
-          await PhoneService.createCallRecord(data);
+          await PhoneService.createCallRecord(payload);
           toast.success("Call created");
         }
       }
@@ -595,7 +767,7 @@ export default function PhonesLettersScreen() {
       setCallDialogOpen(false);
       loadCalls(page, pageSize);
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error("Failed to save call");
     }
   };
@@ -628,7 +800,7 @@ export default function PhonesLettersScreen() {
         });
   
         if (!sendRes.ok) {
-          console.error("letter file upload failed", sendRes.error ?? sendRes);
+          // console.error("letter file upload failed", sendRes.error ?? sendRes);
           toast.error("Failed to upload letter document");
           return;
         }
@@ -651,12 +823,20 @@ export default function PhonesLettersScreen() {
           }
         }
       } else {
-        // No file -> send JSON as before
+        // No new file uploaded
+        // Create clean payload
+        const payload = { ...data };
+        
+        // When editing: don't send file field at all if not changing it (let backend keep existing value)
+        // When creating: remove the field if no file
+        delete payload.letter_document;
+        
+        // Send JSON via existing service
         if (editingLetter?.id) {
-          await LetterService.updateLetter(editingLetter.id, data);
+          await LetterService.updateLetter(editingLetter.id, payload);
           toast.success("Letter updated");
         } else {
-          await LetterService.createLetter(data);
+          await LetterService.createLetter(payload);
           toast.success("Letter created");
         }
       }
@@ -664,7 +844,7 @@ export default function PhonesLettersScreen() {
       setLetterDialogOpen(false);
       loadLetters(page, pageSize);
     } catch (err) {
-      console.error(err);
+      // console.error(err);
       toast.error("Failed to save letter");
     }
   };
@@ -685,12 +865,93 @@ export default function PhonesLettersScreen() {
         <Button className="bg-primary me-2" 
           onClick={() => { 
             if (activeTab === "calls") { 
-              setEditingCall(null); callForm.reset({}); setCallDialogOpen(true); 
+              // Close dialog first if open, then cleanup and reopen
+              if (callDialogOpen) {
+                setCallDialogOpen(false);
+                setTimeout(() => {
+                  setEditingCall(null);
+                  setExistingRecordedCall(null);
+                  setCallDialogKey(k => k + 1);
+                  callForm.reset({
+                    prisoner: null,
+                    caller: "",
+                    phone_number: "",
+                    call_type: null,
+                    relation_to_prisoner: null,
+                    welfare_officer: null,
+                    call_date: "",
+                    call_duration: null,
+                    recorded_call: null,
+                    call_notes: ""
+                  });
+                  setCallDialogOpen(true);
+                }, 50);
+              } else {
+                setEditingCall(null);
+                setExistingRecordedCall(null);
+                setCallDialogKey(k => k + 1);
+                callForm.reset({
+                  prisoner: null,
+                  caller: "",
+                  phone_number: "",
+                  call_type: null,
+                  relation_to_prisoner: null,
+                  welfare_officer: null,
+                  call_date: "",
+                  call_duration: null,
+                  recorded_call: null,
+                  call_notes: ""
+                });
+                setCallDialogOpen(true);
+              }
             } else { 
-              setEditingLetter(null); 
-              setSelectedPrisoner(null); 
-              letterForm.reset({}); 
-              setLetterDialogOpen(true); 
+              // Close dialog first if open, then cleanup and reopen
+              if (letterDialogOpen) {
+                setLetterDialogOpen(false);
+                setTimeout(() => {
+                  setEditingLetter(null);
+                  setExistingLetterDocument(null);
+                  setSelectedPrisoner(null);
+                  setLetterDialogKey(k => k + 1);
+                  letterForm.reset({
+                    prisoner: null,
+                    letter_type: null,
+                    subject: "",
+                    letter_date: "",
+                    relation_to_prisoner: null,
+                    welfare_officer: null,
+                    sender_name: "",
+                    recipient_name: "",
+                    sender_email: "",
+                    recipient_email: "",
+                    letter_content: "",
+                    letter_document: null,
+                    comment: ""
+                  });
+                  setLetterDialogOpen(true);
+                }, 50);
+              } else {
+                setEditingLetter(null);
+                setExistingLetterDocument(null);
+                setSelectedPrisoner(null);
+                setLetterDialogKey(k => k + 1);
+                letterForm.reset({
+                  prisoner: null,
+                  letter_type: null,
+                  subject: "",
+                  letter_date: "",
+                  relation_to_prisoner: null,
+                  welfare_officer: null,
+                  sender_name: "",
+                  recipient_name: "",
+                  sender_email: "",
+                  recipient_email: "",
+                  letter_content: "",
+                  letter_document: null,
+                  comment: ""
+                });
+                setLetterDialogOpen(true);
+              }
             } 
           }}><Plus className="h-4 w-4 mr-2" />
           {activeTab === "calls" ? "Add Call Record" : "Add Letter"}
@@ -755,7 +1016,26 @@ export default function PhonesLettersScreen() {
       </Tabs>
 
       {/* Call dialog */}
-      <Dialog open={callDialogOpen} onOpenChange={setCallDialogOpen}>
+      <Dialog open={callDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          // Clear form when closing
+          setEditingCall(null);
+          setExistingRecordedCall(null);
+          callForm.reset({
+            prisoner: null,
+            caller: "",
+            phone_number: "",
+            call_type: null,
+            relation_to_prisoner: null,
+            welfare_officer: null,
+            call_date: "",
+            call_duration: null,
+            recorded_call: null,
+            call_notes: ""
+          });
+        }
+        setCallDialogOpen(open);
+      }} key={`call-dialog-${callDialogKey}-${editingCall?.id || 'new'}`}>
         <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingCall ? "Edit Call Record" : "Add Call Record"}</DialogTitle></DialogHeader>
           <form onSubmit={callForm.handleSubmit(onSubmitCall)} className="space-y-4 p-4">
@@ -777,11 +1057,12 @@ export default function PhonesLettersScreen() {
                         field.onChange(p?.id ?? p ?? null);
                         setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
                       }}
+                      fetchPaginated={fetchPrisonersPaginated}
                       placeholder="Select prisoner"
                       idField="id"
                       labelField="full_name"
-                      initialItems={prisoners}
-                      pageSize={25}
+                      pageSize={50}
+                      minQueryLength={0}
                     />
                   )}
                 />
@@ -833,10 +1114,12 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      items={callTypes}
+                      fetchPaginated={fetchCallTypesPaginated}
                       placeholder="Select call type"
                       idField="id"
                       labelField="name"
+                      pageSize={50}
+                      minQueryLength={0}
                     />
                   )}
                 />
@@ -858,10 +1141,12 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      items={relationships}
+                      fetchPaginated={fetchRelationshipsPaginated}
                       placeholder="Select relationship"
                       idField="id"
                       labelField="name"
+                      pageSize={50}
+                      minQueryLength={0}
                     />
                   )}
                 />
@@ -884,7 +1169,6 @@ export default function PhonesLettersScreen() {
                       value={String(field.value ?? "")}
                       onChange={(v) => field.onChange(v ?? "")}
                       placeholder="Select welfare officer"
-                      initialItems={staffProfiles}
                     />
                   )}
                 />
@@ -930,6 +1214,11 @@ export default function PhonesLettersScreen() {
               {/* Recorded Call (optional upload) */}
               <div>
                 <Label htmlFor="recorded_call">Recorded Call (Optional)</Label>
+                {existingRecordedCall && editingCall?.id && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Current file: <span className="text-primary">Recorded call exists</span> (upload new file to replace)
+                  </p>
+                )}
                 <div className="border-2 border-dashed rounded-lg p-4 text-center">
                   <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                   <p className="text-sm text-gray-600 mb-2">Upload audio recording (optional)</p>
@@ -972,7 +1261,30 @@ export default function PhonesLettersScreen() {
 
       {/* Letter dialog */}
       
-      <Dialog open={letterDialogOpen} onOpenChange={setLetterDialogOpen}>
+      <Dialog open={letterDialogOpen} onOpenChange={(open) => {
+        if (!open) {
+          // Clear form when closing
+          setEditingLetter(null);
+          setExistingLetterDocument(null);
+          setSelectedPrisoner(null);
+          letterForm.reset({
+            prisoner: null,
+            letter_type: null,
+            subject: "",
+            letter_date: "",
+            relation_to_prisoner: null,
+            welfare_officer: null,
+            sender_name: "",
+            recipient_name: "",
+            sender_email: "",
+            recipient_email: "",
+            letter_content: "",
+            letter_document: null,
+            comment: ""
+          });
+        }
+        setLetterDialogOpen(open);
+      }} key={`letter-dialog-${letterDialogKey}-${editingLetter?.id || 'new'}`}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{editingLetter ? "Edit Letter" : "Add Letter"}</DialogTitle></DialogHeader>
           <form onSubmit={letterForm.handleSubmit(onSubmitLetter)} className="space-y-4 p-4">
@@ -998,11 +1310,12 @@ export default function PhonesLettersScreen() {
                         letterForm.setValue("recipient_name", "");
                         setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
                       }}
+                      fetchPaginated={fetchPrisonersPaginated}
                       placeholder="Select prisoner"
                       idField="id"
                       labelField="full_name"
-                      initialItems={prisoners}
-                      pageSize={25}
+                      pageSize={50}
+                      minQueryLength={0}
                     />
                   )}
                 />
@@ -1024,10 +1337,12 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      items={letterTypes}
+                      fetchPaginated={fetchLetterTypesPaginated}
                       placeholder={watchedPrisoner ? "Select letter type" : "Select prisoner first"}
                       idField="id"
                       labelField="name"
+                      pageSize={50}
+                      minQueryLength={0}
                       disabled={!watchedPrisoner}
                     />
                   )}
@@ -1083,10 +1398,12 @@ export default function PhonesLettersScreen() {
                     <SearchableSelect
                       value={field.value}
                       onChange={(id) => field.onChange(id)}
-                      items={relationships}
+                      fetchPaginated={fetchRelationshipsPaginated}
                       placeholder="Select relationship"
                       idField="id"
                       labelField="name"
+                      pageSize={50}
+                      minQueryLength={0}
                     />
                   )}
                 />
@@ -1125,7 +1442,6 @@ export default function PhonesLettersScreen() {
                       value={String(field.value ?? "")}
                       onChange={(v) => field.onChange(v ?? "")}
                       placeholder="Select welfare officer"
-                      initialItems={staffProfiles}
                     />
                   )}
                 />
@@ -1272,6 +1588,11 @@ export default function PhonesLettersScreen() {
               {/* Letter Document */}
               <div>
                 <Label htmlFor="letter_document">Letter Document (Optional)</Label>
+                {existingLetterDocument && editingLetter?.id && (
+                  <p className="text-xs text-muted-foreground mb-2">
+                    Current file: <span className="text-primary">Letter document exists</span> (upload new file to replace)
+                  </p>
+                )}
                 <div className="border-2 border-dashed rounded-lg p-4 text-center">
                   <Upload className="h-8 w-8 mx-auto mb-2 text-gray-400" />
                   <p className="text-sm text-gray-600">Upload letter [image or document (PDF, DOC, etc.)] — (optional)</p>
@@ -1334,6 +1655,7 @@ export default function PhonesLettersScreen() {
         }}
         title={confirmActionRef.current?.title}
         description={confirmActionRef.current?.description}
+        details={confirmActionRef.current?.details}
         onConfirm={async () => {
           if (confirmActionRef.current?.onConfirm) {
             await confirmActionRef.current.onConfirm();

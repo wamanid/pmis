@@ -1,15 +1,24 @@
-import React, {useState} from "react";
-import {NextOfKinResponse} from "../../services/admission/nextOfKinService";
+import React, {useState, useImperativeHandle, forwardRef} from "react";
+import {NextOfKinResponse, fetchNextOfKinPaginated} from "../../services/admission/nextOfKinService";
 import {
     DefaultPropertyItem, getPropertyBags, getPropertyItems, getPropertyStatuses,
     getPropertyTypes, PrisonerProperty,
     PropertyBag,
-    PropertyItem
+    PropertyItem,
+    fetchPropertyTypesPaginated,
+    fetchPropertyStatusesPaginated,
+    fetchPropertyBagsPaginated,
+    fetchItemCategoriesPaginated,
+    fetchMeasurementUnitsPaginated,
+    fetchPropertyItemsPaginated,
+    fetchCurrenciesPaginated
 } from "../../services/propertyServices/propertyService";
-import {ItemCategory, Unit, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
+import {ItemCategory, Unit, VisitorItem, fetchVisitorItemsPaginated} from "../../services/stationServices/visitorsServices/visitorItem";
+import axiosInstance from "../../services/axiosInstance";
 import {Card} from "../ui/card";
 import {Collapsible, CollapsibleContent, CollapsibleTrigger} from "../ui/collapsible";
 import {Check, ChevronDown, ChevronsUpDown, ChevronUp, Plus, Tag, Trash2} from "lucide-react";
+import SearchableSelect from "../common/SearchableSelect";
 import {Badge} from "../ui/badge";
 import {Button} from "../ui/button";
 import {Label} from "../ui/label";
@@ -29,59 +38,139 @@ import {toast} from "sonner";
 interface ChildProps {
   setPropertyItems: React.Dispatch<React.SetStateAction<DefaultPropertyItem[]>>;
   item: DefaultPropertyItem
-  propertyItems: DefaultPropertyItem
+  propertyItems: DefaultPropertyItem[]
   index: number
-  visitorItems: VisitorItem
+  visitorItems: VisitorItem[]
   setNewDialogLoader: React.Dispatch<React.SetStateAction<boolean>>;
   setLoaderText: React.Dispatch<React.SetStateAction<string>>;
-  nextOfKins: React.Dispatch<React.SetStateAction<NextOfKinResponse[]>>;
+  nextOfKins: NextOfKinResponse[]
   setIsNextCreateDialogOpen: React.Dispatch<React.SetStateAction<boolean>>;
   onUpdate: (itemId: string, updatedFields: Partial<DefaultPropertyItem>) => void;
   // onUpdate: (itemId: string, field: string, value: any) => void;
-  propertyTypes: Unit
-  propertyStatuses: Unit
+  propertyTypes: Unit[]
+  propertyStatuses: Unit[]
   loading: any
   setLoading: React.Dispatch<React.SetStateAction<any>>;
   prisonerInfo: any
   visitorInfo: any
-  itemCategories: ItemCategory
-  units: Unit
+  itemCategories: ItemCategory[]
+  units: Unit[]
   selectedProperty: PrisonerProperty
-  propertyBags: PropertyBag
+  propertyBags: PropertyBag[]
+  validationErrorsFromParent?: Record<string, string>;
+  selectedPrisonerDetails: {id: string, name: string, number: string} | null;
+  setParentPrisonerInfo: React.Dispatch<React.SetStateAction<{prisoner: string; prisonerName: string; prisonerNumber: string}>>;
 }
 
 // export default function PropertyItem() {
 // const PropertyItem React.FC<ChildProps> = ({ }) => {
-const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, visitorItems,
+const PropertyItem = forwardRef<{ syncTextFields: () => any; getData: () => DefaultPropertyItem }, ChildProps>(({ setPropertyItems, index, item, visitorItems,
                                                 setNewDialogLoader, setLoaderText, nextOfKins,
                                                 setIsNextCreateDialogOpen, propertyItems, onUpdate, propertyTypes,
                                                 propertyStatuses, loading, setLoading, prisonerInfo, visitorInfo,
-                                                itemCategories, units, selectedProperty, propertyBags }) => {
+                                                itemCategories, units, selectedProperty, propertyBags, validationErrorsFromParent,
+                                                selectedPrisonerDetails, setParentPrisonerInfo }, ref) => {
 
     const [isItemOpen, setIsItemOpen] = useState(true);
-    const [openPropertyType, setOpenPropertyType] = useState(false);
-    const [openPropertyCategory, setOpenPropertyCategory] = useState(false);
-    const [openPropertyItem, setOpenPropertyItem] = useState(false);
-    const [openMeasurementUnit, setOpenMeasurementUnit] = useState(false);
-    const [openPropertyBag, setOpenPropertyBag] = useState(false);
-    const [openPropertyStatus, setOpenPropertyStatus] = useState(false);
-    const [openNextOfKin, setOpenNextOfKin] = useState(false);
-    const [openVisitorItem, setOpenVisitorItem] = useState(false);
-    const [visitorItemSearch, setVisitorItemSearch] = useState('');
+    
+    // Validation errors state
+    const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
+    
+    // Local state for SearchableSelect dropdowns - Initialize with item values for edit mode
+    const [localVisitorItem, setLocalVisitorItem] = useState<string | null>(() => item.visitor_item || null);
+    const [localPropertyType, setLocalPropertyType] = useState<string | null>(() => item.property_type || null);
+    const [localPropertyCategory, setLocalPropertyCategory] = useState<string | null>(() => item.property_category || null);
+    const [localPropertyItem, setLocalPropertyItem] = useState<string | null>(() => item.property_item || null);
+    const [localMeasurementUnit, setLocalMeasurementUnit] = useState<string | null>(() => item.measurement_unit || null);
+    const [localPropertyBag, setLocalPropertyBag] = useState<string | null>(() => item.property_bag || null);
+    const [localPropertyStatus, setLocalPropertyStatus] = useState<string | null>(() => item.property_status || null);
+    const [localNextOfKin, setLocalNextOfKin] = useState<string | null>(() => item.next_of_kin || null);
+    const [localCurrency, setLocalCurrency] = useState<string | null>(() => item.currency || null);
+    
+    // Local state for text inputs - prevents API calls on every keystroke
+    const [localQuantity, setLocalQuantity] = useState<string>(() => item.quantity || '');
+    const [localAmount, setLocalAmount] = useState<string>(() => item.amount || '');
+    const [localNote, setLocalNote] = useState<string>(() => item.note || '');
+    const [localDestination, setLocalDestination] = useState<string>(() => item.destination || '');
+    
+    // Sync local state when item prop changes (important for edit mode)
+    React.useEffect(() => {
+        setLocalVisitorItem(item.visitor_item || null);
+        setLocalPropertyType(item.property_type || null);
+        setLocalPropertyCategory(item.property_category || null);
+        setLocalPropertyItem(item.property_item || null);
+        setLocalMeasurementUnit(item.measurement_unit || null);
+        setLocalPropertyBag(item.property_bag || null);
+        setLocalPropertyStatus(item.property_status || null);
+        setLocalNextOfKin(item.next_of_kin || null);
+        setLocalCurrency(item.currency || null);
+        
+        // Sync text inputs
+        setLocalQuantity(item.quantity || '');
+        setLocalAmount(item.amount || '');
+        setLocalNote(item.note || '');
+        setLocalDestination(item.destination || '');
+    }, [item.visitor_item, item.property_type, item.property_category, item.property_item, 
+        item.measurement_unit, item.property_bag, item.property_status, item.next_of_kin, item.currency,
+        item.quantity, item.amount, item.note, item.destination]);
+
+    // Receive validation errors from parent
+    React.useEffect(() => {
+        if (validationErrorsFromParent) {
+            setValidationErrors(validationErrorsFromParent);
+        }
+    }, [validationErrorsFromParent]);
 
     const [typeLoader, setTypeLoader] = useState(false)
-    // const [propertyTypes, setPropertyTypes] = useState<Unit[]>([])
     const [propertyItemsX, setPropertyItemsX] = useState<PropertyItem[]>([])
-    // const [propertyStatuses, setPropertyStatuses] = useState<Unit[]>([])
-    // const [propertyBags, setPropertyBags] = useState<PropertyBag[]>([])
 
-    const filteredVisitorItems = visitorItems.filter((visitorItem) => {
-      const searchLower = visitorItemSearch.toLowerCase();
-      return (
-        visitorItem.visitor_name.toLowerCase().includes(searchLower) ||
-        visitorItem.item_name.toLowerCase().includes(searchLower)
-      );
-    });
+    // Derive initialItem objects for edit mode (using selectedProperty with _name fields)
+    const mode = selectedProperty ? "edit" : "add";
+    
+    // Use React.useMemo to derive initialItem objects so they update when dependencies change
+    const initialVisitorItem = React.useMemo(() => {
+        if (selectedProperty && mode === "edit" && item.visitor_item && visitorItems.length > 0) {
+            return visitorItems.find(vi => vi.id === item.visitor_item);
+        }
+        return undefined;
+    }, [selectedProperty, mode, item.visitor_item, visitorItems]);
+    
+    const initialPropertyType = React.useMemo(() => {
+        if (selectedProperty && mode === "edit" && item.property_type && selectedProperty.property_type_name) {
+            return { id: item.property_type, name: selectedProperty.property_type_name };
+        }
+        return undefined;
+    }, [selectedProperty, mode, item.property_type, selectedProperty?.property_type_name]);
+
+    // Derive initialItem objects directly (not useMemo) per SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md
+    const initialPropertyItem = (selectedProperty && mode === "edit" && item.property_item && selectedProperty.property_item_name)
+        ? { id: item.property_item, name: selectedProperty.property_item_name }
+        : undefined;
+
+    const initialMeasurementUnit = (selectedProperty && mode === "edit" && item.measurement_unit && selectedProperty.measurement_unit_name)
+        ? { id: item.measurement_unit, name: selectedProperty.measurement_unit_name }
+        : undefined;
+    
+    const initialPropertyBag = React.useMemo(() => {
+        if (selectedProperty && mode === "edit" && item.property_bag && selectedProperty.property_bag_number) {
+            return { id: item.property_bag, bag_number: selectedProperty.property_bag_number };
+        }
+        return undefined;
+    }, [selectedProperty, mode, item.property_bag, selectedProperty?.property_bag_number]);
+    
+    const initialPropertyStatus = React.useMemo(() => {
+        if (selectedProperty && mode === "edit" && item.property_status && selectedProperty.property_status_name) {
+            return { id: item.property_status, name: selectedProperty.property_status_name };
+        }
+        return undefined;
+    }, [selectedProperty, mode, item.property_status, selectedProperty?.property_status_name]);
+    
+    const initialNextOfKin = React.useMemo(() => {
+        if (selectedProperty && mode === "edit" && item.next_of_kin && selectedProperty.next_of_kin_name) {
+            return { id: item.next_of_kin, full_name: selectedProperty.next_of_kin_name };
+        }
+        return undefined;
+    }, [selectedProperty, mode, item.next_of_kin, selectedProperty?.next_of_kin_name]);
 
     const propertyTypeName = item.property_type
       ? propertyTypes.find((t) => t.id === item.property_type)?.name
@@ -90,29 +179,20 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
       ? propertyItemsX.find((i) => i.id === item.property_item)?.name
       : null;
 
-    const handleVisitorItemSelect = async (visitorItem: VisitorItem) => {
-      // Populate fields from selected visitor item
-      //   onUpdate(item.id, "quantity", visitorItem.quantity.toString());
-      //   onUpdate(item.id, "amount", visitorItem.amount);
-      //   onUpdate(item.id, "visitor_item", visitorItem.id);
-      //   onUpdate(item.id, "property_category", visitorItem.item_category);
-      //   onUpdate(item.id, "measurement_unit", visitorItem.measurement_unit);
+    const handleVisitorItemSelect = async (visitorItemId: string, visitorItemData: any) => {
+        const propertyTypeId = getPropertyTypeUtil(propertyTypes);
+        
+        // Update ALL local state fields that should be auto-populated
+        setLocalVisitorItem(visitorItemId);
+        setLocalQuantity(visitorItemData.quantity?.toString() || '');
+        setLocalPropertyType(propertyTypeId);
+        setLocalAmount(visitorItemData.amount?.toString() || '');
+        setLocalPropertyCategory(visitorItemData.item_category || null);
+        setLocalPropertyItem(visitorItemData.item || null);
+        setLocalMeasurementUnit(visitorItemData.measurement_unit || null);
+        setLocalCurrency(visitorItemData.currency || null);
 
-        const updates = {
-            quantity: visitorItem.quantity.toString(),
-            property_type: getPropertyTypeUtil(propertyTypes),
-            amount: visitorItem.amount,
-            visitor_item: visitorItem.id,
-            property_category: visitorItem.item_category,
-            measurement_unit: visitorItem.measurement_unit,
-        };
-
-        // Now, call onUpdate ONCE with the combined updates object
-        onUpdate(item.id, updates);
-
-      setOpenVisitorItem(false);
-
-      await fetchPropertyData(visitorItem)
+      await fetchPropertyData(visitorItemData)
     };
 
     async function fetchPropertyData(visitorItem: VisitorItem) {
@@ -174,16 +254,110 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
       return false
     }
 
+    // Update local state for dropdown changes (NO parent update - prevents API refetches)
     function handleChange (name: string, value: string){
-        const updates = { [name]: value }
-        onUpdate(item.id, updates);
+        // Update appropriate local state based on field name
+        switch(name) {
+          case 'property_type':
+            setLocalPropertyType(value);
+            break;
+          case 'property_category':
+            setLocalPropertyCategory(value);
+            break;
+          case 'property_item':
+            setLocalPropertyItem(value);
+            break;
+          case 'measurement_unit':
+            setLocalMeasurementUnit(value);
+            break;
+          case 'currency':
+            setLocalCurrency(value);
+            break;
+          case 'property_bag':
+            setLocalPropertyBag(value);
+            break;
+          case 'property_status':
+            setLocalPropertyStatus(value);
+            break;
+          case 'next_of_kin':
+            setLocalNextOfKin(value);
+            break;
+          case 'visitor_item':
+            setLocalVisitorItem(value);
+            break;
+        }
+        
+        // Clear validation error when field is filled
+        if (value && validationErrors[name]) {
+          setValidationErrors(prev => {
+            const newErrors = { ...prev };
+            delete newErrors[name];
+            return newErrors;
+          });
+        }
     }
 
-    const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Update local state on every keystroke (no API call)
+    const handleInput = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
           const { name, value } = e.target;
-          const updates = { [name]: value }
-          onUpdate(item.id, updates);
+          
+          // Update local state based on field name
+          switch(name) {
+            case 'quantity':
+              setLocalQuantity(value);
+              break;
+            case 'amount':
+              setLocalAmount(value);
+              break;
+            case 'note':
+              setLocalNote(value);
+              break;
+            case 'destination':
+              setLocalDestination(value);
+              break;
+          }
+          
+          // Clear validation error when field is filled
+          if (value && validationErrors[name]) {
+            setValidationErrors(prev => {
+              const newErrors = { ...prev };
+              delete newErrors[name];
+              return newErrors;
+            });
+          }
     };
+    
+    // Sync local text state to parent (called before form submission)
+    React.useImperativeHandle(ref, () => ({
+      syncTextFields: () => {
+        // Return the complete item data instead of calling onUpdate
+        return {
+          quantity: localQuantity,
+          amount: localAmount,
+          note: localNote,
+          destination: localDestination
+        };
+      },
+      // Expose method to get all current field values
+      getData: () => ({
+        id: item.id,
+        property_type: localPropertyType || '',
+        property_category: localPropertyCategory || '',
+        property_item: localPropertyItem || '',
+        measurement_unit: localMeasurementUnit || '',
+        property_bag: localPropertyBag || '',
+        next_of_kin: localNextOfKin || '',
+        property_status: localPropertyStatus || '',
+        quantity: localQuantity,
+        amount: localAmount,
+        note: localNote,
+        destination: localDestination,
+        visitor_item: localVisitorItem || '',
+        currency: localCurrency || ''
+      })
+    }), [localQuantity, localAmount, localNote, localDestination, localVisitorItem, 
+        localPropertyType, localPropertyCategory, localPropertyItem, localMeasurementUnit,
+        localPropertyBag, localPropertyStatus, localNextOfKin, localCurrency, item.id]);
 
     return (
         <Collapsible open={isItemOpen} onOpenChange={setIsItemOpen}>
@@ -235,403 +409,390 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
             <div className="px-4 pb-4">{/* Content wrapper */}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Search Visitor Items */}
+              {/* Visitor Item - SearchableSelect */}
               {
-                  !!visitorItems.length && (
+                  !!visitorInfo.visitor && (
                        <div className="space-y-2 md:col-span-2">
-                        <Label>Select Visitor Item (Optional) <span className="text-red-500">*</span></Label>
-                        <Popover open={openVisitorItem} onOpenChange={setOpenVisitorItem}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                              <span className="text-gray-500">
-                              {item.visitor_item
-                                  ? (() => {
-                                      const visitorItem = visitorItems.find((t) => t.id === item.visitor_item);
-                                      return visitorItem
-                                        ? `${visitorItem.item_name} (${visitorItem.category_name})`
-                                        : "Search by item name...";
-                                    })()
-                                  : "Search by item name..."
-                              }
-                              </span>
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-full p-0" style={{ width: '600px' }}>
-                            <Command>
-                              <CommandInput
-                                placeholder="Search by item name..."
-                                value={visitorItemSearch}
-                                onValueChange={setVisitorItemSearch}
-                              />
-                              <CommandList>
-                                <CommandEmpty>No visitor items found.</CommandEmpty>
-                                <CommandGroup>
-                                  {filteredVisitorItems.map((visitorItem) => (
-                                    <CommandItem
-                                      key={visitorItem.id}
-                                      value={`${visitorItem.item_name}`}
-                                      onSelect={() => handleVisitorItemSelect(visitorItem)}
-                                    >
-                                      <div className="flex flex-col w-full mb-5">
-                                        <div className="flex items-center justify-between">
-                                          <span className="font-medium">{visitorItem.item_name} ({visitorItem.category_name})</span>
-                                          {/*<Badge variant="secondary">{visitorItem.item_name}</Badge>*/}
-                                        </div>
-                                        <div className="flex gap-4 text-sm text-gray-600 mt-1">
-                                          {/*<span>ID: {visitorItem.visitor_id_number}</span>*/}
-                                          {/*<span>Phone: {visitorItem.visitor_phone}</span>*/}
-                                          <span>Bag: {visitorItem.bag_no}</span>
-                                        </div>
-                                      </div>
-                                    </CommandItem>
-                                  ))}
-                                </CommandGroup>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                        <Label>Select Visitor Item (Optional)</Label>
+                        <SearchableSelect
+                          key={`visitor-item-${selectedProperty?.id || 'new'}-${item.visitor_item}`}
+                          value={localVisitorItem}
+                          onChange={(v) => {
+                            setLocalVisitorItem(v ?? null);
+                            // Fetch full item data to populate other fields
+                            if (v) {
+                              fetchVisitorItemsPaginated(1, '', visitorInfo.visitor, false).then(response => {
+                                const selectedItem = response.results?.find((item: any) => item.id === v);
+                                if (selectedItem) {
+                                  handleVisitorItemSelect(v, selectedItem);
+                                }
+                              });
+                            } else {
+                              // Clear visitor item local state
+                              setLocalVisitorItem(null);
+                              setLocalPropertyCategory(null);
+                              setLocalPropertyItem(null);
+                              setLocalMeasurementUnit(null);
+                              setLocalCurrency(null);
+                            }
+                          }}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchVisitorItemsPaginated(
+                              opts.page || 1,
+                              opts.search || '',
+                              visitorInfo.visitor,
+                              false
+                            );
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          renderItem={(visitorItem: any) => (
+                            <div className="flex flex-col w-full">
+                              <span className="font-medium">{visitorItem.item_name} ({visitorItem.category_name})</span>
+                              <span className="text-xs text-gray-500">Bag: {visitorItem.bag_no}</span>
+                            </div>
+                          )}
+                          labelField="item_name"
+                          placeholder="Search by item name..."
+                          initialItem={initialVisitorItem}
+                        />
                       </div>
                   )
               }
 
               <>
-                   {/* Property Type */}
+                   {/* Property Type - SearchableSelect */}
                     <div className="space-y-2">
                       <Label>Property Type <span className="text-red-500">*</span></Label>
-                      <Popover open={openPropertyType} onOpenChange={setOpenPropertyType}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={item.visitor_item}
-                          >
-                            {item.visitor_item && !!propertyTypes.length && propertyTypes.find(type => type.name === "Incoming Supplementary")
-                                ? "Incoming Supplementary"
-                                : item.property_type
-                                  ? propertyTypes.find((t) => t.id === item.property_type)?.name
-                                  : "Select property type..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search property type..." />
-                            <CommandList>
-                              <CommandEmpty>No type found.</CommandEmpty>
-                              <CommandGroup>
-                                {propertyTypes.map((type) => (
-                                  <CommandItem
-                                    key={type.id}
-                                    value={type.name}
-                                    onSelect={() => {
-                                      handleChange("property_type", type.id)
-                                      setOpenPropertyType(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.property_type === type.id ? "opacity-100" : "opacity-0")} />
-                                    {type.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      {localVisitorItem ? (
+                        <Input
+                          value={propertyTypes.find(type => type.name === "Incoming Supplementary")?.name || "Incoming Supplementary"}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                      ) : (
+                        <>
+                        <SearchableSelect
+                          key={`property-type-${selectedProperty?.id || 'new'}-${item.property_type}`}
+                          value={localPropertyType}
+                          onChange={(v) => {
+                            setLocalPropertyType(v ?? null);
+                            handleChange("property_type", v || '');
+                          }}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchPropertyTypesPaginated(opts.page || 1, opts.search || '');
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          labelField="name"
+                          placeholder="Select property type..."
+                          initialItem={initialPropertyType}
+                        />
+                        {validationErrors.property_type && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.property_type}</p>
+                        )}
+                        </>
+                      )}
                     </div>
 
-                    {/* Property Category */}
-                   {
-                       selectedProperty === null && (
-                           <div className="space-y-2">
-                              <Label>Property Category <span className="text-red-500">*</span></Label>
-                              <Popover open={openPropertyCategory} onOpenChange={setOpenPropertyCategory}>
-                                <PopoverTrigger asChild>
-                                  <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                          disabled={ item.visitor_item }
-                                  >
-                                    {item.property_category
-                                      ? itemCategories.find((i) => i.id === item.property_category)?.name
-                                      : ""}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                  </Button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-full p-0">
-                                  <Command>
-                                    <CommandInput placeholder="Search category..." />
-                                    <CommandList>
-                                      <CommandEmpty>No category found.</CommandEmpty>
-                                      <CommandGroup>
-                                        {itemCategories.map((category) => (
-                                          <CommandItem
-                                            key={category.id}
-                                            value={category.name}
-                                            onSelect={async () => {
-                                              handleChange("property_category", category.id)
-                                              await getPropertyItemsInfo(category.id)
-                                              setOpenPropertyCategory(false);
-                                            }}
-                                          >
-                                            <Check className={cn("mr-2 h-4 w-4", item.property_category === category.id ? "opacity-100" : "opacity-0")} />
-                                            {category.name}
-                                          </CommandItem>
-                                        ))}
-                                      </CommandGroup>
-                                    </CommandList>
-                                  </Command>
-                                </PopoverContent>
-                              </Popover>
-                            </div>
-                       )
-                   }
+                    {/* Property Category - SearchableSelect (Hidden in edit mode) */}
+                    {mode === "add" && (
+                      <div className="space-y-2">
+                        <Label>Property Category <span className="text-red-500">*</span></Label>
+                        {localVisitorItem ? (
+                          <Input
+                            value={visitorItems.find(vi => vi.id === localVisitorItem)?.category_name || ''}
+                            disabled
+                            className="bg-gray-100"
+                          />
+                        ) : (
+                          <>
+                            <SearchableSelect
+                              value={localPropertyCategory}
+                              onChange={(v) => {
+                                setLocalPropertyCategory(v ?? null);
+                                handleChange("property_category", v || '');
+                                if (v) {
+                                  getPropertyItemsInfo(v);
+                                }
+                              }}
+                              fetchPaginated={async (opts, signal) => {
+                                const response = await fetchItemCategoriesPaginated(opts.page || 1, opts.search || '');
+                                return {
+                                  items: response.results || [],
+                                  count: response.count,
+                                  next: response.next
+                                };
+                              }}
+                              labelField="name"
+                              placeholder="Select category..."
+                            />
+                            {validationErrors.property_category && (
+                              <p className="text-red-500 text-sm mt-1">{validationErrors.property_category}</p>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
 
-
-                    {/* Property Item */}
+                    {/* Property Item - Note: This uses /system-administration/items/ API */}
                     <div className="space-y-2">
                       <Label>Property Item <span className="text-red-500">*</span></Label>
-                      <Popover open={openPropertyItem} onOpenChange={setOpenPropertyItem}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={selectedProperty !== null}
-                          >
-                            {selectedProperty && selectedProperty.property_item_name
-                              ? selectedProperty.property_item_name
-                              : item.property_item
-                                  ? propertyItemsX.find((i) => i.id === item.property_item)?.name
-                                  : "Select item..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search item..." />
-                            <CommandList>
-                              <CommandEmpty>No item found.</CommandEmpty>
-                              <CommandGroup>
-                                {propertyItemsX.map((propertyItem) => (
-                                  <CommandItem
-                                    key={propertyItem.id}
-                                    value={propertyItem.name}
-                                    onSelect={() => {
-                                      handleChange("property_item", propertyItem.id)
-                                      setOpenPropertyItem(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.property_item === propertyItem.id ? "opacity-100" : "opacity-0")} />
-                                    {propertyItem.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      {localVisitorItem ? (
+                        <Input
+                          value={visitorItems.find(vi => vi.id === localVisitorItem)?.item_name || ''}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                      ) : (
+                        <>
+                          <SearchableSelect
+                            key={`property-item-${selectedProperty?.id || 'new'}-${mode}-${localPropertyCategory}`}
+                            value={localPropertyItem}
+                            onChange={(v) => {
+                              setLocalPropertyItem(v ?? null);
+                              handleChange("property_item", v || '');
+                            }}
+                            fetchPaginated={async (opts, signal) => {
+                              const response = await fetchPropertyItemsPaginated(
+                                opts.page || 1,
+                                opts.search || '',
+                                localPropertyCategory || undefined
+                              );
+                              return {
+                                items: response.results || [],
+                                count: response.count,
+                                next: response.next
+                              };
+                            }}
+                            labelField="name"
+                            placeholder="Select item..."
+                            initialItem={initialPropertyItem}
+                          />
+                          {validationErrors.property_item && (
+                            <p className="text-red-500 text-sm mt-1">{validationErrors.property_item}</p>
+                          )}
+                        </>
+                      )}
                     </div>
 
-                    {/* Measurement Unit */}
+                    {/* Measurement Unit - SearchableSelect */}
                     <div className="space-y-2">
                       <Label>Measurement Unit</Label>
-                      <Popover open={openMeasurementUnit} onOpenChange={setOpenMeasurementUnit}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button"
-                                  disabled={ item.visitor_item }
-                          >
-                           {item.measurement_unit
-                              ? units.find((i) => i.id === item.measurement_unit)?.name
-                              : ""}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search unit..." />
-                            <CommandList>
-                              <CommandEmpty>No unit found.</CommandEmpty>
-                              <CommandGroup>
-                                {units.map((unit) => (
-                                  <CommandItem
-                                    key={unit.id}
-                                    value={unit.name}
-                                    onSelect={() => {
-                                      handleChange('measurement_unit', unit.id)
-                                      setOpenMeasurementUnit(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.measurement_unit === unit.id ? "opacity-100" : "opacity-0")} />
-                                    {unit.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      {localVisitorItem ? (
+                        <Input
+                          value={visitorItems.find(vi => vi.id === localVisitorItem)?.measurement_unit_name || ''}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                      ) : (
+                        <SearchableSelect
+                          key={`measurement-unit-${selectedProperty?.id || 'new'}-${mode}`}
+                          value={localMeasurementUnit}
+                          onChange={(v) => {
+                            setLocalMeasurementUnit(v ?? null);
+                            handleChange('measurement_unit', v || '');
+                          }}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchMeasurementUnitsPaginated(opts.page || 1, opts.search || '');
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          labelField="name"
+                          placeholder="Select unit..."
+                          initialItem={initialMeasurementUnit}
+                        />
+                      )}
                     </div>
 
                     {/* Quantity */}
                     <div className="space-y-2">
                       <Label>Quantity <span className="text-red-500">*</span></Label>
                       <Input
-                        type="text"
+                        type="number"
                         name="quantity"
-                        value={item.quantity}
+                        value={localQuantity}
                         placeholder="Enter quantity"
-                        required
                         onChange={handleInput}
-                        disabled={ item.visitor_item !== "" }
+                        disabled={ localVisitorItem !== null && localVisitorItem !== "" }
+                        min="1"
                       />
+                      {validationErrors.quantity && (
+                        <p className="text-red-500 text-sm mt-1">{validationErrors.quantity}</p>
+                      )}
                     </div>
 
                     {/* Amount */}
                     <div className="space-y-2">
-                      <Label>Amount (UGX)</Label>
+                      <Label>Amount</Label>
                       <Input
                         name="amount"
                         type="number"
-                        value={item.amount}
+                        value={localAmount}
                         onChange={handleInput}
                         placeholder="Enter amount"
-                        disabled={ item.visitor_item !== "" }
+                        disabled={ localVisitorItem !== null && localVisitorItem !== "" }
                       />
                     </div>
 
-                    {/* Property Bag */}
+                    {/* Currency - SearchableSelect */}
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      {localVisitorItem ? (
+                        <Input
+                          value={visitorItems.find(vi => vi.id === localVisitorItem)?.currency_name || ''}
+                          disabled
+                          className="bg-gray-100"
+                        />
+                      ) : (
+                        <SearchableSelect
+                          key={`currency-${selectedProperty?.id || 'new'}-${mode}`}
+                          value={localCurrency}
+                          onChange={(v) => {
+                            setLocalCurrency(v ?? null);
+                            handleChange('currency', v || '');
+                          }}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchCurrenciesPaginated(opts.page || 1, opts.search || '');
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          labelField="name"
+                          placeholder="Select currency..."
+                        />
+                      )}
+                    </div>
+
+                    {/* Property Bag - SearchableSelect */}
                     <div className="space-y-2">
                       <Label>Property Bag <span className="text-red-500">*</span></Label>
-                      <Popover open={openPropertyBag} onOpenChange={setOpenPropertyBag}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                            {item.property_bag
-                              ? propertyBags.find((b) => b.id === item.property_bag)?.bag_number
-                              : "Select bag..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search bag..." />
-                            <CommandList>
-                              <CommandEmpty>No bag found.</CommandEmpty>
-                              <CommandGroup>
-                                {propertyBags.map((bag) => (
-                                  <CommandItem
-                                    key={bag.id}
-                                    value={bag.bag_number}
-                                    onSelect={() => {
-                                        handleChange("property_bag", bag.id)
-                                      setOpenPropertyBag(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.property_bag === bag.id ? "opacity-100" : "opacity-0")} />
-                                    {bag.bag_number}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <>
+                        <SearchableSelect
+                          key={`property-bag-${selectedProperty?.id || 'new'}-${item.property_bag}`}
+                          value={localPropertyBag}
+                          onChange={(v) => {
+                            setLocalPropertyBag(v ?? null);
+                            handleChange("property_bag", v || '');
+                          }}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchPropertyBagsPaginated(opts.page || 1, opts.search || '');
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          labelField="bag_number"
+                          placeholder="Select bag..."
+                          initialItem={initialPropertyBag}
+                        />
+                        {validationErrors.property_bag && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.property_bag}</p>
+                        )}
+                      </>
                     </div>
 
-                    {/* Property Status */}
+                    {/* Property Status - SearchableSelect */}
                     <div className="space-y-2">
                       <Label>Property Status <span className="text-red-500">*</span></Label>
-                      <Popover open={openPropertyStatus} onOpenChange={setOpenPropertyStatus}>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" role="combobox" className="w-full justify-between" type="button">
-                            {item.property_status
-                              ? propertyStatuses.find((s) => s.id === item.property_status)?.name
-                              : "Select status..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search status..." />
-                            <CommandList>
-                              <CommandEmpty>No status found.</CommandEmpty>
-                              <CommandGroup>
-                                {propertyStatuses.map((status) => (
-                                  <CommandItem
-                                    key={status.id}
-                                    value={status.name}
-                                    onSelect={() => {
-                                        handleChange("property_status", status.id)
-                                      setOpenPropertyStatus(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.property_status === status.id ? "opacity-100" : "opacity-0")} />
-                                    {status.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <>
+                        <SearchableSelect
+                          key={`property-status-${selectedProperty?.id || 'new'}-${item.property_status}`}
+                          value={localPropertyStatus}
+                          onChange={(v) => {
+                              setLocalPropertyStatus(v ?? null);
+                              handleChange("property_status", v || '');
+                            }}
+                            fetchPaginated={async (opts, signal) => {
+                              const response = await fetchPropertyStatusesPaginated(opts.page || 1, opts.search || '');
+                              return {
+                                items: response.results || [],
+                                count: response.count,
+                                next: response.next
+                              };
+                            }}
+                            labelField="name"
+                            placeholder="Select status..."
+                            initialItem={initialPropertyStatus}
+                        />
+                        {validationErrors.property_status && (
+                          <p className="text-red-500 text-sm mt-1">{validationErrors.property_status}</p>
+                        )}
+                      </>
                     </div>
 
-                    {/* Next of Kin */}
+                    {/* Next of Kin - SearchableSelect */}
                     <div className="space-y-2">
                       <Label>Next of Kin</Label>
                       <div className="flex gap-2">
-                        <Popover open={openNextOfKin} onOpenChange={setOpenNextOfKin}>
-                          <PopoverTrigger asChild>
-                            <Button variant="outline" role="combobox" className="flex-1 justify-between" type="button">
-                              {item.next_of_kin && item.next_of_kin !== 'none'
-                                ? nextOfKins.find((nok) => nok.id === item.next_of_kin)?.full_name + ' (' + nextOfKins.find((nok) => nok.id === item.next_of_kin)?.relationship_name + ')'
-                                : "Select next of kin..."}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search next of kin..." />
-                            <CommandList>
-                              <CommandEmpty>No next of kin found.</CommandEmpty>
-                              <CommandGroup>
-                                <CommandItem
-                                  value="none"
-                                  onSelect={() => {
-                                      handleChange("next_of_kin", "none")
-                                    setOpenNextOfKin(false);
-                                  }}
-                                >
-                                  <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === 'none' ? "opacity-100" : "opacity-0")} />
-                                  None
-                                </CommandItem>
-                                {nextOfKins.map((nok) => (
-                                  <CommandItem
-                                    key={nok.id}
-                                    value={nok.full_name + ' ' + nok.relationship}
-                                    onSelect={() => {
-                                        handleChange("next_of_kin", nok.id)
-                                      setOpenNextOfKin(false);
-                                    }}
-                                  >
-                                    <Check className={cn("mr-2 h-4 w-4", item.next_of_kin === nok.id ? "opacity-100" : "opacity-0")} />
-                                    {nok.full_name} ({nok.relationship_name})
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
-                      {/*<Button*/}
-                      {/*  type="button"*/}
-                      {/*  variant="outline"*/}
-                      {/*  size="icon"*/}
-                      {/*  className="shrink-0"*/}
-                      {/*  onClick={() => setIsNextOfKinDialogOpen(true)}*/}
-                      {/*  title="Add New Next of Kin"*/}
-                      {/*  style={{ borderColor: '#650000' }}*/}
-                      {/*>*/}
+                        <SearchableSelect
+                          key={`next-of-kin-${selectedProperty?.id || 'new'}-${item.next_of_kin}`}
+                          value={localNextOfKin}
+                          onChange={(v) => {
+                            setLocalNextOfKin(v ?? null);
+                            handleChange("next_of_kin", v || 'none');
+                          }}
+                          disabled={!prisonerInfo.prisoner}
+                          fetchPaginated={async (opts, signal) => {
+                            const response = await fetchNextOfKinPaginated(
+                              opts.page || 1,
+                              opts.search || '',
+                              prisonerInfo.prisoner
+                            );
+                            return {
+                              items: response.results || [],
+                              count: response.count,
+                              next: response.next
+                            };
+                          }}
+                          renderItem={(nok: any) => (
+                            <span>{nok.full_name} ({nok.relationship_name})</span>
+                          )}
+                          labelField="full_name"
+                          placeholder={!prisonerInfo.prisoner ? "Select a prisoner first..." : "Select next of kin..."}
+                          className="flex-1"
+                          initialItem={initialNextOfKin}
+                        />
                       <Button
                         type="button"
                         variant="outline"
                         size="icon"
                         className="shrink-0"
-                        onClick={() => setIsNextCreateDialogOpen(true)}
-                        title="Add New Next of Kin"
+                        onClick={() => {
+                          // Update parent prisoner info before opening dialog
+                          if (selectedPrisonerDetails) {
+                            setParentPrisonerInfo({
+                              prisoner: selectedPrisonerDetails.id,
+                              prisonerName: selectedPrisonerDetails.name,
+                              prisonerNumber: selectedPrisonerDetails.number
+                            });
+                          } else if (prisonerInfo.prisoner) {
+                            // Fallback: If prisoner is selected but details not captured, still allow opening
+                            setParentPrisonerInfo({
+                              prisoner: prisonerInfo.prisoner,
+                              prisonerName: '',
+                              prisonerNumber: ''
+                            });
+                          }
+                          // Small delay to ensure state propagates before opening dialog
+                          setTimeout(() => {
+                            setIsNextCreateDialogOpen(true);
+                          }, 10);
+                        }}
+                        disabled={!prisonerInfo.prisoner}
+                        title={!prisonerInfo.prisoner ? "Select a prisoner first" : "Add New Next of Kin"}
                         style={{ borderColor: '#650000' }}
                       >
                         <Plus className="h-5 w-5" style={{ color: '#650000' }} />
@@ -645,7 +806,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                       <Input
                         type="text"
                         name="destination"
-                        value={item.destination}
+                        value={localDestination}
                         onChange={handleInput}
                         placeholder="Enter destination"
                       />
@@ -655,7 +816,7 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
                     <div className="space-y-2 md:col-span-2">
                       <Label>Notes</Label>
                       <Textarea
-                        value={item.note}
+                        value={localNote}
                         name="note"
                         onChange={handleInput}
                         placeholder="Enter any additional notes"
@@ -670,5 +831,8 @@ const PropertyItem: React.FC<ChildProps> = ({ setPropertyItems, index, item, vis
       </Collapsible>
     )
 }
+);
+
+PropertyItem.displayName = 'PropertyItem';
 
 export default PropertyItem

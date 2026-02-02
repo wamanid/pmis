@@ -32,6 +32,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
 import StaffProfileSelect from "../common/StaffProfileSelect";
+import SearchableSelect from "../common/SearchableSelect";
 import { Calendar } from "../ui/calendar";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
@@ -59,12 +60,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import VisitorPassForm from "../gate/VisitorPassForm";
 import VisitorItemList from "./VisitorItemList";
 import VisitorRegistrationDialog from "./VisitorRegistrationDialog";
-import {getStationVisitors, Visitor} from "../../services/stationServices/visitorsServices/VisitorsService";
+import {getStationVisitors, Visitor, VISITOR_API_ENDPOINTS} from "../../services/stationServices/visitorsServices/VisitorsService";
 import axiosInstance from "../../services/axiosInstance"; // << ensure path matches your project
 import {handleResponseError} from "../../services/stationServices/utils";
 import {getVisitorItems, VisitorItem} from "../../services/stationServices/visitorsServices/visitorItem";
 
-
+// NOTE: API endpoints now centralized in service files (VISITOR_API_ENDPOINTS imported above)
+// Red "NS_BINDING_ABORTED" errors in console are NORMAL - they occur when AbortController
+// cancels requests (e.g., when user types quickly or navigates away). This is expected behavior.
 
 interface Region {
   id: string;
@@ -238,6 +241,107 @@ export default function VisitationsScreen() {
     ...it,
   }), []);
 
+  // Paginated fetch callbacks for dropdowns
+  const fetchGatesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_API_ENDPOINTS.GATES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
+      toast.error('Failed to load gates');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchRelationshipsPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_API_ENDPOINTS.RELATIONSHIPS, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
+      toast.error('Failed to load relationships');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchVisitorTypesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_API_ENDPOINTS.VISITOR_TYPES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
+      toast.error('Failed to load visitor types');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchVisitorStatusesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_API_ENDPOINTS.VISITOR_STATUSES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
+      toast.error('Failed to load visitor statuses');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  const fetchIDTypesPaginated = useCallback(async (opts: { search?: string; page?: number; page_size?: number; [key: string]: any }, signal?: AbortSignal) => {
+    try {
+      const res = await axiosInstance.get(VISITOR_API_ENDPOINTS.ID_TYPES, {
+        params: { search: opts.search || '', page: opts.page || 1, page_size: opts.page_size || 50 },
+        signal
+      });
+      return {
+        items: res.data?.results ?? [],
+        count: res.data?.count ?? 0,
+        next: res.data?.next ?? null
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        throw error;
+      }
+      toast.error('Failed to load ID types');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
   // NOTE: DataTable handles fetching when you supply the `url` prop.
   // Manual loadTable + effects are intentionally disabled to avoid double-fetch / shape mismatch.
   // If you need server-side params (search/paging) coordinated, extend the shared DataTable to accept them.
@@ -261,7 +365,7 @@ export default function VisitationsScreen() {
       // DEBUG: log params so we can inspect what the UI is sending
       // call axios directly so query params are forwarded exactly
       console.debug("calling API with params:", params);
-      const apiRes = await axiosInstance.get("/gate-management/station-visitors/", { params });
+      const apiRes = await axiosInstance.get(VISITOR_API_ENDPOINTS.STATION_VISITORS, { params });
       const res = apiRes.data;
       console.debug("loadTable response:", res);
       const itemsRes = res?.results ?? res ?? [];
@@ -458,7 +562,7 @@ export default function VisitationsScreen() {
         async function fetchData() {
           // setVisitorRecordsLoading(true)
             try {
-              const response = await getStationVisitors()
+              const response = await getStationVisitors('')
               if (handleResponseError(response)) return
 
               if ("results" in response) {
@@ -479,7 +583,7 @@ export default function VisitationsScreen() {
                 console.log(data)
               }
 
-            }catch (error) {
+            }catch (error: any) {
               if (!error?.response) {
                 toast.error('Failed to connect to server. Please try again.');
               }
@@ -701,52 +805,16 @@ export default function VisitationsScreen() {
                     {/* ID Type */}
                     <div className="space-y-2">
                       <Label>ID Type <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openIDTypeCombo}
-                        onOpenChange={setOpenIDTypeCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openIDTypeCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.id_type
-                              ? idTypes.find((t) => t.id === form.id_type)?.name
-                              : "Select ID type..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search ID type..." />
-                            <CommandEmpty>No ID type found.</CommandEmpty>
-                            <CommandGroup>
-                              {idTypes.map((type) => (
-                                <CommandItem
-                                  key={type.id}
-                                  value={type.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, id_type: type.id });
-                                    setOpenIDTypeCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.id_type === type.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {type.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <SearchableSelect
+                        value={form.id_type}
+                        onChange={(val) => setForm({ ...form, id_type: String(val ?? "") })}
+                        fetchPaginated={fetchIDTypesPaginated}
+                        idField="id"
+                        labelField="name"
+                        placeholder="Select ID type..."
+                        pageSize={50}
+                        minQueryLength={0}
+                      />
                     </div>
 
                     <div className="space-y-2">
@@ -770,52 +838,16 @@ export default function VisitationsScreen() {
                     {/* Gate */}
                     <div className="space-y-2">
                       <Label>Gate <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openGateCombo}
-                        onOpenChange={setOpenGateCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openGateCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.gate
-                              ? gates.find((g) => g.id === form.gate)?.name
-                              : "Select gate..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search gate..." />
-                            <CommandEmpty>No gate found.</CommandEmpty>
-                            <CommandGroup>
-                              {gates.map((gate) => (
-                                <CommandItem
-                                  key={gate.id}
-                                  value={gate.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, gate: gate.id });
-                                    setOpenGateCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.gate === gate.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {gate.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <SearchableSelect
+                        value={form.gate}
+                        onChange={(val) => setForm({ ...form, gate: String(val ?? "") })}
+                        fetchPaginated={fetchGatesPaginated}
+                        idField="id"
+                        labelField="name"
+                        placeholder="Select gate..."
+                        pageSize={50}
+                        minQueryLength={0}
+                      />
                     </div>
 
                     {/* Gate Keeper */}
@@ -849,53 +881,16 @@ export default function VisitationsScreen() {
                     {/* Relationship */}
                     <div className="space-y-2">
                       <Label>Relationship <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openRelationCombo}
-                        onOpenChange={setOpenRelationCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openRelationCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.relation
-                              ? relationships.find((r) => r.id === form.relation)
-                                  ?.name
-                              : "Select relationship..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search relationship..." />
-                            <CommandEmpty>No relationship found.</CommandEmpty>
-                            <CommandGroup>
-                              {relationships.map((relation) => (
-                                <CommandItem
-                                  key={relation.id}
-                                  value={relation.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, relation: relation.id });
-                                    setOpenRelationCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.relation === relation.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {relation.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <SearchableSelect
+                        value={form.relation}
+                        onChange={(val) => setForm({ ...form, relation: String(val ?? "") })}
+                        fetchPaginated={fetchRelationshipsPaginated}
+                        idField="id"
+                        labelField="name"
+                        placeholder="Select relationship..."
+                        pageSize={50}
+                        minQueryLength={0}
+                      />
                     </div>
                   </div>
 
@@ -903,110 +898,31 @@ export default function VisitationsScreen() {
                     {/* Visitor Type */}
                     <div className="space-y-2">
                       <Label>Visitor Type <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openVisitorTypeCombo}
-                        onOpenChange={setOpenVisitorTypeCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openVisitorTypeCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.visitor_type
-                              ? visitorTypes.find(
-                                  (t) => t.id === form.visitor_type
-                                )?.name
-                              : "Select visitor type..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search visitor type..." />
-                            <CommandEmpty>No visitor type found.</CommandEmpty>
-                            <CommandGroup>
-                              {visitorTypes.map((type) => (
-                                <CommandItem
-                                  key={type.id}
-                                  value={type.name}
-                                  onSelect={() => {
-                                    setForm({ ...form, visitor_type: type.id });
-                                    setOpenVisitorTypeCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.visitor_type === type.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {type.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <SearchableSelect
+                        value={form.visitor_type}
+                        onChange={(val) => setForm({ ...form, visitor_type: String(val ?? "") })}
+                        fetchPaginated={fetchVisitorTypesPaginated}
+                        idField="id"
+                        labelField="name"
+                        placeholder="Select visitor type..."
+                        pageSize={50}
+                        minQueryLength={0}
+                      />
                     </div>
 
                     {/* Visitor Status */}
                     <div className="space-y-2">
                       <Label>Visitor Status <span className="text-red-500">*</span></Label>
-                      <Popover
-                        open={openVisitorStatusCombo}
-                        onOpenChange={setOpenVisitorStatusCombo}
-                      >
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={openVisitorStatusCombo}
-                            className="w-full justify-between"
-                          >
-                            {form.visitor_status
-                              ? visitorStatuses.find(
-                                  (s) => s.id === form.visitor_status
-                                )?.name
-                              : "Select status..."}
-                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-full p-0">
-                          <Command>
-                            <CommandInput placeholder="Search status..." />
-                            <CommandEmpty>No status found.</CommandEmpty>
-                            <CommandGroup>
-                              {visitorStatuses.map((status) => (
-                                <CommandItem
-                                  key={status.id}
-                                  value={status.name}
-                                  onSelect={() => {
-                                    setForm({
-                                      ...form,
-                                      visitor_status: status.id,
-                                    });
-                                    setOpenVisitorStatusCombo(false);
-                                  }}
-                                >
-                                  <Check
-                                    className={cn(
-                                      "mr-2 h-4 w-4",
-                                      form.visitor_status === status.id
-                                        ? "opacity-100"
-                                        : "opacity-0"
-                                    )}
-                                  />
-                                  {status.name}
-                                </CommandItem>
-                              ))}
-                            </CommandGroup>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <SearchableSelect
+                        value={form.visitor_status}
+                        onChange={(val) => setForm({ ...form, visitor_status: String(val ?? "") })}
+                        fetchPaginated={fetchVisitorStatusesPaginated}
+                        idField="id"
+                        labelField="name"
+                        placeholder="Select status..."
+                        pageSize={50}
+                        minQueryLength={0}
+                      />
                     </div>
                   </div>
 
@@ -1036,7 +952,7 @@ export default function VisitationsScreen() {
                           <Calendar
                             mode="single"
                             selected={form.visitation_datetime}
-                            onSelect={(date) => {
+                            onSelect={(date: Date | undefined) => {
                               if (date) {
                                 setForm({ ...form, visitation_datetime: date });
                                 setCalendarOpen(false);
@@ -1330,12 +1246,6 @@ export default function VisitationsScreen() {
                   }},
                 ]}
                 // externalSearch={searchQuery}
-                onSearch={(q: string) => { setSearchQuery(q); setPage(1); }}
-                onPageChange={(p: number) => setPage(p)}
-                onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); }}
-                onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); }}
-                page={page}
-                pageSize={pageSize}
               />
              )}
            </div>

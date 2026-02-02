@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Users, Search, UserPlus, Building2, MapPin, Calendar, CheckIcon } from 'lucide-react';
+import { Users, Search, UserPlus, Building2, MapPin, Calendar, CheckIcon, Edit, Trash, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import {
@@ -29,9 +29,11 @@ import {
   addStaffDeployment, getStaffDeployment,
   getStaffProfile,
   StaffDeployment, StaffDeploymentResponse,
-  StaffItem
+  StaffItem,
+  STAFF_DEPLOYMENT_API_ENDPOINTS
 } from "../../services/stationServices/staffDeploymentService";
-import {getStation} from "../../services/stationServices/manualLockupIntegration";
+import {getStation, MANUAL_LOCKUP_API_ENDPOINTS} from "../../services/stationServices/manualLockupIntegration";
+import axiosInstance from "../../services/axiosInstance";
 import {
   DistrictFilter,
   getDistrictSummary, getRegionSummary,
@@ -40,6 +42,8 @@ import {
   StationFilter
 } from "../../services/stationServices/utils"
 import { DataTable } from '../common/DataTable';
+import StaffProfileSelect from '../common/StaffProfileSelect';
+import SearchableSelect from '../common/SearchableSelect';
 
 export function StaffDeploymentScreen() {
   const { region, district, station } = useFilters();
@@ -56,15 +60,10 @@ export function StaffDeploymentScreen() {
   }, [searchQuery]);
   const [deployOpen, setDeployOpen] = useState(false);
   
-  // HRMIS Staff Search
-  const [hrmisSearchOpen, setHrmisSearchOpen] = useState(false);
-  const [hrmisSearchQuery, setHrmisSearchQuery] = useState('');
-  const [hrmisResults, setHrmisResults] = useState<StaffItem[]>([]);
+  // Staff and Station selection (using SearchableSelect components)
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
+  const [selectedStationId, setSelectedStationId] = useState<string | null>(null);
   const [selectedStaff, setSelectedStaff] = useState<StaffItem | null>(null);
-  const [loadingHRMIS, setLoadingHRMIS] = useState(false);
-  
-  // Station Search for deployment
-  const [stationSearchOpen, setStationSearchOpen] = useState(false);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [summaryX, setSummaryX] = useState({staff: 0, deployed: 0, stations: 0})
   
@@ -80,7 +79,59 @@ export function StaffDeploymentScreen() {
   const [stationSummary, setStationSummary] = useState<StationFilter[]>([])
   const [regionSummary, setRegionSummary] = useState<RegionFilter[]>([])
   const [districtSummary, setDistrictSummary] = useState<DistrictFilter[]>([])
-  // DataTable states (server-side capable pattern)
+  // Paginated staff fetcher for SearchableSelect (14M+ ready)
+  const fetchStaffPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_PROFILES, {
+        params: {
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        },
+        signal,
+      });
+
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load staff profiles');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  // Paginated station fetcher for SearchableSelect (14M+ ready)
+  const fetchStationsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(MANUAL_LOCKUP_API_ENDPOINTS.STATIONS, {
+        params: {
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        },
+        signal,
+      });
+
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load stations');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);  // DataTable states (server-side capable pattern)
   const [tableLoading, setTableLoading] = useState<boolean>(true);
   const [tableData, setTableData] = useState<StaffDeploymentResponse[]>([]);
   const [total, setTotal] = useState<number>(0);
@@ -95,6 +146,12 @@ export function StaffDeploymentScreen() {
   // View modal state
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedDeployment, setSelectedDeployment] = useState<StaffDeploymentResponse | null>(null);
+  // Edit modal state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editingDeployment, setEditingDeployment] = useState<StaffDeploymentResponse | null>(null);
+  // Delete confirmation state
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deletingDeployment, setDeletingDeployment] = useState<StaffDeploymentResponse | null>(null);
 
   useEffect(() => {
     // loadData();
@@ -132,7 +189,6 @@ export function StaffDeploymentScreen() {
           toast.error("There are no staff members")
         }
         setStaffProfile(data1)
-        setHrmisResults(data1)
       }
 
       const response2 = await getStation()
@@ -186,12 +242,12 @@ export function StaffDeploymentScreen() {
   };
 
   const handleDeploy = async () => {
-    if (!selectedStaff) {
-      toast.error('Please select a staff member from HRMIS');
+    if (!selectedStaffId) {
+      toast.error('Please select a staff member');
       return;
     }
 
-    if (!selectedStation) {
+    if (!selectedStationId) {
       toast.error('Please select a station');
       return;
     }
@@ -207,8 +263,8 @@ export function StaffDeploymentScreen() {
         is_active: true,
         start_date: deployFormData.start_date,
         end_date: deployFormData.end_date,
-        station: selectedStation.id,
-        profile: selectedStaff.id
+        station: selectedStationId,
+        profile: selectedStaffId
       }
 
       const response = await addStaffDeployment(deployment)
@@ -245,13 +301,85 @@ export function StaffDeploymentScreen() {
   }
 
   const resetForm = () => {
+    setSelectedStaffId(null);
+    setSelectedStationId(null);
     setSelectedStaff(null);
     setSelectedStation(null);
-    setHrmisSearchQuery('');
     setDeployFormData({
       start_date: new Date().toISOString().split('T')[0],
       end_date: ''
     });
+  };
+
+  const handleEdit = (deployment: StaffDeploymentResponse) => {
+    setEditingDeployment(deployment);
+    setSelectedStaffId(deployment.profile);
+    setSelectedStationId(deployment.station.id || (deployment as any).station);
+    setDeployFormData({
+      start_date: deployment.start_date,
+      end_date: deployment.end_date || ''
+    });
+    setEditOpen(true);
+  };
+
+  const handleEditSave = async () => {
+    if (!editingDeployment) return;
+    if (!selectedStaffId) {
+      toast.error('Please select a staff member');
+      return;
+    }
+    if (!selectedStationId) {
+      toast.error('Please select a station');
+      return;
+    }
+    if (!deployFormData.start_date) {
+      toast.error('Please select a start date');
+      return;
+    }
+
+    try {
+      const payload = {
+        is_active: true,
+        start_date: deployFormData.start_date,
+        end_date: deployFormData.end_date,
+        station: selectedStationId,
+        profile: selectedStaffId
+      };
+
+      await axiosInstance.patch(`${STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_DEPLOYMENTS}${editingDeployment.id}/`, payload);
+      toast.success('Staff deployment updated successfully');
+      setEditOpen(false);
+      resetForm();
+      setEditingDeployment(null);
+      // Refresh data
+      fetchData();
+      setFiltersReloadKey(k => k + 1);
+    } catch (error: any) {
+      console.error('Edit error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to update deployment');
+    }
+  };
+
+  const handleDeleteClick = (deployment: StaffDeploymentResponse) => {
+    setDeletingDeployment(deployment);
+    setDeleteOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingDeployment) return;
+
+    try {
+      await axiosInstance.delete(`${STAFF_DEPLOYMENT_API_ENDPOINTS.STAFF_DEPLOYMENTS}${deletingDeployment.id}/`);
+      toast.success('Staff deployment deleted successfully');
+      setDeleteOpen(false);
+      setDeletingDeployment(null);
+      // Refresh data
+      fetchData();
+      setFiltersReloadKey(k => k + 1);
+    } catch (error: any) {
+      console.error('Delete error:', error);
+      toast.error(error?.response?.data?.message || 'Failed to delete deployment');
+    }
   };
 
   const filteredDeployments = deployments.filter(deployment => {
@@ -409,66 +537,25 @@ export function StaffDeploymentScreen() {
                     <DialogDescription>Search HRMIS and assign a staff member to a station</DialogDescription>
                   </DialogHeader>
                   <div className="space-y-4">
-                    {/* HRMIS Staff Search */}
+                    {/* Staff Member Selection */}
                     <div className="space-y-2">
-                      <Label>Staff Member (from HRMIS)</Label>
-                      <Popover open={hrmisSearchOpen} onOpenChange={setHrmisSearchOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={hrmisSearchOpen}
-                            className="w-full justify-between"
-                          >
-                            {selectedStaff ? (
-                              <span>{selectedStaff.force_number} - {selectedStaff.first_name} {selectedStaff.first_name}</span>
-                            ) : (
-                              <span className="text-muted-foreground">Search by force number or name...</span>
-                            )}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0">
-                          <Command>
-                            <CommandInput
-                              placeholder="Search staff..."
-                              value={hrmisSearchQuery}
-                              onValueChange={setHrmisSearchQuery}
-                            />
-                            <CommandList>
-                              <CommandEmpty>
-                                {loadingHRMIS ? 'Searching HRMIS...' : 'No staff found. Try searching by force number or name.'}
-                              </CommandEmpty>
-                              <CommandGroup>
-                                {hrmisResults.map((staff) => (
-                                  <CommandItem
-                                    key={staff.force_number}
-                                    value={staff.force_number}
-                                    onSelect={() => {
-                                      setSelectedStaff(staff);
-                                      setHrmisSearchOpen(false);
-                                    }}
-                                  >
-                                    <CheckIcon
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        selectedStaff?.force_number === staff.force_number
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      )}
-                                    />
-                                    <div className="flex flex-col">
-                                      <span>{staff.force_number} - {staff.first_name} {staff.last_name}</span>
-                                      <span className="text-xs text-muted-foreground">
-                                        {staff.rank_name} • DOB: {staff.date_of_birth}
-                                      </span>
-                                    </div>
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <Label>Staff Member (from HRMIS) <span className="text-red-500">*</span></Label>
+                      <StaffProfileSelect
+                        value={selectedStaffId}
+                        onChange={(id) => {
+                          setSelectedStaffId(id);
+                          // Find and set the full staff object for display
+                          if (id && staffProfile.length > 0) {
+                            const staff = staffProfile.find(s => s.id === id);
+                            setSelectedStaff(staff || null);
+                          } else {
+                            setSelectedStaff(null);
+                          }
+                        }}
+                        placeholder="Search by force number or name..."
+                        initialItems={staffProfile}
+                        className="w-full"
+                      />
                     </div>
 
                     {/* Display selected staff details */}
@@ -483,54 +570,32 @@ export function StaffDeploymentScreen() {
 
                     {/* Station Selection */}
                     <div className="space-y-2">
-                      <Label>Station</Label>
-                      <Popover open={stationSearchOpen} onOpenChange={setStationSearchOpen}>
-                        <PopoverTrigger asChild>
-                          <Button
-                            variant="outline"
-                            role="combobox"
-                            aria-expanded={stationSearchOpen}
-                            className="w-full justify-between"
-                          >
-                            {selectedStation ? selectedStation.name : "Select station..."}
-                          </Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-[400px] p-0">
-                          <Command>
-                            <CommandInput placeholder="Search station..." />
-                            <CommandList>
-                              <CommandEmpty>No station found.</CommandEmpty>
-                              <CommandGroup>
-                                {stationsX.map((station) => (
-                                  <CommandItem
-                                    key={station.id}
-                                    value={station.name}
-                                    onSelect={() => {
-                                      setSelectedStation(station);
-                                      setStationSearchOpen(false);
-                                    }}
-                                  >
-                                    <CheckIcon
-                                      className={cn(
-                                        "mr-2 h-4 w-4",
-                                        selectedStation?.id === station.id
-                                          ? "opacity-100"
-                                          : "opacity-0"
-                                      )}
-                                    />
-                                    {station.name}
-                                  </CommandItem>
-                                ))}
-                              </CommandGroup>
-                            </CommandList>
-                          </Command>
-                        </PopoverContent>
-                      </Popover>
+                      <Label>Station <span className="text-red-500">*</span></Label>
+                      <SearchableSelect
+                        fetchPaginated={fetchStationsPaginated}
+                        value={selectedStationId}
+                        onChange={(id) => {
+                          setSelectedStationId(id);
+                          // Find and set the full station object for display if needed
+                          if (id && stationsX.length > 0) {
+                            const station = stationsX.find((s: any) => s.id === id);
+                            setSelectedStation(station || null);
+                          } else {
+                            setSelectedStation(null);
+                          }
+                        }}
+                        placeholder="Select station..."
+                        idField="id"
+                        labelField="name"
+                        pageSize={50}
+                        minQueryLength={0}
+                        className="w-full"
+                      />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <Label>Start Date</Label>
+                        <Label>Start Date <span className="text-red-500">*</span></Label>
                         <Input
                           type="date"
                           value={deployFormData.start_date}
@@ -538,7 +603,7 @@ export function StaffDeploymentScreen() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label>End Date (Optional)</Label>
+                        <Label>End Date <span className="text-red-500">*</span></Label>
                         <Input
                           type="date"
                           value={deployFormData.end_date}
@@ -558,6 +623,104 @@ export function StaffDeploymentScreen() {
                  </>
               )
             }
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Staff Deployment Dialog */}
+        <Dialog open={editOpen} onOpenChange={(open) => {
+          setEditOpen(open);
+          if (!open) {
+            resetForm();
+            setEditingDeployment(null);
+          }
+        }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Edit Staff Deployment</DialogTitle>
+              <DialogDescription>Update staff member deployment details</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              {/* Staff Member Selection */}
+              <div className="space-y-2">
+                <Label>Staff Member (from HRMIS) <span className="text-red-500">*</span></Label>
+                <StaffProfileSelect
+                  value={selectedStaffId}
+                  onChange={(id) => {
+                    setSelectedStaffId(id);
+                    if (id && staffProfile.length > 0) {
+                      const staff = staffProfile.find(s => s.id === id);
+                      setSelectedStaff(staff || null);
+                    } else {
+                      setSelectedStaff(null);
+                    }
+                  }}
+                  placeholder="Search by force number or name..."
+                  initialItems={staffProfile}
+                  className="w-full"
+                />
+              </div>
+
+              {/* Display selected staff details */}
+              {selectedStaff && (
+                <div className="p-3 bg-muted rounded-lg space-y-1 text-sm">
+                  <div><span className="font-medium">Force Number:</span> {selectedStaff.force_number}</div>
+                  <div><span className="font-medium">Name:</span> {selectedStaff.first_name} {selectedStaff.last_name}</div>
+                  <div><span className="font-medium">Rank:</span> {selectedStaff.rank_name}</div>
+                  <div><span className="font-medium">Date of Birth:</span> {selectedStaff.date_of_birth}</div>
+                </div>
+              )}
+
+              {/* Station Selection */}
+              <div className="space-y-2">
+                <Label>Station <span className="text-red-500">*</span></Label>
+                <SearchableSelect
+                  fetchPaginated={fetchStationsPaginated}
+                  value={selectedStationId}
+                  onChange={(id) => {
+                    setSelectedStationId(id);
+                    if (id && stationsX.length > 0) {
+                      const station = stationsX.find((s: any) => s.id === id);
+                      setSelectedStation(station || null);
+                    } else {
+                      setSelectedStation(null);
+                    }
+                  }}
+                  placeholder="Select station..."
+                  idField="id"
+                  labelField="name"
+                  pageSize={50}
+                  minQueryLength={0}
+                  className="w-full"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Start Date <span className="text-red-500">*</span></Label>
+                  <Input
+                    type="date"
+                    value={deployFormData.start_date}
+                    onChange={(e) => setDeployFormData({ ...deployFormData, start_date: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>End Date</Label>
+                  <Input
+                    type="date"
+                    value={deployFormData.end_date}
+                    onChange={(e) => setDeployFormData({ ...deployFormData, end_date: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => { setEditOpen(false); resetForm(); setEditingDeployment(null); }}>
+                Cancel
+              </Button>
+              <Button onClick={handleEditSave} style={{ backgroundColor: '#650000' }} className="hover:opacity-90">
+                Save Changes
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
       </div>
@@ -659,8 +822,16 @@ export function StaffDeploymentScreen() {
                     { key: 'age_at_deployment', label: 'Age at Deployment', sortable: false },
                     { key: 'is_active', label: 'Status', sortable: true, render: (v: any) => <Badge variant={v ? 'default' : 'secondary'} style={v ? { backgroundColor: '#650000' } : {}}>{v ? 'Active' : 'Inactive'}</Badge> },
                     { key: 'id', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
-                        <div className="flex gap-2 justify-end">
-                          <Button variant="outline" size="sm" onClick={() => { setSelectedDeployment(row); setViewOpen(true); }}><UserPlus className="h-4 w-4 mr-1" />View</Button>
+                        <div className="flex gap-1 justify-end">
+                          <Button variant="ghost" size="sm" onClick={() => { setSelectedDeployment(row); setViewOpen(true); }} title="View">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleEdit(row)} title="Edit">
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" onClick={() => handleDeleteClick(row)} className="text-destructive hover:text-destructive" title="Delete">
+                            <Trash className="h-4 w-4" />
+                          </Button>
                         </div>
                       )
                     },
@@ -823,6 +994,34 @@ export function StaffDeploymentScreen() {
             </DialogFooter>
           </DialogContent>
         </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Confirm Delete</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete this staff deployment?
+            </DialogDescription>
+          </DialogHeader>
+          {deletingDeployment && (
+            <div className="space-y-2 p-4 bg-muted rounded-lg">
+              <div><strong>Staff:</strong> {deletingDeployment.full_name}</div>
+              <div><strong>Force Number:</strong> {deletingDeployment.force_number}</div>
+              <div><strong>Station:</strong> {deletingDeployment.station_name}</div>
+              <div><strong>Start Date:</strong> {deletingDeployment.start_date}</div>
+            </div>
+          )}
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setDeleteOpen(false); setDeletingDeployment(null); }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleDeleteConfirm}>
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -1,10 +1,16 @@
 import axiosInstance from '../axiosInstance';
 
-const JOURNALS_BASE = '/station-management/api/journals/';
-const JOURNAL_TYPES = '/station-management/api/journal-types/';
-const JOURNAL_PRISONERS = '/station-management/api/journal-prisoners/';
-const STAFF_PROFILES = '/auth/staff-profiles/';
-const STATIONS_ENDPOINT = '/system-administration/stations/';
+/**
+ * Centralized API endpoints for Journal module.
+ * All service functions use these constants for consistency and maintainability.
+ */
+export const JOURNAL_API_ENDPOINTS = {
+  JOURNALS: '/station-management/api/journals/',
+  JOURNAL_TYPES: '/station-management/api/journal-types/',
+  JOURNAL_PRISONERS: '/station-management/api/journal-prisoners/',
+  STAFF_PROFILES: '/auth/staff-profiles/',
+  STATIONS: '/system-administration/stations/',
+} as const;
 
 export interface JournalPrisoner {
   id: string;
@@ -53,64 +59,62 @@ export interface JournalItem {
  * Journals list (paginated). Forward signal for cancellation.
  */
 export const fetchJournals = async (params?: Record<string, any>, signal?: AbortSignal) => {
-  const res = await axiosInstance.get(JOURNALS_BASE, { params, signal });
+  const res = await axiosInstance.get(JOURNAL_API_ENDPOINTS.JOURNALS, { params, signal });
   return res.data; // {count, next, previous, results}
 };
 
 // fetch single journal by id
 export const fetchJournalById = async (id: string, signal?: AbortSignal) => {
-  const res = await axiosInstance.get(`${JOURNALS_BASE}${id}/`, { signal });
+  const res = await axiosInstance.get(`${JOURNAL_API_ENDPOINTS.JOURNALS}${id}/`, { signal });
   return res.data;
 };
 
 export const createJournal = async (payload: Record<string, any>) => {
-  const res = await axiosInstance.post(JOURNALS_BASE, payload);
+  const res = await axiosInstance.post(JOURNAL_API_ENDPOINTS.JOURNALS, payload);
   return res.data;
 };
 
 export const updateJournal = async (id: string, payload: Record<string, any>) => {
-  const res = await axiosInstance.patch(`${JOURNALS_BASE}${id}/`, payload);
+  const res = await axiosInstance.patch(`${JOURNAL_API_ENDPOINTS.JOURNALS}${id}/`, payload);
   return res.data;
 };
 
 export const deleteJournal = async (id: string) => {
-  const res = await axiosInstance.delete(`${JOURNALS_BASE}${id}/`);
+  const res = await axiosInstance.delete(`${JOURNAL_API_ENDPOINTS.JOURNALS}${id}/`);
   return res.data;
 };
 
 export const fetchJournalTypes = async (params?: Record<string, any>, signal?: AbortSignal) => {
-  const res = await axiosInstance.get(JOURNAL_TYPES, { params, signal });
-  return res.data?.results ?? res.data ?? [];
+  const res = await axiosInstance.get(JOURNAL_API_ENDPOINTS.JOURNAL_TYPES, { params, signal });
+  return res.data; // Return full paginated response for server-side pagination
 };
 
 export const fetchJournalPrisoners = async (params?: Record<string, any>, signal?: AbortSignal) => {
-  const res = await axiosInstance.get(JOURNAL_PRISONERS, { params, signal });
+  const res = await axiosInstance.get(JOURNAL_API_ENDPOINTS.JOURNAL_PRISONERS, { params, signal });
   return res.data?.results ?? res.data ?? [];
 };
 
 export const fetchDutyOfficers = async (params?: Record<string, any>, signal?: AbortSignal) => {
-  const res = await axiosInstance.get(STAFF_PROFILES, { params, signal });
-  const items = res.data?.results ?? res.data ?? [];
-  return (items || []).map((p: any) => ({
-    id: p.id,
-    first_name: p.first_name,
-    last_name: p.last_name,
-    force_number: p.force_number,
-    rank: p.rank,
-    rank_name: p.rank_name,
-    station: p.station,
-    station_name: p.station_name,
-    senior: p.senior,
-    raw: p,
-  })) as DutyOfficer[];
+  const res = await axiosInstance.get(JOURNAL_API_ENDPOINTS.STAFF_PROFILES, { params, signal });
+  // Return full paginated response for server-side pagination
+  return res.data;
 };
 
 export const fetchStations = async (params?: Record<string, any>, signal?: AbortSignal) => {
   try {
-    const res = await axiosInstance.get(STATIONS_ENDPOINT, { params, signal });
-    return res.data?.results ?? res.data ?? [];
-  } catch (err) {
+    const res = await axiosInstance.get(JOURNAL_API_ENDPOINTS.STATIONS, { params, signal });
+    return res.data; // Return full paginated response for server-side pagination
+  } catch (err: any) {
+    // Silently ignore cancellation errors (expected when component unmounts)
+    if (
+      err?.name === 'AbortError' ||
+      err?.name === 'CanceledError' ||
+      err?.code === 'ERR_CANCELED' ||
+      String(err?.message).toLowerCase().includes('canceled')
+    ) {
+      throw err; // Re-throw to be handled by caller
+    }
     console.error('fetchStations error:', err);
-    return [];
+    return { results: [], count: 0 };
   }
 };

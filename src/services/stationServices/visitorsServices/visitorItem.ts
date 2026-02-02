@@ -1,9 +1,20 @@
 import axiosInstance from "../../axiosInstance";
 import {IdTypeResponse, StationVisitor, Visitor, VisitorResponse} from "./VisitorsService";
 
+// API Endpoints for Visitor Items and Property Management
+export const VISITOR_ITEM_API_ENDPOINTS = {
+  VISITOR_ITEMS: '/gate-management/visitor-items/',
+  STATION_VISITORS: '/gate-management/station-visitors/',
+  ITEM_CATEGORIES: '/system-administration/item-categories/',
+  ITEM_STATUSES: '/system-administration/item-statuses/',
+  UNITS: '/system-administration/measurement-units/',
+  ITEMS: '/system-administration/items/',
+  CURRENCIES: '/system-administration/currencies/',
+} as const;
+
 export interface Item {
   is_active: boolean;
-  deleted_datetime: string;
+  deleted_datetime: string | null;
   quantity: number;
   currency: string;
   amount: string;
@@ -12,7 +23,7 @@ export interface Item {
   remarks: string;
   is_collected: boolean;
   for_prisoner: boolean;
-  deleted_by: number;
+  deleted_by: number | null;
   visitor: string;
   item_category: string;
   item: string;
@@ -31,6 +42,8 @@ export interface VisitorItem {
   deleted_datetime: string;
   quantity: number;
   currency: string;
+  currency_name?: string;
+  currency_symbol?: string;
   amount: string;
   bag_no: string;
   is_allowed: boolean;
@@ -47,6 +60,7 @@ export interface VisitorItem {
   measurement_unit: string;
   measurement_unit_name: string;
   item_status: string;
+  item_status_name?: string;
 }
 
 export interface VisitorItems {
@@ -155,22 +169,27 @@ export type StationItemsResponse = StationItems | ErrorResponse;
 export type VisitorItemsResponse = VisitorItems | ErrorResponse;
 
 export const addVisitorItem = async (item: Item) : Promise<VisitorItemResponse> => {
-  const response = await axiosInstance.post<VisitorItemResponse>('/gate-management/visitor-items/', item);
+  const response = await axiosInstance.post<VisitorItemResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS, item);
   return response.data;
 }
 
 export const updateVisitorItem = async (item: Item, id: string) : Promise<VisitorItemResponse> => {
-  const response = await axiosInstance.put<VisitorItemResponse>(`/gate-management/visitor-items/${id}/`, item);
+  const response = await axiosInstance.put<VisitorItemResponse>(`${VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}${id}/`, item);
+  return response.data;
+}
+
+export const fetchVisitorItem = async (id: string, signal?: AbortSignal) : Promise<VisitorItemResponse> => {
+  const response = await axiosInstance.get<VisitorItemResponse>(`${VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}${id}/`, { signal });
   return response.data;
 }
 
 export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
-  const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/');
+  const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS);
   return response.data;
 }
 
 export const getVisitorItems2 = async (visitorId: string) : Promise<VisitorItemsResponse> => {
-  const response = await axiosInstance.get<VisitorItemsResponse>('/gate-management/visitor-items/', {
+  const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS, {
     params: {
       visitor: visitorId
     }
@@ -178,9 +197,23 @@ export const getVisitorItems2 = async (visitorId: string) : Promise<VisitorItems
   return response.data;
 }
 
+// Paginated fetch for SearchableSelect dropdown (server-side pagination)
+export const fetchVisitorItemsPaginated = async (page: number = 1, search: string = '', visitorId?: string, isCollected?: boolean) => {
+  const response = await axiosInstance.get(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS, {
+    params: {
+      page,
+      search,
+      visitor: visitorId || undefined,
+      ...(isCollected !== undefined && { is_collected: isCollected }),
+      page_size: 50
+    }
+  });
+  return response.data;
+}
+
 export const deleteVisitorItem = async (id: string) : Promise<{ message: string } | { error: string }> => {
   try {
-    await axiosInstance.delete(`/gate-management/visitor-items/${id}/`);
+    await axiosInstance.delete(`${VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}${id}/`);
 
     return { message: "Visitor team deleted successfully" }
 
@@ -192,21 +225,21 @@ export const deleteVisitorItem = async (id: string) : Promise<{ message: string 
 }
 
 export const getItemCategories = async () : Promise<ItemCategoriesResponse> => {
-  const response = await axiosInstance.get<ItemCategoriesResponse>('/system-administration/item-categories/');
+  const response = await axiosInstance.get<ItemCategoriesResponse>(VISITOR_ITEM_API_ENDPOINTS.ITEM_CATEGORIES);
   return response.data;
 }
 
 export const getItemStatuses = async () : Promise<ItemStatusesResponse> => {
-  const response = await axiosInstance.get<ItemStatusesResponse>('/system-administration/item-statuses/');
+  const response = await axiosInstance.get<ItemStatusesResponse>(VISITOR_ITEM_API_ENDPOINTS.ITEM_STATUSES);
   return response.data;
 }
 
 export const getUnits = async () : Promise<MeasurementUnitResponse> => {
-  const response = await axiosInstance.get<MeasurementUnitResponse>('/system-administration/measurement-units/');
+  const response = await axiosInstance.get<MeasurementUnitResponse>(VISITOR_ITEM_API_ENDPOINTS.UNITS);
   return response.data;
 }
 
 export const getStationItems = async () : Promise<StationItemsResponse> => {
-  const response = await axiosInstance.get<StationItemsResponse>('/system-administration/items/');
+  const response = await axiosInstance.get<StationItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.ITEMS);
   return response.data;
 }

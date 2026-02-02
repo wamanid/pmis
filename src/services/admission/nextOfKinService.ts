@@ -172,6 +172,19 @@ export const getNextOfKins = async <T = NextOfKinResponse>(prisoner: string) : P
   return response.data;
 }
 
+// Paginated fetch for SearchableSelect dropdown (server-side pagination)
+export const fetchNextOfKinPaginated = async (page: number = 1, search: string = '', prisonerId?: string) => {
+  const response = await axiosInstance.get('/admission/next-of-kin/', {
+    params: {
+      page,
+      search,
+      prisoner: prisonerId || undefined,
+      page_size: 50
+    }
+  });
+  return response.data;
+}
+
 export const getRegions = async <T = Region>() : Promise<RegionsResponse<T>> => {
   const response = await axiosInstance.get<Paginated<T>>('/system-administration/regions/');
   return response.data;
