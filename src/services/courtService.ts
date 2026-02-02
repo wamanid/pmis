@@ -179,6 +179,12 @@ export const getvisitorTypes = async (): Promise<WorkingParty[]> => {
 };
 
 
+export const bulkattendance = async (data: object): Promise<WorkingPartyResponse> => {
+  const response = await axiosInstance.post<WorkingPartyResponse>('court-attendance/attendance-records/', data);
+  return response.data;
+};
+
+
 
 export const getVisitorStatus = async (): Promise<WorkingParty[]> => {
   const response = await axiosInstance.get<WorkingParty[]>(`gate-management/visitor-statuses/`);

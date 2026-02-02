@@ -14,3 +14,14 @@ export function fileToBase64(file: File): Promise<string> {
         reader.readAsDataURL(file);
     });
 }
+
+export function unicodeToBase64(str: string): string {
+  // Encode the string into a UTF-8 byte array
+  const utf8Bytes: Uint8Array = new TextEncoder().encode(str);
+  
+  // Convert the byte array to a binary string where each character is a byte
+  const binaryString: string = String.fromCharCode(...utf8Bytes);
+  
+  // Encode the binary string using btoa()
+  return btoa(binaryString);
+}

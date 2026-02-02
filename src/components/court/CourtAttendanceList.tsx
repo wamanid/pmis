@@ -212,7 +212,7 @@ export default function CourtAttendanceList() {
      getCourtattendance().then((data) => {
       setRecords(data.results);
        setCourtAttendanceRecord(data.results);
-       //alert(JSON.stringify(data.mockRecords2));
+      // alert(JSON.stringify(data.results));
     }).catch((error) => {
       alert(error);
     });
@@ -277,6 +277,7 @@ export default function CourtAttendanceList() {
   };
 
   const handleEdit = (record: CourtAttendanceRecord) => {
+   // alert(JSON.stringify(record))
     setEditData(record);
     setFormOpen(true);
   };

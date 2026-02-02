@@ -150,6 +150,16 @@ export interface PrisonerOffencePair {
   prisoner_name: string;
   offence: string;
   offence_name: string;
+  court: string;
+  court_attendance_type: string;
+  attendance_datetime: string;
+  case_outcome: string;
+  appeal: string;
+  gate_pass_number: string;
+  remarks: string;
+  production_warrant: File | null;
+  criminal_case_number: string;
+  legal_proceedings: string;
 }
 
 export interface BulkAttendanceData {

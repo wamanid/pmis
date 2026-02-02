@@ -41,9 +41,12 @@ import {
 import { toast } from 'sonner@2.0.3';
 import { cn } from '../ui/utils';
 import { BulkAttendanceData, Courts } from '../../models/court';
-import { getAppeals, getAttendacetypes, getCourtDetails, getOffencesPersonal, getOutcomes, getprisonerAppeals, getScheduleList, getStations } from '../../services/courtService';
-import { getprisoners } from '../../services/gateService';
+import { bulkattendance, getAppeals, getAttendacetypes, getCourtDetails, getOffencesPersonal, getOutcomes,
+   getprisonerAppeals, getScheduleList, getStations } from '../../services/courtService';
+import { getprisonergatepass, getprisoners } from '../../services/gateService';
 import { OffenceRequest } from '../../models/StageClassification';
+import { fileToBase64, unicodeToBase64 } from '../../utils/Util';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 
 
@@ -137,13 +140,18 @@ const BulkCourtAttendanceForm: React.FC = () => {
     offence: '',
     offence_name: '',
     legal_proceedings:'',
-    remarks:''
+    remarks:'',
+    gate_pass_number:''
   });
+
+    const [mockGatePasses, setMockGatePasses] = useState<any[]>([]);
+               
 
   // Collapsible section states
   const [section1Collapsed, setSection1Collapsed] = useState(false);
   const [section2Collapsed, setSection2Collapsed] = useState(false);
   const [section3Collapsed, setSection3Collapsed] = useState(false);
+
 
   const [fileName, setFileName] = useState<string>('');
 
@@ -222,6 +230,8 @@ const BulkCourtAttendanceForm: React.FC = () => {
       const validTypes = ['image/jpeg', 'image/jpg'];
       if (!validTypes.includes(file.type)) {
         toast.error('Please upload a JPEG image file');
+
+
         return;
       }
       setFormData((prev) => ({
@@ -296,48 +306,69 @@ const BulkCourtAttendanceForm: React.FC = () => {
     }, 1500);
   };
 
-  const handleSubmit = () => {
-    // Validation
-    if (!formData.court) {
-      toast.error('Please select a court');
-      return;
-    }
-    if (!formData.court_attendance_type) {
-      toast.error('Please select an attendance type');
-      return;
-    }
-    if (!formData.attendance_datetime) {
-      toast.error('Please select attendance date and time');
-      return;
-    }
-    if (formData.prisoner_offence_pairs.length === 0) {
-      toast.error('Please add at least one prisoner-offence pair');
-      return;
-    }
+const handleSubmit = async () => {
+  // Validation
+  if (!formData.court) {
+    toast.error('Please select a court');
+    return;
+  }
+  if (!formData.court_attendance_type) {
+    toast.error('Please select an attendance type');
+    return;
+  }
+  if (!formData.attendance_datetime) {
+    toast.error('Please select attendance date and time');
+    return;
+  }
+  if (formData.prisoner_offence_pairs.length === 0) {
+    toast.error('Please add at least one prisoner-offence pair');
+    return;
+  }
+
+  let dataToPost={};
+
+  try {
+
+     const warrantBase64 = formData.production_warrant 
+      ? unicodeToBase64(await fileToBase64(formData.production_warrant))
+      : '';
 
 
+    
 
+    const prisoners = formData.prisoner_offence_pairs.map((pair) => ({
+      prisoner: pair.prisoner,
+      offence: pair.offence,
+      legal_proceedings:pair.legal_proceedings,
+      remarks:formData.remarks,
+      court:formData.court,
+      court_attendance_type:formData.court_attendance_type,
+      attendance_datetime:formData.attendance_datetime,
+      case_outcome:formData.case_outcome,
+      appeal:formData.appeal,
+      gate_pass_number:pair.gate_pass_number,
+      production_warrant: warrantBase64,
+      criminal_case_number:formData.criminal_case_number,
+      remarks:formData.remarks,
+    }));
 
-      let dataToPost={};
-
-      const prisoners = formData.prisoner_offence_pairs.map((pair) => ({
-        prisoner: pair.prisoner,
-        offence: pair.offence,
-      }));
-
-      alert(JSON.stringify(prisoners))
-
-
-
-
-
-    // Here you would make the API call to bulk record attendance
+    dataToPost={records:prisoners,};
+    //alert(JSON.stringify(dataToPost));
+     bulkattendance(dataToPost).then((data) => {
     console.log('Bulk Attendance Data:', formData);
     toast.success(`Successfully recorded attendance for ${formData.prisoner_offence_pairs.length} prisoner(s)`);
-
-    // Reset form
     handleReset();
-  };
+     }).catch((error) => {
+ toast.error(error);
+   
+     });
+   
+
+  } catch (error) {
+    toast.error('Failed to record attendance');
+    console.error(error);
+  }
+};
 
   const handleReset = () => {
     setFormData({
@@ -360,7 +391,9 @@ const BulkCourtAttendanceForm: React.FC = () => {
       offence: '',
       offence_name: '',
       legal_proceedings:'',
-      remarks:''
+      remarks:'',
+      gate_pass_number: ''
+
     });
     setFileName('');
     toast.info('Form reset');
@@ -489,17 +522,7 @@ const BulkCourtAttendanceForm: React.FC = () => {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="gate_pass_number">Gate Pass Number</Label>
-                <Input
-                  id="gate_pass_number"
-                  type="text"
-                  placeholder="Enter gate pass number..."
-                  value={formData.gate_pass_number}
-                  onChange={(e) => handleInputChange('gate_pass_number', e.target.value)}
-                  className="bg-white"
-                />
-              </div>
+              
 
               <div className="space-y-2">
                 <Label htmlFor="criminal_case_number">Criminal Case Number</Label>
@@ -623,6 +646,14 @@ const BulkCourtAttendanceForm: React.FC = () => {
                                     });
 
 
+                                     getprisonergatepass(value).then((data) => {
+                                                setMockGatePasses(data.results);
+                                              }).catch((error) => {
+                                               alert(error);
+                                              });
+                                    
+
+
 
 
 
@@ -666,6 +697,76 @@ const BulkCourtAttendanceForm: React.FC = () => {
                     emptyText="No offence found."
                   />
                 </div>
+
+
+ <div className="space-y-2">
+                  <Label htmlFor="gate_pass">Gate Pass</Label>
+                  <Select
+                    value={formData.gate_pass_number}
+                  //  onValueChange={(value) => setFormData({ ...formData, gate_pass: value })}
+
+                        onValueChange={(value) => {
+                          setFormData({ ...formData, gate_pass_number: value });
+                      const offence = mockOffences.find((o) => o.id === value);
+                      setCurrentPair((prev) => ({
+                       ...prev,
+                        remarks: prev.remarks,
+                        prisoner: prev.prisoner,
+                        prisoner_name: prev.prisoner_name,
+                        offence: prev.offence,
+                        offence_name: prev.offence_name,
+                        legal_proceedings:prev.legal_proceedings,
+                        gate_pass_number:value
+                      }));
+                    }}
+                   
+                  >
+                    <SelectTrigger id="gate_pass">
+                      <SelectValue placeholder="Select gate pass" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      
+                      {mockGatePasses.map((pass) => (
+                        <SelectItem key={pass.id} value={pass.id}>
+                          {pass.gatepass_number}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+             {/*}
+               <div className="space-y-2">
+                <Label htmlFor="gate_pass_number">Gate Pass Number</Label>
+                <Input
+                  id="gate_pass_number"
+                  type="text"
+                  placeholder="Enter gate pass number..."
+                  value={formData.gate_pass_number}
+               //   onChange={(e) => handleInputChange('gate_pass_number', e.target.value)}
+
+                     onChange={(e) => {
+                      const offence = mockOffences.find((o) => o.id === value);
+                      setCurrentPair((prev) => ({
+                       ...prev,
+                        remarks: prev.remarks,
+                        prisoner: prev.prisoner,
+                        prisoner_name: prev.prisoner_name,
+                        offence: prev.offence,
+                        offence_name: prev.offence_name,
+                        legal_proceedings:prev.legal_proceedings,
+                        gate_pass_number:e.target.value
+                      }));
+                    }}
+
+
+                  className="bg-white"
+                />
+              </div>
+             {*/}
+
+
+
                   <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="legal_proceedings">Legal Proceedings</Label>
                 <Textarea
@@ -693,8 +794,18 @@ const BulkCourtAttendanceForm: React.FC = () => {
                 <Textarea
                   id="remarks"
                   placeholder="Enter any additional remarks..."
-                  value={formData.remarks}
-                  onChange={(e) => handleInputChange('remarks', e.target.value)}
+                  value={currentPair.remarks}
+                      onChange={(e) => {
+                      setCurrentPair((prev) => ({
+                        ...prev,
+                        prisoner: prev.prisoner,
+                        prisoner_name: prev.prisoner_name,
+                        offence: prev.offence,
+                        offence_name: prev.offence_name,
+                        legal_proceedings:prev.legal_proceedings,
+                        remarks:e.target.value
+                      }));
+                    }}
                   className="bg-white min-h-20"
                 />
               </div>
@@ -721,6 +832,10 @@ const BulkCourtAttendanceForm: React.FC = () => {
                       <TableHead className="w-12 text-white">#</TableHead>
                       <TableHead className="text-white">Prisoner</TableHead>
                       <TableHead className="text-white">Offence</TableHead>
+                      <TableHead className="text-white">Legal Proceedings</TableHead>
+                      <TableHead className="text-white">Remarks</TableHead>
+                      <TableHead className="text-white">Gate Pass</TableHead>
+                      
                       <TableHead className="w-20 text-right text-white">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -730,6 +845,12 @@ const BulkCourtAttendanceForm: React.FC = () => {
                         <TableCell>{index + 1}</TableCell>
                         <TableCell>{pair.prisoner_name}</TableCell>
                         <TableCell>{pair.offence_name}</TableCell>
+                        <TableCell>{pair.legal_proceedings}</TableCell>
+                        <TableCell>{pair.remarks}</TableCell>
+                        <TableCell>{pair.gate_pass_number}</TableCell>
+
+                        
+
                         <TableCell className="text-right">
                           <Button
                             variant="ghost"
