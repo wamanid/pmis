@@ -166,18 +166,6 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     checked_by_oc: 0,
   });
   const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
-  // expanded rows (for accounts collapsible section)
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
-  const toggleAccountExpansion = (accountId: string) => {
-    const newSet = new Set(expandedAccounts);
-    if (newSet.has(accountId)) newSet.delete(accountId);
-    else newSet.add(accountId);
-    setExpandedAccounts(newSet);
-  };
-  // helper to get transactions for an account (from loaded transactions)
-  const getAccountTransactions = (accountId: string) => {
-    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
-  };
 
   // request control (no shared abort controller — rely on reqId to ignore stale responses)
   const reqId = useRef(0);
@@ -540,6 +528,27 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   // UI computed stats
   const totalAccounts = accountsTotal;
   
+  // Helper to get currency text color for visual differentiation (Option B - text only)
+  const getCurrencyColor = (currencyCode: string) => {
+    const code = String(currencyCode).toUpperCase();
+    const colorMap: Record<string, string> = {
+      USD: '#166534',    // Green - US Dollar
+      US: '#166534',     // Green - US (alternative)
+      EUR: '#1e40af',    // Blue - Euro
+      EURO: '#1e40af',   // Blue - Euro (alternative)
+      GBP: '#6b21a8',    // Purple - British Pound
+      UGX: '#9a3412',    // Orange - Uganda Shilling
+      UGANDA: '#9a3412', // Orange - Uganda (alternative)
+      KES: '#991b1b',    // Red - Kenyan Shilling
+      KENYA: '#991b1b',  // Red - Kenya (alternative)
+      TZS: '#155e75',    // Cyan - Tanzanian Shilling
+      TANZANIA: '#155e75', // Cyan - Tanzania (alternative)
+      RWF: '#3f6212',    // Lime - Rwandan Franc
+      RWANDA: '#3f6212', // Lime - Rwanda (alternative)
+    };
+    return colorMap[code] || '#374151'; // Gray fallback
+  };
+  
   // Calculate balance per currency for multi-currency display
   const balanceByCurrency = useMemo(() => {
     const grouped: Record<string, { total: number; symbol: string; name: string }> = {};
@@ -625,16 +634,6 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
   // Columns for DataTable
   const accountColumns = [
-    {
-      key: 'expand',
-      label: '',
-      sortable: false,
-      render: (_v:any, r:any) => (
-        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
-          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
-      )
-    },
     { 
       key: 'prisoner_name', 
       label: 'Prisoner',
@@ -696,30 +695,29 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       )
     },
     { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
-      <div className="flex">
-        {/* <div className="flex justify-end gap-2"> */}
-
+      <div className="flex gap-2">
         <Button variant="ghost" size="sm" onClick={() => {
             setSelectedAccount(r);
             setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency, balance: r.balance ?? '0' });
-            setAccountFormKey(k => k + 1); // remount form so local state syncs
+            setAccountFormKey(k => k + 1);
             setIsViewAccountDialogOpen(true);
           }}>
            <Eye className="h-4 w-4" />
          </Button>
 
-        {/* <Button variant="ghost" size="sm" onClick={() => {
+        <Button variant="ghost" size="sm" onClick={() => {
             const copy = deepClone(r);
             setSelectedAccount(copy);
             setAccountFormData({ prisoner: copy.prisoner, account_type: copy.account_type, currency: copy.currency, balance: copy.balance ?? '0' });
-            setAccountFormKey(k => k + 1); // ensure AccountForm remounts with fresh data
+            setAccountFormKey(k => k + 1);
             setIsEditAccountDialogOpen(true);
           }}>
            <Pencil className="h-4 w-4" />
-        </Button> */}
-        {/* <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setDeleteAccountId(r.id); }}>
+        </Button>
+        
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setDeleteAccountId(r.id); }}>
           <Trash2 className="h-4 w-4 text-red-600" />
-        </Button> */}
+        </Button>
       </div>
     )},
   ];
@@ -1358,23 +1356,17 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                     renderGroupHeader: (groupValue: string, items: any[]) => {
                       const firstItem = items[0];
                       
-                      // Calculate balance per currency
+                      // Calculate balance per currency - use currency_symbol as key for proper color mapping
                       const balancesByCurrency: Record<string, { total: number; symbol: string; code: string }> = {};
                       items.forEach(item => {
-                        const currencyCode = item.currency_name || 'Unknown';
-                        const symbol = item.currency_symbol || '';
+                        const currencySymbol = item.currency_symbol || 'Unknown';
                         const balance = parseFloat(item.balance || '0') || 0;
                         
-                        if (!balancesByCurrency[currencyCode]) {
-                          balancesByCurrency[currencyCode] = { total: 0, symbol, code: currencyCode };
+                        if (!balancesByCurrency[currencySymbol]) {
+                          balancesByCurrency[currencySymbol] = { total: 0, symbol: currencySymbol, code: currencySymbol };
                         }
-                        balancesByCurrency[currencyCode].total += balance;
+                        balancesByCurrency[currencySymbol].total += balance;
                       });
-                      
-                      // Format currency totals for display
-                      const currencyTotals = Object.values(balancesByCurrency)
-                        .map(c => `${c.symbol} ${c.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
-                        .join(' | ');
                       
                       return (
                         <div className="flex items-center justify-between py-2 px-4">
@@ -1386,7 +1378,18 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                           <div className="flex items-center gap-6">
                             <div className="text-right">
                               <div className="text-xs text-gray-500">Total Balance</div>
-                              <div className="font-semibold">{currencyTotals || 'N/A'}</div>
+                              <div className="font-semibold flex flex-wrap gap-3">
+                                {Object.values(balancesByCurrency).map((c, idx) => {
+                                  const code = c.code; // Already using currency_symbol directly
+                                  const color = getCurrencyColor(code);
+                                  return (
+                                    <span key={idx}>
+                                      <span style={{ color, fontWeight: '600' }}>{code}</span>{' '}
+                                      <span>{c.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
                             <div className="text-right">
                               <div className="text-xs text-gray-500">Accounts</div>
@@ -1394,8 +1397,154 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                             </div>
                             <div className="text-right">
                               <div className="text-xs text-gray-500">Currencies</div>
-                              <div className="text-sm">{Object.keys(balancesByCurrency).join(', ')}</div>
+                              <div className="text-sm">
+                                {Object.keys(balancesByCurrency).map((currSymbol, idx) => {
+                                  const color = getCurrencyColor(currSymbol);
+                                  return (
+                                    <span key={idx}>
+                                      <span style={{ color, fontWeight: '500' }}>{currSymbol}</span>
+                                      {idx < Object.keys(balancesByCurrency).length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                })}
+                              </div>
                             </div>
+                            <div>
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Pre-populate with first account or default if single account
+                                  const accountToUse = items.length === 1 ? items[0].id : '';
+                                  setTransactionFormData({
+                                    property_prisoner_account: accountToUse,
+                                    transaction_type: '',
+                                    transaction_status: '',
+                                    amount: '',
+                                    transaction_remark: '',
+                                    biometric_consent: false,
+                                    checked_by_oc: 0,
+                                  });
+                                  setIsCreateTransactionDialogOpen(true);
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                 Transaction
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  },
+                  expandable: {
+                    isExpanded: (row: any) => expandedAccounts.has(row.id),
+                    onToggle: (row: any) => toggleAccountExpansion(row.id),
+                    renderExpandedRow: (row: any) => {
+                      const accountTransactions = getAccountTransactions(row.id);
+                      
+                      if (accountTransactions.length === 0) {
+                        return (
+                          <div className="p-6 text-center text-gray-500 bg-gray-50">
+                            <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm">No transactions found for this account</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700">Recent Transactions ({accountTransactions.length})</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setActiveTab('transactions');
+                                // Optional: could set a filter for this account
+                              }}
+                              className="text-xs"
+                            >
+                              View All Transactions →
+                            </Button>
+                          </div>
+                          <div className="bg-white rounded-lg border overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-100 border-b">
+                                <tr>
+                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Date & Time</th>
+                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Type</th>
+                                  <th className="text-right py-2 px-3 font-medium text-gray-600">Amount</th>
+                                  <th className="text-right py-2 px-3 font-medium text-gray-600">Balance After</th>
+                                  <th className="text-center py-2 px-3 font-medium text-gray-600">Status</th>
+                                  <th className="text-center py-2 px-3 font-medium text-gray-600">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {accountTransactions.slice(0, 5).map((tx) => {
+                                  const amount = parseFloat(tx.amount || '0');
+                                  const isPositive = amount >= 0;
+                                  const balanceAfter = parseFloat(tx.balance_after || '0');
+                                  const currencyColor = getCurrencyColor(tx.currency_symbol || '');
+
+                                  return (
+                                    <tr key={tx.id} className="hover:bg-gray-50">
+                                      <td className="py-2 px-3">
+                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                          <Calendar className="h-3 w-3" />
+                                          <DateTime value={tx.transaction_datetime} format="dMYT" />
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <div className="flex items-center gap-1">
+                                          <Badge variant={tx.is_credit ? 'default' : 'secondary'} className="text-xs">
+                                            {tx.is_credit ? '📥' : '📤'}
+                                          </Badge>
+                                          <span className="text-xs">{tx.transaction_type_name}</span>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className={`font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                          {isPositive ? '+' : ''}
+                                          <span style={{ color: currencyColor }}>{tx.currency_symbol}</span>{' '}
+                                          {Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className={`text-sm font-medium ${balanceAfter < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                          <span style={{ color: currencyColor }}>{tx.currency_symbol}</span>{' '}
+                                          {balanceAfter.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <Badge variant={getStatusVariant(tx.transaction_status_name)} className="text-xs">
+                                          {tx.transaction_status_name}
+                                        </Badge>
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedTransaction(deepClone(tx));
+                                            setIsViewTransactionDialogOpen(true);
+                                          }}
+                                          className="h-7 w-7 p-0"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                            {accountTransactions.length > 5 && (
+                              <div className="p-2 text-center text-xs text-gray-500 bg-gray-50 border-t">
+                                Showing 5 of {accountTransactions.length} transactions
+                              </div>
+                            )}
                           </div>
                         </div>
                       );

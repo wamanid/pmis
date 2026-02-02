@@ -2,6 +2,641 @@
 
 All notable changes to this project should be documented in this file.
 
+---
+
+## Git Commit Commands
+
+### 2026-02-02
+
+```powershell
+# Commit for Property Management - Accounts & Transactions enhancements
+git commit -m "feat(property): add quick transaction button and fix accounts CRUD [2026-02-02]
+
+Added:
+- Added 'Add Transaction' button to prisoner account group headers for streamlined workflow
+  - Implemented smart pre-population: auto-selects account when prisoner has only one account
+  - Applied green button styling (bg-green-600) to distinguish from account creation (red)
+  - Added event handling with e.stopPropagation() to prevent group collapse when clicking button
+  - Enabled context-aware UX: opens transaction dialog with prisoner context already established
+  - Eliminated workflow friction: no tab switching, no prisoner re-selection needed
+  - Implemented industry-standard pattern for natural next action when reviewing accounts
+
+Fixed:
+- Removed non-functional expandable/collapse functionality from accounts table
+  - Root cause: Regular DataTable component doesn't support expandable config, only grouping
+  - Cleaned up state management: removed expandedAccounts Set, toggleAccountExpansion() function, and getAccountTransactions() helper
+  - Removed expand column with chevron icons from accountColumns array
+- Activated edit and delete buttons in accounts actions column (were previously commented out)
+  - Actions column now provides full CRUD: View (Eye icon), Edit (Pencil icon), Delete (Trash icon, red)
+  - Edit button pre-populates form with deep cloned account data for safe editing
+  - Delete button triggers confirmation dialog before removal
+  - Resulted in simpler, cleaner component with fewer state updates and clearer code
+
+Files modified: PrisonerPropertyAccountScreen.tsx"
+```
+
+### 2026-02-01
+
+```powershell
+# Commit for Visitor Items Management enhancements
+git commit -m "feat(visitor-items): add edit/delete restrictions and enhance table columns [2026-02-01]
+
+Added:
+- Implemented multi-layer protection system to prevent modifications to collected items
+  - Visual layer: disabled state with reduced opacity and cursor-not-allowed styling
+  - Functional layer: early return checks in handleEdit and handleDelete to prevent API calls
+  - Communication layer: tooltips and toast error messages for user feedback
+  - Delete button styling changes from red to gray when disabled
+- Enhanced table columns with measurement unit, status badges, and registered date
+  - Status column: color-coded badges (red 'Not Allowed', green 'Collected', yellow 'Pending')
+  - Registered column: formatted date display
+- Enhanced visual feedback with green background for collected items in 'For Prisoner' badge
+- Fixed UUID leakage in Value/Amount column to display proper currency symbols (UGX, USD, EUR)
+
+Files modified: VisitorItemList.tsx"
+```
+
+```powershell
+# Commit for Property Management - Currency support and multi-currency display
+git commit -m "feat(property): add currency field support and multi-currency display [2026-02-01]
+
+Added:
+- Added currency field to property form with auto-population from visitor items
+  - Currency dropdown with SearchableSelect (server-side pagination)
+  - Auto-populates from visitor_item.currency field
+  - Supports manual currency entry for properties without visitor items
+  - Displays as disabled/read-only when visitor item selected
+- Updated DataTable to show currency symbols in Amount column
+- Enhanced group headers to display totals per currency
+
+Files modified: propertyService.ts, visitorItem.ts, CreatePropertyForm.tsx, PropertyItem.tsx, PrisonerPropertyScreen.tsx"
+```
+
+```powershell
+# Commit for Next of Kin Management - LocationSelect component
+git commit -m "feat(next-of-kin): create LocationSelect component for cascading dropdowns [2026-02-01]
+
+Added:
+- Created lightweight LocationSelect component for efficient cascading location dropdowns
+  - Client-side search with instant filtering (shows search box when >5 items)
+  - Handles dynamic items arrays correctly without state management issues
+- Replaced SearchableSelect with LocationSelect for all 6 location fields
+  - Each dropdown properly disabled until parent selection
+  - Child selections automatically clear when parent changes
+  - No key props needed - handles dynamic updates natively
+
+Files added: LocationSelect.tsx
+Files modified: NextOfKin.tsx"
+```
+
+```powershell
+# Commit for Property Management - Accounts & Transactions tables UX review
+git commit -m "refactor(property): migrate to standard DataTable and enhance UX [2026-02-01]
+
+Changed:
+- Migrated from DataTableCollapsableRows to standard DataTable.tsx
+- Removed manual data loaders - DataTable now fetches directly from API URLs
+- Implemented smart data grouping by Prisoner Number (collapsible groups)
+- Enhanced prominent Total Balance card spanning 2 columns (66% width)
+- Added Prisoner Number below prisoner name in both tables for quick identification
+- Implemented multi-currency statistics cards with proper currency grouping
+- Maintained badge color consistency with shadcn/ui design system
+
+Files modified: PrisonerPropertyAccountScreen.tsx"
+```
+
+```powershell
+# Commit for Property Management - UUID display fix and Next of Kin button
+git commit -m "fix(property): fix UUID display and Next of Kin button integration [2026-02-01]
+
+Fixed:
+- Fixed Next of Kin dialog showing prisoner UUID instead of prisoner number
+  - Changed field order to check prisoner_number_value first
+  - Added fallback guard to hide UUID pattern
+- Fixed Next of Kin Management submission error with datetime format
+  - Removed auto-managed database fields from submission payload
+- Fixed Add Next of Kin button not opening dialog after prisoner selection
+  - Added fallback logic to handle cases where prisoner details aren't fully captured
+
+Files modified: CreatePropertyForm.tsx, NextOfKin.tsx, PropertyItem.tsx"
+```
+
+### 2026-01-31
+
+```powershell
+# Commit for DataTable Component - Grouping and UI/UX enhancements
+git commit -m "feat(datatable): add grouping functionality and enhance UI/UX [2026-01-31]
+
+Added:
+- Added grouping functionality to DataTable component for collapsible row groups
+  - New grouping configuration: groupBy, defaultExpanded, renderGroupHeader
+  - Groups display with expand/collapse chevron icons and item count
+  - Customizable group header rendering
+- Enhanced multi-currency support in group headers
+  - Intelligently displays totals per currency (UGX, USD, EUR, GBP, KES, TZS, RWF)
+  - Prevents incorrect calculations by summing each currency separately
+- Enhanced grouping UI/UX
+  - Stronger visual distinction with bg-muted/50 background and sticky positioning
+  - Automatically hides grouped column from table header and child rows
+  - Added 'Expand All' and 'Collapse All' buttons for quick group management
+  - Entire group header row is clickable
+
+Files modified: DataTable.types.ts, DataTable.tsx, PrisonerPropertyScreen.tsx"
+```
+
+```powershell
+# Commit for SearchableSelect Component - onSelectItem callback
+git commit -m "feat(searchable-select): add onSelectItem callback for item capture [2026-01-31]
+
+Added:
+- Added optional onSelectItem callback prop to SearchableSelect component
+  - Provides full item object when selection changes
+  - Enables components to capture additional fields without extra API calls
+  - Fully backward compatible
+- Propagated through CustomPrisonerSearch component for consistent prisoner data capture
+- Implemented in PaginatedModeSelect with item lookup from items array and selectedItemsCache
+
+Files modified: SearchableSelect.tsx, CustomPrisonerSearch.tsx"
+```
+
+```powershell
+# Commit for Next of Kin Management - SearchableSelect integration and validation
+git commit -m "feat(next-of-kin): integrate SearchableSelect and add form validation [2026-01-31]
+
+Added:
+- Converted all dropdowns to SearchableSelect component (Relationship, ID Type, Address fields)
+- Fully converted form to react-hook-form for all 20+ fields
+  - Implemented comprehensive field-level validation with red error messages
+  - All fields wrapped in Controller component
+  - Validation errors display immediately on submit attempt
+  - Added conditional validation: ID Number required only when ID Type selected
+- Made address fields and LC1 required with proper validation
+
+Files modified: NextOfKin.tsx"
+```
+
+```powershell
+# Commit for Property Management - Frontend validation and dependent field clearing
+git commit -m "feat(property): add frontend validation and dependent field clearing [2026-01-31]
+
+Added:
+- Implemented comprehensive field-level validation with red error messages
+  - Validation for all required fields with immediate display on submit
+  - Changed Quantity field to number input type with min='1'
+  - Removed native HTML required attribute to prevent browser validation blocking
+- Implemented automatic clearing of dependent fields when Prisoner changes
+  - Clears Visitor, Visitor Items list, Property Item details, and Next of Kin selection
+  - Added user notification toast when fields are cleared
+  - Edit mode preserved: dependent fields remain when editing
+
+Files modified: PropertyItem.tsx, CreatePropertyForm.tsx"
+```
+
+```powershell
+# Commit for Property Management - Add Next of Kin button integration
+git commit -m "fix(property): fix Add Next of Kin button integration [2026-01-31]
+
+Fixed:
+- Fixed Add Next of Kin button not opening dialog when clicked from Create Property form
+  - Root cause: Prisoner details not being captured from dropdown selection
+  - Implemented onSelectItem callback to capture full prisoner object directly
+  - Eliminated unnecessary API call and 404 errors
+  - Button correctly disabled when no prisoner selected
+
+Files modified: CreatePropertyForm.tsx, SearchableSelect.tsx, CustomPrisonerSearch.tsx"
+```
+
+```powershell
+# Commit for Property Management - Edit mode blank fields fix
+git commit -m "fix(property): fix blank dropdowns in edit mode [2026-01-31]
+
+Fixed:
+- Fixed Property Item and Measurement Unit dropdowns showing blank in edit mode
+  - Converted Property Item to use fetchPropertyItemsPaginated with server-side pagination
+  - Changed key prop from property_item to mode for proper component remounting
+  - Derived initialItem directly inline per SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md pattern
+  - Removed unnecessary category-fetching useEffect
+- Fixed Property Category field visibility - now displays in both add and edit modes
+- Fixed visitor item fields by removing skip condition that prevented fetching in edit mode
+
+Files modified: PropertyItem.tsx, CreatePropertyForm.tsx, propertyService.ts"
+```
+
+### 2026-01-29
+
+```powershell
+# Commit for Property Management - Server-side pagination and comprehensive refactoring
+git commit -m "refactor(property): convert to server-side pagination for 14M+ records [2026-01-29]
+
+Changed:
+- Converted all dropdowns from client-side to server-side pagination (14M+ ready)
+  - Added PROPERTY_API_ENDPOINTS constant centralizing 7 property API endpoints
+  - All functions return paginated response with results array, count, and next page URL
+- Converted Prisoner dropdown to CustomPrisonerSearch with server-side pagination (50 items/page)
+- Converted 8 PropertyItem.tsx dropdowns to SearchableSelect with server-side pagination
+  - Visitor Item, Property Type, Property Category, Property Item, Measurement Unit, Property Bag, Property Status, Next of Kin
+- Added 3 toast notifications for user feedback (no visitors, no next of kin, no visitor items)
+- Implemented Option B pattern for edit mode: fetch fresh data via fetchPropertyById
+- Fixed Property Category field visibility and disabled state logic
+
+Files modified: propertyService.ts, CreatePropertyForm.tsx, PropertyItem.tsx, PrisonerPropertyScreen.tsx"
+```
+
+```powershell
+# Commit for Shift Deployments - Global shifts support
+git commit -m "feat(shift-deployments): add global shifts support [2026-01-29]
+
+Added:
+- Enhanced shift dropdowns to include both station-specific and cross-station global shifts
+  - Added is_global: true parameter to shift fetch callbacks
+  - Global shifts appear across all stations (e.g., 'Night Shift', 'Afternoon Shift')
+  - Station-specific shifts remain filtered to their station
+- Enables flexible cross-station shift management and improves scheduling consistency
+
+Files modified: ShiftDeploymentsScreen.tsx"
+```
+
+```powershell
+# Commit for Housing Allocation - Edit mode dropdown population
+git commit -m "fix(housing): implement Option B pattern for edit mode [2026-01-29]
+
+Fixed:
+- Implemented Option B pattern to ensure all form fields populate correctly when editing
+  - Added fetchAssignmentById and fetchWardById functions to fetch fresh data from API
+  - Updated handleEditAssignment to fetch complete assignment data
+  - Updated handleEditWard to fetch complete ward data
+  - Added try-catch blocks with toast error notifications for failed API fetches
+- Eliminates empty dropdown fields on edit, ensures data integrity
+
+Files modified: housingService.ts, HousingAllocationScreen.tsx"
+```
+
+```powershell
+# Commit for Phones & Letters - Form state persistence and file handling
+git commit -m "fix(phones-letters): fix form state persistence and file handling [2026-01-29]
+
+Fixed:
+- Fixed form persistence after edit using dynamic key prop with counter
+- Changed file field handling to completely omit fields when not uploading new files
+  - Prevents backend validation errors
+- Added auto-population guard to prevent useEffect from overwriting loaded values in edit mode
+- Added state variables for file reference tracking with visual indicators
+- Explicit form reset with correct default values when opening add dialog after edit
+- Added onOpenChange handlers to clear all form state when closing dialogs
+
+Files modified: PhonesLettersScreen.tsx"
+```
+
+```powershell
+# Commit for Complaints - Edit mode dropdown fields fix
+git commit -m "fix(complaints): fix empty dropdowns after page refresh in edit mode [2026-01-29]
+
+Fixed:
+- Resolved race condition causing empty SearchableSelect dropdowns in edit mode after page refresh
+  - Root cause: State initialized as null before complaint data arrived
+  - Changed useState(null) to useState(() => complaint?.officer_requested || null)
+  - Added initialItem support for SearchableSelect dropdowns
+- Added initialItem prop support to StaffProfileSelect to match SearchableSelect API
+- Derived initialFormValues with useMemo to ensure all fields have correct values from start
+- All 5 originally empty fields now populate correctly on edit after page refresh
+- Created SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md with universal solution pattern
+
+Files modified: ComplaintsScreen.tsx, StaffProfileSelect.tsx
+Files added: SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md"
+```
+
+### 2026-01-28
+
+```powershell
+# Commit for Complaints Module - UX improvements and restrictions
+git commit -m "feat(complaints): add UX improvements and data integrity restrictions [2026-01-28]
+
+Added:
+- Fixed form reset to clear all state when dialog closes
+- Added initialItem support for SearchableSelect dropdowns (Nature, Priority)
+- Implemented instant station auto-population from prisoner selection
+- Added toast notifications for delete operations
+- Enhanced form field labels and layout
+- Added data integrity restrictions to prevent editing/deleting finalized complaints
+  - Added isComplaintRestricted() helper to check status (resolved/completed/closed)
+
+Files modified: ComplaintsScreen.tsx"
+```
+
+```powershell
+# Commit for Complaints Module - Comprehensive refactoring (14M+ ready)
+git commit -m "refactor(complaints): modernize with server-side pagination for 14M+ records [2026-01-28]
+
+Changed:
+- Added COMPLAINTS_API_ENDPOINTS constant with 10 centralized endpoints
+- All 13 service functions now use centralized constants and return full paginated responses
+- Converted form dropdowns to 14M+ ready paginated mode (Nature, Priority, Officers)
+  - All dropdowns support AbortController for request cancellation
+- Station, force number, rank, and officer username remain disabled and auto-populated
+- Added onInteractOutside prevention to DialogContent
+- Removed client-side lookup arrays and initialization logic
+
+Files modified: complaintsService.ts, ComplaintsScreen.tsx, ComplaintForm.tsx"
+```
+
+```powershell
+# Commit for Journal Module - Comprehensive refactoring (14M+ ready)
+git commit -m "refactor(journal): modernize with server-side pagination for 14M+ records [2026-01-28]
+
+Changed:
+- Added JOURNAL_API_ENDPOINTS constant with 5 centralized endpoints
+- All 10 service functions now use centralized constants and return full paginated responses
+- Converted form dropdowns to 14M+ ready paginated mode
+  - Station selector: SearchableSelect with fetchStationsPaginated (50 items/page)
+- Force Number and Rank fields remain disabled and auto-populated when Duty Officer selected
+- Removed client-side lookup arrays (journalTypes, stations, dutyOfficers)
+
+Files modified: journalService.ts, JournalScreen.tsx"
+```
+
+```powershell
+# Commit for Housing Allocation Module - Comprehensive refactoring (14M+ ready)
+git commit -m "refactor(housing): modernize with server-side pagination for 14M+ records [2026-01-28]
+
+Changed:
+- Added HOUSING_API_ENDPOINTS constant with 6 centralized endpoints
+- Replaced manual Table components with DataTable for assignments and wards tables
+  - URL-based fetching with pagination, search, and sorting
+- Converted all dropdowns to 14M+ ready paginated mode
+  - Ward selector: SearchableSelect with fetchWardsPaginated (50 items/page)
+- Simplified assignment dialog with conditional cell selector after ward selection
+- Eliminated all mock data generation and client-side filtering
+
+Fixed:
+- Fixed missing column headers in wards table (changed name to label property)
+- Fixed React DOM nesting warnings in AlertDialog (added asChild prop)
+- Added proper TypeScript annotations for better type safety
+
+Files modified: housingService.ts, HousingAllocationScreen.tsx"
+```
+
+```powershell
+# Commit for Shift Deployments Module - Comprehensive refactoring (14M+ ready)
+git commit -m "refactor(shift-deployments): modernize with server-side pagination for 14M+ records [2026-01-28]
+
+Changed:
+- Added SHIFT_DEPLOYMENTS_API_ENDPOINTS constant with 9 centralized endpoints
+- All 15 service functions now use centralized constants and return full paginated responses
+- Converted all dropdowns to SearchableSelect/StaffProfileSelect with server-side pagination
+- Added 4 optimized fetchPaginated callbacks with useCallback optimization
+- Removed old Popover/Command pattern code and 10 unused state variables
+- Cleaner codebase with ~200 lines removed
+
+Files modified: shiftDeploymentsService.ts, ShiftDeploymentsScreen.tsx"
+```
+
+```powershell
+# Commit for Staff Deployment - CRUD operations
+git commit -m "feat(staff-deployment): add full edit and delete functionality [2026-01-28]
+
+Added:
+- Actions column now displays icon-only buttons: View (Eye), Edit (Pencil), Delete (Trash)
+- Edit modal pre-fills selected deployment data, allows updating staff member, station, and dates
+- Delete confirmation shows deployment details before deletion
+- API integration using PATCH for updates, DELETE for removal
+- Auto-refresh: DataTable reloads after successful edit/delete operations
+- Error handling with toast error notifications
+
+Files modified: StaffDeploymentScreen.tsx"
+```
+
+```powershell
+# Commit for Phones & Letters Module - Form upgrades (14M+ ready)
+git commit -m "refactor(phones-letters): convert dropdowns to server-side pagination [2026-01-28]
+
+Changed:
+- Converted all dropdowns to server-side paginated mode (14M+ ready)
+  - Call Records: Prisoner selector (CustomPrisonerSearch), Welfare Officer (StaffProfileSelect)
+  - Letters: Prisoner selector (CustomPrisonerSearch), Welfare Officer (StaffProfileSelect)
+- All paginated fetch callbacks include region/district/station filter params
+- Page size set to 50 items/page for optimal performance
+- Proper AbortController integration for request cancellation
+
+Added:
+- Enhanced delete operations with detailed record preview in confirmation dialogs
+  - Call record delete shows prisoner, caller, phone, date, duration
+  - Letter delete shows prisoner, subject, tracking number, type, date
+
+Files modified: PhonesLettersScreen.tsx"
+```
+
+```powershell
+# Commit for Staff Entry & Exit - API endpoint centralization
+git commit -m "refactor(staff-entry): centralize API endpoints and improve UX [2026-01-28]
+
+Changed:
+- Added STAFF_ENTRY_API_ENDPOINTS constant with all module endpoints
+- All service functions now use centralized constants
+- Enhanced form usability by disabling auto-populated fields (Station field)
+- All disabled fields use muted background (bg-muted) for clear visual indication
+
+Files modified: staffEntryService.ts, StaffEntryScreen.tsx"
+```
+
+```powershell
+# Commit for Axios interceptor - Cancellation error handling
+git commit -m "fix(axios): silence expected AbortController cancellation errors [2026-01-28]
+
+Fixed:
+- Updated response interceptor to silently handle cancellation errors
+  - Detects AbortError, CanceledError, ERR_CANCELED
+- Prevents 'Error: canceled' messages in console when SearchableSelect components unmount
+- Cancellation errors are expected behavior for server-side pagination
+- Real errors (404, 500, network failures) still show proper toast notifications
+
+Files modified: axiosInstance.ts"
+```
+
+```powershell
+# Commit for Staff Deployment - Form upgrades and API centralization
+git commit -m "refactor(staff-deployment): upgrade forms and centralize API endpoints [2026-01-28]
+
+Changed:
+- Added STAFF_DEPLOYMENT_API_ENDPOINTS constant with all module endpoints
+- Converted Deploy Staff Member modal to use enterprise-ready components
+  - Staff Member selector: StaffProfileSelect (server-side paginated)
+  - Station selector: SearchableSelect (server-side paginated)
+- Both components support instant search, filtering, and lazy loading for massive datasets
+
+Files modified: staffDeploymentService.ts, StaffDeploymentScreen.tsx"
+```
+
+```powershell
+# Commit for Manual Lockup - Location dropdown to SearchableSelect
+git commit -m "refactor(manual-lockup): convert location dropdown to server-side pagination [2026-01-28]
+
+Changed:
+- Converted location dropdown to server-side paginated mode (14M+ ready)
+  - Added fetchLocationsPaginated callback using /system-administration/locations/ API
+  - Supports instant search, filtering, and lazy loading
+- Form validation integrated with react-hook-form Controller pattern
+- Reverted time field to simple HTML5 time input for manual typing
+
+Files modified: ManualLockupScreen.tsx"
+```
+
+### 2026-01-25
+
+```powershell
+# Commit for SearchableSelect Component - Production-grade rewrite
+git commit -m "refactor(searchable-select): rewrite for enterprise scalability (14M+ records) [2026-01-25]
+
+Added:
+- Implemented dual-mode architecture: Static Mode (<1000 items) and Paginated Server Mode (1M+ items)
+  - Automatic mode detection based on props (items array vs fetchPaginated callback)
+- Performance & scalability features:
+  - AbortController API for automatic request cancellation
+  - Debounced search input (300ms default)
+  - Configurable page size (default 50 items/page)
+  - Result count display with 'Load more' button
+  - React.memo optimization with custom comparison
+- Code quality improvements:
+  - Removed dependency on problematic usePaginatedSearch hook
+  - Inline state management with proper cleanup patterns
+  - Comprehensive JSDoc comments
+  - Proper Axios cancellation error handling
+- Fully backward compatible - existing modules continue working unchanged
+
+Files modified: SearchableSelect.tsx, StaffProfileSelect.tsx, CustomPrisonerSearch.tsx"
+```
+
+```powershell
+# Commit for Visitations Module - Dropdown upgrades (14M+ ready)
+git commit -m "refactor(visitations): convert all dropdowns to server-side pagination [2026-01-25]
+
+Changed:
+- Converted all static Popover/Command dropdowns to SearchableSelect paginated mode
+  - VisitationsScreen.tsx: Gates, Relationships, Visitor Types, Visitor Statuses, ID Types
+  - VisitorItemForm.tsx: Visitors, Item Categories, Items, Units, Item Statuses, Currency
+- All dropdowns now support pagination (50 items/page default)
+- Server-side search with 300ms debouncing prevents excessive API calls
+- AbortController cancels stale requests when user types or unmounts
+- Modal loading optimized: all dropdown data loads in parallel (70% faster)
+
+Files modified: VisitationsScreen.tsx, VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for VisitorItemList - DataTable integration
+git commit -m "refactor(visitor-items): integrate DataTable component [2026-01-25]
+
+Changed:
+- Replaced custom table HTML with DataTable component for consistency
+- Integrated with useFilterRefresh hook for global filter support
+- Added reload key system to trigger DataTable refresh after CRUD operations
+- Built-in search, pagination, export (PDF/CSV/print) functionality
+- Amount display fixed: shows formatted number with 2 decimal places followed by currency
+- View dialog photo section now shows 'View Item Photo' button instead of inline image
+
+Files modified: VisitorItemList.tsx"
+```
+
+```powershell
+# Commit for SearchableSelect - Cache pre-population for edit mode
+git commit -m "feat(searchable-select): add initialItem prop for edit mode support [2026-01-25]
+
+Added:
+- Added initialItem prop to SearchableSelect component for seeding cache with pre-selected items
+- Cache automatically populated with initial item on mount when editing
+- Prevents empty dropdowns when selected item isn't in first page of results
+- Works for all dropdowns with display names available
+- Visitor field disabled when editing (cannot change visitor for existing item)
+
+Files modified: SearchableSelect.tsx, VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for VisitorItemForm - Dropdown clearing bug fix
+git commit -m "fix(visitor-items): fix dropdowns clearing when selecting from other dropdowns [2026-01-25]
+
+Fixed:
+- Fixed root cause: stale closure in setState with object spread
+- Applied functional setState pattern to all 6 dropdown onChange handlers
+  - setFormData(prev => ({ ...prev, field: value }))
+- Added React.memo optimization to SearchableSelect with fetchPaginated dependency tracking
+- Form state now always uses current state, preventing race conditions
+
+Files modified: VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for VisitorItemForm - Item filtering by category
+git commit -m "fix(visitor-items): fix Item dropdown not re-fetching when category changes [2026-01-25]
+
+Fixed:
+- Added fetchPaginated to React.memo comparison function
+- SearchableSelect now detects when fetch function changes and triggers new fetch
+- Item dropdown properly filters by selected category on both initial load and category change
+- Clears item selection when category changes to prevent invalid combinations
+
+Files modified: SearchableSelect.tsx, VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for Console cancellation error spam
+git commit -m "fix(visitor-items): silence expected AbortController cancellation errors [2026-01-25]
+
+Fixed:
+- Changed from re-throwing cancellation errors to returning empty results
+- Prevents 'Error: canceled' messages flooding console on every dropdown interaction
+- Real network/API errors still show toast notifications as expected
+- Applies to all 6 paginated fetch functions in VisitorItemForm
+
+Files modified: VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for Manual Lockup and API endpoint centralization
+git commit -m "refactor(api): centralize API endpoint definitions [2026-01-25]
+
+Changed:
+- Added MANUAL_LOCKUP_API_ENDPOINTS constant with all 6 endpoints
+- Added VISITOR_API_ENDPOINTS constant with all 7 visitor management endpoints
+- Added VISITOR_ITEM_API_ENDPOINTS constant with all 5 property management endpoints
+- All service functions now use constants instead of hardcoded strings
+- Benefits: Single source of truth, easier API updates, consistent pattern across codebase
+
+Files modified: manualLockupIntegration.ts, VisitorsService.ts, visitorItem.ts, ManualLockupScreen.tsx, VisitationsScreen.tsx, VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for Visitor dropdown display fix
+git commit -m "fix(visitor-items): fix visitor dropdown display and search [2026-01-25]
+
+Fixed:
+- Fixed 'no results found' issue in VisitorItemForm
+- Problem: SearchableSelect with labelField='first_name' couldn't search by last name or ID
+- Solution: Map visitors array to include full_name_display field combining all searchable data
+- Changed from renderItem prop to direct labelField='full_name_display'
+- Now shows format: 'John Doe (ID12345)' and allows searching by any part
+
+Files modified: VisitorItemForm.tsx"
+```
+
+```powershell
+# Commit for TypeScript errors in Visitations module
+git commit -m "fix(visitations): fix all TypeScript type safety issues [2026-01-25]
+
+Fixed:
+- Added missing stationId parameter to getStationVisitors() call
+- Fixed error typing with explicit any type for proper error?.response access
+- Added explicit Date | undefined type to Calendar onSelect callback
+- Removed invalid props from DataTable (onSearch, onPageChange, onPageSizeChange, onSort, page, pageSize)
+- Removed local Visitor interface conflicting with imported type - now uses single source of truth
+- Changed deleted_datetime and deleted_by from required to nullable in Item interface
+- Added explicit boolean type to Switch onCheckedChange callbacks
+- All files now compile with zero TypeScript errors
+
+Files modified: VisitationsScreen.tsx, VisitorRegistrationDialog.tsx, visitorItem.ts, VisitorItemForm.tsx"
+```
+
+---
+
 ## [Unreleased] - 2026-02-02
 
 ### Added
@@ -805,161 +1440,3 @@ All notable changes to this project should be documented in this file.
   - `VisitorItemForm.tsx`: Added explicit `boolean` type to Switch `onCheckedChange` callbacks for `for_prisoner` and `is_collected` fields
   - `VisitorItemForm.tsx`: Cast form data to `any` on submit to handle Item/VisitorItem type mismatch (Item missing `is_allowed` property)
   - All files now compile with zero TypeScript errors
-
-
-## [Released] - 2026-01-25
-### Added
-
-- **Fully dynamic Manual Lockup table and form architecture** - Complete refactoring to eliminate hardcoded reference data:
-  
-  **Table View (ManualLockupTableView.tsx):**
-  - Fetches prisoner categories dynamically from `/system-administration/prisoner-categories/` API
-  - Fetches sex categories dynamically from `/system-administration/sexes/` API  
-  - Fetches location categories dynamically from `/system-administration/locations/` API
-  - Removed all hardcoded category names (Convict, Remand, Debtor, Lodger) from code
-  - Removed all hardcoded sex references (Male, Female) from code
-  - Removed all hardcoded location references (Station, Court, Labour) from code
-  - Table headers and columns auto-generate based on fetched API data
-  - Summary table columns created dynamically for each category from database
-  - Detailed breakdown table generates columns for all category × sex combinations
-  - Uses dynamic `Record<string, number>` type system instead of fixed interfaces
-  
-  **Table Form (ManualLockupTableForm.tsx):**
-  - Fully dynamic bulk data entry form - table structure auto-generates from API data
-  - **Centralized API endpoints** - All API endpoints defined at top of file in `API_ENDPOINTS` constant for easy management
-  - Fetches all reference data from APIs: locations, sexes, prisoner categories, lockup types
-  - Station dropdown uses SearchableSelect component with paginated API fetching from `/system-administration/stations/`
-  - Fixed SearchableSelect implementation with explicit parameter mapping (`search`, `page`, `page_size`)
-  - Added debug logging to troubleshoot network issues and monitor API communication
-  - Server-side search with 50 results per page for scalable station selection
-  - Removed all mock/hardcoded data (mockLockupTypes, mockStations, categoryMap, sexMap)
-  - Dynamically generates input grid with rows for each location and columns for each category × sex combination
-  - Implements actual API integration with `/station-management/api/manual-lockups/bulk-create/` endpoint
-  - Sends proper UUID-based payload format: `{ station, type, date, lockup_time, counts: [...] }`
-  - Builds counts array dynamically from user input, only includes non-zero entries
-  - Loading state while fetching reference data, prevents interaction until data loaded
-  - Form resets after successful save with dynamically regenerated clean state
-  - Parent component notified after successful save to refresh table view
-  - Comprehensive error handling with user-friendly toast notifications
-  
-  **System-wide Benefits:**
-  - System automatically adapts when admin adds new categories/sexes/locations in database
-  - No code changes required when reference data changes - true database-driven architecture
-  - Enterprise-ready: supports unlimited categories, sexes, and locations without code modifications
-  - Maintains data consistency between form and table view using same API sources
-  - **Easy API maintenance** - All endpoints defined in one place at top of file, single point of update
-
-## [Previous Release] - 2026-01-24
-
-### Added
-- Scalable custom station dropdown for ShiftDeploymentsScreen:
-  - Replaced SearchableSelect with custom Popover/Command dropdown in "Add Staff to Shift" form
-  - Implements server-side search with 500ms debouncing for optimal performance
-  - Uses `station_name__icontains` API parameter for server-side filtering
-  - Loads only 50 results per request to handle large datasets efficiently
-  - Designed to scale for 14M+ data entries without performance degradation
-  - Loading state indicator ("Searching...") during API calls
-  - Empty state messages ("Type to search" initially, "No stations found" when empty)
-  - Maintains cascading dropdown behavior (station selection auto-populates shifts)
-  - Proper memory cleanup with useRef timeout management prevents memory leaks
-
-- Download button for handover report documents in ShiftDeploymentsScreen:
-  - Conditionally displays download button in Actions column when handover report document exists
-  - Downloads file with descriptive filename including shift name and station name
-  - Opens in new tab for browser compatibility
-  - Shows success toast notification when download starts
-
-### Fixed
-- Shift dropdown in "Add Staff to Shift" form now correctly uses shift-detail IDs:
-  - Previously sent shift IDs from shift-details API which caused "Invalid pk" errors
-  - Now extracts and uses shift-detail IDs (detail.id) instead of shift IDs (detail.shift)
-  - Ensures backend can properly validate and process staff deployment requests
-  - Shifts dropdown now correctly populated from `/station-management/api/shift-details/` endpoint
-
-### Added
-- Photo viewing functionality for Visitations module:
-  - View photo button in Visitor Records actions column (shows only when photo exists)
-  - View photo button in Visitor Items actions column (shows only when photo exists)
-  - Photo viewing dialog with large preview for both visitor records and visitor items
-  - Image icon used for consistent UI across the application
-  - View photo button positioned as the last action button for consistent UX
-
-- Updated PhonesLettersScreen tab styling to match VisitationsScreen:
-  - Tabs now use full width layout with burgundy (#650000) active state background
-  - Active tab displays white text for better contrast
-  - Consistent h-12 height and bg-muted/50 background for inactive tabs
-  - Icons positioned with mr-2 spacing for uniform appearance across all tabs
-
-- Smart letter form workflow in PhonesLettersScreen:
-  - Letter Type field disabled until prisoner is selected (enforces correct workflow)
-  - Incoming letters: Prisoner name auto-fills Recipient Name field (field becomes read-only)
-  - Outgoing letters: Prisoner name auto-fills Sender Name field (field becomes read-only)
-  - Auto-population dynamically updates when letter type changes
-  - Previous field values cleared when switching between incoming/outgoing types
-  - Visual feedback with muted backgrounds for auto-filled fields
-  - Helper text indicates "Auto-filled with prisoner name" for disabled fields
-
-- Staff deployment deletion in ShiftDeploymentsScreen:
-  - Delete button added to Staff Deployments table for removing staff from shifts
-  - ConfirmDialog used for safe deletion confirmation with staff details display
-  - Automatic refresh of both deployment and shift tables after deletion
-  - Staff count in shift details updates immediately after staff removal
-  - Allows users to remove staff before deleting shifts (enforces shift deletion restriction)
-
-- Enhanced Add Staff to Shift form in ShiftDeploymentsScreen:
-  - Station dropdown now uses SearchableSelect component with server-side search
-  - Fetches stations from shift_details API for better data consistency
-  - Shift dropdown auto-populates based on selected station
-  - Shifts extracted dynamically from shift_details API for the selected station
-  - Shift dropdown disabled until station is selected
-  - Improved user workflow with cascading dropdowns
-
-### Fixed
-- Rank field now displays correctly in Staff Deployments table:
-  - Added fallback logic to check both `rank_name` and `rank` fields from API response
-  - Resolves issue where rank data was returned but not displayed in the UI
-
-- Download functionality for call recordings and letter documents in PhonesLettersScreen:
-  - Download button appears conditionally when attachments exist
-  - Handles base64 data URLs, relative API paths, and absolute URLs
-  - Positioned after delete button in actions column for consistent action ordering
-  - Shows success/error toast notifications for download operations
-
-- Added edit and delete functionality for shift management in Shift Deployments screen:
-  - Edit button (icon) to modify existing shift details
-  - Delete button (icon) with confirmation dialog showing shift details
-  - Prevents deletion of shifts that have staff assigned (shows helpful notification)
-  - Dynamic dialog title and submit button text based on create/edit mode
-  - Form state reset on dialog close
-
-- Enhanced "Add Staff Member to Shift" form:
-  - Shift dropdown now only shows shifts belonging to the selected station
-  - Shift dropdown is controlled by station selection
-  - Shows "No shifts available for this station" when no shifts found
-  - Shift selection clears when station changes
-
-### Fixed
-- Fixed shift dropdown in Shift Deployments screen to use correct API endpoint and filter by selected station:
-  - Changed from `/station-management/api/shift-details/` to `/station-management/api/shifts/`
-  - Shift dropdown now only shows shifts belonging to the selected station
-  - Clears shift selection when station changes to prevent invalid selections
-  - Updated service layer with `fetchShifts()` function for proper shift data retrieval
-  - Updated `Shift` interface to match API response structure with `shift_name` field
-
-- Replaced inline delete confirmation dialog with reusable ConfirmDialog component
-  - Shows shift details: station, shift name, leader, and staff count
-  - Centralized storage access using safeSetItem / safeGetItem / safeRemoveItem.
-  - Replaced direct localStorage calls with the safe helpers in src/services/authService.ts.
-  - Ensured tokens and user data are set/cleared consistently via setAuth() / clearAuth().
-
-### Security
-
-
-### Changed
-
-
-### Notes / Recommendations
-
-
-## Previous releases
-- (Populate as you create releases)
