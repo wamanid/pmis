@@ -2,7 +2,7 @@
 
 All notable changes to this project should be documented in this file.
 
-## [Unreleased] - 2026-02-02
+## [Released] - 2026-02-02
 
 ### Added
 - **Property Management - Quick Transaction Creation from Account Groups**:
@@ -29,7 +29,7 @@ All notable changes to this project should be documented in this file.
   - Simpler, cleaner component with fewer state updates and clearer code
   - Files modified: PrisonerPropertyAccountScreen.tsx (state cleanup lines 119-120, actions column lines 635-724)
 
-## [Unreleased] - 2026-02-01
+## [Released] - 2026-02-01
 
 ### Added
 - **Property Management - Performance Optimization (IN PROGRESS - NEEDS REVISIT)**:
@@ -189,7 +189,7 @@ All notable changes to this project should be documented in this file.
   - Button now works as long as a prisoner is selected, regardless of detail capture state
   - File modified: PropertyItem.tsx (enhanced onClick handler with fallback)
 
-## [Unreleased] - 2026-01-31
+## [Released] - 2026-01-31
 
 ### Added
 - **DataTable Component - Multi-Currency Support in Group Headers**:
@@ -312,7 +312,7 @@ All notable changes to this project should be documented in this file.
   - Now fetches visitor items in both create and edit modes, ensuring disabled Property Item/Measurement Unit fields can display correct values from visitorItems array
   - Files modified: PropertyItem.tsx, CreatePropertyForm.tsx, propertyService.ts (added fetchPropertyItemsPaginated import)
 
-## [Unreleased] - 2026-01-29
+## [Released] - 2026-01-29
 
 ### Added
 - **Property Management module - Server-side pagination and comprehensive refactoring** - Converted all dropdowns from client-side to server-side pagination for 14M+ record support:
@@ -406,7 +406,7 @@ All notable changes to this project should be documented in this file.
   - **Testing**: Verified with hard refresh (Ctrl+Shift+R) → Edit complaint → All fields display correct values immediately
   - **Documentation**: Created SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md with universal solution pattern for all future modules
 
-## [Unreleased] - 2026-01-28
+## [Released] - 2026-01-28
 
 ### Added
 - **Complaints module UX improvements and restrictions** - Enhanced user experience with performance optimizations and data integrity protections:
@@ -663,7 +663,7 @@ All notable changes to this project should be documented in this file.
 
 - **Manual Lockup time field** - Reverted to simple HTML5 time input for manual typing (pending better time picker library implementation)
 
-## [Unreleased] - 2026-01-25
+## [Released] - 2026-01-25
 
 ### Added
 - **Production-grade SearchableSelect component rewrite** - Enterprise-ready implementation supporting 14M+ records:
