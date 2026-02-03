@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Card, CardContent } from '../ui/card';
 import { Activity } from 'lucide-react';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import MedicalRecordScreen from './MedicalRecordScreen';
+import MedicalRecordScreen from './medicalRecord/MedicalRecordScreen';
 import BMIScreen from './BMIScreen';
 import CaseBookScreen from './CaseBookScreen';
 import ScheduleScreen from './ScheduleScreen';
@@ -11,10 +11,19 @@ import TreatmentScreen from './TreatmentScreen';
 import ExamResultScreen from './ExamResultScreen';
 import AilmentScreen from './AilmentScreen';
 import DiagnosisScreen from './DiagnosisScreen';
+import {PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
+
+export interface Loading {
+  record: boolean
+}
 
 export default function MedicalDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'medical-record' | 'bmi' | 'casebook' | 'schedule' | 'labtest' | 'treatment' | 'examresult' | 'ailment' | 'diagnosis'>('medical-record');
+
+  // API Integration
+  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
+  const [loading, setLoading] = useState<Loading>({ record: true })
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -166,7 +175,7 @@ export default function MedicalDetails() {
           {/* Tab Content */}
           {activeTab === 'medical-record' && (
             <div>
-              <MedicalRecordScreen />
+              <MedicalRecordScreen prisoners={prisoners} setPrisoners={setPrisoners} loading={loading} setLoading={setLoading} />
             </div>
           )}
 

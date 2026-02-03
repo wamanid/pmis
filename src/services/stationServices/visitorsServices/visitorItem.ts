@@ -178,18 +178,18 @@ export const updateVisitorItem = async (item: Item, id: string) : Promise<Visito
   return response.data;
 }
 
-export const fetchVisitorItem = async (id: string, signal?: AbortSignal) : Promise<VisitorItemResponse> => {
-  const response = await axiosInstance.get<VisitorItemResponse>(`${VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}${id}/`, { signal });
-  return response.data;
-}
+    export const fetchVisitorItem = async (id: string, signal?: AbortSignal) : Promise<VisitorItemResponse> => {
+      const response = await axiosInstance.get<VisitorItemResponse>(`${VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS}${id}/`, { signal });
+      return response.data;
+    }
 
-export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
-  const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS);
-  return response.data;
-}
+    export const getVisitorItems = async () : Promise<VisitorItemsResponse> => {
+      const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS);
+      return response.data;
+    }
 
-export const getVisitorItems2 = async (visitorId: string) : Promise<VisitorItemsResponse> => {
-  const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS, {
+    export const getVisitorItems2 = async (visitorId: string) : Promise<VisitorItemsResponse> => {
+      const response = await axiosInstance.get<VisitorItemsResponse>(VISITOR_ITEM_API_ENDPOINTS.VISITOR_ITEMS, {
     params: {
       visitor: visitorId
     }

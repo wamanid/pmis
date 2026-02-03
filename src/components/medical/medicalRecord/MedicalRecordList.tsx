@@ -1,16 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
-import { Badge } from '../ui/badge';
+import { Card, CardContent } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../ui/table';
+import { Badge } from '../../ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '../ui/dropdown-menu';
+} from '../../ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,100 +20,109 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
+} from '../../ui/alert-dialog';
 import { Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {MedicalRecord} from "../../../services/medical/medical";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
-interface MedicalRecord {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  blood_group_name: string;
-  prisoner: string;
-  blood_group: string;
-}
+// interface MedicalRecord {
+//   id: string;
+//   prisoner_name: string;
+//   prisoner_number: string;
+//   blood_group_name: string;
+//   prisoner: string;
+//   blood_group: string;
+// }
 
 interface MedicalRecordListProps {
   onView: (medicalRecord: MedicalRecord) => void;
   onEdit: (medicalRecord: MedicalRecord) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  medicalRecords: MedicalRecord
+  setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
+  bloodGroups: Unit
+  deleteDialogOpen: boolean
+  setDeleteDialogOpen: React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const MedicalRecordList: React.FC<MedicalRecordListProps> = ({
+  medicalRecords, setMedicalRecords, bloodGroups, setDeleteDialogOpen, deleteDialogOpen,
   onView,
   onEdit,
   onDelete,
   refreshTrigger,
 }) => {
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  // const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<MedicalRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [bloodGroupFilter, setBloodGroupFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  // const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
-  const mockMedicalRecords: MedicalRecord[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'PR-2024-001',
-      blood_group_name: 'A+',
-      prisoner: '1',
-      blood_group: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'PR-2024-002',
-      blood_group_name: 'O+',
-      prisoner: '2',
-      blood_group: '7',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      prisoner_number: 'PR-2024-003',
-      blood_group_name: 'B+',
-      prisoner: '3',
-      blood_group: '3',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Emily Davis',
-      prisoner_number: 'PR-2024-004',
-      blood_group_name: 'AB+',
-      prisoner: '4',
-      blood_group: '5',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Robert Lee',
-      prisoner_number: 'PR-2024-005',
-      blood_group_name: 'O-',
-      prisoner: '5',
-      blood_group: '8',
-    },
-  ];
+  // const mockMedicalRecords: MedicalRecord[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     prisoner_number: 'PR-2024-001',
+  //     blood_group_name: 'A+',
+  //     prisoner: '1',
+  //     blood_group: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     prisoner_number: 'PR-2024-002',
+  //     blood_group_name: 'O+',
+  //     prisoner: '2',
+  //     blood_group: '7',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     prisoner_number: 'PR-2024-003',
+  //     blood_group_name: 'B+',
+  //     prisoner: '3',
+  //     blood_group: '3',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Emily Davis',
+  //     prisoner_number: 'PR-2024-004',
+  //     blood_group_name: 'AB+',
+  //     prisoner: '4',
+  //     blood_group: '5',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Robert Lee',
+  //     prisoner_number: 'PR-2024-005',
+  //     blood_group_name: 'O-',
+  //     prisoner: '5',
+  //     blood_group: '8',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadMedicalRecords();
-  }, [refreshTrigger]);
+  // useEffect(() => {
+  //   loadMedicalRecords();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
     filterRecords();
   }, [medicalRecords, searchTerm, bloodGroupFilter]);
 
-  const loadMedicalRecords = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setMedicalRecords(mockMedicalRecords);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadMedicalRecords = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setMedicalRecords(mockMedicalRecords);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterRecords = () => {
     let filtered = [...medicalRecords];
@@ -122,8 +131,8 @@ const MedicalRecordList: React.FC<MedicalRecordListProps> = ({
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(
         (record) =>
-          record.prisoner_name.toLowerCase().includes(term) ||
-          record.prisoner_number.toLowerCase().includes(term)
+          record.prisoner_name?.toLowerCase().includes(term) ||
+          record.prisoner_number?.toLowerCase().includes(term)
       );
     }
 
@@ -160,10 +169,10 @@ const MedicalRecordList: React.FC<MedicalRecordListProps> = ({
   const handleConfirmDelete = () => {
     if (recordToDelete) {
       onDelete(recordToDelete);
-      setMedicalRecords((prev) => prev.filter((record) => record.id !== recordToDelete));
-      toast.success('Medical record deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
+      // setMedicalRecords((prev) => prev.filter((record) => record.id !== recordToDelete));
+      // toast.success('Medical record deleted successfully');
+      // setDeleteDialogOpen(false);
+      // setRecordToDelete(null);
     }
   };
 
@@ -193,14 +202,11 @@ const MedicalRecordList: React.FC<MedicalRecordListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Blood Groups</SelectItem>
-                <SelectItem value="A+">A+</SelectItem>
-                <SelectItem value="A-">A-</SelectItem>
-                <SelectItem value="B+">B+</SelectItem>
-                <SelectItem value="B-">B-</SelectItem>
-                <SelectItem value="AB+">AB+</SelectItem>
-                <SelectItem value="AB-">AB-</SelectItem>
-                <SelectItem value="O+">O+</SelectItem>
-                <SelectItem value="O-">O-</SelectItem>
+                {
+                  bloodGroups.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>

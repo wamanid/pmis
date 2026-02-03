@@ -1,10 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Button } from '../ui/button';
-import { Label } from '../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Button } from '../../ui/button';
+import { Label } from '../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
 import { FileText, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {Loading} from "../MedicalDetails";
+import {Record} from "../../../services/medical/medical";
 
 interface MedicalRecord {
   id?: string;
@@ -20,9 +24,14 @@ interface MedicalRecordFormProps {
   onSubmit: (medicalRecord: MedicalRecord) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  prisoners: PrisonerItem
+  bloodGroups: Unit
+  loader: Boolean,
+  setLoader: React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
+  prisoners, bloodGroups, loader, setLoader,
   medicalRecord,
   onSubmit,
   onCancel,
@@ -33,44 +42,45 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
     blood_group: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [bloodGroups, setBloodGroups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // const [prisoners, setPrisoners] = useState<any[]>([]);
+  // const [bloodGroups, setBloodGroups] = useState<any[]>([]);
+  // const [loader, setLoader] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(true);
 
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
+  // useEffect(() => {
+  //   loadDropdownData();
+  // }, []);
 
   useEffect(() => {
     if (medicalRecord && dataLoaded) {
-      setFormData(medicalRecord);
+      setFormData({ prisoner: medicalRecord.prisoner, blood_group: medicalRecord.blood_group })
+      // setFormData(medicalRecord);
     }
   }, [medicalRecord, dataLoaded]);
 
-  const loadDropdownData = () => {
-    // Mock data - replace with actual API calls
-    setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
-
-    setBloodGroups([
-      { id: '1', name: 'A+', description: 'Blood Group A Positive' },
-      { id: '2', name: 'A-', description: 'Blood Group A Negative' },
-      { id: '3', name: 'B+', description: 'Blood Group B Positive' },
-      { id: '4', name: 'B-', description: 'Blood Group B Negative' },
-      { id: '5', name: 'AB+', description: 'Blood Group AB Positive' },
-      { id: '6', name: 'AB-', description: 'Blood Group AB Negative' },
-      { id: '7', name: 'O+', description: 'Blood Group O Positive' },
-      { id: '8', name: 'O-', description: 'Blood Group O Negative' },
-    ]);
-    
-    setDataLoaded(true);
-  };
+  // const loadDropdownData = () => {
+  //   // Mock data - replace with actual API calls
+  //   setPrisoners([
+  //     { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+  //     { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+  //     { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+  //     { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+  //     { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
+  //   ]);
+  //
+  //   setBloodGroups([
+  //     { id: '1', name: 'A+', description: 'Blood Group A Positive' },
+  //     { id: '2', name: 'A-', description: 'Blood Group A Negative' },
+  //     { id: '3', name: 'B+', description: 'Blood Group B Positive' },
+  //     { id: '4', name: 'B-', description: 'Blood Group B Negative' },
+  //     { id: '5', name: 'AB+', description: 'Blood Group AB Positive' },
+  //     { id: '6', name: 'AB-', description: 'Blood Group AB Negative' },
+  //     { id: '7', name: 'O+', description: 'Blood Group O Positive' },
+  //     { id: '8', name: 'O-', description: 'Blood Group O Negative' },
+  //   ]);
+  //
+  //   setDataLoaded(true);
+  // };
 
   const handleInputChange = (field: keyof MedicalRecord, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -88,29 +98,42 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
       return;
     }
 
-    setLoading(true);
+    // const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
+    // const selectedBloodGroup = bloodGroups.find((bg) => bg.id === formData.blood_group);
+    //
 
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedBloodGroup = bloodGroups.find((bg) => bg.id === formData.blood_group);
+    const submitData: Record = {
+      ...formData,
+      is_active: true,
+      deleted_datetime: null,
+      deleted_by: null
+    };
 
-      const submitData: MedicalRecord = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        prisoner_number: selectedPrisoner?.prisoner_number || '',
-        blood_group_name: selectedBloodGroup?.name || '',
-      };
+    setLoader(true);
+    onSubmit(submitData);
 
-      onSubmit(submitData);
-      setLoading(false);
+    // setTimeout(() => {
+    //   const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
+    //   const selectedBloodGroup = bloodGroups.find((bg) => bg.id === formData.blood_group);
+    //
+    //   const submitData: MedicalRecord = {
+    //     ...formData,
+    //     prisoner_name: selectedPrisoner?.full_name || '',
+    //     prisoner_number: selectedPrisoner?.prisoner_number || '',
+    //     blood_group_name: selectedBloodGroup?.name || '',
+    //   };
+    //
+    //   onSubmit(submitData);
+    //   setLoader(false);
+    //
+    //   if (mode === 'create') {
+    //     toast.success('Medical record created successfully');
+    //     setFormData({ prisoner: '', blood_group: '' });
+    //   } else {
+    //     toast.success('Medical record updated successfully');
+    //   }
+    // }, 500);
 
-      if (mode === 'create') {
-        toast.success('Medical record created successfully');
-        setFormData({ prisoner: '', blood_group: '' });
-      } else {
-        toast.success('Medical record updated successfully');
-      }
-    }, 500);
   };
 
   const isReadOnly = mode === 'view';
@@ -151,7 +174,7 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
                     <SelectContent>
                       {prisoners.map((prisoner) => (
                         <SelectItem key={prisoner.id} value={prisoner.id}>
-                          {prisoner.prisoner_number} - {prisoner.full_name}
+                          {prisoner.prisoner_number_value} - {prisoner.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -190,7 +213,7 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
 
           {!isReadOnly && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={loader}>
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
@@ -198,10 +221,10 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
                 type="submit"
                 style={{ backgroundColor: '#650000' }}
                 className="text-white hover:opacity-90"
-                disabled={loading}
+                disabled={loader}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
+                {loader ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
               </Button>
             </div>
           )}
