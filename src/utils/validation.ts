@@ -138,7 +138,7 @@ export const emailValidation = {
  * National ID validation pattern (Uganda)
  * Format: CM12345678901234 (2 letters followed by 14 digits)
  */
-export const NATIONAL_ID_PATTERN = /^[A-Z]{2}[0-9]{14}$/;
+export const NATIONAL_ID_PATTERN = /^[A-Z]{2}[0-9]{8}[A-Z0-9]{4}$/;
 
 /**
  * National ID validation rule
@@ -146,15 +146,15 @@ export const NATIONAL_ID_PATTERN = /^[A-Z]{2}[0-9]{14}$/;
 export const nationalIdValidation = {
   pattern: {
     value: NATIONAL_ID_PATTERN,
-    message: "Please enter a valid National ID (e.g., CM12345678901234)",
+    message: "Please enter a valid National ID (e.g., CM123459012312)",
   },
   minLength: {
-    value: 16,
-    message: "National ID must be 16 characters",
+    value: 14,
+    message: "National ID must be 14 characters",
   },
   maxLength: {
-    value: 16,
-    message: "National ID must be 16 characters",
+    value: 14,
+    message: "National ID must be 14 characters",
   },
 };
 
@@ -269,7 +269,6 @@ export const pastOrTodayDateValidation = {
     if (!value) return true;
     const selectedDate = new Date(value);
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
     return selectedDate <= today || "Date cannot be in the future";
   },
 };

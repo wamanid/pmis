@@ -166,6 +166,9 @@ export interface DataTableProps {
   
   /** Optional configuration (uses defaults if not provided) */
   config?: DataTableConfig;
+  
+  /** Placeholder text for the search input (default: "Search") */
+  searchPlaceholder?: string;
 }
 
 /**

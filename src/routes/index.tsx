@@ -6,7 +6,11 @@ import { admissionRoutes } from './admission.routes';
 import { demoRoutes } from './demo.routes';
 import { propertyRoutes } from './property.routes'
 import { transferRoutes } from './transfer.routes';
+import { gateRoutes } from './gate.routes';
+import { stageRoutes } from './stage.routes';
 import { dischargeRoutes } from './discharge.routes';
+import { reportsRoutes } from './reports.routes';
+import { medicalRoutes } from './medical.routes';
 
 /**
  * Application Routes Configuration
@@ -37,8 +41,19 @@ export const routes: RouteObject[] = [
   // Transfer Management Routes
   ...transferRoutes,
 
+  // Gate Management Routes
+  ...gateRoutes,
+
+  // Stage Classification Routes
+  ...stageRoutes,
   // Discharge Management Routes
   ...dischargeRoutes,
+
+  // Reports Routes
+  ...reportsRoutes,
+
+  // Medical Routes
+  ...medicalRoutes,
 
   // Default/Fallback Route
   {

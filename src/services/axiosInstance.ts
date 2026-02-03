@@ -21,6 +21,7 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    console.log("token"+token);
     
     // Add location filters to query parameters
     const filterStorage = localStorage.getItem('pmis_user_filters');
@@ -65,7 +66,7 @@ axiosInstance.interceptors.request.use(
 );
 
 // Response interceptor
-axiosInstance.interceptors.response.use(
+   axiosInstance.interceptors.response.use(
   (response) => {
     // Log response for debugging (remove in production)
     // console.log('API Response:', {
@@ -102,7 +103,6 @@ axiosInstance.interceptors.response.use(
           // Clear token and redirect to login
           localStorage.removeItem('auth_token');
           localStorage.removeItem('user_data');
-          localStorage.removeItem('pmis_user_filters');
           // Redirect to login page
           window.location.href = '/login';
           break;
