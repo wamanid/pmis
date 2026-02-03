@@ -99,14 +99,14 @@ function PrisonerListScreen() {
           >
             <Eye className="h-4 w-4" />
           </Button>
-          <Button
+          {/* <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate(`/admissions-management/prisoners/${row.id}/edit`)}
             title="Edit Prisoner"
           >
             <Edit className="h-4 w-4" />
-          </Button>
+          </Button> */}
         </div>
       ),
     },
