@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
-import { Button } from '../../ui/button';
-import { Label } from '../../ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../ui/select';
+import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
+import { Button } from '../../../ui/button';
+import { Label } from '../../../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { FileText, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
-import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Loading} from "../MedicalDetails";
-import {Record} from "../../../services/medical/medical";
+import {Record} from "../../../../services/medical/medical";
 
 interface MedicalRecord {
   id?: string;

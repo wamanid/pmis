@@ -1,31 +1,31 @@
 import React, {useEffect, useState} from 'react';
 import {Activity, Edit, Plus, Search, Trash2} from 'lucide-react';
-import { Button } from '../../ui/button';
+import { Button } from '../../../ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../../ui/dialog';
+} from '../../../ui/dialog';
 import MedicalRecordForm from './MedicalRecordForm';
 import MedicalRecordList from './MedicalRecordList';
-import {Loader} from "../../discharge/ViewDischargeDetails";
-import {deleteAllowance, DischargeRequest, DischargeType} from "../../../services/discharge/discharge";
-import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
-import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
-import {StaffItem} from "../../../services/stationServices/staffDeploymentService";
+import {Loader} from "../../../discharge/ViewDischargeDetails";
+import {deleteAllowance, DischargeRequest, DischargeType} from "../../../../services/discharge/discharge";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
+import {StaffItem} from "../../../../services/stationServices/staffDeploymentService";
 import {Loading} from "../MedicalDetails";
-import {Card, CardContent} from "../../ui/card";
-import {Input} from "../../ui/input";
-import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "../../ui/table";
-import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../services/medical/medicalApis";
-import {handleCatchError, handleResponseError} from "../../../services/stationServices/utils";
+import {Card, CardContent} from "../../../ui/card";
+import {Input} from "../../../ui/input";
+import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "../../../ui/table";
+import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../../services/medical/medicalApis";
+import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
 import {
   addMedicalRecord,
   deleteMedicalRecord,
   MedicalRecord,
   updateMedicalRecord
-} from "../../../services/medical/medical";
+} from "../../../../services/medical/medical";
 import {toast} from "sonner";
 
 interface ChildProps {
