@@ -62,6 +62,31 @@ export interface DataTableExportConfig {
 export type RowSpacing = 'compact' | 'normal' | 'cozy';
 
 /**
+ * Grouping configuration for the DataTable
+ */
+export interface DataTableGroupConfig {
+  /** The column key to group by (e.g., 'prisoner' or 'prisoner_name') */
+  groupBy: string;
+  
+  /** 
+   * Custom render function for the group header row
+   * @param groupValue - The value being grouped (e.g., prisoner name)
+   * @param items - Array of items in this group
+   * @param isExpanded - Whether this group is currently expanded
+   * @returns React node to render in the group header
+   * 
+   * @example
+   * renderGroupHeader: (value, items) => (
+   *   <span className="font-bold">{value} ({items.length} items)</span>
+   * )
+   */
+  renderGroupHeader?: (groupValue: any, items: any[], isExpanded: boolean) => ReactNode;
+  
+  /** Start with all groups expanded (default: false) */
+  defaultExpanded?: boolean;
+}
+
+/**
  * Configuration options for the DataTable
  * 
  * All options are optional and have sensible defaults.
@@ -74,6 +99,10 @@ export type RowSpacing = 'compact' | 'normal' | 'cozy';
  *   pagination: true,
  *   summary: true,
  *   rowSpacing: 'normal',
+ *   grouping: {
+ *     groupBy: 'prisoner_name',
+ *     defaultExpanded: false,
+ *   },
  * };
  */
 export interface DataTableConfig {
@@ -106,6 +135,12 @@ export interface DataTableConfig {
    * - cozy: Extra padding for comfortable reading
    */
   rowSpacing?: RowSpacing;
+  
+  /** 
+   * Grouping configuration for collapsible row groups
+   * When enabled, rows will be grouped by the specified column
+   */
+  grouping?: DataTableGroupConfig;
 }
 
 /**

@@ -83,6 +83,12 @@ axiosInstance.interceptors.request.use(
     return response;
   },
   (error) => {
+    // Silently handle cancellation errors (expected behavior from AbortController)
+    if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED' || axios.isCancel(error)) {
+      // Don't show toast or log error - this is normal when components unmount or new searches trigger
+      return Promise.reject(error);
+    }
+
     // Handle different error scenarios
     if (error.response) {
       // Server responded with error status

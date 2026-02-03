@@ -1,141 +1,181 @@
 import axiosInstance from '../axiosInstance';
 import { toast } from 'sonner';
 
-const BASE = '/station-management/api/complaints/';
+/**
+ * Centralized API endpoints for Complaints module.
+ * All service functions use these constants for consistency and maintainability.
+ */
+export const COMPLAINTS_API_ENDPOINTS = {
+  COMPLAINTS: '/station-management/api/complaints/',
+  STATIONS: '/system-administration/stations/',
+  PRISONERS: '/admission/prisoners/',
+  NATURES: '/station-management/api/nature-of-complaints/',
+  PRIORITIES: '/station-management/api/complaint-priorities/',
+  RANKS: '/system-administration/ranks/',
+  STAFF_PROFILES: '/auth/staff-profiles/',
+  COMPLAINT_STATUS: '/station-management/api/complaint-status/',
+  COMPLAINT_ACTIONS: '/station-management/api/complaint-actions/',
+  APPROVAL_STATUSES: '/station-management/api/complaint-status/',
+} as const;
 
-// Option endpoints (adjust if your API uses different paths)
-const STATIONS_ENDPOINT = '/system-administration/stations/';
-const PRISONERS_ENDPOINT = '/admission/prisoners/';
-const NATURES_ENDPOINT = '/station-management/api/nature-of-complaints/';
-const PRIORITIES_ENDPOINT = '/station-management/api/complaint-priorities/';
-const RANKS_ENDPOINT = '/system-administration/ranks/';
-const OFFICER_ENDPOINT = '/auth/staff-profiles/';
-const COMPLAINT_STATUS_ENDPOINT = '/station-management/api/complaint-status/';
-const COMPLAINT_ACTIONS_ENDPOINT = '/station-management/api/complaint-actions/';
-const APPROVAL_STATUSES = '/system-administration/approval-statuses/';
-
-export const fetchComplaints = async (params?: Record<string, any>) => {
-    const res = await axiosInstance.get(BASE, { params });
+export const fetchComplaints = async (params?: Record<string, any>, signal?: AbortSignal) => {
+    const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.COMPLAINTS, { params, signal });
     return res.data;
 };
 
-export const fetchComplaint = async (id: string) => {
-    const res = await axiosInstance.get(`${BASE}${id}/`);
+export const fetchComplaint = async (id: string, signal?: AbortSignal) => {
+    const res = await axiosInstance.get(`${COMPLAINTS_API_ENDPOINTS.COMPLAINTS}${id}/`, { signal });
     return res.data;
 };
 
 export const createComplaint = async (payload: any) => {
     // tell axiosInstance (via config flag) to skip its default toasts (form will handle friendly message)
-    const res = await axiosInstance.post(BASE, payload, { skipErrorToast: true });
+    const res = await axiosInstance.post(COMPLAINTS_API_ENDPOINTS.COMPLAINTS, payload, { skipErrorToast: true } as any);
     return res.data;
 };
 
 export const updateComplaint = async (id: string, payload: any) => {
-    const res = await axiosInstance.put(`${BASE}${id}/`, payload, { skipErrorToast: true });
+    const res = await axiosInstance.put(`${COMPLAINTS_API_ENDPOINTS.COMPLAINTS}${id}/`, payload, { skipErrorToast: true } as any);
     return res.data;
 };
 
 export const deleteComplaint = async (id: string) => {
-    const res = await axiosInstance.delete(`${BASE}${id}/`);
+    const res = await axiosInstance.delete(`${COMPLAINTS_API_ENDPOINTS.COMPLAINTS}${id}/`);
     return res.data;
 };
 
-// Option fetchers — best-effort, return [] on failure so UI stays functional
-export const fetchStations = async () => {
+// Option fetchers — return full paginated response for server-side pagination
+export const fetchStations = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(STATIONS_ENDPOINT);
-        return res.data.results ?? res.data ?? [];
-    } catch {
-        return [];
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.STATIONS, { params, signal });
+        return res.data; // Return full paginated response
+    } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
+        console.error('fetchStations error:', err);
+        return { results: [], count: 0 };
     }
 };
 
-export const fetchPrisoners = async () => {
+export const fetchPrisoners = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(PRISONERS_ENDPOINT);
-        const items = res.data.results ?? res.data ?? [];
-        // Normalize to { id, name } so UI can display labels consistently
-        return (items || []).map((p: any) => {
-            const fullName = `${(p.first_name ?? '').trim()} ${(p.last_name ?? '').trim()}`.trim();
-            const name = (p.full_name ?? fullName) || p.prison_number || p.name || '';
-            return {
-                id: p.id,
-                name,
-                raw: p,
-            };
-        });
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.PRISONERS, { params, signal });
+        return res.data; // Return full paginated response for server-side pagination
     } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
         console.error('fetchPrisoners error:', err?.response ?? err);
-        toast.error(`Failed to load prisoners: ${err?.response?.status || err?.message || 'unknown'}`);
-        return [];
+        return { results: [], count: 0 };
     }
 };
 
-export const fetchComplaintNatures = async () => {
+export const fetchComplaintNatures = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(NATURES_ENDPOINT);
-        return res.data.results ?? res.data ?? [];
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.NATURES, { params, signal });
+        return res.data; // Return full paginated response for server-side pagination
     } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
         console.error('fetchComplaintNatures error:', err?.response ?? err);
-        toast.error(`Failed to load complaint natures: ${err?.response?.status || err?.message || 'unknown'}`);
-        return [];
+        return { results: [], count: 0 };
     }
 };
 
-export const fetchPriorities = async () => {
+export const fetchPriorities = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(PRIORITIES_ENDPOINT);
-        return res.data.results ?? res.data ?? [];
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.PRIORITIES, { params, signal });
+        return res.data; // Return full paginated response for server-side pagination
     } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
         console.error('fetchPriorities error:', err?.response ?? err);
-        toast.error(`Failed to load priorities: ${err?.response?.status || err?.message || 'unknown'}`);
-        return [];
+        return { results: [], count: 0 };
     }
 };
 
 // api fetch option for ranks
-export const fetchRanks = async () => {
+export const fetchRanks = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(RANKS_ENDPOINT);
-        return res.data.results ?? res.data ?? [];
-    } catch {
-        return [];
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.RANKS, { params, signal });
+        return res.data; // Return full paginated response for server-side pagination
+    } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
+        console.error('fetchRanks error:', err);
+        return { results: [], count: 0 };
     }
 };
 
 // fetch staff profiles (used by ComplaintForm)
-export const fetchStaffProfiles = async () => {
+export const fetchStaffProfiles = async (params?: Record<string, any>, signal?: AbortSignal) => {
     try {
-        const res = await axiosInstance.get(OFFICER_ENDPOINT);
-        const items = res.data?.results ?? res.data ?? [];
-        return (items || []).map((p: any) => {
-            // robust extraction
-            const username = p.username ?? p.user?.username ?? `${(p.first_name ?? '').toLowerCase()}.${(p.last_name ?? '').toLowerCase()}`.replace(/\s+/g, '.');
-            const name = (p.first_name || p.last_name) ? `${(p.first_name ?? '').trim()} ${(p.last_name ?? '').trim()}`.trim() : (p.name ?? '');
-            return {
-                id: p.id,
-                force_number: p.force_number ?? '',
-                username,
-                name,
-                rank: p.rank ?? null,
-                rank_name: p.rank_name ?? null,
-                station: p.station ?? null,
-                raw: p,
-            };
-        });
+        const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.STAFF_PROFILES, { params, signal });
+        return res.data; // Return full paginated response for server-side pagination
     } catch (err: any) {
+        // Silently ignore cancellation errors
+        if (
+            err?.name === 'AbortError' ||
+            err?.name === 'CanceledError' ||
+            err?.code === 'ERR_CANCELED' ||
+            String(err?.message).toLowerCase().includes('canceled')
+        ) {
+            throw err;
+        }
         console.error('fetchStaffProfiles error', err?.response ?? err);
-        toast.error('Failed to load staff profiles');
-        return [];
+        return { results: [], count: 0 };
     }
 }
 
 // Fetch complaint statuses (used to render status badges)
 export const fetchComplaintStatuses = async (signal?: AbortSignal) => {
   try {
-    const res = await axiosInstance.get(COMPLAINT_STATUS_ENDPOINT, { signal });
+    const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.COMPLAINT_STATUS, { signal });
     return res.data?.results ?? res.data ?? [];
-  } catch (err) {
+  } catch (err: any) {
+    // Silently ignore cancellation errors
+    if (
+        err?.name === 'AbortError' ||
+        err?.name === 'CanceledError' ||
+        err?.code === 'ERR_CANCELED' ||
+        String(err?.message).toLowerCase().includes('canceled')
+    ) {
+        return [];
+    }
     console.error('fetchComplaintStatuses error', err);
     return [];
   }
@@ -144,7 +184,7 @@ export const fetchComplaintStatuses = async (signal?: AbortSignal) => {
 // Create a complaint action
 export const createComplaintAction = async (payload: any) => {
   try {
-    const res = await axiosInstance.post(COMPLAINT_ACTIONS_ENDPOINT, payload, { skipErrorToast: true });
+    const res = await axiosInstance.post(COMPLAINTS_API_ENDPOINTS.COMPLAINT_ACTIONS, payload, { skipErrorToast: true } as any);
     return res.data;
   } catch (err: any) {
     console.error('createComplaintAction error', err?.response ?? err);
@@ -153,7 +193,21 @@ export const createComplaintAction = async (payload: any) => {
 };
 
 export const fetchApprovalStatuses = async (signal?: AbortSignal) => {
-  const res = await axiosInstance.get(APPROVAL_STATUSES, { signal });
-  // Return either paginated results or raw array
-  return res.data?.results ?? res.data;
+  try {
+    const res = await axiosInstance.get(COMPLAINTS_API_ENDPOINTS.APPROVAL_STATUSES, { signal });
+    // Return either paginated results or raw array
+    return res.data?.results ?? res.data;
+  } catch (err: any) {
+    // Silently ignore cancellation errors
+    if (
+        err?.name === 'AbortError' ||
+        err?.name === 'CanceledError' ||
+        err?.code === 'ERR_CANCELED' ||
+        String(err?.message).toLowerCase().includes('canceled')
+    ) {
+        return [];
+    }
+    console.error('fetchApprovalStatuses error:', err);
+    return [];
+  }
 };

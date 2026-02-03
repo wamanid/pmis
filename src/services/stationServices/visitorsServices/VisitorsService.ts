@@ -1,5 +1,16 @@
 import axiosInstance from "../../axiosInstance";
 
+// API Endpoints for Visitor Management
+export const VISITOR_API_ENDPOINTS = {
+  STATION_VISITORS: '/gate-management/station-visitors/',
+  ID_TYPES: '/system-administration/id-types/',
+  GATES: '/system-administration/gates/',
+  PRISONERS: '/admission/prisoners/',
+  VISITOR_TYPES: '/system-administration/visitor-types/',
+  RELATIONSHIPS: '/system-administration/relationships/',
+  VISITOR_STATUSES: '/gate-management/visitor-statuses/',
+} as const;
+
 export interface StationVisitor {
   is_active: boolean;
   deleted_datetime: string;
@@ -233,12 +244,12 @@ export type RelationshipResponse = Relationship | ErrorResponse;
 export type VisitorStatusResponse = VisitorStatus | ErrorResponse;
 
 export const addStationVisitor = async (visitor: StationVisitor) : Promise<VisitorResponse> => {
-  const response = await axiosInstance.post<VisitorResponse>('/gate-management/station-visitors/', visitor);
+  const response = await axiosInstance.post<VisitorResponse>(VISITOR_API_ENDPOINTS.STATION_VISITORS, visitor);
   return response.data;
 }
 
 // export const getStationVisitors = async (stationId: string) : Promise<VisitorGetResponse> => {
-//   const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/', {
+//   const response = await axiosInstance.get<VisitorGetResponse>(VISITOR_API_ENDPOINTS.STATION_VISITORS, {
 //     params: {
 //       visit_location: stationId
 //     }
@@ -246,12 +257,12 @@ export const addStationVisitor = async (visitor: StationVisitor) : Promise<Visit
 //   return response.data;
 // }
 export const getStationVisitors = async (stationId: string) : Promise<VisitorGetResponse> => {
-  const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/');
+  const response = await axiosInstance.get<VisitorGetResponse>(VISITOR_API_ENDPOINTS.STATION_VISITORS);
   return response.data;
 }
 
 export const getStationVisitors2 = async (prisonerId: string) : Promise<VisitorGetResponse> => {
-  const response = await axiosInstance.get<VisitorGetResponse>('/gate-management/station-visitors/', {
+  const response = await axiosInstance.get<VisitorGetResponse>(VISITOR_API_ENDPOINTS.STATION_VISITORS, {
     params: {
       prisoner: prisonerId
     }
@@ -259,39 +270,52 @@ export const getStationVisitors2 = async (prisonerId: string) : Promise<VisitorG
   return response.data;
 }
 
+// Paginated fetch for SearchableSelect dropdown (server-side pagination)
+export const fetchVisitorsPaginated = async (page: number = 1, search: string = '', prisonerId?: string) => {
+  const response = await axiosInstance.get(VISITOR_API_ENDPOINTS.STATION_VISITORS, {
+    params: {
+      page,
+      search,
+      prisoner: prisonerId || undefined,
+      page_size: 50
+    }
+  });
+  return response.data;
+}
+
 export const updateStationVisitor = async (visitor: StationVisitor, id: string) : Promise<VisitorResponse> => {
-  const response = await axiosInstance.put<VisitorResponse>(`/gate-management/station-visitors/${id}/`, visitor);
+  const response = await axiosInstance.put<VisitorResponse>(`${VISITOR_API_ENDPOINTS.STATION_VISITORS}${id}/`, visitor);
   return response.data;
 }
 
 export const getIdTypes = async () : Promise<IdTypeResponse> => {
-  const response = await axiosInstance.get<IdTypeResponse>('/system-administration/id-types/');
+  const response = await axiosInstance.get<IdTypeResponse>(VISITOR_API_ENDPOINTS.ID_TYPES);
   return response.data;
 }
 
 export const getGates= async () : Promise<GateResponse> => {
-  const response = await axiosInstance.get<GateResponse>('/system-administration/gates/');
+  const response = await axiosInstance.get<GateResponse>(VISITOR_API_ENDPOINTS.GATES);
   return response.data;
 }
 
 export const getPrisoners= async (station?: String) : Promise<PrisonerResponse> => {
-  const response = await axiosInstance.get<PrisonerResponse>('/admission/prisoners/', {
+  const response = await axiosInstance.get<PrisonerResponse>(VISITOR_API_ENDPOINTS.PRISONERS, {
     params: station? {station} : undefined
   });
   return response.data;
 }
 
 export const getVisitorTypes= async () : Promise<VisitorTypeResponse> => {
-  const response = await axiosInstance.get<VisitorTypeResponse>('/system-administration/visitor-types/')
+  const response = await axiosInstance.get<VisitorTypeResponse>(VISITOR_API_ENDPOINTS.VISITOR_TYPES)
   return response.data;
 }
 
 export const getRelationships= async () : Promise<RelationshipResponse> => {
-  const response = await axiosInstance.get<RelationshipResponse>('/system-administration/relationships/');
+  const response = await axiosInstance.get<RelationshipResponse>(VISITOR_API_ENDPOINTS.RELATIONSHIPS);
   return response.data;
 }
 
 export const getVisitorStatus= async () : Promise<VisitorStatusResponse> => {
-  const response = await axiosInstance.get<VisitorStatusResponse  >('/gate-management/visitor-statuses/');
+  const response = await axiosInstance.get<VisitorStatusResponse>(VISITOR_API_ENDPOINTS.VISITOR_STATUSES);
   return response.data;
 }

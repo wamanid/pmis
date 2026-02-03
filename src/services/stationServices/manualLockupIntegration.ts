@@ -1,5 +1,15 @@
 import axiosInstance from '../axiosInstance';
 
+// API Endpoints for Manual Lockup Management (single source of truth)
+export const MANUAL_LOCKUP_API_ENDPOINTS = {
+  MANUAL_LOCKUPS: '/station-management/api/manual-lockups/',
+  LOCKUP_TYPES: '/station-management/api/lockup-types/',
+  STATIONS: '/system-administration/stations/',
+  SEXES: '/system-administration/sexes/',
+  PRISONER_CATEGORIES: '/system-administration/prisoner-categories/',
+  LOCATIONS: '/system-administration/locations/',
+} as const;
+
 export interface AddLockUp {
   is_active: boolean;
   date: string;
@@ -144,31 +154,31 @@ export type ManualLockupResponse = ManualLockup | ErrorResponse;
 export type ManualLockupResp = ManualLockUpItem | ErrorResponse;
 
 export const addLockUpRecord = async (lockup: AddLockUp): Promise<ManualLockupResp> => {
-  const response = await axiosInstance.post<ManualLockupResp>('/station-management/api/manual-lockups/', lockup);
+  const response = await axiosInstance.post<ManualLockupResp>(MANUAL_LOCKUP_API_ENDPOINTS.MANUAL_LOCKUPS, lockup);
   return response.data;
 };
 
 export const getManualLockup = async () : Promise<ManualLockupResponse> => {
-  const response = await axiosInstance.get<ManualLockupResponse>('/station-management/api/manual-lockups/');
+  const response = await axiosInstance.get<ManualLockupResponse>(MANUAL_LOCKUP_API_ENDPOINTS.MANUAL_LOCKUPS);
   return response.data;
 }
 
 export const getLockType = async () : Promise<LockTypeResponse> => {
-  const response = await axiosInstance.get<LockTypeResponse>('/station-management/api/lockup-types/');
+  const response = await axiosInstance.get<LockTypeResponse>(MANUAL_LOCKUP_API_ENDPOINTS.LOCKUP_TYPES);
   return response.data;
 }
 
 export const getSexes = async () : Promise<StationInformationResponse> => {
-  const response = await axiosInstance.get<StationInformationResponse>('/system-administration/sexes/');
+  const response = await axiosInstance.get<StationInformationResponse>(MANUAL_LOCKUP_API_ENDPOINTS.SEXES);
   return response.data;
 }
 
 export const getPrisonerCategories = async () : Promise<StationInformationResponse> => {
-  const response = await axiosInstance.get<StationInformationResponse>('/system-administration/prisoner-categories/');
+  const response = await axiosInstance.get<StationInformationResponse>(MANUAL_LOCKUP_API_ENDPOINTS.PRISONER_CATEGORIES);
   return response.data;
 }
 
 export const getStation = async () : Promise<StationResponse> => {
-  const response = await axiosInstance.get<StationResponse>('/system-administration/stations/');
+  const response = await axiosInstance.get<StationResponse>(MANUAL_LOCKUP_API_ENDPOINTS.STATIONS);
   return response.data;
 }

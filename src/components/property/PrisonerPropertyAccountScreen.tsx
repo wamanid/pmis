@@ -34,7 +34,7 @@ import {
   ChevronsUpDown
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import { DataTable } from "../common/DataTableCollapsableRows";
+import { DataTable } from "../common/DataTable";
 import SearchableSelect from '../common/SearchableSelect';
 import StaffProfileSelect from '../common/StaffProfileSelect';
 import AmountInput from '../common/AmountInput';
@@ -166,18 +166,6 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     checked_by_oc: 0,
   });
   const [transactionFormErrors, setTransactionFormErrors] = useState<Record<string,string>>({});
-  // expanded rows (for accounts collapsible section)
-  const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set());
-  const toggleAccountExpansion = (accountId: string) => {
-    const newSet = new Set(expandedAccounts);
-    if (newSet.has(accountId)) newSet.delete(accountId);
-    else newSet.add(accountId);
-    setExpandedAccounts(newSet);
-  };
-  // helper to get transactions for an account (from loaded transactions)
-  const getAccountTransactions = (accountId: string) => {
-    return transactions.filter(t => String(t.property_prisoner_account) === String(accountId));
-  };
 
   // request control (no shared abort controller — rely on reqId to ignore stale responses)
   const reqId = useRef(0);
@@ -297,8 +285,13 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
   useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
 
-  // initial lookups
-  useEffect(() => { loadLookups(); }, [loadLookups]);
+  // initial lookups and data load
+  useEffect(() => { 
+    loadLookups();
+    // Load both accounts and transactions on mount since Accounts tab displays transaction statistics
+    loadAccounts();
+    loadTransactions();
+  }, [loadLookups, loadAccounts, loadTransactions]);
 
   // register filter refresh to reload lists when global filters change via header UI
   useFilterRefresh(() => {
@@ -534,9 +527,93 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
   // UI computed stats
   const totalAccounts = accountsTotal;
-  const totalBalance = accounts.reduce((sum, a) => sum + (parseFloat(a.balance || '0') || 0), 0);
+  
+  // Helper to get currency text color for visual differentiation (Option B - text only)
+  const getCurrencyColor = (currencyCode: string) => {
+    const code = String(currencyCode).toUpperCase();
+    const colorMap: Record<string, string> = {
+      USD: '#166534',    // Green - US Dollar
+      US: '#166534',     // Green - US (alternative)
+      EUR: '#1e40af',    // Blue - Euro
+      EURO: '#1e40af',   // Blue - Euro (alternative)
+      GBP: '#6b21a8',    // Purple - British Pound
+      UGX: '#9a3412',    // Orange - Uganda Shilling
+      UGANDA: '#9a3412', // Orange - Uganda (alternative)
+      KES: '#991b1b',    // Red - Kenyan Shilling
+      KENYA: '#991b1b',  // Red - Kenya (alternative)
+      TZS: '#155e75',    // Cyan - Tanzanian Shilling
+      TANZANIA: '#155e75', // Cyan - Tanzania (alternative)
+      RWF: '#3f6212',    // Lime - Rwandan Franc
+      RWANDA: '#3f6212', // Lime - Rwanda (alternative)
+    };
+    return colorMap[code] || '#374151'; // Gray fallback
+  };
+  
+  // Calculate balance per currency for multi-currency display
+  const balanceByCurrency = useMemo(() => {
+    const grouped: Record<string, { total: number; symbol: string; name: string }> = {};
+    accounts.forEach(acc => {
+      const currencyKey = acc.currency_name || acc.currency || 'Unknown';
+      const symbol = acc.currency_symbol || '';
+      const name = acc.currency_name || '';
+      const balance = parseFloat(acc.balance || '0') || 0;
+      
+      if (!grouped[currencyKey]) {
+        grouped[currencyKey] = { total: 0, symbol, name };
+      }
+      grouped[currencyKey].total += balance;
+    });
+    return grouped;
+  }, [accounts]);
+  
+  // Format balance display for card (show top 3 currencies or primary)
+  const formattedBalance = useMemo(() => {
+    const entries = Object.entries(balanceByCurrency);
+    if (entries.length === 0) return '0';
+    if (entries.length === 1) {
+      const [_, data] = entries[0];
+      return `${data.symbol || ''} ${data.total.toLocaleString()}`;
+    }
+    // Show top 3 currencies by total value
+    return entries
+      .sort(([_, a], [__, b]) => b.total - a.total)
+      .slice(0, 3)
+      .map(([_, data]) => `${data.symbol || ''} ${data.total.toLocaleString()}`)
+      .join(' | ');
+  }, [balanceByCurrency]);
+  
   const totalTransactions = transactionsTotal;
   const pendingTransactions = transactions.filter(t => t.transaction_status_name === 'Pending').length;
+  
+  // Calculate transaction value per currency
+  const transactionValueByCurrency = useMemo(() => {
+    const grouped: Record<string, { total: number; symbol: string }> = {};
+    transactions.forEach(tx => {
+      const currencyKey = tx.currency_name || tx.currency || 'Unknown';
+      const symbol = tx.currency_symbol || '';
+      const amount = parseFloat(tx.amount || '0') || 0;
+      
+      if (!grouped[currencyKey]) {
+        grouped[currencyKey] = { total: 0, symbol };
+      }
+      grouped[currencyKey].total += amount;
+    });
+    return grouped;
+  }, [transactions]);
+  
+  const formattedTransactionValue = useMemo(() => {
+    const entries = Object.entries(transactionValueByCurrency);
+    if (entries.length === 0) return '0';
+    if (entries.length === 1) {
+      const [_, data] = entries[0];
+      return `${data.symbol || ''} ${Math.abs(data.total).toLocaleString()}`;
+    }
+    return entries
+      .sort(([_, a], [__, b]) => Math.abs(b.total) - Math.abs(a.total))
+      .slice(0, 3)
+      .map(([_, data]) => `${data.symbol || ''} ${Math.abs(data.total).toLocaleString()}`)
+      .join(' | ');
+  }, [transactionValueByCurrency]);
 
   // helper to render currency label (show code/name in UI, save uuid)
   const getCurrencyLabel = (val?: string) => {
@@ -557,45 +634,90 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
   // Columns for DataTable
   const accountColumns = [
-    {
-      key: 'expand',
-      label: '',
-      sortable: false,
-      render: (_v:any, r:any) => (
-        <Button variant="ghost" size="sm" onClick={() => toggleAccountExpansion(r.id)}>
-          {expandedAccounts.has(r.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-        </Button>
+    { 
+      key: 'prisoner_name', 
+      label: 'Prisoner',
+      render: (v: any, r: any) => (
+        <div className="flex flex-col">
+          <span className="font-medium">{v}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+        </div>
       )
     },
-    { key: 'prisoner_name', label: 'Prisoner' },
-    { key: 'account_type_name', label: 'Account Type' },
-    { key: 'currency', label: 'Currency', render: (v:any, r:any) => <span>{getCurrencyLabel(v)}</span> },
-    { key: 'balance', label: 'Balance', render: (v:any, r:any) => parseFloat(r.balance || '0').toLocaleString() },
+    { 
+      key: 'account_type_name', 
+      label: 'Account Type',
+      render: (v: any) => <Badge variant="outline" className="font-normal">{v}</Badge>
+    },
+    { 
+      key: 'currency_name', 
+      label: 'Currency', 
+      render: (_v: any, r: any) => (
+        <div className="flex items-center gap-1">
+          <span className="font-medium">{r.currency_symbol || r.currency_name}</span>
+          <span className="text-xs text-gray-500">{r.currency_name}</span>
+        </div>
+      )
+    },
+    { 
+      key: 'balance', 
+      label: 'Balance', 
+      render: (v: any, r: any) => {
+        const balance = parseFloat(r.balance || '0');
+        const isNegative = balance < 0;
+        return (
+          <div className="flex items-center gap-1">
+            <span className={`font-semibold ${isNegative ? 'text-red-600' : 'text-green-600'}`}>
+              {r.currency_symbol || ''} {Math.abs(balance).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            {isNegative && <Badge variant="destructive" className="text-xs">Overdrawn</Badge>}
+          </div>
+        );
+      }
+    },
+    {
+      key: 'created_datetime',
+      label: 'Registered',
+      render: (v: any) => (
+        <div className="flex items-center gap-2">
+          <Calendar className="h-3 w-3 text-gray-400" />
+          <DateTime value={v} format="dMY" />
+        </div>
+      )
+    },
+    {
+      key: 'is_active',
+      label: 'Status',
+      render: (v: any) => (
+        <Badge variant={v ? 'default' : 'secondary'}>
+          {v ? 'Active' : 'Inactive'}
+        </Badge>
+      )
+    },
     { key: 'actions', label: 'Actions', sortable: false, render: (_v:any, r:any) => (
-      <div className="flex">
-        {/* <div className="flex justify-end gap-2"> */}
-
+      <div className="flex gap-2">
         <Button variant="ghost" size="sm" onClick={() => {
             setSelectedAccount(r);
             setAccountFormData({ prisoner: r.prisoner, account_type: r.account_type, currency: r.currency, balance: r.balance ?? '0' });
-            setAccountFormKey(k => k + 1); // remount form so local state syncs
+            setAccountFormKey(k => k + 1);
             setIsViewAccountDialogOpen(true);
           }}>
            <Eye className="h-4 w-4" />
          </Button>
 
-        {/* <Button variant="ghost" size="sm" onClick={() => {
+        <Button variant="ghost" size="sm" onClick={() => {
             const copy = deepClone(r);
             setSelectedAccount(copy);
             setAccountFormData({ prisoner: copy.prisoner, account_type: copy.account_type, currency: copy.currency, balance: copy.balance ?? '0' });
-            setAccountFormKey(k => k + 1); // ensure AccountForm remounts with fresh data
+            setAccountFormKey(k => k + 1);
             setIsEditAccountDialogOpen(true);
           }}>
            <Pencil className="h-4 w-4" />
-        </Button> */}
-        {/* <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setDeleteAccountId(r.id); }}>
+        </Button>
+        
+        <Button variant="ghost" size="sm" onClick={() => { setSelectedAccount(r); setDeleteAccountId(r.id); }}>
           <Trash2 className="h-4 w-4 text-red-600" />
-        </Button> */}
+        </Button>
       </div>
     )},
   ];
@@ -607,29 +729,76 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       render: (value: any) => (
         <div className="flex items-center gap-2">
           <Calendar className="h-4 w-4 text-gray-400" />
-          <DateTime value={value} format="dMY" />
+          <DateTime value={value} format="dMYT" />
         </div>
       ),
     },
-    { key: 'prisoner_name', label: 'Prisoner' },
-    // { key: 'account_type_name', label: 'Account Type' },
+    { 
+      key: 'prisoner_name', 
+      label: 'Prisoner',
+      render: (v: any, r: any) => (
+        <div className="flex flex-col">
+          <span className="font-medium">{v}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+        </div>
+      )
+    },
     {
       key: "account_type_name",
       label: "Account Type",
       render: (value: any) => (
-        <Badge variant="outline">{value}</Badge>
+        <Badge variant="outline" className="font-normal">{value}</Badge>
       ),
     },
-    // { key: 'transaction_type_name', label: 'Type' },
     {
       key: "transaction_type_name",
       label: "Type",
-      render: (value: any) => (
-        <Badge variant="outline">{value}</Badge>
+      render: (value: any, r: any) => (
+        <div className="flex items-center gap-2">
+          <Badge variant={r.is_credit ? 'default' : 'secondary'}>
+            {r.is_credit ? '📥 Credit' : '📤 Debit'}
+          </Badge>
+          <span className="text-sm">{value}</span>
+        </div>
       ),
     },
-    { key: 'amount', label: 'Amount', render: (v:any, r:any) => <span className={parseFloat(r.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>{parseFloat(r.amount) >= 0 ? '+' : ''}{parseFloat(r.amount).toLocaleString()}</span> },
-    // { key: 'transaction_status_name', label: 'Status' },
+    { 
+      key: 'amount', 
+      label: 'Amount', 
+      render: (v: any, r: any) => {
+        const amount = parseFloat(r.amount || '0');
+        const isPositive = amount >= 0;
+        return (
+          <div className="flex flex-col">
+            <span className={`font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+              {isPositive ? '+' : ''}{r.currency_symbol || ''} {Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </span>
+            <span className="text-xs text-gray-500">{r.currency_name || ''}</span>
+          </div>
+        );
+      }
+    },
+    {
+      key: 'balance_before',
+      label: 'Balance Before',
+      render: (v: any, r: any) => (
+        <span className="text-sm text-gray-600">
+          {r.currency_symbol || ''} {parseFloat(v || '0').toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        </span>
+      )
+    },
+    {
+      key: 'balance_after',
+      label: 'Balance After',
+      render: (v: any, r: any) => {
+        const balance = parseFloat(v || '0');
+        return (
+          <span className={`text-sm font-medium ${balance < 0 ? 'text-red-600' : 'text-green-600'}`}>
+            {r.currency_symbol || ''} {balance.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </span>
+        );
+      }
+    },
     {
       key: "transaction_status_name",
       label: "Status",
@@ -637,8 +806,27 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         <Badge variant={getStatusVariant(value)}>{value}</Badge>
       ),
     },
-    { key: 'checked_by_name', label: 'Checked By' },
-    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate">{v || '-'}</div> },
+    { 
+      key: 'biometric_consent', 
+      label: 'Verified',
+      render: (v: any) => (
+        <div className="flex items-center gap-1">
+          {v ? (
+            <Badge variant="default">✓ Biometric</Badge>
+          ) : (
+            <Badge variant="outline">Manual</Badge>
+          )}
+        </div>
+      )
+    },
+    { 
+      key: 'checked_by_name', 
+      label: 'Checked By',
+      render: (v: any) => (
+        <span className="text-sm">{v || <span className="text-gray-400">Not checked</span>}</span>
+      )
+    },
+    { key: 'transaction_remark', label: 'Remarks', render: (v:any) => <div className="max-w-xs truncate text-sm">{v || <span className="text-gray-400">-</span>}</div> },
     {
       key: 'actions',
       label: 'Actions',
@@ -1097,7 +1285,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
         <TabsContent value="accounts" className="space-y-6">
           {/* Statistics Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm">Total Accounts</CardTitle>
@@ -1108,13 +1296,16 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="md:col-span-2 border-2">
               <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm">Total Balance</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
+                <CardTitle className="text-base ">Total Balance (All Currencies)</CardTitle>
+                <DollarSign className="h-5 w-5" style={{ color: '#650000' }} />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl"> {totalBalance.toLocaleString()}</div>
+                <div className="text-2xl font-bold" style={{ color: '#650000' }}>{formattedBalance}</div>
+                {Object.keys(balanceByCurrency).length > 3 && (
+                  <p className="text-sm text-gray-600 mt-2">+{Object.keys(balanceByCurrency).length - 3} more currencies</p>
+                )}
               </CardContent>
             </Card>
 
@@ -1139,30 +1330,17 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
             </Card>
           </div>
 
-          {/* Filters and Actions */}
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
-                <div className="relative flex-1 max-w-sm">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <Input
-                    placeholder="Search accounts..."
-                    value={searchTerm}
-                    onChange={(e) => { setSearchTerm(e.target.value); setPage(1); }}
-                    className="pl-10"
-                  />
-                </div>
-                <Button onClick={() => {
-                    // reset account form to blank defaults for Create
-                    setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
-                    setIsCreateAccountDialogOpen(true);
-                  }} style={{ backgroundColor: '#650000' }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create Account
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Create Account Button */}
+          <div className="flex justify-end">
+            <Button onClick={() => {
+                // reset account form to blank defaults for Create
+                setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+                setIsCreateAccountDialogOpen(true);
+              }} style={{ backgroundColor: '#650000' }}>
+              <Plus className="h-4 w-4 mr-2" />
+              Create Account
+            </Button>
+          </div>
 
           {/* Accounts Table (DataTable) */}
           <Card>
@@ -1170,104 +1348,209 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               <DataTable
                 url="/property-management/prisoner-accounts/"
                 title="Accounts"
-                data={accounts}
-                loading={accountsLoading}
-                total={accountsTotal}
-                page={page}
-                pageSize={pageSize}
-                onPageChange={(p:number)=> setPage(p)}
-                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
-                onSort={() => { setPage(1); loadAccounts(); }}
                 columns={accountColumns}
-                externalSearch={searchTerm}
-                // expanded rows support: DataTable should call this to render expanded content for a row
-                renderExpandedRow={(row:any) => expandedAccounts.has(row.id) ? (
-                  <div className="p-4 bg-gray-50">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="font-semibold">Transactions</h3>
-                      <Button
-                        size="sm"
-                        onClick={() => {
-                          setTransactionFormData((prev) => ({ ...deepClone(prev), property_prisoner_account: row.id }));
-                          setIsCreateTransactionDialogOpen(true);
-                        }}
-                        style={{ backgroundColor: '#650000' }}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Transaction
-                      </Button>
-                    </div>
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Date & Time</TableHead>
-                          <TableHead>Type</TableHead>
-                          <TableHead>Amount</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead>Balance After</TableHead>
-                          <TableHead>Remarks</TableHead>
-                          <TableHead className="text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {getAccountTransactions(row.id).length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center text-gray-500">No transactions found</TableCell>
-                          </TableRow>
-                        ) : getAccountTransactions(row.id).map((t:any) => (
-                          <TableRow key={t.id}>
-                            <TableCell>
-                              <div className="flex items-center gap-2">
-                                <Calendar className="h-4 w-4 text-gray-400" />
-                                <DateTime value={t.transaction_datetime} format="dMY" />
+                config={{
+                  grouping: {
+                    groupBy: 'prisoner_name',
+                    defaultExpanded: false,
+                    renderGroupHeader: (groupValue: string, items: any[]) => {
+                      const firstItem = items[0];
+                      
+                      // Calculate balance per currency - use currency_symbol as key for proper color mapping
+                      const balancesByCurrency: Record<string, { total: number; symbol: string; code: string }> = {};
+                      items.forEach(item => {
+                        const currencySymbol = item.currency_symbol || 'Unknown';
+                        const balance = parseFloat(item.balance || '0') || 0;
+                        
+                        if (!balancesByCurrency[currencySymbol]) {
+                          balancesByCurrency[currencySymbol] = { total: 0, symbol: currencySymbol, code: currencySymbol };
+                        }
+                        balancesByCurrency[currencySymbol].total += balance;
+                      });
+                      
+                      return (
+                        <div className="flex items-center justify-between py-2 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Total Balance</div>
+                              <div className="font-semibold flex flex-wrap gap-3">
+                                {Object.values(balancesByCurrency).map((c, idx) => {
+                                  const code = c.code; // Already using currency_symbol directly
+                                  const color = getCurrencyColor(code);
+                                  return (
+                                    <span key={idx}>
+                                      <span style={{ color, fontWeight: '600' }}>{code}</span>{' '}
+                                      <span>{c.total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                    </span>
+                                  );
+                                })}
                               </div>
-                            </TableCell>
-                            <TableCell><Badge variant="outline">{t.transaction_type_name}</Badge></TableCell>
-                            <TableCell>
-                              <span className={parseFloat(t.amount) >= 0 ? 'text-green-600' : 'text-red-600'}>
-                                {parseFloat(t.amount) >= 0 ? '+' : ''}{parseFloat(t.amount).toLocaleString()}
-                              </span>
-                            </TableCell>
-                            <TableCell>
-                              {/* <Badge variant={t.transaction_status_name === 'Approved' ? 'default' : t.transaction_status_name === 'Pending' ? 'secondary' : 'destructive'}>
-                                {t.transaction_status_name}
-                              </Badge> */}
-                              <Badge variant={getStatusVariant(t.transaction_status_name)}>
-                                {t.transaction_status_name}
-                              </Badge>
-                            </TableCell>
-                            <TableCell>{parseFloat(t.balance_after || '0').toLocaleString()}</TableCell>
-                            <TableCell className="max-w-xs truncate">{t.transaction_remark}</TableCell>
-                            <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(t); setIsViewTransactionDialogOpen(true); }}><Eye className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => {
-                                    const copy = deepClone(t);
-                                    setSelectedTransaction(copy);
-                                    // populate form data for editing (use cloned values)
-                                    setTransactionFormData({
-                                      property_prisoner_account: copy.property_prisoner_account,
-                                      transaction_type: copy.transaction_type,
-                                      transaction_status: copy.transaction_status,
-                                      amount: copy.amount,
-                                      transaction_remark: copy.transaction_remark,
-                                      biometric_consent: copy.biometric_consent,
-                                      checked_by_oc: copy.checked_by_oc ?? '',
-                                      transaction_datetime: copy.transaction_datetime ?? new Date().toISOString(),
-                                      balance_before: copy.balance_before ?? '',
-                                      balance_after: copy.balance_after ?? '',
-                                    });
-                                    setIsEditTransactionDialogOpen(true);
-                                  }}><Pencil className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="sm" onClick={() => { setSelectedTransaction(deepClone(t)); setDeleteTransactionId(t.id); }}><Trash2 className="h-4 w-4 text-red-600" /></Button>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Accounts</div>
+                              <div className="font-semibold">{items.length}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Currencies</div>
+                              <div className="text-sm">
+                                {Object.keys(balancesByCurrency).map((currSymbol, idx) => {
+                                  const color = getCurrencyColor(currSymbol);
+                                  return (
+                                    <span key={idx}>
+                                      <span style={{ color, fontWeight: '500' }}>{currSymbol}</span>
+                                      {idx < Object.keys(balancesByCurrency).length - 1 ? ', ' : ''}
+                                    </span>
+                                  );
+                                })}
                               </div>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                ) : null}
+                            </div>
+                            <div>
+                              <Button
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  // Pre-populate with first account or default if single account
+                                  const accountToUse = items.length === 1 ? items[0].id : '';
+                                  setTransactionFormData({
+                                    property_prisoner_account: accountToUse,
+                                    transaction_type: '',
+                                    transaction_status: '',
+                                    amount: '',
+                                    transaction_remark: '',
+                                    biometric_consent: false,
+                                    checked_by_oc: 0,
+                                  });
+                                  setIsCreateTransactionDialogOpen(true);
+                                }}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                <Plus className="h-3 w-3 mr-1" />
+                                 Transaction
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  },
+                  expandable: {
+                    isExpanded: (row: any) => expandedAccounts.has(row.id),
+                    onToggle: (row: any) => toggleAccountExpansion(row.id),
+                    renderExpandedRow: (row: any) => {
+                      const accountTransactions = getAccountTransactions(row.id);
+                      
+                      if (accountTransactions.length === 0) {
+                        return (
+                          <div className="p-6 text-center text-gray-500 bg-gray-50">
+                            <FileText className="h-8 w-8 mx-auto mb-2 text-gray-400" />
+                            <p className="text-sm">No transactions found for this account</p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="p-4 bg-gray-50">
+                          <div className="flex items-center justify-between mb-3">
+                            <h4 className="text-sm font-semibold text-gray-700">Recent Transactions ({accountTransactions.length})</h4>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                setActiveTab('transactions');
+                                // Optional: could set a filter for this account
+                              }}
+                              className="text-xs"
+                            >
+                              View All Transactions →
+                            </Button>
+                          </div>
+                          <div className="bg-white rounded-lg border overflow-hidden">
+                            <table className="w-full text-sm">
+                              <thead className="bg-gray-100 border-b">
+                                <tr>
+                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Date & Time</th>
+                                  <th className="text-left py-2 px-3 font-medium text-gray-600">Type</th>
+                                  <th className="text-right py-2 px-3 font-medium text-gray-600">Amount</th>
+                                  <th className="text-right py-2 px-3 font-medium text-gray-600">Balance After</th>
+                                  <th className="text-center py-2 px-3 font-medium text-gray-600">Status</th>
+                                  <th className="text-center py-2 px-3 font-medium text-gray-600">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y">
+                                {accountTransactions.slice(0, 5).map((tx) => {
+                                  const amount = parseFloat(tx.amount || '0');
+                                  const isPositive = amount >= 0;
+                                  const balanceAfter = parseFloat(tx.balance_after || '0');
+                                  const currencyColor = getCurrencyColor(tx.currency_symbol || '');
+
+                                  return (
+                                    <tr key={tx.id} className="hover:bg-gray-50">
+                                      <td className="py-2 px-3">
+                                        <div className="flex items-center gap-1 text-xs text-gray-600">
+                                          <Calendar className="h-3 w-3" />
+                                          <DateTime value={tx.transaction_datetime} format="dMYT" />
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3">
+                                        <div className="flex items-center gap-1">
+                                          <Badge variant={tx.is_credit ? 'default' : 'secondary'} className="text-xs">
+                                            {tx.is_credit ? '📥' : '📤'}
+                                          </Badge>
+                                          <span className="text-xs">{tx.transaction_type_name}</span>
+                                        </div>
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className={`font-semibold ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                                          {isPositive ? '+' : ''}
+                                          <span style={{ color: currencyColor }}>{tx.currency_symbol}</span>{' '}
+                                          {Math.abs(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-right">
+                                        <span className={`text-sm font-medium ${balanceAfter < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                                          <span style={{ color: currencyColor }}>{tx.currency_symbol}</span>{' '}
+                                          {balanceAfter.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <Badge variant={getStatusVariant(tx.transaction_status_name)} className="text-xs">
+                                          {tx.transaction_status_name}
+                                        </Badge>
+                                      </td>
+                                      <td className="py-2 px-3 text-center">
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => {
+                                            setSelectedTransaction(deepClone(tx));
+                                            setIsViewTransactionDialogOpen(true);
+                                          }}
+                                          className="h-7 w-7 p-0"
+                                        >
+                                          <Eye className="h-3 w-3" />
+                                        </Button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                            {accountTransactions.length > 5 && (
+                              <div className="p-2 text-center text-xs text-gray-500 bg-gray-50 border-t">
+                                Showing 5 of {accountTransactions.length} transactions
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                }}
               />
             </CardContent>
           </Card>
@@ -1275,7 +1558,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
 
         <TabsContent value="transactions" className="space-y-6">
           {/* Transactions statistics & filters */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             <Card>
               <CardHeader className="flex flex-row items-center justify-between pb-2">
                 <CardTitle className="text-sm">Total Transactions</CardTitle>
@@ -1283,6 +1566,19 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl">{totalTransactions}</div>
+              </CardContent>
+            </Card>
+
+            <Card className="md:col-span-2 border-2">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-base" >Total Value (All Currencies)</CardTitle>
+                <DollarSign className="h-5 w-5" style={{ color: '#650000' }} />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold" style={{ color: '#650000' }}>{formattedTransactionValue}</div>
+                {Object.keys(transactionValueByCurrency).length > 3 && (
+                  <p className="text-sm text-gray-600 mt-2">+{Object.keys(transactionValueByCurrency).length - 3} more currencies</p>
+                )}
               </CardContent>
             </Card>
 
@@ -1303,16 +1599,6 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               </CardHeader>
               <CardContent>
                 <div className="text-2xl">{transactions.filter(t => t.transaction_status_name === 'Approved').length}</div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm">Total Value</CardTitle>
-                <DollarSign className="h-4 w-4 text-muted-foreground" />
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl">UGX {transactions.reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0).toLocaleString()}</div>
               </CardContent>
             </Card>
           </div>
@@ -1388,16 +1674,86 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
               <DataTable
                 url="/property-management/transactions/"
                 title="Transactions"
-                data={transactions}
-                loading={transactionsLoading}
-                total={transactionsTotal}
-                page={page}
-                pageSize={pageSize}
-                onPageChange={(p:number)=> setPage(p)}
-                onPageSizeChange={(s:number)=> { setPageSize(s); setPage(1); }}
-                onSort={() => { setPage(1); loadTransactions(); }}
                 columns={updatedTransactionColumns}
-                externalSearch={transactionSearchTerm}
+                config={{
+                  grouping: {
+                    groupBy: 'prisoner_name',
+                    defaultExpanded: false,
+                    renderGroupHeader: (groupValue: string, items: any[]) => {
+                      const firstItem = items[0];
+                      
+                      // Calculate totals per currency
+                      const currencyTotals: Record<string, { credits: number; debits: number; symbol: string; code: string }> = {};
+                      items.forEach(item => {
+                        const currencyCode = item.currency_name || 'Unknown';
+                        const symbol = item.currency_symbol || '';
+                        const amount = parseFloat(item.amount || '0') || 0;
+                        
+                        if (!currencyTotals[currencyCode]) {
+                          currencyTotals[currencyCode] = { credits: 0, debits: 0, symbol, code: currencyCode };
+                        }
+                        
+                        if (item.is_credit) {
+                          currencyTotals[currencyCode].credits += amount;
+                        } else {
+                          currencyTotals[currencyCode].debits += Math.abs(amount);
+                        }
+                      });
+                      
+                      // Format for display - show all currencies if 3 or less, otherwise show top 3 by total value
+                      const currencyEntries = Object.values(currencyTotals);
+                      const displayCurrencies = currencyEntries.length <= 3 
+                        ? currencyEntries
+                        : currencyEntries.sort((a, b) => (b.credits + b.debits) - (a.credits + a.debits)).slice(0, 3);
+                      
+                      const creditsDisplay = displayCurrencies
+                        .map(c => `${c.symbol} ${c.credits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+                        .join(' | ');
+                      
+                      const debitsDisplay = displayCurrencies
+                        .map(c => `${c.symbol} ${c.debits.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`)
+                        .join(' | ');
+                      
+                      const netDisplay = displayCurrencies
+                        .map(c => {
+                          const net = c.credits - c.debits;
+                          return `${c.symbol} ${net.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                        })
+                        .join(' | ');
+                      
+                      const moreCurrencies = currencyEntries.length > 3 ? ` (+${currencyEntries.length - 3} more)` : '';
+                      
+                      return (
+                        <div className="flex items-center justify-between py-2 px-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex flex-col">
+                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                              {moreCurrencies && <span className="text-xs text-gray-500">{moreCurrencies}</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Credits</div>
+                              <div className="font-semibold text-green-600">+{creditsDisplay}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Debits</div>
+                              <div className="font-semibold text-red-600">-{debitsDisplay}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Net Amount</div>
+                              <div className="font-semibold text-gray-700">{netDisplay}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-xs text-gray-500">Transactions</div>
+                              <div className="font-semibold">{items.length}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    }
+                  }
+                }}
               />
             </CardContent>
           </Card>

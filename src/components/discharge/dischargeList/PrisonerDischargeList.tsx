@@ -48,11 +48,12 @@ import TransferRequestForm from '../../transfer/TransferRequestForm';
 import {Loader} from "../ViewDischargeDetails";
 import {
   handleCatchError,
-  handleEmptyList,
+  handleEmptyList, handleResponseError,
   handleServerError,
   handleServerError2
 } from "../../../services/stationServices/utils";
 import {
+  addDischarge,
   DischargeRequest,
   DischargeType,
   getDischarges,
@@ -251,23 +252,110 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
     setSelectedRecord(null);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = async (data: any) => {
+    console.log(data)
 
-    if (selectedRecord) {
-      setDischargeRecords(
-        dischargeRecords.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
-      );
-      toast.success('Discharge record updated successfully');
-    } else {
-      const newRecord = {
-        id: Date.now().toString(),
-        ...data,
-      };
-      setDischargeRecords([...dischargeRecords, newRecord]);
-      toast.success('Discharge record created successfully');
+    const formData = new FormData()
+
+    formData.append("request", data.request)
+    formData.append("prisoner", data.prisoner)
+    formData.append("discharge_reason", data.discharge_reason)
+    formData.append("discharge_datetime", data.discharge_datetime)
+    formData.append("discharge_type", data.discharge_type)
+    formData.append("remarks", data.remarks)
+    formData.append("intended_place_of_stay", data.intended_place_of_stay)
+
+    data.officers.forEach((officer) => {
+      formData.append("discharge_officers", officer.staff)
+    })
+
+    const type = types.find(t => t.id === data.discharge_type)?.name
+
+    if(type === "Death"){
+      formData.append("deceased.date_of_death", data.date_of_death)
+      formData.append("deceased.next_of_kin_available", data.next_of_kin_available)
+      formData.append("deceased.morgue_details", data.morgue_details)
+      formData.append("deceased.next_of_kin", data.next_of_kin)
+      if (data.post_mortem_report instanceof File) {
+        formData.append("deceased.post_mortem_report", data.post_mortem_report);
+      }
     }
-    setIsFormOpen(false);
-    setSelectedRecord(null);
+    else if (type === "Execution") {
+      formData.append("execution.datetime_of_execution", data.datetime_of_execution)
+      formData.append("execution.approving_authority", data.approving_authority)
+    }
+
+    data.documents.forEach((doc, index) => {
+      formData.append(`discharge_documents.${index}.document_type`, doc.document_type)
+      formData.append(`discharge_documents.${index}.description`, doc.description)
+      if (doc.document instanceof File) {
+        formData.append(
+          `discharge_documents.${index}.document_file`,
+          doc.document
+        );
+      }
+    })
+
+    console.log(formData)
+
+    try {
+      const response = await addDischarge(formData)
+      if (handleResponseError(response)) return;
+
+      console.log(response)
+      if (!('request' in response)) {
+        toast.error("Failed to update the discharges table");
+        return;
+      }
+
+      const newDischarge: PrisonerDischarge = {
+        id: new Date().toISOString(),
+        prisoner_name: "",
+        prisoner_number: "",
+        discharge_type_name: "",
+        discharge_reason_name: "",
+        request_number: "",
+        created_datetime: null,
+        updated_datetime: null,
+        deleted_datetime: null,
+        is_active: true,
+        discharge_number: null,
+        discharge_datetime: data.discharge_datetime,
+        remarks: data.remarks,
+        intended_place_of_stay: data.intended_place_of_stay,
+        created_by: null,
+        updated_by: null,
+        deleted_by: null,
+        request: data.request,
+        prisoner: data.prisoner,
+        discharge_type: data.discharge_type,
+        discharge_reason: data.discharge_reason,
+      }
+
+      setDischargeRecords([newDischarge, ...dischargeRecords]);
+      toast.success('Discharge record created successfully');
+      // setIsFormOpen(false);
+      // setSelectedRecord(null);
+    }
+    catch (error){
+      handleCatchError(error)
+    }
+
+    // if (selectedRecord) {
+    //   setDischargeRecords(
+    //     dischargeRecords.map((r) => (r.id === selectedRecord.id ? { ...r, ...data } : r))
+    //   );
+    //   toast.success('Discharge record updated successfully');
+    // } else {
+    //   const newRecord = {
+    //     id: Date.now().toString(),
+    //     ...data,
+    //   };
+    //   setDischargeRecords([...dischargeRecords, newRecord]);
+    //   toast.success('Discharge record created successfully');
+    // }
+    // setIsFormOpen(false);
+    // setSelectedRecord(null);
   };
 
   const handleResetFilters = () => {
@@ -866,6 +954,7 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 };

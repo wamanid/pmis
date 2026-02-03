@@ -57,6 +57,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import {useFilterRefresh} from "../../hooks/useFilterRefresh";
 import {useFilters} from "../../contexts/FilterContext";
 import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
+import SearchableSelect from "../common/SearchableSelect";
 import {getPrisoners, PrisonerItem} from "../../services/stationServices/visitorsServices/VisitorsService";
 import {
   addHousingAssignment,
@@ -64,8 +65,14 @@ import {
   Cell, deleteHousingAssignment, deleteWardById, getHousingAssignments,
   getStationWards,
   getWardCells, HousingAssignment, updateHousingAssignment,
-  Ward
+  Ward,
+  HOUSING_API_ENDPOINTS,
+  fetchAssignmentById,
+  fetchWardById
 } from "../../services/stationServices/housingService";
+import { DataTable } from "../common/DataTable";
+import axiosInstance from "../../services/axiosInstance";
+import { useCallback } from "react";
 import {handleCatchError, handleEffectLoad, handleResponseError} from "../../services/stationServices/utils";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -164,25 +171,11 @@ export default function HousingAllocationScreen() {
   const [activeTab, setActiveTab] = useState("assignments");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Filters
-  const [selectedRegion, setSelectedRegion] = useState("");
-  const [selectedDistrict, setSelectedDistrict] = useState("");
-  const [selectedStation, setSelectedStation] = useState("");
-
   // Data
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [districts, setDistricts] = useState<District[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
   const [blocks, setBlocks] = useState<Block[]>([]);
-  const [wards, setWards] = useState<Ward[]>([]);
-  const [cells, setCells] = useState<Cell[]>([]);
   const [wardTypes, setWardTypes] = useState<WardType[]>([]);
   const [securityClassifications, setSecurityClassifications] = useState<
     SecurityClassification[]
-  >([]);
-  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([]);
-  const [housingAssignments, setHousingAssignments] = useState<
-    HousingAssignment[]
   >([]);
 
   const [deleteAssignment, setDeleteAssignment] = useState<HousingAssignment | null>(null);
@@ -206,15 +199,26 @@ export default function HousingAllocationScreen() {
   const [loading, setLoading] = useState(false);
 
   // Searchable select states
-  const [prisonerSearchOpen, setPrisonerSearchOpen] = useState(false);
-  const [wardSearchOpen, setWardSearchOpen] = useState(false);
-  const [cellSearchOpen, setCellSearchOpen] = useState(false);
   const [selectedWardForCells, setSelectedWardForCells] = useState("");
 
   const [housingLoading, setHousingLoading] = useState(false)
   const { region, district, station } = useFilters();
   const [cellVisible, setCellVisible] = useState(false)
   const [cellLoading, setCellLoading] = useState(false)
+
+  // DataTable states
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [filtersReloadKey, setFiltersReloadKey] = useState(0);
+  const [debouncedSearch, setDebouncedSearch] = useState("");
+
+  // Debounce search
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [searchTerm]);
 
   // Forms
   const {
@@ -234,243 +238,106 @@ export default function HousingAllocationScreen() {
     formState: { errors: wardErrors },
   } = useForm<Ward>();
 
-  // Load mock data
+  // Load lookup data (blocks, ward types, security classifications)
   useEffect(() => {
-    loadMockData();
+    loadLookupData();
   }, []);
 
-  // Load overview data on mount and when filters change
-  useEffect(() => {
-    loadOverviewData();
-  }, [selectedRegion, selectedDistrict, selectedStation]);
+  const loadLookupData = async () => {
+    try {
+      // Load blocks from API
+      const blocksResponse = await axiosInstance.get(HOUSING_API_ENDPOINTS.BLOCKS, {
+        params: { page_size: 100 }
+      });
+      const blocksData = blocksResponse?.data?.results ?? blocksResponse?.data ?? [];
+      setBlocks(Array.isArray(blocksData) ? blocksData : []);
 
-  // Reset dependent filters when parent filter changes
-  useEffect(() => {
-    if (selectedRegion) {
-      setSelectedDistrict("");
-      setSelectedStation("");
+      // Load ward types from API
+      const wardTypesResponse = await axiosInstance.get(HOUSING_API_ENDPOINTS.WARD_TYPES, {
+        params: { page_size: 100 }
+      });
+      const wardTypesData = wardTypesResponse?.data?.results ?? wardTypesResponse?.data ?? [];
+      setWardTypes(Array.isArray(wardTypesData) ? wardTypesData : []);
+
+      // Load security classifications from API
+      const securityResponse = await axiosInstance.get(HOUSING_API_ENDPOINTS.SECURITY_CLASSIFICATIONS, {
+        params: { page_size: 100 }
+      });
+      const securityData = securityResponse?.data?.results ?? securityResponse?.data ?? [];
+      setSecurityClassifications(Array.isArray(securityData) ? securityData : []);
+    } catch (error) {
+      console.error("Failed to load lookup data:", error);
+      toast.error("Failed to load ward configuration data");
     }
-  }, [selectedRegion]);
-
-  useEffect(() => {
-    if (selectedDistrict) {
-      setSelectedStation("");
-    }
-  }, [selectedDistrict]);
-
-  const loadMockData = () => {
-    // Mock regions
-    const mockRegions: Region[] = [
-      { id: "reg-1", name: "Central Region" },
-      { id: "reg-2", name: "Eastern Region" },
-      { id: "reg-3", name: "Western Region" },
-    ];
-    setRegions(mockRegions);
-
-    // Mock districts
-    const mockDistricts: District[] = [
-      { id: "dist-1", name: "Kampala", region: "reg-1" },
-      { id: "dist-2", name: "Wakiso", region: "reg-1" },
-      { id: "dist-3", name: "Mbale", region: "reg-2" },
-      { id: "dist-4", name: "Jinja", region: "reg-2" },
-    ];
-    setDistricts(mockDistricts);
-
-    // Mock stations
-    const mockStations: Station[] = [
-      { id: "st-1", name: "Luzira Prison", district: "dist-1" },
-      { id: "st-2", name: "Kitalya Prison", district: "dist-2" },
-      { id: "st-3", name: "Mbale Prison", district: "dist-3" },
-    ];
-    setStations(mockStations);
-
-    // Mock blocks
-    const mockBlocks: Block[] = [
-      { id: "blk-1", name: "Block A", station: "st-1" },
-      { id: "blk-2", name: "Block B", station: "st-1" },
-      { id: "blk-3", name: "Block C", station: "st-1" },
-    ];
-    setBlocks(mockBlocks);
-
-    // Mock ward types
-    const mockWardTypes: WardType[] = [
-      { id: "wt-1", name: "Male Ward" },
-      { id: "wt-2", name: "Female Ward" },
-      { id: "wt-3", name: "Juvenile Ward" },
-      { id: "wt-4", name: "Remand Ward" },
-    ];
-    setWardTypes(mockWardTypes);
-
-    // Mock security classifications
-    const mockSecurityClassifications: SecurityClassification[] = [
-      { id: "sc-1", name: "Maximum Security" },
-      { id: "sc-2", name: "Medium Security" },
-      { id: "sc-3", name: "Minimum Security" },
-    ];
-    setSecurityClassifications(mockSecurityClassifications);
-
-    // Mock wards
-    // const mockWards: Ward[] = [
-    //   {
-    //     id: "ward-1",
-    //     station_name: "Luzira Prison",
-    //     ward_type_name: "Male Ward",
-    //     block_name: "Block A",
-    //     security_classification_name: "Maximum Security",
-    //     created_by_name: "Admin User",
-    //     ward_capacity: "100",
-    //     occupancy: "85",
-    //     congestion: "85",
-    //     name: "Ward A1",
-    //     ward_number: "WA-001",
-    //     ward_area: "500 sq m",
-    //     description: "Maximum security male ward",
-    //     station: "st-1",
-    //     ward_type: "wt-1",
-    //     block: "blk-1",
-    //     security_classification: "sc-1",
-    //   },
-    //   {
-    //     id: "ward-2",
-    //     station_name: "Luzira Prison",
-    //     ward_type_name: "Female Ward",
-    //     block_name: "Block B",
-    //     security_classification_name: "Medium Security",
-    //     created_by_name: "Admin User",
-    //     ward_capacity: "50",
-    //     occupancy: "42",
-    //     congestion: "84",
-    //     name: "Ward B1",
-    //     ward_number: "WB-001",
-    //     ward_area: "300 sq m",
-    //     description: "Medium security female ward",
-    //     station: "st-1",
-    //     ward_type: "wt-2",
-    //     block: "blk-2",
-    //     security_classification: "sc-2",
-    //   },
-    // ];
-    // setWards(mockWards);
-
-    // Mock cells
-    // const mockCells: Cell[] = [
-    //   { id: "cell-1", name: "Cell A1-01", ward: "ward-1" },
-    //   { id: "cell-2", name: "Cell A1-02", ward: "ward-1" },
-    //   { id: "cell-3", name: "Cell B1-01", ward: "ward-2" },
-    //   { id: "cell-4", name: "Cell B1-02", ward: "ward-2" },
-    // ];
-    // setCells(mockCells);
-
-    // Mock prisoners
-    // const mockPrisoners: Prisoner[] = [
-    //   { id: "p-1", prisoner_name: "John Doe", prisoner_number: "P001" },
-    //   { id: "p-2", prisoner_name: "Jane Smith", prisoner_number: "P002" },
-    //   { id: "p-3", prisoner_name: "Robert Johnson", prisoner_number: "P003" },
-    // ];
-    // setPrisoners(mockPrisoners);
-
-    // Mock housing assignments
-    // const mockAssignments: HousingAssignment[] = [
-    //   {
-    //     id: "ha-1",
-    //     prisoner: "p-1",
-    //     prisoner_name: "John Doe (P001)",
-    //     ward: "ward-1",
-    //     ward_name: "Ward A1 (WA-001)",
-    //     cell: "cell-1",
-    //     cell_name: "Cell A1-01",
-    //   },
-    //   {
-    //     id: "ha-2",
-    //     prisoner: "p-2",
-    //     prisoner_name: "Jane Smith (P002)",
-    //     ward: "ward-2",
-    //     ward_name: "Ward B1 (WB-001)",
-    //     cell: "cell-3",
-    //     cell_name: "Cell B1-01",
-    //   },
-    // ];
-    // setHousingAssignments(mockAssignments);
   };
 
-  const loadOverviewData = () => {
-    // Mock overview data based on selected filters
-    // Different data based on filter selections
-    let mockOverview: OverviewData;
-
-    if (selectedStation) {
-      // Station-specific data
-      mockOverview = {
-        capacity: 1200,
-        occupancy: 1008,
-        congestion_level: 84,
-        blocks: 3,
-        wards: 12,
-        cells: 48,
+  // Paginated fetch callbacks for server-side pagination (14M+ ready)
+  const fetchWardsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(HOUSING_API_ENDPOINTS.WARDS, {
+        params: {
+          search: opts?.search || "",
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          region: region || undefined,
+          district: district || undefined,
+          station: station || undefined,
+        },
+        signal,
+      });
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
       };
-    } else if (selectedDistrict) {
-      // District-level data
-      mockOverview = {
-        capacity: 3500,
-        occupancy: 3150,
-        congestion_level: 90,
-        blocks: 8,
-        wards: 32,
-        cells: 128,
-      };
-    } else if (selectedRegion) {
-      // Region-level data
-      mockOverview = {
-        capacity: 5000,
-        occupancy: 4200,
-        congestion_level: 84,
-        blocks: 12,
-        wards: 48,
-        cells: 200,
-      };
-    } else {
-      // National-level data (no filters)
-      mockOverview = {
-        capacity: 15000,
-        occupancy: 13500,
-        congestion_level: 90,
-        blocks: 36,
-        wards: 144,
-        cells: 600,
-      };
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      console.error("fetchWardsPaginated error", error);
+      return { items: [], count: 0, next: null };
     }
+  }, [region, district, station]);
 
-    setOverviewData(mockOverview);
-  };
+  const fetchCellsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(HOUSING_API_ENDPOINTS.CELLS, {
+        params: {
+          search: opts?.search || "",
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+          ward: selectedWardForCells || undefined,
+          region: region || undefined,
+          district: district || undefined,
+          station: station || undefined,
+        },
+        signal,
+      });
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === "AbortError" || error.name === "CanceledError" || error.code === "ERR_CANCELED") {
+        return { items: [], count: 0, next: null };
+      }
+      console.error("fetchCellsPaginated error", error);
+      return { items: [], count: 0, next: null };
+    }
+  }, [selectedWardForCells, region, district, station]);
 
-  // Get filtered districts based on selected region
-  const filteredDistricts = selectedRegion
-    ? districts.filter((d) => d.region === selectedRegion)
-    : [];
-
-  // Get filtered stations based on selected district
-  const filteredStations = selectedDistrict
-    ? stations.filter((s) => s.district === selectedDistrict)
-    : [];
-
-  // Get filtered blocks based on selected station
-  const filteredBlocks = selectedStation
-    ? blocks.filter((b) => b.station === selectedStation)
-    : blocks;
-
-  // Get filtered wards based on selected station
-  const filteredWards = selectedStation
-    ? wards.filter((w) => w.station === selectedStation)
-    : wards;
-
-  // Get filtered cells based on selected ward
-  const getFilteredCells = (wardId: string) => {
-    return cells.filter((c) => c.ward === wardId);
-  };
+  // Integrate global filters to trigger table refresh
+  useFilterRefresh(() => {
+    setPage(1);
+    setFiltersReloadKey(k => k + 1);
+  }, [region, district, station]);
 
   // Housing Assignment CRUD
   const handleAddAssignment = () => {
-    if (!selectedStation) {
+    if (!station) {
       toast.error("Please select a station first");
       return;
     }
@@ -480,65 +347,48 @@ export default function HousingAllocationScreen() {
     setIsAssignmentDialogOpen(true);
   };
 
-  const handleEditAssignment = (assignment: HousingAssignment) => {
-    setEditingAssignment(assignment);
-    // setSelectedWardForCells(assignment.ward);
-    // Object.keys(assignment).forEach((key) => {
-    //   // Use type assertion for the form value setting
-    //   const value = assignment[key as keyof HousingAssignment];
-    //   if (value !== undefined) {
-    //     resetAssignment({ [key]: value } as any);
-    //   }
-    // });
-    setIsAssignmentDialogOpen(true);
-    setSelectedWardForCells(assignment.ward)
-  };
-
-  const handleDeleteAssignment = (id: string) => {
-    setHousingAssignments(housingAssignments.filter((a) => a.id !== id));
-    toast.success("Housing assignment deleted successfully");
+  const handleEditAssignment = async (assignment: HousingAssignment) => {
+    try {
+      // Option B: Fetch fresh data from API
+      const freshAssignment = await fetchAssignmentById(assignment.id);
+      setEditingAssignment(freshAssignment);
+      resetAssignment({
+        prisoner: freshAssignment.prisoner,
+        ward: freshAssignment.ward,
+        cell: freshAssignment.cell,
+        is_active: freshAssignment.is_active,
+        created_by: null,
+      });
+      setSelectedWardForCells(freshAssignment.ward);
+      setIsAssignmentDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch assignment details:', error);
+      toast.error('Failed to load assignment details. Please try again.');
+    }
   };
 
   const onSubmitAssignment = async (data: HousingAssignment) => {
     setLoading(true);
 
-    const prisoner = prisoners.find((p) => p.id === data.prisoner);
-    const ward = wards.find((w) => w.id === data.ward);
-    const cell = cells.find((c) => c.id === data.cell);
-
-    // const assignmentData = {
-    //   ...data,
-    //   prisoner_name: prisoner
-    //     ? `${prisoner.prisoner_name} (${prisoner.prisoner_number})`
-    //     : "",
-    //   ward_name: ward ? `${ward.name} (${ward.ward_number})` : "",
-    //   cell_name: cell?.name || "",
-    // };
-
     const assignmentData: Assignment = {
-      prisoner: prisoner?.id || '',
-      ward: ward?.id || "",
-      cell: cell?.id || "",
+      prisoner: data.prisoner || '',
+      ward: data.ward || "",
+      cell: data.cell || "",
       is_active: true,
       created_by: null
     }
 
     try {
-
         if (editingAssignment) {
            const response = await updateHousingAssignment(assignmentData, editingAssignment.id)
            if (handleResponseError(response)) return
 
-            if ("id" in response) {
-               setHousingAssignments(prev => prev.map(v => (v.id === response.id ? response : v)))
-            }
             toast.success("Housing assignment updated successfully");
         }
         else {
           const response = await addHousingAssignment(assignmentData)
           if (handleResponseError(response)) return
 
-          setHousingAssignments([response as AssignmentResponse, ...housingAssignments])
           toast.success("Housing assignment created successfully")
         }
 
@@ -546,59 +396,52 @@ export default function HousingAllocationScreen() {
         setSelectedWardForCells("");
         setEditingAssignment(null)
         resetAssignment();
+        setFiltersReloadKey(k => k + 1); // Refresh table
 
     }catch (error) {
       handleCatchError(error)
     }finally {
       setLoading(false)
     }
-
-    // setTimeout(() => {
-    //   if (editingAssignment) {
-    //     setHousingAssignments(
-    //       housingAssignments.map((a) =>
-    //         a.id === editingAssignment.id
-    //           ? { ...assignmentData, id: editingAssignment.id }
-    //           : a
-    //       )
-    //     );
-    //     toast.success("Housing assignment updated successfully");
-    //   } else {
-    //     setHousingAssignments([
-    //       ...housingAssignments,
-    //       { ...assignmentData, id: `ha-${Date.now()}` },
-    //     ]);
-    //     toast.success("Housing assignment created successfully");
-    //   }
-
-    //   setLoading(false);
-    // }, 500);
   };
 
   // Ward CRUD
   const handleAddWard = () => {
-    if (!selectedStation) {
+    if (!station) {
       toast.error("Please select a station first");
       return;
     }
     setEditingWard(null);
     resetWard();
-    setWardValue("station", selectedStation);
+    setWardValue("station", station);
     setIsWardDialogOpen(true);
   };
 
-  const handleEditWard = (ward: Ward) => {
-    setEditingWard(ward);
-    Object.keys(ward).forEach((key) => {
-      setWardValue(key as keyof Ward, ward[key as keyof Ward]);
-    });
-    setIsWardDialogOpen(true);
+  const handleEditWard = async (ward: Ward) => {
+    try {
+      // Option B: Fetch fresh data from API
+      const freshWard = await fetchWardById(ward.id);
+      setEditingWard(freshWard);
+      resetWard({
+        name: freshWard.name,
+        ward_number: freshWard.ward_number,
+        block: freshWard.block,
+        ward_type: freshWard.ward_type,
+        security_classification: freshWard.security_classification,
+        ward_capacity: freshWard.ward_capacity?.toString() || "",
+        ward_area: freshWard.ward_area || "",
+        description: freshWard.description || "",
+      });
+      setIsWardDialogOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch ward details:', error);
+      toast.error('Failed to load ward details. Please try again.');
+    }
   };
 
   const onSubmitWard = (data: Ward) => {
     setLoading(true);
 
-    const station = stations.find((s) => s.id === data.station);
     const wardType = wardTypes.find((wt) => wt.id === data.ward_type);
     const block = blocks.find((b) => b.id === data.block);
     const securityClass = securityClassifications.find(
@@ -607,7 +450,6 @@ export default function HousingAllocationScreen() {
 
     const wardData = {
       ...data,
-      station_name: station?.name || "",
       ward_type_name: wardType?.name || "",
       block_name: block?.name || "",
       security_classification_name: securityClass?.name || "",
@@ -618,36 +460,16 @@ export default function HousingAllocationScreen() {
 
     setTimeout(() => {
       if (editingWard) {
-        setWards(
-          wards.map((w) =>
-            w.id === editingWard.id ? { ...wardData, id: editingWard.id } : w
-          )
-        );
         toast.success("Ward updated successfully");
       } else {
-        setWards([...wards, { ...wardData, id: `ward-${Date.now()}` }]);
         toast.success("Ward created successfully");
       }
       setIsWardDialogOpen(false);
       resetWard();
       setLoading(false);
+      setFiltersReloadKey(k => k + 1); // Refresh table
     }, 500);
   };
-
-  // Search filtering
-  const filteredAssignments = housingAssignments.filter(
-    (a) =>
-      a.prisoner_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.ward_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      a.cell_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
-
-  const filteredWardsSearch = filteredWards.filter(
-    (w) =>
-      w.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.ward_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      w.block_name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   const getCongestionColor = (level: number) => {
     if (level >= 90) return "text-red-600";
@@ -662,133 +484,16 @@ export default function HousingAllocationScreen() {
     return "secondary";
   };
 
-  //API Integration
-
-  const loadData = async () => {
-    handleEffectLoad(region, district, station, setHousingLoading, fetchData)
-  };
-
-  useFilterRefresh(loadData, [region, district, station]);
-
-  function handleServerError (response: any) {
-    if ('error' in response){
-          setHousingLoading(false);
-          toast.error(response.error);
-          return true
-    }
-    return false
-  }
-
-  function handleEmptyList (data: any, msg: string) {
-    if (!data.length){
-          setHousingLoading(false);
-          toast.error(msg);
-          return true
-    }
-    return false
-  }
-
-  // function populateList(response: any, msg: string, setData: any) {
-  //   if (handleServerError(response)) return
-  //
-  //   if ("results" in response) {
-  //     const data = response.results
-  //     if(handleEmptyList(data, msg)) return
-  //     setData(data)
-  //   }
-  // }
-
-  function populateList(response: any, msg: string, setData: any) {
-    if (handleServerError(response)) return
-
-    if ("results" in response) {
-      const data = response.results
-      // console.log(data)
-      handleEmptyList(data, msg)
-      if (msg === "There are no prisoners for the selected station") {
-        const newData = data.filter(prisoner => prisoner.current_station === station)
-        // console.log(station)
-        // console.log(newData)
-        setData(newData)
-        setSelectedStation(station)
-      }
-      else if (msg === "There are no cells for the selected ward" && !data.length) {
-        setData(data)
-        // console.log(data)
-        setCellVisible(false)
-      }
-      else if (msg === "There are no cells for the selected ward" && data.length) {
-        setData(data)
-        // console.log(data)
-        setCellVisible(true)
-      }
-      else {
-        setData(data)
-        // console.log(data)
-      }
-
-    }
-  }
-
-  async function fetchData () {
-      try {
-
-        const resp = await getHousingAssignments()
-        populateList(resp, "There are no housing assignments for the selected station", setHousingAssignments)
-
-        const response1 = await getPrisoners()
-        populateList(response1, "There are no prisoners for the selected station", setPrisoners)
-
-        const response2 = await getStationWards(station)
-        populateList(response2, "There are no wards for the selected station", setWards)
-
-        setHousingLoading(false)
-
-      }
-      catch (error) {
-        handleCatchError(error)
-      }
-  }
-
-  useEffect(() => {
-      if (selectedWardForCells) {
-        setCellLoading(true)
-        fetchCells()
-      }
-  }, [selectedWardForCells]);
-
-  async function fetchCells() {
-      try {
-        const response = await getWardCells(selectedWardForCells)
-        populateList(response, "There are no cells for the selected ward", setCells)
-        setSelectedWardForCells("")
-      }
-      catch (error) {
-        handleCatchError(error)
-      }
-      finally {
-        setCellLoading(false)
-      }
-  }
-
-  useEffect(() => {
-    if(!isAssignmentDialogOpen){
-      setCells([])
-      setCellVisible(false)
-    }
-  }, [isAssignmentDialogOpen]);
-
-  async function handleDelete () {
+  async function handleDeleteAssignment () {
       if (!deleteAssignment) return;
       setLoading(true);
 
       try {
           await deleteHousingAssignment(deleteAssignment.id)
-          setHousingAssignments(housingAssignments.filter((item) => item.id !== deleteAssignment.id));
           toast.success("Housing assignment deleted successfully")
           setDeleteAssignment(null);
-          setLoading(false);
-      }catch (error){
+          setFiltersReloadKey(k => k + 1); // Refresh table
+      }catch (error: any){
         toast.error(error?.response?.data?.detail || "Failed to delete assignment")
       }finally {
         setLoading(false)
@@ -801,11 +506,10 @@ export default function HousingAllocationScreen() {
 
       try {
           await deleteWardById(deleteWard.id)
-          setWards(wards.filter((item) => item.id !== deleteWard.id));
           toast.success("Ward deleted successfully")
           setDeleteWard(null);
-          setLoading(false);
-      }catch (error){
+          setFiltersReloadKey(k => k + 1); // Refresh table
+      }catch (error: any){
         toast.error(error?.response?.data?.detail || "Failed to delete ward")
       }finally {
         setLoading(false)
@@ -930,8 +634,8 @@ export default function HousingAllocationScreen() {
               </div>
 
               {/* Search and Add */}
-              <div className="flex items-center gap-4">
-                <div className="relative flex-1 max-w-md">
+              <div className="flex gap-4 justify-end">
+                {/* <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
                     placeholder="Search..."
@@ -939,12 +643,12 @@ export default function HousingAllocationScreen() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="pl-10"
                   />
-                </div>
+                </div> */}
                 {activeTab === "assignments" && (
                   <Button
                     onClick={handleAddAssignment}
-                    className="bg-[#650000] hover:bg-[#4a0000]"
-                    disabled={!selectedStation}
+                    className="bg-[#650000] hover:bg-[#4a0000] "
+                    disabled={!station}
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     Assign Prisoner
@@ -969,7 +673,7 @@ export default function HousingAllocationScreen() {
                       }}
                     >
                       <Users className="h-4 w-4" />
-                      Housing Assignments ({filteredAssignments.length})
+                      Housing Assignments
                     </button>
                     <button
                       onClick={() => setActiveTab("wards")}
@@ -983,152 +687,156 @@ export default function HousingAllocationScreen() {
                       }}
                     >
                       <Home className="h-4 w-4" />
-                      Wards ({filteredWardsSearch.length})
+                      Wards
                     </button>
                   </div>
 
-                {/* Housing Assignments Table */}
+                {/* Housing Assignments Table with DataTable */}
                 {activeTab === "assignments" && (
                   <Card>
                     <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Prisoner</TableHead>
-                            <TableHead>Ward</TableHead>
-                            <TableHead>Cell</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredAssignments.length === 0 ? (
-                            <TableRow>
-                              <TableCell
-                                colSpan={4}
-                                className="text-center py-8 text-gray-500"
-                              >
-                                {selectedStation
-                                  ? "No housing assignments found"
-                                  : "Please select a station to view housing assignments"}
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredAssignments.map((assignment) => (
-                              <TableRow key={assignment.id}>
-                                <TableCell>{assignment.prisoner_name}</TableCell>
-                                <TableCell>{assignment.ward_name}</TableCell>
-                                <TableCell>{assignment.cell_name}</TableCell>
-                                <TableCell>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() => handleEditAssignment(assignment)}
-                                    >
-                                      <Edit className="h-4 w-4" />
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="destructive"
-                                      onClick={() =>
-                                        // handleDeleteAssignment(assignment.id!)
-                                          setDeleteAssignment(assignment)
-                                      }
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            ))
-                          )}
-                        </TableBody>
-                      </Table>
+                      <DataTable
+                        key={`assignments-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                        url={`${HOUSING_API_ENDPOINTS.ASSIGNMENTS}?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                        columns={[
+                          {
+                            key: "prisoner_name",
+                            label: "Prisoner",
+                            render: (value: any, row: AssignmentResponse) => row.prisoner_name || row.prisoner_number || "—"
+                          },
+                          {
+                            key: "ward_name",
+                            label: "Ward",
+                            render: (value: any, row: AssignmentResponse) => row.ward_name || "—"
+                          },
+                          {
+                            key: "cell_name",
+                            label: "Cell",
+                            render: (value: any, row: AssignmentResponse) => row.cell_name || "—"
+                          },
+                          {
+                            key: "actions",
+                            label: "Actions",
+                            render: (value: any, row: AssignmentResponse) => (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditAssignment(row)}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setDeleteAssignment(row)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )
+                          }
+                        ]}
+                        onSearch={(v: string) => setSearchTerm(v)}
+                        onPageChange={(p: number) => setPage(p)}
+                        onPageSizeChange={(ps: number) => setPageSize(ps)}
+                        page={page}
+                        pageSize={pageSize}
+                      />
                     </CardContent>
                   </Card>
                 )}
 
-                {/* Wards Table */}
+                {/* Wards Table with DataTable */}
                 {activeTab === "wards" && (
                   <Card>
                     <CardContent className="p-0">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Ward Number</TableHead>
-                            <TableHead>Ward Name</TableHead>
-                            <TableHead>Block</TableHead>
-                            <TableHead>Type</TableHead>
-                            <TableHead>Security Level</TableHead>
-                            <TableHead>Capacity</TableHead>
-                            <TableHead>Occupancy</TableHead>
-                            <TableHead>Congestion</TableHead>
-                            <TableHead>Actions</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {filteredWardsSearch.length === 0 ? (
-                            <TableRow>
-                              <TableCell
-                                colSpan={9}
-                                className="text-center py-8 text-gray-500"
-                              >
-                                {selectedStation
-                                  ? "No wards found"
-                                  : "Please select a station to view wards"}
-                              </TableCell>
-                            </TableRow>
-                          ) : (
-                            filteredWardsSearch.map((ward) => {
-                              const congestion = parseInt(ward.congestion || "0");
+                      <DataTable
+                        key={`wards-${filtersReloadKey}-${station ?? ''}-${district ?? ''}-${region ?? ''}`}
+                        url={`${HOUSING_API_ENDPOINTS.WARDS}?${station ? `station=${encodeURIComponent(station)}&` : ''}${district ? `district=${encodeURIComponent(district)}&` : ''}${region ? `region=${encodeURIComponent(region)}&` : ''}`}
+                        columns={[
+                          {
+                            key: "ward_number",
+                            label: "Ward Number",
+                            render: (value: any, row: Ward) => (
+                              <Badge className="bg-[#650000]">
+                                {row.ward_number}
+                              </Badge>
+                            )
+                          },
+                          {
+                            key: "name",
+                            label: "Ward Name"
+                          },
+                          {
+                            key: "block_name",
+                            label: "Block"
+                          },
+                          {
+                            key: "ward_type_name",
+                            label: "Type",
+                            render: (value: any, row: Ward) => (
+                              <Badge variant="outline">{row.ward_type_name}</Badge>
+                            )
+                          },
+                          {
+                            key: "security_classification_name",
+                            label: "Security Level",
+                            render: (value: any, row: Ward) => (
+                              <Badge variant="secondary">{row.security_classification_name}</Badge>
+                            )
+                          },
+                          {
+                            key: "ward_capacity",
+                            label: "Capacity"
+                          },
+                          {
+                            key: "occupancy",
+                            label: "Occupancy"
+                          },
+                          {
+                            key: "congestion",
+                            label: "Congestion",
+                            render: (value: any, row: Ward) => {
+                              const congestion = parseInt(row.congestion || "0");
                               return (
-                                <TableRow key={ward.id}>
-                                  <TableCell>
-                                    <Badge className="bg-[#650000]">
-                                      {ward.ward_number}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{ward.name}</TableCell>
-                                  <TableCell>{ward.block_name}</TableCell>
-                                  <TableCell>
-                                    <Badge variant="outline">{ward.ward_type_name}</Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <Badge variant="secondary">
-                                      {ward.security_classification_name}
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>{ward.ward_capacity}</TableCell>
-                                  <TableCell>{ward.occupancy}</TableCell>
-                                  <TableCell>
-                                    <Badge variant={getCongestionBadgeVariant(congestion)}>
-                                      {congestion}%
-                                    </Badge>
-                                  </TableCell>
-                                  <TableCell>
-                                    <div className="flex gap-2">
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => handleEditWard(ward)}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="destructive"
-                                        onClick={() => setDeleteWard(ward)}
-                                      >
-                                        <Trash2 className="h-4 w-4" />
-                                      </Button>
-                                    </div>
-                                  </TableCell>
-                                </TableRow>
+                                <Badge variant={getCongestionBadgeVariant(congestion)}>
+                                  {congestion}%
+                                </Badge>
                               );
-                            })
-                          )}
-                        </TableBody>
-                      </Table>
+                            }
+                          },
+                          {
+                            key: "actions",
+                            label: "Actions",
+                            render: (value: any, row: Ward) => (
+                              <div className="flex gap-2">
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleEditWard(row)}
+                                  // disabled
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="destructive"
+                                  onClick={() => setDeleteWard(row)}
+                                  disabled
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            )
+                          }
+                        ]}
+                        onSearch={(v: string) => setSearchTerm(v)}
+                        onPageChange={(p: number) => setPage(p)}
+                        onPageSizeChange={(ps: number) => setPageSize(ps)}
+                        page={page}
+                        pageSize={pageSize}
+                      />
                     </CardContent>
                   </Card>
                 )}
@@ -1171,16 +879,11 @@ export default function HousingAllocationScreen() {
                     onChange={(v) => field.onChange(v ?? null)}
                     onSelectItem={(p: any) => {
                       field.onChange(p?.id ?? null);
-                      // keep local cache so initialItems has recent picks
-                      setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
-                      // close old popover state if you still rely on it elsewhere
-                      setPrisonerSearchOpen(false);
                     }}
                     placeholder="Select prisoner"
                     idField="id"
                     labelField="full_name"
-                    initialItems={prisoners}
-                    pageSize={25}
+                    pageSize={50}
                   />
                 )}
               />
@@ -1201,52 +904,22 @@ export default function HousingAllocationScreen() {
                 control={controlAssignment}
                 rules={{ required: "Ward is required" }}
                 render={({ field }) => (
-                  <Popover open={wardSearchOpen} onOpenChange={setWardSearchOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        role="combobox"
-                        aria-expanded={wardSearchOpen}
-                        className="w-full justify-between"
-                      >
-                         <>
-                           {field.value
-                            ? (() => {
-                                const ward = filteredWards.find((w) => w.id === field.value);
-                                return ward
-                                  ? `${ward.name} (${ward.ward_number}) - ${ward.block_name}`
-                                  : "Select ward...";
-                              })()
-                            : "Search ward..."}
-                         </>
-
-                        <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-full p-0">
-                      <Command>
-                        <CommandInput placeholder="Search ward..." />
-                        <CommandList>
-                          <CommandEmpty>No ward found.</CommandEmpty>
-                          <CommandGroup>
-                            {filteredWards.map((ward) => (
-                              <CommandItem
-                                key={ward.id}
-                                value={`${ward.name} ${ward.ward_number} ${ward.block_name}`}
-                                onSelect={() => {
-                                  field.onChange(ward.id);
-                                  setSelectedWardForCells(ward.id);
-                                  setWardSearchOpen(false);
-                                }}
-                              >
-                                {ward.name} ({ward.ward_number}) - {ward.block_name}
-                              </CommandItem>
-                            ))}
-                          </CommandGroup>
-                        </CommandList>
-                      </Command>
-                    </PopoverContent>
-                  </Popover>
+                  <SearchableSelect
+                    fetchPaginated={fetchWardsPaginated}
+                    value={field.value}
+                    onChange={(id) => {
+                      field.onChange(id);
+                      setSelectedWardForCells(id || "");
+                    }}
+                    placeholder="Select ward..."
+                    idField="id"
+                    labelField="name"
+                    renderItem={(ward: any) => (
+                      <div>{ward.name} ({ward.ward_number}) - {ward.block_name}</div>
+                    )}
+                    pageSize={50}
+                    minQueryLength={0}
+                  />
                 )}
               />
               {assignmentErrors.ward && (
@@ -1256,100 +929,60 @@ export default function HousingAllocationScreen() {
               )}
             </div>
 
-            {
-              cellVisible && (
-                  <>
-                    {/* Cell Selection */}
-                    <div>
-                      <Label htmlFor="cell">
-                        Cell <span className="text-red-500">*</span>
-                      </Label>
-                      <Controller
-                        name="cell"
-                        control={controlAssignment}
-                        rules={{ required: "Cell is required" }}
-                        render={({ field }) => {
-                          const availableCells = selectedWardForCells
-                            ? getFilteredCells(selectedWardForCells)
-                            : cells;
-                          return (
-                            <Popover open={cellSearchOpen} onOpenChange={setCellSearchOpen}>
-                              <PopoverTrigger asChild>
-                                <Button
-                                  variant="outline"
-                                  role="combobox"
-                                  aria-expanded={cellSearchOpen}
-                                  className="w-full justify-between"
-                                >
-                                  {field.value
-                                      ? availableCells.find((c) => c.id === field.value)?.name ||
-                                        "Select cell..."
-                                      : selectedWardForCells
-                                      ? "Search cell..."
-                                      : "Select ward first"}
+            {/* Cell Selection */}
+            {selectedWardForCells && (
+              <div>
+                <Label htmlFor="cell">
+                  Cell <span className="text-red-500">*</span>
+                </Label>
+                <Controller
+                  name="cell"
+                  control={controlAssignment}
+                  rules={{ required: "Cell is required" }}
+                  render={({ field }) => (
+                    <SearchableSelect
+                      fetchPaginated={fetchCellsPaginated}
+                      value={field.value}
+                      onChange={(id) => field.onChange(id)}
+                      placeholder="Select cell..."
+                      idField="id"
+                      labelField="name"
+                      pageSize={50}
+                      minQueryLength={0}
+                    />
+                  )}
+                />
+                {assignmentErrors.cell && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {assignmentErrors.cell.message}
+                  </p>
+                )}
+              </div>
+            )}
 
-                                  <Search className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </PopoverTrigger>
-                              <PopoverContent className="w-full p-0">
-                                <Command>
-                                  <CommandInput placeholder="Search cell..." />
-                                  <CommandList>
-                                    <CommandEmpty>No cell found.</CommandEmpty>
-                                    <CommandGroup>
-                                      {availableCells.map((cell) => (
-                                        <CommandItem
-                                          key={cell.id}
-                                          value={cell.name}
-                                          onSelect={() => {
-                                            field.onChange(cell.id);
-                                            setCellSearchOpen(false);
-                                          }}
-                                        >
-                                          {cell.name}
-                                        </CommandItem>
-                                      ))}
-                                    </CommandGroup>
-                                  </CommandList>
-                                </Command>
-                              </PopoverContent>
-                            </Popover>
-                          );
-                        }}
-                      />
-                      {assignmentErrors.cell && (
-                        <p className="text-red-500 text-sm mt-1">
-                          {assignmentErrors.cell.message}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex justify-end gap-2 pt-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setIsAssignmentDialogOpen(false);
-                          setSelectedWardForCells("");
-                          resetAssignment();
-                        }}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={loading}
-                        className="bg-[#650000] hover:bg-[#4a0000]"
-                      >
-                        <Save className="h-4 w-4 mr-2" />
-                        {loading ? "Saving..." : editingAssignment ? "Update" : "Save"}
-                      </Button>
-                    </div>
-                  </>
-              )
-            }
+            {/* Actions */}
+            <div className="flex justify-end gap-2 pt-4">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setIsAssignmentDialogOpen(false);
+                  setSelectedWardForCells("");
+                  resetAssignment();
+                }}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={loading}
+                className="bg-[#650000] hover:bg-[#4a0000]"
+              >
+                <Save className="h-4 w-4 mr-2" />
+                {loading ? "Saving..." : editingAssignment ? "Update" : "Save"}
+              </Button>
+            </div>
 
           </form>
           </div>
@@ -1358,7 +991,7 @@ export default function HousingAllocationScreen() {
 
       {/* Ward Dialog */}
       <Dialog open={isWardDialogOpen} onOpenChange={setIsWardDialogOpen}>
-        <DialogContent className="max-w-[95vw] w-[1300px] max-h-[95vh] overflow-hidden p-0 flex flex-col resize">
+        <DialogContent className="max-w-[95vw] w-[1000px] max-h-[95vh] overflow-hidden p-0 flex flex-col">
           <div className="flex-1 overflow-y-auto p-6">
           <DialogHeader>
             <DialogTitle className="text-[#650000] flex items-center gap-2">
@@ -1423,7 +1056,7 @@ export default function HousingAllocationScreen() {
                         <SelectValue placeholder="Select block" />
                       </SelectTrigger>
                       <SelectContent>
-                        {filteredBlocks.map((block) => (
+                        {blocks.map((block) => (
                           <SelectItem key={block.id} value={block.id}>
                             {block.name}
                           </SelectItem>
@@ -1595,24 +1228,26 @@ export default function HousingAllocationScreen() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Housing Assignment</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this housing Assignment? <strong>This action cannot be undone.</strong>
-              {deleteAssignment && (
-                <div className="mt-2 p-3 bg-muted rounded">
-                  <p>
-                    <strong>Prisoner:</strong> {deleteAssignment.prisoner_name}
-                  </p>
-                  <p>
-                    <strong>Ward:</strong> {deleteAssignment.ward_name}
-                  </p>
-                </div>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Are you sure you want to delete this housing Assignment? <strong>This action cannot be undone.</strong></p>
+                {deleteAssignment && (
+                  <div className="mt-2 p-3 bg-muted rounded">
+                    <p>
+                      <strong>Prisoner:</strong> {deleteAssignment.prisoner_name}
+                    </p>
+                    <p>
+                      <strong>Ward:</strong> {deleteAssignment.ward_name}
+                    </p>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={loading}>Cancel</AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleDelete}
+              onClick={handleDeleteAssignment}
               disabled={loading}
               className="bg-red-600 hover:bg-red-700"
             >
@@ -1626,18 +1261,20 @@ export default function HousingAllocationScreen() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Ward</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete this ward? <strong>This action cannot be undone.</strong>
-              {deleteWard && (
-                <div className="mt-2 p-3 bg-muted rounded">
-                  <p>
-                    <strong>Ward:</strong> {deleteWard.name}
-                  </p>
-                  <p>
-                    <strong>Block:</strong> {deleteWard.block_name}
-                  </p>
-                </div>
-              )}
+            <AlertDialogDescription asChild>
+              <div>
+                <p>Are you sure you want to delete this ward? <strong>This action cannot be undone.</strong></p>
+                {deleteWard && (
+                  <div className="mt-2 p-3 bg-muted rounded">
+                    <p>
+                      <strong>Ward:</strong> {deleteWard.name}
+                    </p>
+                    <p>
+                      <strong>Block:</strong> {deleteWard.block_name}
+                    </p>
+                  </div>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

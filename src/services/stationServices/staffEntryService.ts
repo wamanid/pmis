@@ -1,9 +1,14 @@
 import axiosInstance from '../axiosInstance';
 
-// correct endpoint for staff attendance records
-const ENTRIES_BASE = '/station-management/api/attendance/';
-const STAFF_PROFILES = '/auth/staff-profiles/';
-const STATIONS_ENDPOINT = '/system-administration/stations/';
+/**
+ * Centralized API endpoints for Staff Entry & Exit module.
+ * All service functions use these constants for consistency and maintainability.
+ */
+export const STAFF_ENTRY_API_ENDPOINTS = {
+  ENTRIES: '/station-management/api/attendance/',
+  STAFF_PROFILES: '/auth/staff-profiles/',
+  STATIONS: '/system-administration/stations/',
+} as const;
 
 export interface StaffProfile {
   id: string;
@@ -35,22 +40,22 @@ export interface StaffEntryPayload {
 
 export const fetchEntries = async (params?: Record<string, any>, signal?: AbortSignal) => {
   // pass through the signal so callers can cancel requests
-  const res = await axiosInstance.get(ENTRIES_BASE, { params, signal });
+  const res = await axiosInstance.get(STAFF_ENTRY_API_ENDPOINTS.ENTRIES, { params, signal });
   return res.data; // standardized DRF paginated payload: {count, next, previous, results}
 };
 
 export const createEntry = async (payload: StaffEntryPayload) => {
-  const res = await axiosInstance.post(ENTRIES_BASE, payload);
+  const res = await axiosInstance.post(STAFF_ENTRY_API_ENDPOINTS.ENTRIES, payload);
   return res.data;
 };
 
 export const deleteEntry = async (id: string) => {
-  const res = await axiosInstance.delete(`${ENTRIES_BASE}${id}/`);
+  const res = await axiosInstance.delete(`${STAFF_ENTRY_API_ENDPOINTS.ENTRIES}${id}/`);
   return res.data;
 };
 
 export const fetchStaffProfiles = async (params?: Record<string, any>) => {
-  const res = await axiosInstance.get(STAFF_PROFILES, { params });
+  const res = await axiosInstance.get(STAFF_ENTRY_API_ENDPOINTS.STAFF_PROFILES, { params });
   const items = res.data.results ?? res.data ?? [];
 
   // Normalize to consistent shape
@@ -80,7 +85,7 @@ export const fetchStaffProfiles = async (params?: Record<string, any>) => {
 
 export const fetchStations = async () => {
   try {
-    const res = await axiosInstance.get(STATIONS_ENDPOINT);
+    const res = await axiosInstance.get(STAFF_ENTRY_API_ENDPOINTS.STATIONS);
     return res.data.results ?? res.data ?? [];
   } catch (err) {
     console.error('fetchStations error:', err);
@@ -92,7 +97,7 @@ export const fetchStations = async () => {
 // PATCH /station-management/api/attendance/{id}/
 export const updateEntry = async (id: string, payload: Partial<StaffEntryPayload>) => {
   if (!id) throw new Error('updateEntry: id is required');
-  // use axiosInstance + ENTRIES_BASE so baseURL from axiosInstance is honored
-  const res = await axiosInstance.patch(`${ENTRIES_BASE}${id}/`, payload);
+  // use axiosInstance + STAFF_ENTRY_API_ENDPOINTS so baseURL from axiosInstance is honored
+  const res = await axiosInstance.patch(`${STAFF_ENTRY_API_ENDPOINTS.ENTRIES}${id}/`, payload);
   return res.data;
 };

@@ -19,6 +19,7 @@ import * as ComplaintsService from '../../services/stationServices/complaintsSer
 // import { useFilterRefresh, useFilters } from '../../hooks/useFilters';
 import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 import { useFilters } from '../../contexts/FilterContext';
+import { toast } from 'sonner';
 
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
@@ -108,13 +109,6 @@ export function ComplaintsScreen() {
   // DataTable reload key (keep pagination state declared once above)
   const [tableReloadKey, setTableReloadKey] = useState(0);
 
-  const [stations, setStations] = useState<any[]>([]);
-  // small local cache used for initial items; CustomPrisonerSearch will handle searching
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [natures, setNatures] = useState<any[]>([]);
-  const [priorities, setPriorities] = useState<any[]>([]);
-  const [ranks, setRanks] = useState<any[]>([]);
-
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -157,13 +151,15 @@ export function ComplaintsScreen() {
     const c = new AbortController();
     (async () => {
       try {
-        const [sts, prios] = await Promise.all([
+        const [sts, priosRes] = await Promise.all([
           ComplaintsService.fetchComplaintStatuses(c.signal),
           ComplaintsService.fetchPriorities()
         ]);
         if (!mounted) return;
         setComplaintStatuses(sts || []);
-        setPriorityOptions(prios || []);
+        // Extract results array from paginated response
+        const prios = priosRes?.results ?? priosRes ?? [];
+        setPriorityOptions(Array.isArray(prios) ? prios : []);
       } catch (err) {
         console.error('load statuses/priorities error', err);
       }
@@ -261,6 +257,13 @@ export function ComplaintsScreen() {
 
   // use DateTime component for formatting (see DateTime.tsx)
 
+  // Check if complaint status is restricted (resolved or completed)
+  const isComplaintRestricted = (complaint: Complaint) => {
+    const statusObj = complaintStatuses.find((s) => String(s.id) === String(complaint.complaint_status));
+    const statusName = (statusObj?.name ?? complaint.complaint_status ?? '').toLowerCase();
+    return statusName.includes('resolved') || statusName.includes('completed') || statusName.includes('closed');
+  };
+
   // View complaint details
   const viewComplaintDetails = (complaint: Complaint) => {
     // DataTable provides the row object; set it as selected so details dialog can render.
@@ -275,15 +278,33 @@ export function ComplaintsScreen() {
     setIsFormOpen(true);
   };
 
-  // Open edit complaint form
-  const handleEditComplaint = (complaint: Complaint) => {
-    setEditingComplaint(complaint);
-    setFormMode("edit");
-    setIsFormOpen(true);
+  // Open edit complaint form - Option B: Fetch fresh data from API
+  const handleEditComplaint = async (complaint: Complaint) => {
+    // Check if complaint is restricted (resolved/completed)
+    if (isComplaintRestricted(complaint)) {
+      toast.error('Cannot edit complaint with resolved, completed, or closed status');
+      return;
+    }
+    
+    try {
+      // Fetch fresh complaint data from API to ensure all fields are up-to-date
+      const freshComplaint = await ComplaintsService.fetchComplaint(complaint.id);
+      setEditingComplaint(freshComplaint);
+      setFormMode("edit");
+      setIsFormOpen(true);
+    } catch (error) {
+      console.error('Failed to fetch complaint details:', error);
+      toast.error('Failed to load complaint details. Please try again.');
+    }
   };
 
   // Prepare delete confirmation
   const handleDeleteClick = (complaint: Complaint) => {
+    // Check if complaint is restricted (resolved/completed)
+    if (isComplaintRestricted(complaint)) {
+      toast.error('Cannot delete complaint with resolved, completed, or closed status');
+      return;
+    }
     setDeleteTarget(complaint);
     // short description for dialog
     setConfirmDescription(`Are you sure you want to delete this complaint?`);
@@ -314,8 +335,10 @@ export function ComplaintsScreen() {
         setIsDetailsOpen(false);
         setSelectedComplaint(null);
       }
+      toast.success('Complaint deleted successfully');
     } catch (err) {
       console.error('delete complaint error', err);
+      toast.error('Failed to delete complaint');
     } finally {
       setConfirmOpen(false);
       setDeleteTarget(null);
@@ -348,30 +371,6 @@ export function ComplaintsScreen() {
     }
   };
 
-  // initial lookups (stations/natures/priorities/ranks). Do NOT prefetch prisoners here:
-  useEffect(() => {
-    let mounted = true;
-    const controller = new AbortController();
-    (async () => {
-      try {
-        const [stationsRes, naturesRes, prioritiesRes, ranksRes] = await Promise.all([
-          ComplaintsService.fetchStations(),
-          ComplaintsService.fetchComplaintNatures(),
-          ComplaintsService.fetchPriorities(),
-          ComplaintsService.fetchRanks(),
-        ]);
-        if (!mounted) return;
-        setStations(stationsRes || []);
-        setNatures(naturesRes || []);
-        setPriorities(prioritiesRes || []);
-        setRanks(ranksRes || []);
-      } catch (err) {
-        // handled by services
-      }
-    })();
-    return () => { mounted = false; controller.abort(); };
-  }, []);
-
   // DataTable is now server-driven. Use global filter refresh to force reloads.
   const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
   useFilterRefresh(() => {
@@ -403,7 +402,7 @@ export function ComplaintsScreen() {
         // Keep a tiny local cache (first item) so details/dialogs have something quickly if needed
         const items = res?.results ?? (Array.isArray(res) ? res : []);
         setComplaints(items);
-      } catch (err) {
+      } catch (err: any) {
         console.error('fetch complaints count error', err?.response ?? err);
       }
     })();
@@ -495,7 +494,7 @@ export function ComplaintsScreen() {
       <Card>
         <CardContent className="pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
+            {/* <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
               <Input
                 placeholder="Search by prisoner, complaint, or station..."
@@ -503,7 +502,7 @@ export function ComplaintsScreen() {
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
-            </div>
+            </div> */}
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger>
                 <SelectValue placeholder="Filter by status" />
@@ -542,21 +541,35 @@ export function ComplaintsScreen() {
               { key: 'complaint_priority_name', label: 'Priority', render: (_v: any, row: any) => getPriorityBadge(row?.complaint_priority_name ?? row?.complaint_priority ?? '') },
               { key: 'complaint_status', label: 'Status', render: (_v: any, row: any) => getStatusBadge(row?.complaint_status) },
               { key: 'complaint_date', label: 'Date', render: (_v: any, row: any) => <DateTime value={row?.complaint_date} format="dateOnly" /> },
-              { key: 'actions', label: 'Actions', sortable: false, render: (_v: any, row: any) => (
-                  <div className="flex gap-2 justify-end">
-                    <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4" /></Button>
-                    <Button variant="outline" size="sm" onClick={() => handleEditComplaint(row)} className="text-[#0000FF] border-[#0000FF]"><Edit className="h-4 w-4" /></Button>
-                    <Button variant="outline" size="sm" onClick={() => handleDeleteClick(row)} className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white"><Trash className="h-4 w-4" /></Button>
-                  </div>
-                )},
+              { key: 'actions', label: 'Actions', sortable: false, render: (_v: any, row: any) => {
+                  const isRestricted = isComplaintRestricted(row);
+                  return (
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" size="sm" onClick={() => viewComplaintDetails(row)}><Eye className="h-4 w-4" /></Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleEditComplaint(row)} 
+                        className="text-[#0000FF] border-[#0000FF]" 
+                        disabled={isRestricted}
+                        title={isRestricted ? 'Cannot edit resolved/completed complaint' : 'Edit complaint'}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => handleDeleteClick(row)} 
+                        className="text-[#650000] border-[#650000] hover:bg-[#650000] hover:text-white" 
+                        disabled={isRestricted}
+                        title={isRestricted ? 'Cannot delete resolved/completed complaint' : 'Delete complaint'}
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                }},
             ]}
-            externalSearch={searchTerm}
-            onSearch={(q: string) => { setSearchTerm(q); setPage(1); setTableReloadKey(k => k + 1); }}
-            onPageChange={(p: number) => { setPage(p); setTableReloadKey(k => k + 1); }}
-            onPageSizeChange={(s: number) => { setPageSize(s); setPage(1); setTableReloadKey(k => k + 1); }}
-            onSort={(f: string | null, d: 'asc' | 'desc' | null) => { setSortField(f ?? undefined); setSortDir(d ?? undefined); setPage(1); setTableReloadKey(k => k + 1); }}
-            page={page}
-            pageSize={pageSize}
           />
         </CardContent>
       </Card>
@@ -775,11 +788,6 @@ export function ComplaintsScreen() {
         onSave={handleSaveComplaint}
         complaint={editingComplaint}
         mode={formMode}
-        stations={stations}
-        prisoners={prisoners}
-        complaintNatures={natures}
-        priorities={priorities}
-        ranks={ranks}
       />
     </div>
   );

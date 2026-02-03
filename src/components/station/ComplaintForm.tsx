@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useForm, Controller } from "react-hook-form";
+import { useFilters } from "../../contexts/FilterContext";
 import CustomPrisonerSearch from "../common/CustomPrisonerSearch";
 import SearchableSelect from "../common/SearchableSelect";
+import StaffProfileSelect from "../common/StaffProfileSelect";
 import DatePicker from "../common/DatePicker";
 import {
   Plus,
@@ -63,7 +65,7 @@ interface Complaint {
   prisoner_name: string;
   nature_of_complaint_name: string;
   complaint_priority_name: string;
-  officer_requested_username: string;
+  officer_requested_username?: string; // Optional - may not be in API response
   rank_name: string;
   created_by_name: string;
   actions: ComplaintAction[];
@@ -86,7 +88,7 @@ interface Complaint {
   prisoner: string;
   nature_of_complaint: string;
   complaint_priority: string;
-  officer_requested: number;
+  officer_requested: string; // Changed from number to string - API returns UUID
   rank: string;
 }
 
@@ -101,8 +103,10 @@ interface ComplaintFormData {
   complaint_date: string;
   complaint_status: string; // UUID from backend
   officer_requested_username: string;
+  officer_requested?: string; // officer ID
   force_number: string;
   rank: string;
+  rank_name?: string; // display name for rank
   response: string;
 }
 
@@ -121,11 +125,6 @@ interface ComplaintFormProps {
   onSave: (complaint: Complaint) => Promise<any>;
   complaint?: Complaint | null;
   mode: "add" | "edit";
-  stations?: { id: string; name: string }[];
-  prisoners?: { id: string; name: string }[];
-  complaintNatures?: { id: string; name: string }[];
-  priorities?: { id: string; name: string }[];
-  ranks?: { id: string; name: string }[];
 }
 
 const ComplaintForm: React.FC<ComplaintFormProps> = ({
@@ -134,31 +133,27 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   onSave,
   complaint,
   mode,
-  stations = [],
-  prisoners = [],
-  complaintNatures = [],
-  priorities = [],
-  ranks = [],
 }) => {
+  const { region: globalRegion, district: globalDistrict, station: globalStation } = useFilters();
   const [actions, setActions] = useState<ComplaintAction[]>([]);
   const [isAddingAction, setIsAddingAction] = useState(false);
-  // add search state for prisoners and stations
-  const [stationSearch, setStationSearch] = useState("");
   const [currentActionForm, setCurrentActionForm] = useState<ActionFormData>({
     action: "",
     action_date: new Date().toISOString().split("T")[0],
-    // start blank; we populate with UUID when user picks from select
     action_status: "",
     action_remark: "",
   });
-  const [staffProfiles, setStaffProfiles] = useState<any[]>([]);
-  const [staffSearch, setStaffSearch] = useState<string>("");
-  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
-  // derived options that combine searchable fields so SearchableSelect can match force number, username or name
-  const staffOptions = staffProfiles.map(sp => ({
-    ...sp,
-    search_label: `${sp.force_number ?? ""} ${sp.username ?? ""} ${sp.name ?? ""}`.trim(),
-  }));
+  // Track if we've initialized officer to prevent clearing on re-renders
+  const isOfficerInitialized = React.useRef(false);
+  
+  // Initialize selectedStaffId from complaint data to avoid null flash
+  const [selectedStaffId, setSelectedStaffId] = useState<string | null>(() => {
+    if (complaint && mode === "edit" && complaint.officer_requested) {
+      isOfficerInitialized.current = true;
+      return complaint.officer_requested;
+    }
+    return null;
+  });
 
   // display name for station (auto-populated when prisoner selected)
   const [stationDisplay, setStationDisplay] = useState<string>("");
@@ -170,43 +165,73 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   // track actions that are pending (not yet persisted)
   const [pendingActions, setPendingActions] = useState<ComplaintAction[]>([]);
 
-  // local small cache for initial items / quick prefill (rename to avoid conflict with prop)
-  const [localPrisoners, setLocalPrisoners] = useState<any[]>(prisoners ?? []);
   const [originalStationLabel, setOriginalStationLabel] = useState<string>("");
-  // when editing an existing complaint, populate prisoner + station and keep them non-editable
+  const [selectsKey, setSelectsKey] = useState<number>(0);
+  
+  // Derive initial items directly from complaint prop to avoid timing issues
+  const initialNature = (complaint && mode === "edit" && complaint.nature_of_complaint && complaint.nature_of_complaint_name)
+    ? { id: complaint.nature_of_complaint, name: complaint.nature_of_complaint_name }
+    : null;
+  
+  const initialPriority = (complaint && mode === "edit" && complaint.complaint_priority && complaint.complaint_priority_name)
+    ? { id: complaint.complaint_priority, name: complaint.complaint_priority_name }
+    : null;
+  
+  // Local state for SearchableSelect values - initialize from complaint immediately
+  const [localNatureValue, setLocalNatureValue] = useState<string | null>(null);
+  const [localPriorityValue, setLocalPriorityValue] = useState<string | null>(null);
+  
+  // Update local state when complaint data changes (from fresh API data)
   useEffect(() => {
-    if (!complaint || mode !== "edit") {
-      // clear when not editing
-      setOriginalStationLabel("");
-      return;
+    if (complaint && mode === "edit") {
+      setLocalNatureValue(complaint.nature_of_complaint || null);
+      setLocalPriorityValue(complaint.complaint_priority || null);
+      // Force SearchableSelect to remount with fresh initialItem
+      setSelectsKey(k => k + 1);
+    } else {
+      setLocalNatureValue(null);
+      setLocalPriorityValue(null);
     }
-    // complaint.prisoner is the prisoner id, complaint.prisoner_name is display name
-    try {
-      // set form fields (react-hook-form setValue must be in scope)
-      if (typeof setValue === "function") {
-        setValue("prisoner", complaint.prisoner ?? null);
-        setValue("original_station", complaint.station ?? "");
-        // also ensure main station field is set (used by hidden input / submission)
-        setValue("station", complaint.station ?? "");
-      }
-    } catch (e) {
-      // ignore if setValue not available
-    }
-    // populate both station display states so the UI shows the station on edit
-    setOriginalStationLabel(complaint.station_name ?? "");
-    setStationDisplay(complaint.station_name ?? "");
-    // ensure local cache contains the prisoner object so CustomPrisonerSearch (or display) can show label
-    const p = localPrisoners.find((pr: any) => String(pr.id) === String(complaint.prisoner));
-    if (!p) {
-      const newPr = {
-        id: complaint.prisoner,
-        full_name: complaint.prisoner_name ?? "",
-        current_station: complaint.station ?? "",
-        current_station_name: complaint.station_name ?? "",
+  }, [complaint?.nature_of_complaint, complaint?.complaint_priority, mode]);
+  
+  // Derive initial form values synchronously to avoid timing issues
+  const initialFormValues = React.useMemo(() => {
+    if (complaint && mode === "edit") {
+      return {
+        prisoner: complaint.prisoner,
+        prisoner_name: complaint.prisoner_name || "",
+        station: complaint.station,
+        nature_of_complaint: complaint.nature_of_complaint,
+        complaint_priority: complaint.complaint_priority,
+        complaint: complaint.complaint,
+        complaint_remark: complaint.complaint_remark,
+        complaint_date: complaint.complaint_date.split("T")[0],
+        complaint_status: complaint.complaint_status,
+        officer_requested_username: complaint.officer_requested_username || "",
+        officer_requested: complaint.officer_requested, // Already a string UUID from API
+        force_number: complaint.force_number,
+        rank: complaint.rank,
+        rank_name: complaint.rank_name || "",
+        response: complaint.response || "",
       };
-      setLocalPrisoners((prev) => [newPr, ...prev]);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return {
+      prisoner: "",
+      prisoner_name: "",
+      station: "",
+      nature_of_complaint: "",
+      complaint_priority: "",
+      complaint: "",
+      complaint_remark: "",
+      complaint_date: new Date().toISOString().split("T")[0],
+      complaint_status: "OPEN",
+      officer_requested_username: "",
+      officer_requested: "",
+      force_number: "",
+      rank: "",
+      rank_name: "",
+      response: "",
+    };
   }, [complaint, mode]);
 
   const {
@@ -218,22 +243,24 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     formState: { errors },
     control,
   } = useForm<ComplaintFormData>({
-    defaultValues: {
-      prisoner: "",
-      prisoner_name: "",
-      station: "",
-      nature_of_complaint: "",
-      complaint_priority: "",
-      complaint: "",
-      complaint_remark: "",
-      complaint_date: new Date().toISOString().split("T")[0],
-      complaint_status: "OPEN",
-      officer_requested_username: "",
-      force_number: "",
-      rank: "",
-      response: "",
-    },
+    defaultValues: initialFormValues as ComplaintFormData,
   });
+
+  // Reset form when initialFormValues change (when complaint changes)
+  useEffect(() => {
+    if (isOpen && mode === "edit" && complaint) {
+      // Update local state (in case complaint changed)
+      setLocalNatureValue(initialFormValues.nature_of_complaint || null);
+      setLocalPriorityValue(initialFormValues.complaint_priority || null);
+      
+      // Use reset with options to ensure all fields update
+      reset(initialFormValues as ComplaintFormData, { 
+        keepDefaultValues: false,
+        keepDirty: false,
+        keepTouched: false,
+      });
+    }
+  }, [isOpen, complaint?.nature_of_complaint, complaint?.complaint_priority, complaint?.officer_requested, complaint?.force_number, complaint?.rank, mode, initialFormValues, reset]);
 
   // Watch form values for selects
   const watchStation = watch("station");
@@ -241,35 +268,28 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
   const watchPriority = watch("complaint_priority");
   const watchStatus = watch("complaint_status");
   const watchRank = watch("rank");
+  const watchRankName = watch("rank_name");
   const watchPrisoner = watch("prisoner");
   const watchForceNumber = watch("force_number");
 
-  // Initialize form with complaint data if editing
+  // Initialize display states when editing
   useEffect(() => {
     if (complaint && mode === "edit") {
-      setValue("prisoner", complaint.prisoner);
-      setValue("station", complaint.station);
-      // set human-friendly display for station (use complaint.station_name if present)
       setStationDisplay(complaint.station_name ?? "");
-      setValue("nature_of_complaint", complaint.nature_of_complaint);
-      setValue("complaint_priority", complaint.complaint_priority);
-      setValue("complaint", complaint.complaint);
-      setValue("complaint_remark", complaint.complaint_remark);
-      setValue(
-        "complaint_date",
-        complaint.complaint_date.split("T")[0],
-      );
-      setValue("complaint_status", complaint.complaint_status);
-      setValue("officer_requested_username", complaint.officer_requested_username);
-      setValue("force_number", complaint.force_number);
-      setValue("rank", complaint.rank);
-      setValue("response", complaint.response || "");
       setActions(complaint.actions || []);
-    } else {
-      reset();
-      setActions([]);
+      // Only set if we have an officer and haven't initialized yet, or if the officer changed
+      const newOfficerId = complaint.officer_requested || null;
+      if (newOfficerId && (!isOfficerInitialized.current || selectedStaffId !== newOfficerId)) {
+        console.log('Setting selectedStaffId to:', newOfficerId);
+        setSelectedStaffId(newOfficerId);
+        isOfficerInitialized.current = true;
+      }
+    } else if (mode === "add") {
+      // Reset when switching to add mode
+      setSelectedStaffId(null);
+      isOfficerInitialized.current = false;
     }
-  }, [complaint, mode, setValue, reset]);
+  }, [complaint?.officer_requested, complaint?.station_name, mode, selectedStaffId]);
 
   // Reset form when dialog closes
   useEffect(() => {
@@ -284,49 +304,66 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
         action_status: "",
         action_remark: "",
       });
+      // Reset officer selection and auto-populated fields
+      setSelectedStaffId(null);
+      isOfficerInitialized.current = false;
+      setStationDisplay("");
+      setOriginalStationLabel("");
+      // Clear pending actions
+      setPendingActions([]);
     }
   }, [isOpen, reset]);
 
-  // load staff profiles once
+  // Fetch staff details only when user manually changes officer selection
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const st = await ComplaintsService.fetchStaffProfiles();
-        if (!mounted) return;
-        setStaffProfiles(st || []);
-        // if editing and complaint has officer_requested, set selectedStaffId
-        if (complaint?.officer_requested) {
-          setSelectedStaffId(String(complaint.officer_requested));
-        }
-      } catch (err) {}
-    })();
-    return () => { mounted = false; };
-  }, [complaint]);
-
-  // when selectedStaffId changes populate form values
-  useEffect(() => {
-    if (!selectedStaffId) {
-      setValue("officer_requested", "");
-      setValue("force_number", "");
-      setValue("officer_requested_username", "");
-      setValue("rank", "");
-      setValue("rank_name", "");
+    // Skip if no staff selected OR if we're editing and staff ID matches existing complaint
+    if (!selectedStaffId || (mode === "edit" && complaint?.officer_requested === selectedStaffId)) {
       return;
     }
-    const s = staffProfiles.find(sp => String(sp.id) === String(selectedStaffId));
-    if (s) {
-      // submitable values
-      setValue("officer_requested", s.id);           // PK expected by backend
-      setValue("force_number", s.force_number ?? ""); // textual
-      setValue("rank", s.rank ?? "");                // UUID (submit)
-      // user-facing / disabled values
-      setValue("officer_requested_username", s.username ?? "");
-      setValue("rank_name", s.rank_name ?? "");
-    }
-  }, [selectedStaffId, staffProfiles, setValue]);
 
-  // When prisoner changes, auto-populate station (read-only)
+    let mounted = true;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await ComplaintsService.fetchStaffProfiles({
+          id: selectedStaffId,
+          page: 1,
+          page_size: 1,
+        }, controller.signal);
+        
+        if (!mounted) return;
+        
+        const results = response?.results ?? [];
+        const s = results.length > 0 ? results[0] : null;
+        
+        if (s) {
+          setValue("officer_requested", s.id);
+          setValue("force_number", s.force_number ?? "");
+          setValue("rank", s.rank ?? "");
+          setValue("officer_requested_username", s.username ?? "");
+          setValue("rank_name", s.rank_name ?? "");
+        }
+      } catch (err: any) {
+        if (
+          err?.name === 'AbortError' ||
+          err?.name === 'CanceledError' ||
+          err?.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+        console.error('Failed to fetch staff details:', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [selectedStaffId, mode, complaint?.officer_requested, setValue]);
+
+  // When prisoner changes, fetch prisoner details to auto-populate station (read-only)
+  // This only runs if station is not already set (e.g., when editing)
   useEffect(() => {
     const pid = watchPrisoner;
     if (!pid) {
@@ -334,31 +371,66 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       setStationDisplay("");
       return;
     }
-    const p = localPrisoners.find((pr: any) => String(pr.id) === String(pid));
-    if (p) {
-      // support multiple prisoner item shapes: prefer explicit fields, fallback to .raw or name/full_name
-      const stationId =
-        p.current_station ??
-        p.current_station_id ??
-        p.raw?.current_station ??
-        p.station ??
-        p.station_id ??
-        "";
-      const stationName =
-        p.current_station_name ??
-        p.current_stationName ??
-        p.raw?.current_station_name ??
-        p.name ??
-        p.full_name ??
-        "";
-      // set the hidden station value (id) and the UI label (name)
-      setValue("station", stationId || "");
-      setStationDisplay(stationName || stationId || "");
-    } else {
-      setValue("station", "");
-      setStationDisplay("");
+    
+    // If station is already set, don't fetch again
+    if (stationDisplay) {
+      return;
     }
-  }, [watchPrisoner, localPrisoners, setValue]);
+
+    let mounted = true;
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const response = await ComplaintsService.fetchPrisoners({
+          id: pid,
+          page: 1,
+          page_size: 1,
+        }, controller.signal);
+        
+        if (!mounted) return;
+        
+        const results = response?.results ?? [];
+        const p = results.length > 0 ? results[0] : null;
+        
+        if (p) {
+          const stationId =
+            p.current_station ??
+            p.current_station_id ??
+            p.raw?.current_station ??
+            p.station ??
+            p.station_id ??
+            "";
+          const stationName =
+            p.current_station_name ??
+            p.current_stationName ??
+            p.raw?.current_station_name ??
+            p.name ??
+            p.full_name ??
+            "";
+          setValue("station", stationId || "");
+          setStationDisplay(stationName || stationId || "");
+        } else {
+          setValue("station", "");
+          setStationDisplay("");
+        }
+      } catch (err: any) {
+        if (
+          err?.name === 'AbortError' ||
+          err?.name === 'CanceledError' ||
+          err?.code === 'ERR_CANCELED'
+        ) {
+          return;
+        }
+        console.error('Failed to fetch prisoner details:', err);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [watchPrisoner, setValue]);
 
   // load complaint statuses from backend
   useEffect(() => {
@@ -393,13 +465,72 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
     return () => { mounted = false; c.abort(); };
   }, []);
 
+  // Fetch paginated callbacks for SearchableSelect components
+  const fetchNaturesPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await ComplaintsService.fetchComplaintNatures({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchNaturesPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    []
+  );
+
+  const fetchPrioritiesPaginated = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      try {
+        const response = await ComplaintsService.fetchPriorities({
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        }, signal);
+        const payload = response?.results ? response : { results: response || [], count: 0 };
+        return {
+          items: payload?.results ?? [],
+          count: payload?.count ?? 0,
+          next: payload?.next ?? null,
+        };
+      } catch (error: any) {
+        if (
+          error?.name === 'CanceledError' ||
+          error?.code === 'ERR_CANCELED' ||
+          String(error?.message).toLowerCase().includes('canceled')
+        ) {
+          return { items: [], count: 0, next: null };
+        }
+        console.error('fetchPrioritiesPaginated error:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    []
+  );
+
   const onSubmit = async (data: ComplaintFormData) => {
-    // Get names from IDs
-    const stationName = stations.find((s) => s.id === data.station)?.name || "";
-    const natureName = complaintNatures.find((n) => n.id === data.nature_of_complaint)?.name || "";
-    const priorityName = priorities.find((p) => p.id === data.complaint_priority)?.name || "";
-    const rankName = ranks.find((r) => r.id === data.rank)?.name || "";
-    const prisonerName = localPrisoners.find((p) => p.id === (data as any).prisoner)?.name || (data as any).prisoner || "";
+    // Names will be resolved by backend or displayed from form values
+    const stationName = stationDisplay || "";
+    const natureName = "";
+    const priorityName = "";
+    const rankName = data.rank_name || "";
+    const prisonerName = "";
 
     const complaintData: Complaint = {
       id: complaint?.id || `complaint-${Date.now()}`,
@@ -449,7 +580,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
       (submitPayload as any).id = complaint.id;
     }
     try {
-      const created = await onSave(submitPayload);
+      const created = await onSave(submitPayload as any);
       // if there are pending actions (created while adding new complaint), persist them now
       const createdId = created?.id ?? created;
       if (createdId && pendingActions.length > 0) {
@@ -596,7 +727,10 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent 
+        className="max-w-4xl max-h-[90vh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
         <DialogHeader>
           <DialogTitle className="text-[#650000]">
             {mode === "add" ? "New Complaint" : "Edit Complaint"}
@@ -628,33 +762,28 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                   render={({ field }) => {
                     // when editing, show a disabled input with prisoner name (not editable)
                     if (mode === "edit") {
-                      const displayName =
-                        localPrisoners.find((pr: any) => String(pr.id) === String(field.value))?.full_name ??
-                        complaint?.prisoner_name ??
-                        "";
-                      return <Input disabled value={displayName} />;
+                      const displayName = complaint?.prisoner_name ?? "";
+                      return <Input disabled value={displayName} className="bg-muted" />;
                     }
 
                     return (
                       <CustomPrisonerSearch
+                        key={`prisoner-${isOpen}`}
                         value={field.value ?? null}
                         onChange={(v) => field.onChange(v ?? null)}
                         onSelectItem={(p: any) => {
-                          // set prisoner id on form
                           field.onChange(p?.id ?? null);
-                          // auto-populate original_station (store ID) but show name in the disabled label field
-                          if (typeof setValue === "function") {
-                            setValue("original_station", p?.current_station ?? "");
-                          }
-                          setOriginalStationLabel(p?.current_station_name ?? "");
-                          // update local cache so initialItems contains selection next time
-                          setLocalPrisoners((prev) => (prev.some((x) => String(x.id) === String(p.id)) ? prev : [p, ...prev]));
+                          // Immediately set station from prisoner data to avoid slow API call
+                          const stationId = p?.current_station ?? p?.current_station_id ?? p?.station ?? p?.station_id ?? "";
+                          const stationName = p?.current_station_name ?? p?.current_stationName ?? "";
+                          setValue("station", stationId || "");
+                          setStationDisplay(stationName || stationId || "");
+                          setOriginalStationLabel(stationName ?? "");
                         }}
                         placeholder="Select prisoner"
                         idField="id"
                         labelField="full_name"
-                        initialItems={localPrisoners}
-                        pageSize={25}
+                        pageSize={50}
                       />
                     );
                   }}
@@ -674,6 +803,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                   placeholder="Station will be filled when prisoner is selected"
                   disabled
                   readOnly
+                  className="bg-muted"
                 />
                 {/* hidden value to submit station id/name */}
                 <input type="hidden" {...register("station")} />
@@ -715,10 +845,10 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 </Label>
                 <Select
                   value={watchStatus ?? ""}
-                  onValueChange={(value) => setValue("complaint_status", value)}
+                  onValueChange={(value: string) => setValue("complaint_status", value)}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select status" />
+                    <SelectValue placeholder="Select complaint status" />
                   </SelectTrigger>
                   <SelectContent>
                     {(complaintStatuses || []).map((s) => (
@@ -746,14 +876,19 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                   Nature of Complaint <span className="text-red-500">*</span>
                 </Label>
                 <SearchableSelect
-                  value={watchNature ?? null}
-                  onChange={(v) => setValue("nature_of_complaint", v ?? "")}
-                  items={complaintNatures}
+                  key={`nature-${isOpen}-${complaint?.id}-${selectsKey}`}
+                  value={localNatureValue}
+                  onChange={(v) => {
+                    setLocalNatureValue(v ?? null);
+                    setValue("nature_of_complaint", v ?? "");
+                  }}
+                  fetchPaginated={fetchNaturesPaginated}
                   idField="id"
                   labelField="name"
                   placeholder="Select nature"
-                  pageSize={25}
+                  pageSize={50}
                   className="w-full"
+                  initialItem={initialNature ?? undefined}
                 />
                 {errors.nature_of_complaint && (
                   <p className="text-red-500 text-sm mt-1">
@@ -766,23 +901,21 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                 <Label htmlFor="complaint_priority">
                   Priority <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={watchPriority}
-                  onValueChange={(value) =>
-                    setValue("complaint_priority", value)
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {priorities.map((priority) => (
-                      <SelectItem key={priority.id} value={priority.id}>
-                        {priority.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  key={`priority-${isOpen}-${complaint?.id}-${selectsKey}`}
+                  value={localPriorityValue}
+                  onChange={(v) => {
+                    setLocalPriorityValue(v ?? null);
+                    setValue("complaint_priority", v ?? "");
+                  }}
+                  fetchPaginated={fetchPrioritiesPaginated}
+                  idField="id"
+                  labelField="name"
+                  placeholder="Select priority"
+                  pageSize={50}
+                  className="w-full"
+                  initialItem={initialPriority ?? undefined}
+                />
                 {errors.complaint_priority && (
                   <p className="text-red-500 text-sm mt-1">
                     {errors.complaint_priority.message}
@@ -831,61 +964,53 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="force_number">Force Number <span className="text-red-500">*</span></Label>
-                <SearchableSelect
+                <Label htmlFor="force_number">Officer <span className="text-red-500">*</span></Label>
+                <StaffProfileSelect
                   value={selectedStaffId ?? null}
-                  // when user selects an item, populate the form fields immediately
-                  onChange={(v) => {
-                    if (!v) {
-                      setSelectedStaffId(null);
-                      setValue("officer_requested", "");
-                      setValue("force_number", "");
-                      setValue("rank", "");
-                      setValue("officer_requested_username", "");
-                      setValue("rank_name", "");
-                      return;
+                  onChange={(v) => setSelectedStaffId(v ?? null)}
+                  placeholder="Select officer"
+                  initialItem={(() => {
+                    if (complaint && mode === "edit" && complaint.officer_requested) {
+                      const item = {
+                        id: complaint.officer_requested,
+                        staff_name: complaint.officer_requested_username || complaint.force_number || "Unknown Officer",
+                        force_number: complaint.force_number,
+                        rank_name: complaint.rank_name
+                      };
+                      console.log('StaffProfileSelect initialItem:', item);
+                      return item;
                     }
-                    const s = staffOptions.find(sp => String(sp.id) === String(v));
-                    if (s) {
-                      setSelectedStaffId(String(s.id));
-                      // set fields expected by backend (ids) and user-facing fields
-                      setValue("officer_requested", s.id);
-                      setValue("force_number", s.force_number ?? "");
-                      setValue("rank", s.rank ?? "");
-                      setValue("officer_requested_username", s.username ?? "");
-                      setValue("rank_name", s.rank_name ?? "");
-                    } else {
-                      setSelectedStaffId(String(v));
-                    }
-                  }}
-                  items={staffOptions}
-                  idField="id"
-                  // search_label contains force_number + username + name so users can search by any
-                  labelField="search_label"
-                  placeholder="Search by force number, username or name"
-                  pageSize={25}
-                  renderItem={(sp: any) => (
-                    <div className="flex flex-col">
-                      <span className="font-medium">{sp.force_number}</span>
-                      <span className="text-xs text-muted-foreground">{sp.username} {sp.name ? ` • ${sp.name}` : ""}</span>
-                    </div>
-                  )}
-                  className="w-full"
+                    return undefined;
+                  })()}
                 />
                 {errors.force_number && <p className="text-red-500 text-sm mt-1">{(errors as any).force_number?.message}</p>}
               </div>
 
-              {/* Officer Username - disabled */}
+              {/* Force Number - auto-populated */}
               <div>
-                <Label htmlFor="officer_requested_username">Officer Username</Label>
-                <Input id="officer_requested_username" {...register("officer_requested_username")} disabled readOnly />
+                <Label htmlFor="force_number">Force Number</Label>
+                <Input 
+                  id="force_number" 
+                  value={watchForceNumber ?? ""}
+                  disabled 
+                  readOnly 
+                  className="bg-muted"
+                  placeholder="Auto-populated"
+                />
+                <input type="hidden" {...register("force_number")} />
               </div>
 
               {/* Rank - visible rank_name disabled, but submit rank UUID in hidden field */}
               <div>
                 <Label htmlFor="rank_name">Rank</Label>
-                <Input id="rank_name" {...register("rank_name")} disabled readOnly />
-                {/* hidden actual rank id value for submission */}
+                <Input 
+                  id="rank_name" 
+                  value={watchRankName ?? ""}
+                  disabled 
+                  readOnly 
+                  className="bg-muted"
+                  placeholder="Auto-populated"
+                />
                 <input type="hidden" {...register("rank")} />
               </div>
 
@@ -962,7 +1087,7 @@ const ComplaintForm: React.FC<ComplaintFormProps> = ({
                       <Label>Action Status</Label>
                       <Select
                         value={currentActionForm.action_status}
-                        onValueChange={(value) =>
+                        onValueChange={(value: string) =>
                           setCurrentActionForm({
                             ...currentActionForm,
                             // value will be the approval-status id (UUID) returned by API

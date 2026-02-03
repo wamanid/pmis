@@ -34,7 +34,7 @@ import { ManualLockupTableView } from './ManualLockupTableView';
 import {
   addLockUpRecord,
   getLockType, getManualLockup, getPrisonerCategories, getSexes,
-  getStation, ManualLockUpItem,
+  getStation, ManualLockUpItem, MANUAL_LOCKUP_API_ENDPOINTS,
 } from '../../services/stationServices/manualLockupIntegration';
 import axiosInstance from "../../services/axiosInstance";
 import { Edit, Trash } from 'lucide-react';
@@ -78,6 +78,62 @@ export function ManualLockupScreen() {
   const [locations, setLocations] = useState<any[]>([]) // <-- new
   const [prisonerCategories, setPrisonerCategories] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<"table-form"|"table-view"|"records">("table-form");
+  
+  // Paginated station fetcher for 14M+ datasets (SearchableSelect server mode)
+  const fetchStationsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(MANUAL_LOCKUP_API_ENDPOINTS.STATIONS, {
+        params: {
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        },
+        signal,
+      });
+
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        // Request was cancelled (user typed quickly, navigated away, etc.) - this is expected
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load stations');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
+
+  // Paginated location fetcher for 14M+ datasets (SearchableSelect server mode)
+  const fetchLocationsPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    try {
+      const response = await axiosInstance.get(MANUAL_LOCKUP_API_ENDPOINTS.LOCATIONS, {
+        params: {
+          search: opts?.search || '',
+          page: opts?.page || 1,
+          page_size: opts?.page_size || 50,
+        },
+        signal,
+      });
+
+      const payload = response?.data ?? response ?? {};
+      return {
+        items: payload?.results ?? [],
+        count: payload?.count ?? 0,
+        next: payload?.next ?? null,
+      };
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'CanceledError' || error.code === 'ERR_CANCELED') {
+        // Request was cancelled (user typed quickly, navigated away, etc.) - this is expected
+        return { items: [], count: 0, next: null };
+      }
+      toast.error('Failed to load locations');
+      return { items: [], count: 0, next: null };
+    }
+  }, []);
  
   // load lookup data (stations, lock types, categories, sexes, locations)
   useEffect(() => {
@@ -90,7 +146,7 @@ export function ManualLockupScreen() {
           getLockType(),
           getPrisonerCategories(),
           getSexes(),
-          axiosInstance.get("/system-administration/locations/"),
+          axiosInstance.get(MANUAL_LOCKUP_API_ENDPOINTS.LOCATIONS),
         ]);
         if (!mounted) return;
         setStations(stationsRes?.results ?? stationsRes ?? []);
@@ -426,7 +482,7 @@ export function ManualLockupScreen() {
   // Debug: log a sample item and available fields in the summary cache
   useEffect(() => {
     if (lockups && lockups.length) {
-      console.debug('ManualLockupScreen: sample lockups[0]', lockups[0]);
+      // console.debug('ManualLockupScreen: sample lockups[0]', lockups[0]);
     }
   }, [lockups]);
 
@@ -655,15 +711,15 @@ export function ManualLockupScreen() {
                         Lockup Time <span className="text-red-500">*</span>
                       </Label>
                       <div className="relative">
-                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Clock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
                         <Input
                           id="lockup_time"
                           type="time"
                           className="pl-9"
                           {...register("lockup_time", { required: "Lockup time is required" })}
                         />
-                        {formState.errors.lockup_time && <p className="text-red-500 text-sm mt-1">{(formState.errors.lockup_time as any).message}</p>}
-                       </div>
+                      </div>
+                      {formState.errors.lockup_time && <p className="text-red-500 text-sm mt-1">{(formState.errors.lockup_time as any).message}</p>}
                      </div>
                    </div>
  
@@ -673,31 +729,24 @@ export function ManualLockupScreen() {
                        <Label htmlFor="location">
                          Location <span className="text-red-500">*</span>
                        </Label>
-  
-                        <Select
-                          value={String(watch("location") ?? "")}
-                          onValueChange={(value) => setValue("location", value)}
-                        >
-                         <SelectTrigger id="location">
-                           <SelectValue placeholder="Select location" />
-                         </SelectTrigger>
-                         <SelectContent>
-                            {locations.length === 0 ? (
-                              <div className="p-3 text-sm text-muted-foreground">No locations</div>
-                            ) : (
-                              locations.map((loc: any) => (
-                                <SelectItem key={loc.id} value={String(loc.id)}>
-                                  <div className="flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
-                                    {loc.name ?? loc.location_name ?? String(loc.id)}
-                                  </div>
-                                </SelectItem>
-                              ))
-                            )}
-                         </SelectContent>
-                       </Select>
-                       <input type="hidden" {...register("location", { required: "Location is required" })} />
-                       
+                       <Controller
+                         control={control}
+                         name="location"
+                         rules={{ required: "Location is required" }}
+                         render={({ field }) => (
+                           <SearchableSelect
+                             fetchPaginated={fetchLocationsPaginated}
+                             value={field.value}
+                             onChange={(v) => field.onChange(v)}
+                             placeholder="Select location"
+                             idField="id"
+                             labelField="name"
+                             pageSize={50}
+                             minQueryLength={0}
+                             className="w-full"
+                           />
+                         )}
+                       />
                        {formState.errors.location && <p className="text-red-500 text-sm mt-1">{(formState.errors.location as any).message}</p>}
                      </div>
  
@@ -731,12 +780,14 @@ export function ManualLockupScreen() {
                          rules={{ required: "Station is required" }}
                          render={({ field }) => (
                            <SearchableSelect
-                             items={stations}
+                              fetchPaginated={fetchStationsPaginated}
                              value={field.value}
                              onChange={(v) => field.onChange(v)}
                              placeholder="Select station"
                              idField="id"
                              labelField="name"
+                              pageSize={50}
+                              minQueryLength={0}
                              className="w-full"
                            />
                          )}
