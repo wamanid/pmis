@@ -349,7 +349,6 @@ const handleSubmit = async () => {
       gate_pass_number:pair.gate_pass_number,
       production_warrant: warrantBase64,
       criminal_case_number:formData.criminal_case_number,
-      remarks:formData.remarks,
     }));
 
     dataToPost={records:prisoners,};
