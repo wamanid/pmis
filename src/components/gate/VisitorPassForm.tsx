@@ -10,6 +10,7 @@ import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, Command
 import { Check, ChevronsUpDown, AlertCircle, Plus } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import {Pass} from "../../services/stationServices/visitorsServices/visitorPass";
+import { getprisoners } from '../../services/gateService';
 
 interface VisitorPass {
   id?: string;
@@ -43,7 +44,7 @@ interface VisitorPassFormProps {
 }
 
 // Mock data for dropdowns
-const mockPrisoners = [
+let mockPrisoners = [
   { id: 'prisoner-uuid-1', name: 'John Doe', prisoner_number: 'P-2024-001' },
   { id: 'prisoner-uuid-2', name: 'Michael Brown', prisoner_number: 'P-2024-002' },
   { id: 'prisoner-uuid-3', name: 'Robert Wilson', prisoner_number: 'P-2024-003' },
@@ -52,11 +53,6 @@ const mockPrisoners = [
 ];
 
 const mockVisitors = [
-  { id: 'visitor-uuid-1', name: 'Jane Smith', id_number: 'ID-001' },
-  { id: 'visitor-uuid-2', name: 'Sarah Johnson', id_number: 'ID-002' },
-  { id: 'visitor-uuid-3', name: 'Emily Davis', id_number: 'ID-003' },
-  { id: 'visitor-uuid-4', name: 'Lisa Thompson', id_number: 'ID-004' },
-  { id: 'visitor-uuid-5', name: 'Maria Garcia', id_number: 'ID-005' }
 ];
 
 export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFields, onAddNewVisitor, visitors }: VisitorPassFormProps) {
@@ -85,6 +81,19 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
   const visitorList = visitors || mockVisitors;
 
   useEffect(() => {
+    //load prisoners
+      //get the prisoners here
+        //get pass types
+      getprisoners().then((data) => {
+      //alert(JSON.stringify(data.results));
+       mockPrisoners = data.results;
+    }).catch((error) => {
+      alert(error);
+    
+    });
+
+
+
     if (pass) {
       setFormData({
         ...pass,
@@ -157,8 +166,8 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
               >
                 {selectedPrisoner
                   ? selectedPrisoner.prisoner_number 
-                    ? `${selectedPrisoner.name} (${selectedPrisoner.prisoner_number})`
-                    : selectedPrisoner.name
+                    ? `${selectedPrisoner.full_name} (${selectedPrisoner.prisoner_number_value})`
+                    : selectedPrisoner.full_name
                   : 'Select prisoner...'}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
@@ -172,7 +181,7 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
                     {mockPrisoners.map((prisoner) => (
                       <CommandItem
                         key={prisoner.id}
-                        value={`${prisoner.name} ${prisoner.prisoner_number}`}
+                        value={`${prisoner.id}`}
                         onSelect={() => {
                           setFormData({ ...formData, prisoner: prisoner.id });
                           setPrisonerOpen(false);
@@ -184,7 +193,7 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
                             formData.prisoner === prisoner.id ? 'opacity-100' : 'opacity-0'
                           }`}
                         />
-                        {prisoner.name} ({prisoner.prisoner_number})
+                        {prisoner.full_name} ({prisoner.prisoner_number_value})
                       </CommandItem>
                     ))}
                   </CommandGroup>
@@ -217,8 +226,8 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
                 >
                   {selectedVisitor
                     ? selectedVisitor.id_number 
-                      ? `${selectedVisitor.name} (${selectedVisitor.id_number})`
-                      : selectedVisitor.name
+                      ? `${selectedVisitor.first_name}-${selectedVisitor.last_name}  (${selectedVisitor.id_number})`
+                      : selectedVisitor.first_name
                     : 'Select visitor...'}
                   <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
@@ -244,7 +253,7 @@ export default function VisitorPassForm({ pass, onSubmit, onCancel, disabledFiel
                               formData.visitor === visitor.id ? 'opacity-100' : 'opacity-0'
                             }`}
                           />
-                          {visitor.name} ({visitor.id_number})
+                          {visitor.first_name}  {visitor.last_name} ({visitor.id_number})
                         </CommandItem>
                       ))}
                     </CommandGroup>
