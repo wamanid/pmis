@@ -11,6 +11,7 @@ import { stageRoutes } from './stage.routes';
 import { dischargeRoutes } from './discharge.routes';
 import { reportsRoutes } from './reports.routes';
 import { medicalRoutes } from './medical.routes';
+import { courtRoutes } from './court.routes';
 
 /**
  * Application Routes Configuration
@@ -46,6 +47,7 @@ export const routes: RouteObject[] = [
 
   // Stage Classification Routes
   ...stageRoutes,
+
   // Discharge Management Routes
   ...dischargeRoutes,
 
@@ -54,6 +56,9 @@ export const routes: RouteObject[] = [
 
   // Medical Routes
   ...medicalRoutes,
+
+  // Court Management Routes
+  ...courtRoutes,
 
   // Default/Fallback Route
   {

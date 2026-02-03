@@ -8,6 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner@2.0.3';
 import { Calendar, Upload, X } from 'lucide-react';
 import PrisonerSearchScreen from '../common/PrisonerSearchScreen';
+import {CourtAttendanceRecord, Prisoner} from '../../models/court';
+import { PrisonerRecord } from '../../models/gate/Index';
+import { OffenceRequest } from '../../models/StageClassification';
+import { getAttendacetypes, getCourtDetails, getOffences, getOffencesPersonal, getOutcomes, getprisonerAppeals, getStations, submitCourtAttendance } from '../../services/courtService';
+import PrisonerSearchScreenMini from '../common/PrisonerSearchScreenMini';
+import { getgatepasses, getprisonergatepass } from '../../services/gateService';
+import axiosInstance from '../../services/axiosInstance';
 
 interface CourtAttendanceFormProps {
   open: boolean;
@@ -16,95 +23,11 @@ interface CourtAttendanceFormProps {
   editData?: CourtAttendanceRecord | null;
 }
 
-interface CourtAttendanceRecord {
-  id?: string;
-  prisoner_name?: string;
-  attendance_type_name?: string;
-  court_name?: string;
-  offence_name?: string;
-  case_outcome_name?: string;
-  appeal_id?: string;
-  gate_pass_number?: string;
-  remarks?: string;
-  production_warrant?: string;
-  criminal_case_number?: string;
-  attendance_datetime?: string;
-  legal_proceedings?: string;
-  prisoner?: string;
-  court_attendance_type?: string;
-  court?: string;
-  offence?: string;
-  case_outcome?: string;
-  appeal?: string;
-  gate_pass?: string;
-}
 
-interface Prisoner {
-  id: string;
-  prisoner_number: string;
-  personal_number: string;
-  full_name: string;
-  first_name: string;
-  middle_name: string;
-  last_name: string;
-  date_of_birth: string;
-  id_number: string;
-  id_type: string;
-  gender: string;
-  tribe: string;
-  date_of_admission: string;
-  religion: string;
-  category?: string;
-  status?: string;
-}
 
-// Mock data for dropdowns
-const mockAttendanceTypes = [
-  { id: '1', name: 'Court Appearance' },
-  { id: '2', name: 'Bail Hearing' },
-  { id: '3', name: 'Sentencing' },
-  { id: '4', name: 'Appeal Hearing' },
-  { id: '5', name: 'Case Mention' }
-];
 
-const mockCourts = [
-  { id: '1', name: 'High Court - Kampala' },
-  { id: '2', name: 'Chief Magistrates Court - Kampala' },
-  { id: '3', name: 'Magistrates Court - Nakawa' },
-  { id: '4', name: 'Family Court - Mengo' },
-  { id: '5', name: 'Commercial Court - Kampala' }
-];
-
-const mockOffences = [
-  { id: '1', name: 'Theft' },
-  { id: '2', name: 'Assault' },
-  { id: '3', name: 'Murder' },
-  { id: '4', name: 'Fraud' },
-  { id: '5', name: 'Drug Trafficking' }
-];
-
-const mockCaseOutcomes = [
-  { id: '1', name: 'Adjourned' },
-  { id: '2', name: 'Convicted' },
-  { id: '3', name: 'Acquitted' },
-  { id: '4', name: 'Case Dismissed' },
-  { id: '5', name: 'Bail Granted' },
-  { id: '6', name: 'Remanded' }
-];
-
-const mockAppeals = [
-  { id: '1', name: 'APP-2024-001' },
-  { id: '2', name: 'APP-2024-002' },
-  { id: '3', name: 'APP-2024-003' }
-];
-
-const mockGatePasses = [
-  { id: '1', number: 'GP-2024-001' },
-  { id: '2', number: 'GP-2024-002' },
-  { id: '3', number: 'GP-2024-003' }
-];
-
-export default function CourtAttendanceForm({ open, onClose, onSuccess, editData }: CourtAttendanceFormProps) {
+export default function CourtAttendanceForm({ open, onClose, onSuccess, editData,
+ }: CourtAttendanceFormProps) {
   const [formData, setFormData] = useState<CourtAttendanceRecord>({
     prisoner: '',
     court_attendance_type: '',
@@ -122,10 +45,65 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [warrantFile, setWarrantFile] = useState<File | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+    const [offs, setOffs] = useState([]);
+      const [stations, setStations] = useState<any[]>([]);
+      const [attendancetypes, setAttendancetypes] = useState<any[]>([]);
+      const [outcomes, setOutcomes] = useState<any[]>([]);
+        const [courts, setUniqueCourts] = useState<any[]>([]);
+               const [mockGatePasses, setMockGatePasses] = useState<any[]>([]);
+                   const [mockAppeals, setMockAppeals] = useState<any[]>([]);
+                   const [offences, setOffences] = useState<any[]>([]);
+           
+ // alert(JSON.stringify(attendancetypes));
 
+// Mock data for dropdowns
+const mockAttendanceTypes = attendancetypes;
+
+const mockCourts = courts
+
+const mockOffences = offs; 
+
+const mockCaseOutcomes = outcomes
+
+const mockAppeals2 = [
+  { id: '1', name: 'APP-2024-001' },
+  { id: '2', name: 'APP-2024-002' },
+  { id: '3', name: 'APP-2024-003' }
+];
   // Load edit data
   useEffect(() => {
-    if (editData) {
+    loadFilters();
+    if (editData) { 
+      
+      let prisonerId:string=editData.prisoner as string;
+       let datatopost:OffenceRequest={
+            prisoner:editData.prisoner
+          }
+
+      
+
+        getprisonergatepass(prisonerId).then((data) => {
+            setMockGatePasses(data.results);
+       //  alert(JSON.stringify(data.results));
+          }).catch((error) => {
+           alert(error);
+          });
+          
+              getprisonerAppeals(prisonerId).then((data) => {
+            setMockAppeals(data.results);
+       // alert(JSON.stringify(data.results));
+          }).catch((error) => {
+           alert(error);
+          });
+
+           getOffencesPersonal(datatopost).then((data) => {
+            setOffs(data.results);
+         // alert(JSON.stringify(offs));
+           
+          }).catch((error) => {
+           // alert(error);
+          });
+
       setFormData({
         ...editData,
         attendance_datetime: editData.attendance_datetime ? 
@@ -136,6 +114,38 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
     }
   }, [editData, open]);
 
+  const loadFilters = () => {
+           getOutcomes().then((data) => {
+          //alert(JSON.stringify(data.results));
+           setOutcomes(data.results);
+        }).catch((error) => {
+          alert(error);
+        });
+           getAttendacetypes().then((data) => {
+           setAttendancetypes(data.results);
+        }).catch((error) => {
+          alert(error);
+        });
+       
+         getStations().then((data) => {
+           setStations(data.results);
+        }).catch((error) => {
+          alert(error);
+        });
+
+
+          getCourtDetails().then((data) => {
+            // alert(JSON.stringify(data.results));
+               setUniqueCourts(data.results);
+            }).catch((error) => {
+              alert(error);
+            });
+    
+    
+    
+  }
+
+  
   const resetForm = () => {
     setFormData({
       prisoner: '',
@@ -158,6 +168,34 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
   const handlePrisonerSelect = (prisonerId: string, prisoner: Prisoner | null) => {
     setFormData({ ...formData, prisoner: prisonerId });
     setSelectedPrisoner(prisoner);
+
+    let datatopost:OffenceRequest={
+            prisoner:prisonerId
+          }
+          getOffencesPersonal(datatopost).then((data) => {
+            setOffs(data.results);
+         // alert(JSON.stringify(offs));
+           
+          }).catch((error) => {
+           // alert(error);
+          });
+
+        getprisonergatepass(prisonerId).then((data) => {
+            setMockGatePasses(data.results);
+       //  alert(JSON.stringify(data.results));
+          }).catch((error) => {
+           alert(error);
+          });
+
+
+          
+          getprisonerAppeals(prisonerId).then((data) => {
+          setMockAppeals(data.results);
+       // alert(JSON.stringify(data.results));
+          }).catch((error) => {
+           alert(error);
+          });
+
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -173,7 +211,6 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
     // Validation
     if (!formData.prisoner) {
       toast.error('Please select a prisoner');
@@ -188,6 +225,7 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
       return;
     }
     if (!formData.attendance_datetime) {
+     // alert(formData.attendance_datetime);
       toast.error('Please select attendance date and time');
       return;
     }
@@ -196,34 +234,96 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
 
     try {
       // TODO: Replace with actual API call
-      // const formDataToSend = new FormData();
-      // Object.keys(formData).forEach(key => {
-      //   if (formData[key as keyof CourtAttendanceRecord]) {
-      //     formDataToSend.append(key, formData[key as keyof CourtAttendanceRecord] as string);
-      //   }
-      // });
-      // if (warrantFile) {
-      //   formDataToSend.append('production_warrant', warrantFile);
-      // }
-      
-      // const url = editData 
-      //   ? `/api/court-attendance/attendance-records/${editData.id}/`
-      //   : '/api/court-attendance/attendance-records/';
-      // const method = editData ? 'PUT' : 'POST';
-      
-      // const response = await fetch(url, {
-      //   method,
-      //   body: formDataToSend
-      // });
-      
-      // if (!response.ok) throw new Error('Failed to save record');
+       const formDataToSend = new FormData();
+       //multipart form data
 
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+       Object.keys(formData).forEach(key => {
+         if (formData[key as keyof CourtAttendanceRecord]) {
+           formDataToSend.append(key, formData[key as keyof CourtAttendanceRecord] as string);
+         }
+       });
+      
+       //use editData if editData exist
+       if (warrantFile) {
+         formDataToSend.append('production_warrant', warrantFile);
+       }
+    
 
+     const token =
+        localStorage.getItem("access_token") ??
+        localStorage.getItem("token") ??
+        localStorage.getItem("auth_token") ??
+        localStorage.getItem("authToken") ??
+        null;
+      const configuredBase =
+      (axiosInstance && (axiosInstance.defaults as any)?.baseURL) ??
+      ((import.meta as any).env?.VITE_API_BASE_URL ?? "")
+
+       try {   
+        
+        let response:any=null;
+
+            //if edit data
+            if(editData){
+               response = await fetch(configuredBase+"/court-attendance/attendance-records/"+editData.id+"/", {
+                method: 'PUT',
+                headers: {
+                  "Authorization": "Bearer "+token, // ✅ Optional auth
+                },
+                body: formDataToSend,
+              });
+            }
+            else{
+ response = await fetch(configuredBase+"/court-attendance/attendance-records/", {
+              method: 'POST',
+              headers: {
+                "Authorization": "Bearer "+token, // ✅ Optional auth
+              },
+              body: formDataToSend,
+            });
+            }
+             const result = await response.json();
+           //   alert(JSON.stringify(result));
+            if (!response.ok) {
+                  toast.error(response.status); 
+             // throw new Error(`Upload failed: ${response.status}`);
+            }
+            else{
       toast.success(editData ? 'Court attendance record updated successfully' : 'Court attendance record created successfully');
-      onSuccess();
-      handleClose();
+    //  onSuccess();
+     // handleClose();
+            }
+          } catch (error) {
+            console.error('Upload error:', error);
+            alert(error);
+          
+          }
+
+            const dataTopost:CourtAttendanceRecord={
+              prisoner:formData.prisoner,
+              court_attendance_type:formData.court_attendance_type,
+              court:formData.court,
+              offence:formData.offence,
+              case_outcome:formData.case_outcome,
+              appeal:formData.appeal,
+              gate_pass:formData.gate_pass,
+              criminal_case_number:formData.criminal_case_number,
+              attendance_datetime:formData.attendance_datetime,
+              legal_proceedings:formData.legal_proceedings,
+              remarks:formData.remarks,
+              production_warrant:''
+            };
+            //alert(JSON.stringify(dataTopost));
+/*
+            submitCourtAttendance(dataTopost).then(() => {
+              toast.success(editData ? 'Court attendance record updated successfully' : 'Court attendance record created successfully');
+              onSuccess();
+              handleClose();
+            }).catch((error) => {
+             toast.success(error);           
+            });*/
+
+
     } catch (error) {
       console.error('Error saving court attendance record:', error);
       toast.error('Failed to save court attendance record');
@@ -241,7 +341,7 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-[1270px] h-[95vh] overflow-hidden p-0 flex flex-col">
+      <DialogContent className="max-w-[1270px] h-[95vh] overflow-hidden p-0 flex flex-col overflow-y-auto">
         {/* Fixed Header */}
         <DialogHeader style={{ borderBottom: '2px solid #650000', padding: '0.75rem 1.5rem' }} className="shrink-0">
           <DialogTitle style={{ color: '#650000' }}>
@@ -250,12 +350,12 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
         </DialogHeader>
 
         {/* Scrollable Content */}
-        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 scroll-auto">
           <div className="flex-1 overflow-y-auto px-6 py-4">
             <div className="space-y-6">
               {/* Prisoner Search */}
               <div>
-                <PrisonerSearchScreen
+                <PrisonerSearchScreenMini
                   value={formData.prisoner}
                   onChange={handlePrisonerSelect}
                   showTitle={false}
@@ -311,7 +411,9 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
                   </Select>
                 </div>
 
-                <div className="space-y-2">
+              </div>
+
+                <div className="space-y-6 mb6-l">
                   <Label htmlFor="attendance_datetime">
                     Attendance Date & Time <span className="text-red-600">*</span>
                   </Label>
@@ -327,7 +429,6 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
                     <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
                   </div>
                 </div>
-              </div>
 
               {/* Case Details */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -342,9 +443,9 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
                       <SelectValue placeholder="Select offence" />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockOffences.map((offence) => (
+                      {offs.map((offence) => (
                         <SelectItem key={offence.id} value={offence.id}>
-                          {offence.name}
+                          {offence.offence_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -398,7 +499,7 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
                     <SelectContent>
                       {mockAppeals.map((appeal) => (
                         <SelectItem key={appeal.id} value={appeal.id}>
-                          {appeal.name}
+                          {appeal.appeal_number}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -418,7 +519,7 @@ export default function CourtAttendanceForm({ open, onClose, onSuccess, editData
                     <SelectContent>
                       {mockGatePasses.map((pass) => (
                         <SelectItem key={pass.id} value={pass.id}>
-                          {pass.number}
+                          {pass.gatepass_number}
                         </SelectItem>
                       ))}
                     </SelectContent>

@@ -18,33 +18,21 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import PrisonerSearchScreen from '../common/PrisonerSearchScreen';
+import { CourtVisitRecord } from '../../models/court';
+import { deleteCourtVisit, getVisitorStatus, getvisitorTypes, postcourtVisit, updatecourtVisit } from '../../services/courtService';
 
 interface CourtVisitFormProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   editData?: CourtVisitRecord | null;
-}
-
-interface CourtVisitRecord {
-  id?: string;
-  prisoner_name?: string;
-  id_type_name?: string;
-  relationship_name?: string;
-  visit_id?: string;
-  visit_date?: string;
-  visitor_name?: string;
-  id_number?: string;
-  telephone_number?: string;
-  address?: string;
-  items_brought?: string;
-  prisoner?: string;
-  id_type?: string;
-  relationship?: string;
+    mockIdTypes?:any[];
+    mockRelationships?:any[];
+    mockItems?:any[];
 }
 
 // Mock data for dropdowns
-const mockIdTypes = [
+const mockIdTypes2 = [
   { id: '1', name: 'National ID' },
   { id: '2', name: 'Passport' },
   { id: '3', name: 'Driving License' },
@@ -52,7 +40,7 @@ const mockIdTypes = [
   { id: '5', name: 'Student ID' },
 ];
 
-const mockRelationships = [
+const mockRelationships2 = [
   { id: '1', name: 'Spouse' },
   { id: '2', name: 'Parent' },
   { id: '3', name: 'Child' },
@@ -63,7 +51,7 @@ const mockRelationships = [
   { id: '8', name: 'Other' },
 ];
 
-const mockItems = [
+const mockItems2 = [
   { id: '1', name: 'Food Items' },
   { id: '2', name: 'Clothing' },
   { id: '3', name: 'Books' },
@@ -76,19 +64,28 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
   open,
   onClose,
   onSuccess,
-  editData
+  editData,
+    mockIdTypes,
+    mockRelationships,
+    mockItems,
 }) => {
   const [formData, setFormData] = useState({
     prisoner: '',
     visit_id: '',
     visit_date: '',
-    visitor_name: '',
+    first_name: '',
+    middle_name: '',
+    last_name: '',
     id_type: '',
     id_number: '',
-    telephone_number: '',
-    relationship: '',
+    contact_no: '',
+    relation: '',
     address: '',
-    items_brought: ''
+    items_brought: '',
+    visitor_type:'',
+    visitor_status:''
+
+   
   });
 
   const [loading, setLoading] = useState(false);
@@ -96,19 +93,39 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
   const [showPrisonerSearch, setShowPrisonerSearch] = useState(false);
   const [selectedPrisonerName, setSelectedPrisonerName] = useState('');
 
+   const [visitorTypes, setVisitorTypes] = useState<any[]>([]);
+      const [visitorStatus, setVisitorStatus] = useState<any[]>([]);
+
+
   useEffect(() => {
+      getvisitorTypes().then((data) => {
+       // alert(JSON.stringify(data.results));
+         setVisitorTypes(data.results);
+    });
+         getVisitorStatus().then((data) => {
+       // alert(JSON.stringify(data.results));
+         setVisitorStatus(data.results);
+    });
+
+    //load data here
     if (editData) {
+
+    //  alert(JSON.stringify(editData));
       setFormData({
         prisoner: editData.prisoner || '',
         visit_id: editData.visit_id || '',
-        visit_date: editData.visit_date || '',
-        visitor_name: editData.visitor_name || '',
+        visit_date: editData.visitation_datetime || '',
+        first_name: editData.first_name || '',
+        middle_name: editData.middle_name || '',
+        last_name: editData.last_name || '',
         id_type: editData.id_type || '',
         id_number: editData.id_number || '',
-        telephone_number: editData.telephone_number || '',
-        relationship: editData.relationship || '',
+        contact_no: editData.contact_no || '',
+        relation: editData.relation || '',
         address: editData.address || '',
-        items_brought: editData.items_brought || ''
+        items_brought: editData.items_brought || '',
+        visitor_type: editData.visitor_type || '',
+        visitor_status: editData.visitor_status || ''
       });
       setSelectedPrisonerName(editData.prisoner_name || '');
     } else {
@@ -116,18 +133,24 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
     }
   }, [editData, open]);
 
+
+
   const resetForm = () => {
     setFormData({
       prisoner: '',
       visit_id: '',
       visit_date: '',
-      visitor_name: '',
+      first_name: '',
+      middle_name: '',
+      last_name: '',
       id_type: '',
       id_number: '',
-      telephone_number: '',
-      relationship: '',
+      contact_no: '',
+      relation: '',
       address: '',
-      items_brought: ''
+      items_brought: '',
+      visitor_type: '',
+      visitor_status: ''
     });
     setSelectedPrisonerName('');
   };
@@ -153,8 +176,14 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
       toast.error('Please select a prisoner');
       return;
     }
-    if (!formData.visitor_name?.trim()) {
-      toast.error('Please enter visitor name');
+    if (!formData.first_name?.trim()) {
+      toast.error('Please enter first name');
+      return;
+    }
+
+
+     if (!formData.last_name?.trim()) {
+      toast.error('Please enter last name');
       return;
     }
     if (!formData.id_type) {
@@ -165,11 +194,8 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
       toast.error('Please enter ID number');
       return;
     }
-    if (!formData.telephone_number?.trim()) {
-      toast.error('Please enter telephone number');
-      return;
-    }
-    if (!formData.relationship) {
+
+    if (!formData.relation) {
       toast.error('Please select relationship');
       return;
     }
@@ -182,18 +208,37 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
 
     try {
       // Generate visit ID if creating new record
-      const submitData = {
+
+    const submitData:CourtVisitRecord = {
         ...formData,
+        id: editData?.id || '',
+        visitation_datetime: formData.visit_date,
         visit_id: editData?.visit_id || generateVisitId()
       };
-
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+   
+
+   /* postcourtVisit(submitData).then((data) => {
+
+    }).catch((error) => {
+    });*/
+
+  
       if (editData?.id) {
-        toast.success('Court visit updated successfully');
+        //alert(JSON.stringify(submitData));
+          updatecourtVisit(submitData).then((data) => {
+          toast.success('Court visit updated successfully');
+        }).catch((error) => {
+          alert(error);
+        });
+
+       
       } else {
-        toast.success('Court visit recorded successfully');
+      postcourtVisit(submitData).then((data) => {
+          toast.success('Court visit recorded successfully');
+        }).catch((error) => {
+          alert(error);
+        });
       }
       
       resetForm();
@@ -211,13 +256,16 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
     
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+    
+      deleteCourtVisit(editData.id).then(() => {
       toast.success('Court visit deleted successfully');
       setShowDeleteDialog(false);
       onSuccess();
       onClose();
+      }).catch((error) => {
+
+      });
+
     } catch (error) {
       toast.error('Failed to delete court visit');
     } finally {
@@ -302,7 +350,7 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
                 <div className="relative">
                   <Input
                     id="visit_date"
-                    type="date"
+                    type="datetime-local"
                     value={formData.visit_date}
                     onChange={(e) => setFormData({ ...formData, visit_date: e.target.value })}
                     disabled={loading}
@@ -313,27 +361,83 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
             </div>
 
             {/* Row 2: Visitor Name and Relationship */}
+
+
+
+              <div className="space-y-2">
+                <Label htmlFor="relationship">
+                  Visitor Type <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={formData.visitor_type}
+                  onValueChange={(value) => setFormData({ ...formData, visitor_type: value })}
+                  disabled={loading}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select visitor type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {visitorTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="visitor_name">
-                  Visitor Name <span className="text-red-500">*</span>
+                First Name <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="visitor_name"
-                  value={formData.visitor_name}
-                  onChange={(e) => setFormData({ ...formData, visitor_name: e.target.value })}
+                  id="first_name"
+                  value={formData.first_name}
+                  onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                   placeholder="Enter visitor full name"
                   disabled={loading}
                 />
               </div>
+
+              
+                <div className="space-y-2">
+                <Label htmlFor="visitor_name">
+                Middle Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="middle_name"
+                  value={formData.middle_name}
+                  onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
+                  placeholder="Enter visitor full name"
+                  disabled={loading}
+                />
+              </div>
+
+
+   <div className="space-y-2">
+                <Label htmlFor="visitor_name">
+                Last Name <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="last_name"
+                  value={formData.last_name}
+                  onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
+                  placeholder="Enter visitor full name"
+                  disabled={loading}
+                />
+              </div>
+
+
 
               <div className="space-y-2">
                 <Label htmlFor="relationship">
                   Relationship <span className="text-red-500">*</span>
                 </Label>
                 <Select
-                  value={formData.relationship}
-                  onValueChange={(value) => setFormData({ ...formData, relationship: value })}
+                  value={formData.relation}
+                  onValueChange={(value) => setFormData({ ...formData, relation: value })}
                   disabled={loading}
                 >
                   <SelectTrigger>
@@ -386,56 +490,61 @@ const CourtVisitForm: React.FC<CourtVisitFormProps> = ({
                   disabled={loading}
                 />
               </div>
-            </div>
 
-            {/* Row 4: Telephone Number and Items Brought */}
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="telephone_number">
-                  Telephone Number <span className="text-red-500">*</span>
+                <Label htmlFor="contact_no">
+                  Contact Number <span className="text-red-500">*</span>
                 </Label>
                 <Input
-                  id="telephone_number"
-                  value={formData.telephone_number}
-                  onChange={(e) => setFormData({ ...formData, telephone_number: e.target.value })}
-                  placeholder="Enter phone number"
+                  id="contact_no"
+                  value={formData.contact_no}
+                  onChange={(e) => setFormData({ ...formData, contact_no: e.target.value })}
+                  placeholder="Enter contact number"
                   disabled={loading}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="items_brought">Items Brought</Label>
+                <Label htmlFor="id_number">
+                  ID Number <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="id_number"
+                  value={formData.id_number}
+                  onChange={(e) => setFormData({ ...formData, id_number: e.target.value })}
+                  placeholder="Enter ID number"
+                  disabled={loading}
+                />
+              </div>
+
+               <div className="space-y-2">
+                <Label htmlFor="visitor status">
+                  Visitor Status <span className="text-red-500">*</span>
+                </Label>
                 <Select
-                  value={formData.items_brought}
-                  onValueChange={(value) => setFormData({ ...formData, items_brought: value })}
+                  value={formData.visitor_status}
+                  onValueChange={(value) => setFormData({ ...formData, visitor_status: value })}
                   disabled={loading}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select items brought" />
+                    <SelectValue placeholder="Select visitor status" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockItems.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
+                    {visitorStatus.map((type) => (
+                      <SelectItem key={type.id} value={type.id}>
+                        {type.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+
             </div>
 
-            {/* Address */}
-            <div className="space-y-2">
-              <Label htmlFor="address">Address</Label>
-              <Textarea
-                id="address"
-                value={formData.address}
-                onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                placeholder="Enter visitor address..."
-                rows={3}
-                disabled={loading}
-              />
-            </div>
+            {/* Row 4: Telephone Number and Items Brought */}
+          
+
+            
 
             {/* Form Actions */}
             <div className="flex justify-end gap-3 pt-4 border-t">

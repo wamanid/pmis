@@ -29,158 +29,13 @@ import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, Calendar, FileText,
 import { toast } from 'sonner@2.0.3';
 import CourtScheduleForm from './CourtScheduleForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-
-interface CourtScheduleRecord {
-  id: string;
-  prisoner_name: string;
-  offence_name: string;
-  court_name: string;
-  station_name: string;
-  attendance_type_name: string;
-  case_outcome_name: string;
-  scheduled_date: string;
-  scheduled_time: string;
-  presiding_judge: string;
-  attendance_status: boolean;
-  remarks: string;
-  court_order: string;
-  prisoner: string;
-  offence: string;
-  court_detail: string;
-  station: string;
-  court_attendance_type: string;
-  case_outcome: string;
-}
+import { CourtScheduleRecord } from '../../models/court';
+import { getprisoners } from '../../services/gateService';
+import { PrisonerRecord } from '../../models/gate/Index';
+import { getAttendacetypes, getCourtDetails, getCourtLevels, getOffences, getOffencesPersonal, getOutcomes, getScheduleList, getStations } from '../../services/courtService';
 
 // Mock data
-const mockCourtScheduleRecords: CourtScheduleRecord[] = [
-  {
-    id: '1',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    offence: '1',
-    offence_name: 'Theft',
-    court_detail: '1',
-    court_name: 'High Court - Kampala',
-    station: '1',
-    station_name: 'Luzira Prison',
-    court_attendance_type: '1',
-    attendance_type_name: 'Court Appearance',
-    case_outcome: '1',
-    case_outcome_name: 'Adjourned',
-    scheduled_date: '2025-11-15',
-    scheduled_time: '09:00:00',
-    presiding_judge: 'Hon. Justice Sarah Kisakye',
-    attendance_status: false,
-    remarks: 'First hearing for theft charges. All documents submitted.',
-    court_order: 'court_order_001.pdf'
-  },
-  {
-    id: '2',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    offence: '2',
-    offence_name: 'Assault',
-    court_detail: '2',
-    court_name: 'Chief Magistrates Court - Kampala',
-    station: '1',
-    station_name: 'Luzira Prison',
-    court_attendance_type: '2',
-    attendance_type_name: 'Bail Hearing',
-    case_outcome: '4',
-    case_outcome_name: 'Bail Granted',
-    scheduled_date: '2025-11-08',
-    scheduled_time: '10:30:00',
-    presiding_judge: 'Hon. Chief Magistrate James Okello',
-    attendance_status: true,
-    remarks: 'Bail hearing completed. Bail granted with conditions.',
-    court_order: 'court_order_002.pdf'
-  },
-  {
-    id: '3',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    offence: '4',
-    offence_name: 'Murder',
-    court_detail: '1',
-    court_name: 'High Court - Kampala',
-    station: '2',
-    station_name: 'Kigo Prison',
-    court_attendance_type: '3',
-    attendance_type_name: 'Sentencing',
-    case_outcome: '2',
-    case_outcome_name: 'Convicted',
-    scheduled_date: '2025-11-20',
-    scheduled_time: '14:00:00',
-    presiding_judge: 'Hon. Justice David Makumbi',
-    attendance_status: false,
-    remarks: 'Sentencing hearing scheduled after conviction.',
-    court_order: ''
-  },
-  {
-    id: '4',
-    prisoner: '4',
-    prisoner_name: 'Mary Williams',
-    offence: '5',
-    offence_name: 'Fraud',
-    court_detail: '5',
-    court_name: 'Commercial Court - Kampala',
-    station: '1',
-    station_name: 'Luzira Prison',
-    court_attendance_type: '5',
-    attendance_type_name: 'Case Mention',
-    case_outcome: '1',
-    case_outcome_name: 'Adjourned',
-    scheduled_date: '2025-11-12',
-    scheduled_time: '11:00:00',
-    presiding_judge: 'Hon. Justice Patricia Mutesi',
-    attendance_status: false,
-    remarks: 'Case mention to set trial dates.',
-    court_order: 'court_order_004.pdf'
-  },
-  {
-    id: '5',
-    prisoner: '5',
-    prisoner_name: 'James Brown',
-    offence: '6',
-    offence_name: 'Drug Trafficking',
-    court_detail: '1',
-    court_name: 'High Court - Kampala',
-    station: '3',
-    station_name: 'Kitalya Prison',
-    court_attendance_type: '4',
-    attendance_type_name: 'Appeal Hearing',
-    case_outcome: '6',
-    case_outcome_name: 'Remanded',
-    scheduled_date: '2025-11-25',
-    scheduled_time: '09:30:00',
-    presiding_judge: 'Hon. Justice Richard Buteera',
-    attendance_status: false,
-    remarks: 'Appeal hearing against previous conviction.',
-    court_order: ''
-  },
-  {
-    id: '6',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    offence: '1',
-    offence_name: 'Theft',
-    court_detail: '1',
-    court_name: 'High Court - Kampala',
-    station: '1',
-    station_name: 'Luzira Prison',
-    court_attendance_type: '1',
-    attendance_type_name: 'Court Appearance',
-    case_outcome: '3',
-    case_outcome_name: 'Acquitted',
-    scheduled_date: '2025-10-20',
-    scheduled_time: '09:00:00',
-    presiding_judge: 'Hon. Justice Sarah Kisakye',
-    attendance_status: true,
-    remarks: 'Final hearing. Case dismissed due to lack of evidence.',
-    court_order: 'court_order_006.pdf'
-  },
-];
+
 
 const CourtScheduleList: React.FC = () => {
   const [schedules, setSchedules] = useState<CourtScheduleRecord[]>([]);
@@ -204,8 +59,80 @@ const CourtScheduleList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [totalCount, setTotalCount] = useState(0);
+  const uniquePrisoners = Array.from(new Set(schedules.map(s => s.prisoner_name)));
+  //const uniqueOffences = Array.from(new Set(schedules.map(s => s.offence_name)));
+
+  const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
+  const [uniqueCourts, setUniqueCourts] = useState<any[]>([]);
+  const [uniqueOffences, setUniqueOffences] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
+  const [attendancetypes, setAttendancetypes] = useState<any[]>([]);
+
+
+
+  const [mockCourtScheduleRecords2, setMockCourtScheduleRecords] = useState<CourtScheduleRecord[]>([]);
+
+const [outcomes, setOutcomes] = useState<any[]>([]);
+
+
+  
 
   useEffect(() => {
+     getScheduleList().then((data) => {
+     //alert(JSON.stringify(data.results));
+     setSchedules(data.results)
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+      getprisoners().then((data) => {
+     // alert(JSON.stringify(data.results));
+       setPrisoners(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+       getOutcomes().then((data) => {
+      //alert(JSON.stringify(data.results));
+       setOutcomes(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+       getAttendacetypes().then((data) => {
+       setAttendancetypes(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+   
+     getStations().then((data) => {
+       setStations(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+
+    getOffences().then((data) => {
+       setUniqueOffences(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+    //get courts
+    
+     getCourtDetails().then((data) => {
+    // alert(JSON.stringify(data.results));
+       setUniqueCourts(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
     loadSchedules();
   }, []);
 
@@ -217,11 +144,11 @@ const CourtScheduleList: React.FC = () => {
     setLoading(true);
     try {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setSchedules(mockCourtScheduleRecords);
-      setTotalCount(mockCourtScheduleRecords.length);
+     // await new Promise(resolve => setTimeout(resolve, 500));
+    //  setSchedules(mockCourtScheduleRecords);
+      //setTotalCount(mockCourtScheduleRecords.length);
     } catch (error) {
-      toast.error('Failed to load court schedules');
+      //toast.error('Failed to load court schedules');
     } finally {
       setLoading(false);
     }
@@ -310,9 +237,6 @@ const CourtScheduleList: React.FC = () => {
   };
 
   // Get unique values for filters
-  const uniquePrisoners = Array.from(new Set(schedules.map(s => s.prisoner_name)));
-  const uniqueCourts = Array.from(new Set(schedules.map(s => s.court_name)));
-  const uniqueOffences = Array.from(new Set(schedules.map(s => s.offence_name)));
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -389,9 +313,9 @@ const CourtScheduleList: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Prisoners</SelectItem>
-                    {uniquePrisoners.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {prisoners.map((prisoner) => (
+                      <SelectItem key={prisoner.full_name} value={prisoner.id}>
+                        {prisoner.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -406,9 +330,9 @@ const CourtScheduleList: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Courts</SelectItem>
-                    {uniqueCourts.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {uniqueCourts.map((court) => (
+                      <SelectItem key={court.name} value={court.name}>
+                        {court.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -423,9 +347,9 @@ const CourtScheduleList: React.FC = () => {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Offences</SelectItem>
-                    {uniqueOffences.map((name) => (
-                      <SelectItem key={name} value={name}>
-                        {name}
+                    {uniqueOffences.map((offense) => (
+                      <SelectItem key={offense.name} value={offense.name}>
+                        {offense.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -604,6 +528,12 @@ const CourtScheduleList: React.FC = () => {
 
       {/* Form Dialog */}
       <CourtScheduleForm
+        prisoners={prisoners}
+        offenses={uniqueOffences}
+        courts={uniqueCourts}
+        stations={stations}
+        attendancetypes={attendancetypes}
+        coutcomes={outcomes}
         open={showForm}
         onClose={() => {
           setShowForm(false);

@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { toast } from 'sonner@2.0.3';
-import { Save, X, Trash2, Upload, Calendar as CalendarIcon, Clock } from 'lucide-react';
+import { Save, X, Trash2, Upload, Calendar as CalendarIcon, Clock, File } from 'lucide-react';
 import { Switch } from '../ui/switch';
 import {
   AlertDialog,
@@ -20,84 +20,34 @@ import {
 } from '../ui/alert-dialog';
 import PrisonerSearchScreen from '../common/PrisonerSearchScreen';
 import CourtAttendanceForm from './CourtAttendanceForm';
+import { PrisonerRecord } from '../../models/gate/Index';
+import { CourtSchedulePost, CourtScheduleRecord, UploadedFile } from '../../models/court';
+import { deleteCourtSchedule, getOffencesPersonal, submitCourtSchedule, submitCourtScheduleMulti } from '../../services/courtService';
+import { fileToBase64 } from '../../utils/Util';
+import { OffenceRequest } from '../../models/StageClassification';
+import axiosInstance from '../../services/axiosInstance';
 
 interface CourtScheduleFormProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
   editData?: CourtScheduleRecord | null;
+  
+  prisoners?:PrisonerRecord[];
+  offenses?:any[];
+  courts?:any[];
+  stations?:any[];
+  attendancetypes?:any;
+  coutcomes?:any[];
 }
-
-interface CourtScheduleRecord {
-  id?: string;
-  prisoner_name?: string;
-  offence_name?: string;
-  court_name?: string;
-  station_name?: string;
-  attendance_type_name?: string;
-  case_outcome_name?: string;
-  scheduled_date?: string;
-  scheduled_time?: string;
-  presiding_judge?: string;
-  attendance_status?: boolean;
-  remarks?: string;
-  court_order?: string;
-  prisoner?: string;
-  offence?: string;
-  court_detail?: string;
-  station?: string;
-  court_attendance_type?: string;
-  case_outcome?: string;
-}
-
-// Mock data for dropdowns
-const mockOffences = [
-  { id: '1', name: 'Theft' },
-  { id: '2', name: 'Assault' },
-  { id: '3', name: 'Robbery' },
-  { id: '4', name: 'Murder' },
-  { id: '5', name: 'Fraud' },
-  { id: '6', name: 'Drug Trafficking' },
-];
-
-const mockCourts = [
-  { id: '1', name: 'High Court - Kampala' },
-  { id: '2', name: 'Chief Magistrates Court - Kampala' },
-  { id: '3', name: 'Magistrates Court - Nakawa' },
-  { id: '4', name: 'Family Court - Mengo' },
-  { id: '5', name: 'Commercial Court - Kampala' },
-];
-
-const mockStations = [
-  { id: '1', name: 'Luzira Prison' },
-  { id: '2', name: 'Kigo Prison' },
-  { id: '3', name: 'Kitalya Prison' },
-  { id: '4', name: 'Fort Portal Prison' },
-  { id: '5', name: 'Gulu Prison' },
-];
-
-const mockAttendanceTypes = [
-  { id: '1', name: 'Court Appearance' },
-  { id: '2', name: 'Bail Hearing' },
-  { id: '3', name: 'Sentencing' },
-  { id: '4', name: 'Appeal Hearing' },
-  { id: '5', name: 'Case Mention' },
-];
-
-const mockCaseOutcomes = [
-  { id: '1', name: 'Adjourned' },
-  { id: '2', name: 'Convicted' },
-  { id: '3', name: 'Acquitted' },
-  { id: '4', name: 'Bail Granted' },
-  { id: '5', name: 'Bail Denied' },
-  { id: '6', name: 'Remanded' },
-];
-
 const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
   open,
   onClose,
   onSuccess,
-  editData
+  editData,
+  prisoners,
+  offenses,
+  courts,stations,attendancetypes,coutcomes
 }) => {
   const [formData, setFormData] = useState({
     prisoner: '',
@@ -113,6 +63,33 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
     remarks: '',
     court_order: ''
   });
+const [files, setFiles] = useState<UploadedFile[]>([]);
+
+  // Mock data for dropdowns
+let mockOffences = offenses;
+
+const mockCourts = courts;
+
+const mockStations = stations;
+
+
+const mockAttendanceTypes =/* [
+  { id: '1', name: 'Court Appearance' },
+  { id: '2', name: 'Bail Hearing' },
+  { id: '3', name: 'Sentencing' },
+  { id: '4', name: 'Appeal Hearing' },
+  { id: '5', name: 'Case Mention' },
+];*/ attendancetypes;
+
+const mockCaseOutcomes =/* [
+  { id: '1', name: 'Adjourned' },
+  { id: '2', name: 'Convicted' },
+  { id: '3', name: 'Acquitted' },
+  { id: '4', name: 'Bail Granted' },
+  { id: '5', name: 'Bail Denied' },
+  { id: '6', name: 'Remanded' },
+];*/coutcomes;
+
 
   const [loading, setLoading] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -120,9 +97,20 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
   const [selectedPrisonerName, setSelectedPrisonerName] = useState('');
   const [selectedFileName, setSelectedFileName] = useState('');
   const [showAttendanceForm, setShowAttendanceForm] = useState(false);
+  const [offs, setOffs] = useState([]);
+  const [imgdata, setImageData] = useState("");
 
   useEffect(() => {
     if (editData) {
+
+        getOffencesPersonal(editData).then((data) => {
+        mockOffences=data.results;
+        setOffs(data.results);
+       //  alert(JSON.stringify(data.results));
+      }).catch((error) => {
+       // alert(error);
+      });
+
       setFormData({
         prisoner: editData.prisoner || '',
         offence: editData.offence || '',
@@ -135,7 +123,7 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
         presiding_judge: editData.presiding_judge || '',
         attendance_status: editData.attendance_status || false,
         remarks: editData.remarks || '',
-        court_order: editData.court_order || ''
+        court_order: editData.court_order
       });
       setSelectedPrisonerName(editData.prisoner_name || '');
       if (editData.court_order) {
@@ -159,7 +147,7 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
       presiding_judge: '',
       attendance_status: false,
       remarks: '',
-      court_order: ''
+      court_order: File || null
     });
     setSelectedPrisonerName('');
     setSelectedFileName('');
@@ -168,25 +156,60 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
   const handlePrisonerSelect = (prisonerId: string) => {
     setFormData({ ...formData, prisoner: prisonerId });
     // Mock prisoner name - in real app, fetch from API
-    setSelectedPrisonerName(`Prisoner ${prisonerId}`);
+    const p = prisoners.find((assignment) => assignment.id === prisonerId);
+    if(p) {
+      setSelectedPrisonerName(`Prisoner ${p?.first_name} ${p?.last_name}`);
+      //load the offenses here
+      let datatopost:OffenceRequest={
+        prisoner:prisonerId
+      }
+
+      getOffencesPersonal(datatopost).then((data) => {
+        mockOffences=data.results;
+        setOffs(data.results);
+       //  alert(JSON.stringify(data.results));
+       
+      }).catch((error) => {
+       // alert(error);
+      });
+    }
+
     setShowPrisonerSearch(false);
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.type !== 'application/pdf') {
+     /* if (file.type !== 'application/pdf') {
         toast.error('Please upload a PDF file');
         return;
-      }
+      }*/
       if (file.size > 5 * 1024 * 1024) { // 5MB limit
         toast.error('File size must be less than 5MB');
         return;
       }
+
+      try {
+        let selectedFile = file;
+            // Convert the selected file to a Base64 string
+            const base64String = await fileToBase64(selectedFile);
+            // Display the Data URL in the output field and image preview
+          //  const base64Output = document.getElementById('image_preview') as HTMLInputElement;
+           // base64Output.value = base64String;
+          //  alert(base64String);
       setSelectedFileName(file.name);
-      // In real app, upload to server and get URL
-      setFormData({ ...formData, court_order: file.name });
-    }
+      setFiles([...files, { name: file.name, file: file }]);
+      setFormData({ ...formData, court_order: base64String});
+      setImageData(base64String);
+     // alert(formData.court_order);
+
+            console.log('Base64 encoding complete:', base64String);
+        } catch (error) {
+            console.error('Error during file conversion:', error);
+           
+        }
+
+         }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,17 +253,141 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
 
     try {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+    //  await new Promise(resolve => setTimeout(resolve, 1000));
+         const formData2= new FormData();
+    files.forEach((uploadFile, index) => {
+      formData2.append('court_order', uploadFile.file); // Note: 'files' is the field name
+    });
+    formData2.append('prisoner', formData?.prisoner || '');
+    formData2.append('offence', formData?.offence || '');
+    formData2.append('court_detail', formData?.court_detail || '');
+    formData2.append('station', formData?.station || '');
+    formData2.append('court_attendance_type', formData?.court_attendance_type || '');
+    formData2.append('case_outcome', formData?.case_outcome || '');
+    formData2.append('scheduled_date', formData?.scheduled_date || '');
+    formData2.append('scheduled_time', formData?.scheduled_time ? formData.scheduled_time.substring(0, 5) : '');
+    formData2.append('presiding_judge', formData?.presiding_judge || '');
+    formData2.append('attendance_status', String(editData?.attendance_status || false));
+    formData2.append('remarks', formData?.remarks || '');
+    formData2.append('uploadedAt', new Date().toISOString());
+
+     const token =
+        localStorage.getItem("access_token") ??
+        localStorage.getItem("token") ??
+        localStorage.getItem("auth_token") ??
+        localStorage.getItem("authToken") ??
+        null;
+      const configuredBase =
+      (axiosInstance && (axiosInstance.defaults as any)?.baseURL) ??
+      ((import.meta as any).env?.VITE_API_BASE_URL ?? "")
+
+
       if (editData?.id) {
         toast.success('Court schedule updated successfully');
-      } else {
-        toast.success('Court schedule created successfully');
+
+        try {      
+      const response = await fetch(configuredBase+"/court-attendance/schedules/"+editData?.id+"/", {
+        method: 'PATCH',
+        headers: {
+          "Authorization": "Bearer "+token, // ✅ Optional auth
+        },
+        body: formData2,
+      });
+       const result = await response.json();
+        //alert(JSON.stringify(result));
+      if (!response.ok) {
+            toast.error(response.status); 
+       // throw new Error(`Upload failed: ${response.status}`);
       }
+      else{
+           
+    resetForm();
+    onSuccess();
+    onClose();
+      toast.success('Court schedule created successfully');
+      }
+    } catch (error) {
+      toast.error(error);
+
+    }
+
+
+
+
+
+        //update wapi call here
+      } else {
+        //add here
+            try {
+    
       
-      resetForm();
-      onSuccess();
-      onClose();
+    try {      
+      const response = await fetch(configuredBase+"/court-attendance/schedules/", {
+        method: 'POST',
+        headers: {
+          "Authorization": "Bearer "+token, // ✅ Optional auth
+        },
+        body: formData2,
+      });
+       const result = await response.json();
+     //   alert(JSON.stringify(result));
+      if (!response.ok) {
+            toast.error(response.status); 
+       // throw new Error(`Upload failed: ${response.status}`);
+      }
+      else{
+           
+    resetForm();
+    onSuccess();
+    onClose();
+      toast.success('Court schedule created successfully');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(error);
+      
+      // Update all files to error
+     /* setFiles((prev) =>
+        prev.map((f) => ({ ...f, status: 'error', error: 'Upload failed' }))
+      );*/
+      
+      
+    }
+
+
+    /*
+      let dataPost:CourtSchedulePost= {
+        start_date: formData?.scheduled_date || '',
+        scheduled_time: formData?.scheduled_time ? formData.scheduled_time.substring(0, 5) : '',
+        presiding_judge: formData?.presiding_judge || '',
+        attendance_status: String(formData?.attendance_status || false),
+        remarks: formData?.remarks || '',
+        court_order: '',
+        prisoner: formData?.prisoner || '',
+        stage: formData?.stage || '',
+        offence: formData?.offence || '',
+        court_detail: formData?.court_detail || '',
+        station: formData?.station || '',
+        court_attendance_type: formData?.court_attendance_type || '',
+        case_outcome: formData?.case_outcome || '',
+        file:formData?.court_order || File
+      };
+     alert(JSON.stringify(dataPost));
+     await submitCourtSchedule(dataPost).then((data) => {
+            alert(JSON.stringify(data));
+          }).catch((error) => {
+            alert(error);
+          });*/
+        
+     // toast.success('Court schedule created successfully');
+    } catch (error) {
+      console.error('Upload error:', error);
+
+      toast.error('Upload failed. Please try again.');
+    }
+        
+      }
+
     } catch (error) {
       toast.error('An error occurred. Please try again.');
     } finally {
@@ -250,18 +397,19 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
 
   const handleDelete = async () => {
     if (!editData?.id) return;
-    
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+          deleteCourtSchedule(editData.id).then((data) => {
+           toast.success('Court schedule deleted successfully');
+          }).catch((error) => {
+            alert(error);
+          });
       
-      toast.success('Court schedule deleted successfully');
       setShowDeleteDialog(false);
       onSuccess();
       onClose();
     } catch (error) {
-      toast.error('Failed to delete court schedule');
+      //toast.error('Failed to delete court schedule'+error);
     } finally {
       setLoading(false);
     }
@@ -277,7 +425,7 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
   return (
     <>
       <Dialog open={open} onOpenChange={handleClose}>
-        <DialogContent className="max-w-[1400px] max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[1400px] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <span>{editData ? 'Edit Court Schedule' : 'New Court Schedule'}</span>
@@ -288,8 +436,7 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
                     variant="destructive"
                     size="sm"
                     onClick={() => setShowDeleteDialog(true)}
-                    disabled={loading}
-                  >
+                    disabled={loading}>
                     <Trash2 className="h-4 w-4 mr-2" />
                     Delete
                   </Button>
@@ -338,9 +485,9 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
                     <SelectValue placeholder="Select offence" />
                   </SelectTrigger>
                   <SelectContent>
-                    {mockOffences.map((offence) => (
+                    {offs.map((offence) => (
                       <SelectItem key={offence.id} value={offence.id}>
-                        {offence.name}
+                        {offence.offence_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -503,7 +650,7 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
                 Mark as Attended
               </Label>
             </div>
-
+           
             {/* Court Order Upload */}
             <div className="space-y-2">
               <Label htmlFor="court_order">Court Order (PDF)</Label>
@@ -531,9 +678,19 @@ const CourtScheduleForm: React.FC<CourtScheduleFormProps> = ({
                   onChange={handleFileChange}
                   className="hidden"
                 />
-              </div>
+
+               <br/>
+               </div>
               <p className="text-sm text-gray-500">Upload PDF file (Max 5MB)</p>
             </div>
+               <div className="space-y-2">
+
+              {/*}
+                 <img id="image_preview" src={formData.court_order} alt="Preview" className="mt-2 max-h-40 border" />
+             
+              
+              {*/}
+               </div>
 
             {/* Remarks */}
             <div className="space-y-2">

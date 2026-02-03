@@ -29,138 +29,14 @@ import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, Users, MoreVertical
 import { toast } from 'sonner@2.0.3';
 import CourtVisitForm from './CourtVisitForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+import { CourtVisitRecord } from '../../models/court';
+import { getCourtVisits, getIDTypes, getrelationShips, getVisitorItems } from '../../services/courtService';
 
-interface CourtVisitRecord {
-  id: string;
-  prisoner_name: string;
-  id_type_name: string;
-  relationship_name: string;
-  visit_id: string;
-  visit_date: string;
-  visitor_name: string;
-  id_number: string;
-  telephone_number: string;
-  address: string;
-  items_brought: string;
-  prisoner: string;
-  id_type: string;
-  relationship: string;
-}
+
 
 // Mock data
-const mockCourtVisitRecords: CourtVisitRecord[] = [
-  {
-    id: '1',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    visit_id: 'VIS-1698765432-123',
-    visit_date: '2025-11-01',
-    visitor_name: 'Mary Doe',
-    id_type: '1',
-    id_type_name: 'National ID',
-    id_number: 'CM12345678',
-    telephone_number: '0712345678',
-    relationship: '1',
-    relationship_name: 'Spouse',
-    address: 'Plot 123, Kampala Road, Kampala',
-    items_brought: '1'
-  },
-  {
-    id: '2',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    visit_id: 'VIS-1698765433-456',
-    visit_date: '2025-11-01',
-    visitor_name: 'David Smith',
-    id_type: '2',
-    id_type_name: 'Passport',
-    id_number: 'P987654321',
-    telephone_number: '0787654321',
-    relationship: '2',
-    relationship_name: 'Parent',
-    address: 'Box 456, Entebbe, Uganda',
-    items_brought: '2'
-  },
-  {
-    id: '3',
-    prisoner: '3',
-    prisoner_name: 'Michael Johnson',
-    visit_id: 'VIS-1698765434-789',
-    visit_date: '2025-10-30',
-    visitor_name: 'Attorney Sarah Williams',
-    id_type: '1',
-    id_type_name: 'National ID',
-    id_number: 'CM11223344',
-    telephone_number: '0701122334',
-    relationship: '6',
-    relationship_name: 'Lawyer',
-    address: 'Williams & Associates, Plot 89, Kampala',
-    items_brought: '3'
-  },
-  {
-    id: '4',
-    prisoner: '1',
-    prisoner_name: 'John Doe',
-    visit_id: 'VIS-1698765435-012',
-    visit_date: '2025-10-28',
-    visitor_name: 'Pastor Robert Brown',
-    id_type: '1',
-    id_type_name: 'National ID',
-    id_number: 'CM55667788',
-    telephone_number: '0755667788',
-    relationship: '7',
-    relationship_name: 'Religious Leader',
-    address: 'Grace Church, Mukono',
-    items_brought: '3'
-  },
-  {
-    id: '5',
-    prisoner: '4',
-    prisoner_name: 'Mary Williams',
-    visit_id: 'VIS-1698765436-345',
-    visit_date: '2025-10-27',
-    visitor_name: 'Lisa Taylor',
-    id_type: '3',
-    id_type_name: 'Driving License',
-    id_number: 'DL44556677',
-    telephone_number: '0744556677',
-    relationship: '5',
-    relationship_name: 'Friend',
-    address: 'Jinja Road, Kampala',
-    items_brought: '4'
-  },
-  {
-    id: '6',
-    prisoner: '5',
-    prisoner_name: 'James Brown',
-    visit_id: 'VIS-1698765437-678',
-    visit_date: '2025-10-26',
-    visitor_name: 'Jennifer Brown',
-    id_type: '1',
-    id_type_name: 'National ID',
-    id_number: 'CM99887766',
-    telephone_number: '0799887766',
-    relationship: '3',
-    relationship_name: 'Child',
-    address: 'Mbarara Town',
-    items_brought: '1'
-  },
-  {
-    id: '7',
-    prisoner: '2',
-    prisoner_name: 'Jane Smith',
-    visit_id: 'VIS-1698765438-901',
-    visit_date: '2025-10-25',
-    visitor_name: 'Thomas Smith',
-    id_type: '1',
-    id_type_name: 'National ID',
-    id_number: 'CM33445566',
-    telephone_number: '0733445566',
-    relationship: '4',
-    relationship_name: 'Sibling',
-    address: 'Masaka District',
-    items_brought: '2'
-  },
+let mockCourtVisitRecords: CourtVisitRecord[] = [
+
 ];
 
 const CourtVisitList: React.FC = () => {
@@ -171,6 +47,13 @@ const CourtVisitList: React.FC = () => {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<CourtVisitRecord | null>(null);
   const [editData, setEditData] = useState<CourtVisitRecord | null>(null);
+
+
+  const [mockIdTypes, setMockIdTypes] = useState<any[]>([]);
+  const [mockRelationships, setMockRelationships] = useState<any[]>([]);
+  const [mockItems, setMockItems] = useState<any[]>([]);
+
+    
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -196,9 +79,40 @@ const CourtVisitList: React.FC = () => {
     setLoading(true);
     try {
       // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setVisits(mockCourtVisitRecords);
-      setTotalCount(mockCourtVisitRecords.length);
+      //await new Promise(resolve => setTimeout(resolve, 500));
+              getCourtVisits().then((data) => {
+              // alert(JSON.stringify(data));
+                mockCourtVisitRecords=data.results;
+                setVisits(data.results);
+                setTotalCount(data.results.length);
+              }).catch((error) => {
+                alert(error);
+              });
+
+
+        
+              getrelationShips().then((data) => {
+                setMockRelationships(data.results);
+              }).catch((error) => {
+                alert(error);
+              });
+
+              getVisitorItems().then((data) => {
+             //   alert(JSON.stringify(data));
+                setMockItems(data.results);
+              }).catch((error) => {
+                alert(error);
+              });
+
+              //id types
+               getIDTypes().then((data) => {
+             //   alert(JSON.stringify(data));
+                setMockIdTypes(data.results);
+              }).catch((error) => {
+                alert(error);
+              });
+
+     
     } catch (error) {
       toast.error('Failed to load court visits');
     } finally {
@@ -453,19 +367,19 @@ const CourtVisitList: React.FC = () => {
                       <TableCell>{indexOfFirstItem + index + 1}</TableCell>
                       <TableCell>
                         <Badge variant="outline" className="font-mono text-xs">
-                          {visit.visit_id}
+                          {visit.id_number}
                         </Badge>
                       </TableCell>
-                      <TableCell>{formatDate(visit.visit_date)}</TableCell>
+                      <TableCell>{formatDate(visit.visitation_datetime)}</TableCell>
                       <TableCell>{visit.prisoner_name}</TableCell>
-                      <TableCell>{visit.visitor_name}</TableCell>
+                      <TableCell>{visit.first_name} {visit.middle_name} {visit.last_name}</TableCell>
                       <TableCell>
                         <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                          {visit.relationship_name}
+                          {visit.relation_name}
                         </Badge>
                       </TableCell>
                       <TableCell>{visit.id_type_name}</TableCell>
-                      <TableCell>{visit.telephone_number}</TableCell>
+                      <TableCell>{visit.contact_no}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
@@ -528,6 +442,9 @@ const CourtVisitList: React.FC = () => {
         }}
         onSuccess={handleFormSuccess}
         editData={editData}
+        mockIdTypes={mockIdTypes}
+        mockRelationships={mockRelationships}
+        mockItems={mockItems}
       />
 
       {/* View Dialog */}
@@ -550,7 +467,7 @@ const CourtVisitList: React.FC = () => {
                 </div>
                 <div>
                   <Label className="text-gray-600">Visit Date</Label>
-                  <p className="mt-1">{formatDate(selectedVisit.visit_date)}</p>
+                  <p className="mt-1">{formatDate(selectedVisit.visitation_datetime)}</p>
                 </div>
               </div>
 
@@ -571,13 +488,13 @@ const CourtVisitList: React.FC = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <Label className="text-gray-600">Visitor Name</Label>
-                    <p className="mt-1">{selectedVisit.visitor_name}</p>
+                    <p className="mt-1">{selectedVisit.first_name} {selectedVisit.last_name}</p>
                   </div>
                   <div>
                     <Label className="text-gray-600">Relationship</Label>
                     <div className="mt-1">
                       <Badge className="bg-blue-100 text-blue-800 hover:bg-blue-100">
-                        {selectedVisit.relationship_name}
+                        {selectedVisit.relation_name}
                       </Badge>
                     </div>
                   </div>
@@ -591,7 +508,7 @@ const CourtVisitList: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-gray-600">Telephone Number</Label>
-                    <p className="mt-1">{selectedVisit.telephone_number}</p>
+                    <p className="mt-1">{selectedVisit.contact_no}</p>
                   </div>
                 </div>
               </div>

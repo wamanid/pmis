@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -27,6 +27,10 @@ import {
 import { Plus, Trash2, Save, X, ChevronDown, ChevronUp, Check, Calendar as CalendarIcon, ScanBarcode } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { cn } from '../ui/utils';
+import { Courts, CourtScheduleRecord } from '../../models/court';
+import { getprisoners } from '../../services/gateService';
+import { getAttendacetypes, getCourtDetails, getOffences, getOffencesPersonal, getOutcomes, getStations, submitBulkSchedule } from '../../services/courtService';
+import { OffenceRequest } from '../../models/StageClassification';
 
 interface PrisonerOffencePair {
   id: string;
@@ -43,21 +47,14 @@ interface BulkScheduleData {
   scheduled_date: string;
   scheduled_time: string;
   presiding_judge: string;
+  offence: string;
   prisoner_offence_pairs: PrisonerOffencePair[];
 }
 
-// Mock data for dropdowns
-const mockCourts = [
-  { id: '1', name: 'High Court Kampala' },
-  { id: '2', name: 'Chief Magistrates Court Kampala' },
-  { id: '3', name: 'Magistrates Court Entebbe' },
-  { id: '4', name: 'High Court Jinja' },
-  { id: '5', name: 'Chief Magistrates Court Mbarara' },
-  { id: '6', name: 'Magistrates Court Gulu' },
-  { id: '7', name: 'High Court Mbale' },
-];
 
-const mockStations = [
+let mockCourts:any=[];
+
+let mockStations:any = [/*
   { id: '1', name: 'Luzira Prison' },
   { id: '2', name: 'Kigo Prison' },
   { id: '3', name: 'Jinja Main Prison' },
@@ -65,43 +62,12 @@ const mockStations = [
   { id: '5', name: 'Fort Portal Prison' },
   { id: '6', name: 'Gulu Prison' },
   { id: '7', name: 'Mbale Prison' },
-];
+*/];
 
-const mockAttendanceTypes = [
-  { id: '1', name: 'Hearing' },
-  { id: '2', name: 'Mention' },
-  { id: '3', name: 'Sentencing' },
-  { id: '4', name: 'Bail Application' },
-  { id: '5', name: 'Judgment' },
-  { id: '6', name: 'Plea Bargain' },
-  { id: '7', name: 'Pre-Trial Conference' },
-];
 
-const mockPrisoners = [
-  { id: '1', name: 'John Doe - PR001' },
-  { id: '2', name: 'Jane Smith - PR002' },
-  { id: '3', name: 'Michael Johnson - PR003' },
-  { id: '4', name: 'Emily Davis - PR004' },
-  { id: '5', name: 'Robert Lee - PR005' },
-  { id: '6', name: 'Sarah Williams - PR006' },
-  { id: '7', name: 'David Brown - PR007' },
-  { id: '8', name: 'Mary Wilson - PR008' },
-  { id: '9', name: 'James Anderson - PR009' },
-  { id: '10', name: 'Patricia Martinez - PR010' },
-];
 
-const mockOffences = [
-  { id: '1', name: 'Theft' },
-  { id: '2', name: 'Assault' },
-  { id: '3', name: 'Murder' },
-  { id: '4', name: 'Robbery' },
-  { id: '5', name: 'Fraud' },
-  { id: '6', name: 'Drug Trafficking' },
-  { id: '7', name: 'Burglary' },
-  { id: '8', name: 'Manslaughter' },
-  { id: '9', name: 'Embezzlement' },
-  { id: '10', name: 'Kidnapping' },
-];
+
+
 
 // Searchable Combobox Component
 interface ComboboxProps {
@@ -169,6 +135,14 @@ const Combobox: React.FC<ComboboxProps> = ({
 };
 
 const BulkCourtScheduleForm: React.FC = () => {
+    const [courts, setCourts] = useState<Courts[]>([]);
+        const [attendancetypes, setAttendancetypes] = useState<any[]>([]);
+           const [mockPrisoners, setMockPrisoners] = useState<any[]>([]);
+
+             const [mockOffences, setmockOffences] = useState([]);
+
+        
+
   const [formData, setFormData] = useState<BulkScheduleData>({
     court_detail: '',
     station: '',
@@ -176,6 +150,7 @@ const BulkCourtScheduleForm: React.FC = () => {
     scheduled_date: '',
     scheduled_time: '',
     presiding_judge: '',
+    offence: '',
     prisoner_offence_pairs: [],
   });
 
@@ -190,6 +165,59 @@ const BulkCourtScheduleForm: React.FC = () => {
   const [section1Collapsed, setSection1Collapsed] = useState(false);
   const [section2Collapsed, setSection2Collapsed] = useState(false);
   const [section3Collapsed, setSection3Collapsed] = useState(false);
+
+
+
+
+    useEffect(() => {
+
+        getAttendacetypes().then((data) => {
+                alert(JSON.stringify(data.results));
+             setAttendancetypes(data.results);
+          }).catch((error) => {
+            alert(error);
+          });
+
+
+
+        getCourtDetails().then((data) => {
+        mockCourts=data.results;
+        setCourts(data.results);
+
+      }).catch((error) => {
+        alert(error);
+      });
+
+
+         getStations().then((data) => {
+        mockStations=data.results;
+        setStations(data.results);
+      // alert(JSON.stringify(courts));
+      }).catch((error) => {
+        alert(error);
+      });
+
+
+
+            getAttendacetypes().then((data) => {
+             setAttendancetypes(data.results);
+          }).catch((error) => {
+            alert(error);
+          });
+
+
+          
+
+           getprisoners().then((data) => {
+           // alert(JSON.stringify(data.results));
+                 setMockPrisoners(data.results);
+              }).catch((error) => {
+                alert(error);
+              });
+
+
+    }, []);
+
 
   const handleInputChange = (field: keyof BulkScheduleData, value: string) => {
     setFormData((prev) => ({
@@ -273,7 +301,24 @@ const BulkCourtScheduleForm: React.FC = () => {
       toast.error('Please add at least one prisoner-offence pair');
       return;
     }
+    
+   
+      let dataToPost={};
+      const schedules = formData.prisoner_offence_pairs.map((pair) => ({
+        prisoner: pair.prisoner,
+        scheduled_date: formData.scheduled_date,
+        scheduled_time: formData.scheduled_time,
+        court_detail: formData.court_detail,
+        station: formData.station,
+        court_attendance_type: formData.court_attendance_type,
+        presiding_judge: formData.presiding_judge,
+        offence: pair.offence,
+         
+      }));
 
+      dataToPost = { schedules:schedules };
+     // alert(JSON.stringify(dataToPost));
+      submitBulkSchedule(dataToPost).then((data) => {
     // Here you would make the API call to bulk schedule
     console.log('Bulk Schedule Data:', formData);
     toast.success(`Successfully scheduled ${formData.prisoner_offence_pairs.length} court appearances`);
@@ -288,6 +333,12 @@ const BulkCourtScheduleForm: React.FC = () => {
       presiding_judge: '',
       prisoner_offence_pairs: [],
     });
+      }).catch((error) => {
+        alert(error);
+      });
+
+
+
   };
 
   const handleReset = () => {
@@ -356,13 +407,15 @@ const BulkCourtScheduleForm: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="court_detail">Court Name *</Label>
-                <Combobox
+              
+ <Combobox
                   value={formData.court_detail}
                   onChange={(value) => handleInputChange('court_detail', value)}
                   options={mockCourts}
                   placeholder="Select court"
                   emptyText="No court found."
                 />
+              
               </div>
 
               <div className="space-y-2">
@@ -381,7 +434,7 @@ const BulkCourtScheduleForm: React.FC = () => {
                 <Combobox
                   value={formData.court_attendance_type}
                   onChange={(value) => handleInputChange('court_attendance_type', value)}
-                  options={mockAttendanceTypes}
+                  options={attendancetypes}
                   placeholder="Select type"
                   emptyText="No attendance type found."
                 />
@@ -492,20 +545,33 @@ const BulkCourtScheduleForm: React.FC = () => {
             {/* Add Pair Form */}
             <div className="grid grid-cols-1 md:grid-cols-12 gap-4 p-4 bg-white border-2 border-gray-200 rounded-lg shadow-sm">
               <div className="md:col-span-4 space-y-2">
-                <Label htmlFor="prisoner">Select Prisoner *</Label>
+                <Label htmlFor="prisoner">Select Prisonerss *</Label>
                 <div className="flex gap-2">
                   <div className="flex-1">
                     <Combobox
                       value={currentPair.prisoner}
                       onChange={(value) => {
+                      
                         const prisoner = mockPrisoners.find((p) => p.id === value);
                         setCurrentPair((prev) => ({
                           ...prev,
                           prisoner: value,
-                          prisoner_name: prisoner?.name || '',
+                          prisoner_name: prisoner?.full_name || '',
                         }));
+
+                         let datatopost:OffenceRequest={
+                                prisoner:prisoner.id
+                              }
+
+                              getOffencesPersonal(datatopost).then((data) => {
+                                setmockOffences(data.results);
+                            //  alert(JSON.stringify(data.results));
+                              }).catch((error) => {
+                               alert(error);
+                              });
+
                       }}
-                      options={mockPrisoners}
+                      options={mockPrisoners.map((p) => ({ id: p.id, name: p.full_name }))}
                       placeholder="Select prisoner"
                       emptyText="No prisoner found."
                     />
@@ -535,7 +601,7 @@ const BulkCourtScheduleForm: React.FC = () => {
                       offence_name: offence?.name || '',
                     }));
                   }}
-                  options={mockOffences}
+                  options={mockOffences.map((o:any) => ({ id: o.id, name: o.offence_name }))}
                   placeholder="Select offence"
                   emptyText="No offence found."
                 />
