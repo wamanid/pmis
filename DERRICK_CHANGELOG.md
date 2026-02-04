@@ -2,6 +2,42 @@
 
 All notable changes to this project should be documented in this file.
 
+## [Released] - 2026-02-04
+
+### Added
+- **Medical Records Management - Modular Folder Structure Refactoring**:
+  - Reorganized 48 medical component files from flat structure into menu-aligned modular architecture
+  - Created 5 main sub-modules matching UI navigation: medicalInformation, restrictionAndDietary, stationsAndAssessment, recommendations, deathDetails
+  - Each sub-module contains organized feature folders (e.g., bmi, caseBook, schedules under medicalInformation)
+  - Created parallel services folder structure with barrel export index.ts files for future service implementations
+  - Updated medical.routes.tsx imports to reflect new component paths
+  - Used `git mv` for all file moves to preserve Git history
+  - Created comprehensive MEDICAL_MODULE_STRUCTURE.md documentation with import examples and design principles
+  - Benefits: Menu-aligned navigation, reduced merge conflicts, clear feature boundaries, scalable for future growth
+  - Pattern established for refactoring other flat modules (Discharge, Gate, Station, Rehabilitation)
+  - Files modified: 48 component files moved, 19 component subfolders created, 5 service subfolders created, medical.routes.tsx updated
+  - Commits: 9d6c64a (refactoring), af3e233 (documentation), 3998234 (template to ma_ignore)
+
+- **Module Refactoring Prompt Template**:
+  - Created reusable prompt template for reorganizing flat module structures
+  - Includes step-by-step customization guide for any module
+  - Example implementation for Discharge module
+  - Quick checklist and expected output structure
+  - References Medical module refactoring (9d6c64a) as pattern
+  - Moved to ma_ignore/ folder for personal reference (not shared with team)
+  - Location: ma_ignore/MODULE_REFACTORING_PROMPT_TEMPLATE.md
+
+### Changed
+- **Git Branch Synchronization - Upstream Integration**:
+  - Successfully merged upstream/staging into pmis_team branch with selective conflict resolution
+  - Resolved 58 merge conflicts across components, services, and configuration files
+  - Strategy: Kept pmis_team versions for custom work (property, station modules, services), accepted upstream versions for shared components (gate, layout, routes, utilities)
+  - Integrated 150+ new files from upstream: medical module, discipline module, reports, earning scheme, comprehensive documentation guides
+  - Updated package-lock.json from upstream and ran npm install for dependency consistency
+  - Preserved all local Property Management enhancements from 2026-02-02
+  - Merge commit: fa67114 on pmis_team branch
+  - Branch now synchronized with team repository while maintaining local innovations
+
 ## [Released] - 2026-02-02
 
 ### Added
