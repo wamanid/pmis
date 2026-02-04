@@ -1,13 +1,13 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { FileText, Plus } from 'lucide-react';
-import { Button } from '../ui/button';
-import { Card, CardContent } from '../ui/card';
+import { Button } from '../../../ui/button';
+import { Card, CardContent } from '../../../ui/card';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from '../../../ui/dialog';
 import CaseBookForm from './CaseBookForm';
 import CaseBookList from './CaseBookList';
 

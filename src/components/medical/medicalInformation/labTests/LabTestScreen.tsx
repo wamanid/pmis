@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { TestTube, Plus } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Button } from '../../../ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from '../../../ui/dialog';
 import LabTestForm from './LabTestForm';
 import LabTestList from './LabTestList';
 

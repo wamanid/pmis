@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
+﻿import React, { useState } from 'react';
+import { Card, CardContent } from '../../ui/card';
 import { ThumbsUp } from 'lucide-react';
-import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import WardRecommendationList from './WardRecommendationList';
-import TransferRecommendationList from './TransferRecommendationList';
+import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
+import WardRecommendationList from './wardRecommendations/WardRecommendationList';
+import TransferRecommendationList from './transferRecommendations/TransferRecommendationList';
 
 export default function RecommendationsDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');

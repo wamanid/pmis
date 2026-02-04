@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
+﻿import React, { useState } from 'react';
+import { Card, CardContent } from '../../ui/card';
 import { ShieldAlert } from 'lucide-react';
-import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import PrisonerRestrictionList from './PrisonerRestrictionList';
-import DietaryRequirementList from './DietaryRequirementList';
+import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
+import PrisonerRestrictionList from './restrictions/PrisonerRestrictionList';
+import DietaryRequirementList from './dietary/DietaryRequirementList';
 
 export default function RestrictionAndDietaryDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');

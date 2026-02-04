@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { Pill, Plus } from 'lucide-react';
-import { Button } from '../ui/button';
+import { Button } from '../../../ui/button';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from '../ui/dialog';
+} from '../../../ui/dialog';
 import TreatmentForm from './TreatmentForm';
 import TreatmentList from './TreatmentList';
 

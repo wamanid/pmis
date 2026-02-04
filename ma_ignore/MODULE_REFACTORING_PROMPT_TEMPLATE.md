@@ -46,9 +46,10 @@ Deliverables:
 1. Reorganize all component files into appropriate subfolders
 2. Create parallel services folder structure with index.ts barrel exports
 3. Update route imports to reflect new paths
-4. Use git mv to preserve file history
-5. Commit changes with descriptive message
-6. Create documentation file showing new structure
+4. **Systematically fix all import paths in moved files**
+5. Use git mv to preserve file history
+6. Commit changes with descriptive message
+7. Create documentation file showing new structure
 
 Best Practices to Follow:
 
@@ -58,6 +59,72 @@ Best Practices to Follow:
 ✅ Parallel services structure matching components exactly
 ✅ Barrel exports (index.ts) for clean imports
 ✅ Menu-aligned structure for intuitive navigation
+✅ **Fix import paths systematically after moving files**
+
+Import Path Correction Strategy:
+
+After restructuring, imports will break because files moved to different depths. Fix them systematically:
+
+**1. Calculate File Depth:**
+- Files at `[module]/Component.tsx` = 1 level deep → use `../ui/component`
+- Files at `[module]/subfolder/Component.tsx` = 2 levels deep → use `../../ui/component`
+- Files at `[module]/sub1/sub2/Component.tsx` = 3 levels deep → use `../../../ui/component`
+
+**2. Container Component Imports:**
+When a container imports from subfolders:
+```typescript
+// BEFORE (flat structure):
+import FeatureList from './FeatureList';
+
+// AFTER (nested structure):
+import FeatureList from './featureFolder/FeatureList';
+```
+
+**3. Fix Order (do in this sequence):**
+a) Update route file imports first
+b) Fix container component imports to subfolders
+c) Fix relative imports in 2-level deep files
+d) Fix relative imports in 3-level deep files
+e) Verify no overcorrected paths (too many `../`)
+
+**4. PowerShell Bulk Fix Commands:**
+```powershell
+# Fix 2-level deep files (in subfolders)
+Get-ChildItem -Recurse -Path "src/components/[module]" -Filter "*.tsx" | 
+  ForEach-Object { 
+    $c = (Get-Content $_.FullName -Raw -Encoding UTF8) -replace "from '\.\./ui/", "from '../../ui/"; 
+    Set-Content -Path $_.FullName -Value $c -NoNewline -Encoding UTF8 
+  }
+
+# Fix 3-level deep files (in nested subfolders)
+Get-ChildItem -Recurse -Path "src/components/[module]" -Filter "*.tsx" | 
+  ForEach-Object { 
+    $c = (Get-Content $_.FullName -Raw -Encoding UTF8) -replace "from '\.\./\.\./ui/", "from '../../../ui/"; 
+    Set-Content -Path $_.FullName -Value $c -NoNewline -Encoding UTF8 
+  }
+```
+
+**5. Test Iteratively:**
+- Run `npm run dev` after each batch of fixes
+- Check Vite error messages for remaining broken imports
+- Fix specific files manually if bulk commands miss edge cases
+- Verify container imports point to correct subfolders
+
+**6. Common Import Patterns:**
+```typescript
+// Shared UI components
+import { Button } from '../../../ui/button';
+import { Card } from '../../ui/card';
+
+// Container importing from subfolder
+import FeatureForm from './feature/FeatureForm';
+import FeatureList from './feature/FeatureList';
+
+// Service imports
+import { featureService } from '../../../services/[module]/feature';
+```
+
+⚠️ **Critical:** Import paths are the #1 issue after restructuring. Budget extra time for systematic fixes.
 
 Constraints:
 
@@ -100,6 +167,14 @@ Fill in:
 
 ### Step 5: Run the Prompt
 Paste the customized prompt to get the same modular reorganization
+
+### Step 6: Fix Import Paths After Restructuring
+After moving files, systematically fix all broken imports:
+1. Update route file imports
+2. Fix container component imports to subfolders
+3. Run bulk PowerShell commands for relative path corrections
+4. Test iteratively with `npm run dev`
+5. Fix any remaining specific errors manually
 
 ---
 
@@ -149,9 +224,10 @@ Deliverables:
 1. Reorganize all component files into appropriate subfolders
 2. Create parallel services folder structure with index.ts barrel exports
 3. Update route imports to reflect new paths (src/routes/discharge.routes.tsx)
-4. Use git mv to preserve file history
-5. Commit changes with descriptive message
-6. Create documentation file showing new structure
+4. **Systematically fix all import paths in moved files**
+5. Use git mv to preserve file history
+6. Commit changes with descriptive message
+7. Create documentation file showing new structure
 
 Best Practices to Follow:
 
@@ -161,6 +237,7 @@ Best Practices to Follow:
 ✅ Parallel services structure matching components exactly
 ✅ Barrel exports (index.ts) for clean imports
 ✅ Menu-aligned structure for intuitive navigation
+✅ **Fix import paths systematically after moving files**
 
 Constraints:
 
@@ -182,6 +259,15 @@ Before running the prompt, ensure you have:
 - [ ] Services folder exists (or needs creation)
 - [ ] Current branch is clean (`git status`)
 - [ ] Module overview/container component identified
+
+After refactoring, don't forget to:
+
+- [ ] Update route file imports
+- [ ] Fix container component imports to subfolders
+- [ ] Run PowerShell bulk import corrections
+- [ ] Test with `npm run dev` iteratively
+- [ ] Commit changes with descriptive message
+- [ ] Create module structure documentation
 
 ---
 
@@ -226,6 +312,17 @@ src/services/[module]/
 ✅ **Scalability** - Add features without restructuring  
 ✅ **Easy onboarding** - New developers understand structure quickly  
 ✅ **Preserved history** - Git tracks all file moves  
+✅ **Systematic import fixing** - Clear strategy for path corrections  
+
+---
+
+## Common Pitfalls to Avoid
+
+⚠️ **Import Path Errors** - Most common issue after restructuring. Follow the systematic fix strategy.  
+⚠️ **Inconsistent Depth** - Some files 2 levels deep, some 3 levels. Check each file's actual depth.  
+⚠️ **Container Imports** - Don't forget to update container components to import from subfolders.  
+⚠️ **Overcorrection** - Using too many `../` can break imports. Count the actual levels needed.  
+⚠️ **Batch Testing** - Test after each batch of import fixes, don't wait until the end.  
 
 ---
 

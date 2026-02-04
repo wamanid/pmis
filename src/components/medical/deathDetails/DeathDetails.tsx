@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
+﻿import React, { useState } from 'react';
+import { Card, CardContent } from '../../ui/card';
 import { FileX } from 'lucide-react';
-import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import DeathConfirmationList from './DeathConfirmationList';
-import DeathNotificationList from './DeathNotificationList';
-import DeathRecipientList from './DeathRecipientList';
+import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
+import DeathConfirmationList from './deathConfirmation/DeathConfirmationList';
+import DeathNotificationList from './deathNotification/DeathNotificationList';
+import DeathRecipientList from './deathRecipient/DeathRecipientList';
 
 export default function DeathDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');

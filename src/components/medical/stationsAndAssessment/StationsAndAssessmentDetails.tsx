@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
+﻿import React, { useState } from 'react';
+import { Card, CardContent } from '../../ui/card';
 import { ClipboardList } from 'lucide-react';
-import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import StationStateList from './StationStateList';
-import FoodAssessmentList from './FoodAssessmentList';
+import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
+import StationStateList from './stationState/StationStateList';
+import FoodAssessmentList from './foodAssessment/FoodAssessmentList';
 
 export default function StationsAndAssessmentDetails() {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
