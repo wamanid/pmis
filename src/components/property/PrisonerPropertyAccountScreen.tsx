@@ -156,6 +156,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
   // force remount AccountForm to reset its internal state when opening create/edit
   const [accountFormKey, setAccountFormKey] = useState(0);
+  // force DataTable remount to trigger refetch after CRUD operations
+  const [accountsTableKey, setAccountsTableKey] = useState(0);
+  const [transactionsTableKey, setTransactionsTableKey] = useState(0);
   const [transactionFormData, setTransactionFormData] = useState({
     property_prisoner_account: '',
     transaction_type: '',
@@ -344,9 +347,18 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         balance: data.balance ?? '0',
       });
       toast.success('Account created');
+      // Reload accounts first to ensure table updates
+      await loadAccounts();
+      // Also reload transactions to update stats cards
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
       setIsCreateAccountDialogOpen(false);
-      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
-      loadAccounts();
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+      setAccountFormErrors({});
+      // Force form remount
+      setAccountFormKey(prev => prev + 1);
     } catch (err) {
       console.error('create account error', err);
       toast.error('Failed to create account');
@@ -401,10 +413,16 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       });
       console.debug('updateAccount response', res);
       toast.success('Account updated');
+      // Reload both accounts and transactions to update table and stats
+      await loadAccounts();
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
       setIsEditAccountDialogOpen(false);
       setSelectedAccount(null);
-      // authoritative reload
-      await loadAccounts();
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+      setAccountFormErrors({});
     } catch (err) {
       console.debug('updateAccount error', err);
       console.error('update account error', err);
@@ -419,7 +437,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       console.debug('deleteAccount success', deleteAccountId);
       toast.success('Account deleted');
       setDeleteAccountId(null);
+      // Reload both accounts and transactions to update table and stats
       await loadAccounts();
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('deleteAccount error', err);
       console.error('delete account error', err);
@@ -453,6 +476,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reload
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('createTransaction error', err);
       console.error('create tx error', err);
@@ -497,6 +523,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reloads
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('updateTransaction error', err);
       console.error('update tx error', err);
@@ -518,6 +547,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reloads
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('deleteTransaction error', err);
       console.error('delete tx error', err);
@@ -1346,6 +1378,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <DataTable
+                key={accountsTableKey}
                 url="/property-management/prisoner-accounts/"
                 title="Accounts"
                 columns={accountColumns}
@@ -1672,6 +1705,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           <Card>
             <CardContent className="pt-6">
               <DataTable
+                key={transactionsTableKey}
                 url="/property-management/transactions/"
                 title="Transactions"
                 columns={updatedTransactionColumns}
