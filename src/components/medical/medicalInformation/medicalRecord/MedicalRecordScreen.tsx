@@ -33,17 +33,20 @@ interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   loading: Loading
   setLoading: React.Dispatch<React.SetStateAction<Loading>>
+  medicalRecords: MedicalRecord
+  setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
+  bloodGroups: Unit
+  setBloodGroups: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
-const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading }) => {
+const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, medicalRecords, setMedicalRecords, bloodGroups, setBloodGroups }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // API Integration
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
-  const [bloodGroups, setBloodGroups] = useState<Unit[]>([]);
+
   const [loader, setLoader] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 

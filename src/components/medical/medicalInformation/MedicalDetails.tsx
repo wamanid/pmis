@@ -12,6 +12,8 @@ import ExamResultScreen from './examinationResults/ExamResultScreen';
 import AilmentScreen from './ailments/AilmentScreen';
 import DiagnosisScreen from './diagnosis/DiagnosisScreen';
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
+import {BmiClassification, BmiRecord, MedicalRecord} from "../../../services/medical/medicalInformation/medical";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
 export interface Loading {
   record: boolean,
@@ -25,6 +27,12 @@ export default function MedicalDetails() {
   // API Integration
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [loading, setLoading] = useState<Loading>({ record: true, bmi: true })
+  // BIM
+  const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
+  const [classifications, setClassifications] = useState<BmiClassification[]>([])
+  // Medical records
+  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
+  const [bloodGroups, setBloodGroups] = useState<Unit[]>([]);
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -176,13 +184,31 @@ export default function MedicalDetails() {
           {/* Tab Content */}
           {activeTab === 'medical-record' && (
             <div>
-              <MedicalRecordScreen prisoners={prisoners} setPrisoners={setPrisoners} loading={loading} setLoading={setLoading} />
+              <MedicalRecordScreen
+                  prisoners={prisoners}
+                  setPrisoners={setPrisoners}
+                  loading={loading}
+                  setLoading={setLoading}
+                  medicalRecords={medicalRecords}
+                  bloodGroups={bloodGroups}
+                  setBloodGroups={setBloodGroups}
+                  setMedicalRecords={setMedicalRecords}
+              />
             </div>
           )}
 
           {activeTab === 'bmi' && (
             <div>
-              <BMIScreen prisoners={prisoners} setPrisoners={setPrisoners} loading={loading} setLoading={setLoading}/>
+              <BMIScreen
+                  prisoners={prisoners}
+                  setPrisoners={setPrisoners}
+                  loading={loading}
+                  setLoading={setLoading}
+                  setBmiRecords={setBmiRecords}
+                  bmiRecords={bmiRecords}
+                  classifications={classifications}
+                  setClassifications={setClassifications}
+              />
             </div>
           )}
 

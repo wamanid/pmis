@@ -32,17 +32,20 @@ interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   loading: Loading
   setLoading: React.Dispatch<React.SetStateAction<Loading>>
+  classifications: BmiClassification
+  setClassifications: React.Dispatch<React.SetStateAction<BmiClassification[]>>
+  bmiRecords: BmiRecord
+  setBmiRecords: React.Dispatch<React.SetStateAction<BmiRecord[]>>
 }
 
-const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading }) => {
+const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading,bmiRecords, setBmiRecords, classifications, setClassifications }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // API integration
-  const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
-  const [classifications, setClassifications] = useState<BmiClassification[]>([])
+
   const [loader, setLoader] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
