@@ -27,8 +27,8 @@ interface BMIFormProps {
   onSubmit: (bmiRecord: BMIRecord) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
-  classifications: BmiClassification
-  prisoners: PrisonerItem
+  classifications: BmiClassification[]
+  prisoners: PrisonerItem[]
   loader: boolean
   setLoader:  React.Dispatch<React.SetStateAction<Boolean>>
 }

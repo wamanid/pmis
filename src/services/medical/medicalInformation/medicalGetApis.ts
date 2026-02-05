@@ -3,11 +3,11 @@ import {toast} from "sonner";
 import {PrisonerItem} from "../../stationServices/visitorsServices/VisitorsService";
 import { getPrisoners } from "../../stationServices/visitorsServices/VisitorsService"
 import {
-    BmiClassification, BmiRecord,
+    BmiClassification, BmiRecord, CaseBook,
     getBloodGroups,
     getBmiClassifications,
-    getBmiRecords,
-    getMedicalRecords,
+    getBmiRecords, getCaseBooks, getCheckupTypes,
+    getMedicalRecords, getPresentationTypes,
     MedicalRecord
 } from "./medical";
 import React from "react";
@@ -56,4 +56,22 @@ export async function getClassifications(setData: React.Dispatch<React.SetStateA
 export async function getBmiList(setData: React.Dispatch<React.SetStateAction<BmiRecord[]>>) {
     const response = await getBmiRecords()
     populateList(response, "There are no BMI records", setData)
+}
+
+// Get case book list
+export async function getCasebookList(setData: React.Dispatch<React.SetStateAction<CaseBook[]>>) {
+    const response = await getCaseBooks()
+    populateList(response, "There are no case records", setData)
+}
+
+// Get presentation types
+export async function getPresentations(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getPresentationTypes()
+    populateList(response, "There are no presentation types", setData)
+}
+
+// Get checkup types
+export async function getCheckupTypesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getCheckupTypes()
+    populateList(response, "There are no checkup types", setData)
 }

@@ -24,8 +24,8 @@ interface MedicalRecordFormProps {
   onSubmit: (medicalRecord: MedicalRecord) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
-  prisoners: PrisonerItem
-  bloodGroups: Unit
+  prisoners: PrisonerItem[]
+  bloodGroups: Unit[]
   loader: Boolean,
   setLoader: React.Dispatch<React.SetStateAction<Boolean>>
 }

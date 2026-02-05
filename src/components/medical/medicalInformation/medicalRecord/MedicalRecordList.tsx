@@ -41,9 +41,9 @@ interface MedicalRecordListProps {
   onEdit: (medicalRecord: MedicalRecord) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
-  medicalRecords: MedicalRecord
+  medicalRecords: MedicalRecord[]
   setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
-  bloodGroups: Unit
+  bloodGroups: Unit[]
   deleteDialogOpen: boolean
   setDeleteDialogOpen: React.Dispatch<React.SetStateAction<Boolean>>
 }

@@ -55,8 +55,8 @@ interface BMIListProps {
   onDelete: (id: string) => void;
   refreshTrigger?: number;
   prisonerId?: string;
-  classifications: BmiClassification
-  bmiRecords: BMIRecord
+  classifications: BmiClassification[]
+  bmiRecords: BMIRecord[]
   deleteDialogOpen: boolean
   setDeleteDialogOpen: React.Dispatch<React.SetStateAction<Boolean>>
 }

@@ -12,12 +12,18 @@ import ExamResultScreen from './examinationResults/ExamResultScreen';
 import AilmentScreen from './ailments/AilmentScreen';
 import DiagnosisScreen from './diagnosis/DiagnosisScreen';
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
-import {BmiClassification, BmiRecord, MedicalRecord} from "../../../services/medical/medicalInformation/medical";
+import {
+  BmiClassification,
+  BmiRecord,
+  CaseBook,
+  MedicalRecord
+} from "../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
 export interface Loading {
   record: boolean,
   bmi: boolean,
+  case: boolean,
 }
 
 export default function MedicalDetails() {
@@ -26,13 +32,17 @@ export default function MedicalDetails() {
 
   // API Integration
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
-  const [loading, setLoading] = useState<Loading>({ record: true, bmi: true })
+  const [loading, setLoading] = useState<Loading>({ record: true, bmi: true, case: true })
   // BIM
   const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
   const [classifications, setClassifications] = useState<BmiClassification[]>([])
   // Medical records
   const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
   const [bloodGroups, setBloodGroups] = useState<Unit[]>([]);
+  // Case book
+  const [caseBooks, setCaseBooks] = useState<CaseBook[]>([]);
+  const [checkupTypes, setCheckupTypes] = useState<Unit[]>([]);
+  const [presentations, setPresentations] = useState<Unit[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -214,7 +224,18 @@ export default function MedicalDetails() {
 
           {activeTab === 'casebook' && (
             <div>
-              <CaseBookScreen />
+              <CaseBookScreen
+                  prisoners={prisoners}
+                  setPrisoners={setPrisoners}
+                  loading={loading}
+                  setLoading={setLoading}
+                  caseBooks={caseBooks}
+                  setCaseBooks={setCaseBooks}
+                  checkupTypes={checkupTypes}
+                  setCheckupTypes={setCheckupTypes}
+                  presentations={presentations}
+                  setPresentations={setPresentations}
+              />
             </div>
           )}
 

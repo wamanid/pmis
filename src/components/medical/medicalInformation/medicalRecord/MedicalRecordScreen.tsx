@@ -29,13 +29,13 @@ import {
 import {toast} from "sonner";
 
 interface ChildProps {
-  prisoners: PrisonerItem
+  prisoners: PrisonerItem[]
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   loading: Loading
   setLoading: React.Dispatch<React.SetStateAction<Loading>>
-  medicalRecords: MedicalRecord
+  medicalRecords: MedicalRecord[]
   setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
-  bloodGroups: Unit
+  bloodGroups: Unit[]
   setBloodGroups: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 

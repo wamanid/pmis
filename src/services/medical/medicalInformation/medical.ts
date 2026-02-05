@@ -138,3 +138,58 @@ export const updateBmiRecord = async (bmi: Bmi, id: string) : Promise<BmiRespons
 export const deleteBmiRecord = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/bmi-records/${id}/`);
 };
+
+// Case books
+export interface CaseBook {
+  id: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  check_type_name: string;
+  blood_group_name: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string;
+  is_active: boolean;
+  present_complaint: string;
+  history: string;
+  grade: string;
+  referral: string;
+  doctors_name: string;
+  mental_case: boolean;
+  notes: string;
+  edoctor_video_link: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  prisoner: string;
+  check_type: string;
+  bmi: string;
+  presentation_of_patient: string;
+  blood_group: string;
+}
+
+
+export type PresentationTypesResponse<T> = Paginated<T> | ErrorResponse
+export type CheckupTypesResponse<T> = Paginated<T> | ErrorResponse
+export type CaseBooksResponse<T> = Paginated<T> | ErrorResponse
+
+export const getPresentationTypes = async (): Promise<PresentationTypesResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/presentation-types/'
+  )
+  return response.data
+}
+
+export const getCheckupTypes = async (): Promise<CheckupTypesResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/checkup-types/'
+  )
+  return response.data
+}
+
+export const getCaseBooks = async (): Promise<CaseBooksResponse<CaseBook>> => {
+  const response = await axiosInstance.get<Paginated<CaseBook>>(
+    '/medical-management/case-books/'
+  )
+  return response.data
+}
