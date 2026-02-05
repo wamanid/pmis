@@ -8,7 +8,7 @@ import { toast } from 'sonner@2.0.3';
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Loading} from "../MedicalDetails";
-import {Record} from "../../../../services/medical/medical";
+import {Record} from "../../../../services/medical/medicalInformation/medical";
 
 interface MedicalRecord {
   id?: string;

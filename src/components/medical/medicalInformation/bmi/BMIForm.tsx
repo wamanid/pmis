@@ -7,6 +7,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Activity, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import { Badge } from '../../../ui/badge';
+import {Bmi, BmiClassification, Record} from "../../../../services/medical/medicalInformation/medical";
+import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 
 interface BMIRecord {
   id?: string;
@@ -25,9 +27,14 @@ interface BMIFormProps {
   onSubmit: (bmiRecord: BMIRecord) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  classifications: BmiClassification
+  prisoners: PrisonerItem
+  loader: boolean
+  setLoader:  React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const BMIForm: React.FC<BMIFormProps> = ({
+  prisoners, classifications, loader, setLoader,
   bmiRecord,
   onSubmit,
   onCancel,
@@ -41,14 +48,14 @@ const BMIForm: React.FC<BMIFormProps> = ({
     bmi_classification: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [bmiClassifications, setBmiClassifications] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
+  // const [prisoners, setPrisoners] = useState<any[]>([]);
+  // const [bmiClassifications, setBmiClassifications] = useState<any[]>([]);
+  // const [loader, setLoader] = useState(false);
   const [calculatedBMI, setCalculatedBMI] = useState<number | null>(null);
 
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
+  // useEffect(() => {
+  //   loadDropdownData();
+  // }, []);
 
   useEffect(() => {
     if (bmiRecord) {
@@ -63,25 +70,25 @@ const BMIForm: React.FC<BMIFormProps> = ({
     calculateBMI();
   }, [formData.weight, formData.height]);
 
-  const loadDropdownData = () => {
-    // Mock data - replace with actual API calls
-    setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
-
-    setBmiClassifications([
-      { id: '1', name: 'Underweight', min_bmi: 0, max_bmi: 18.5, description: 'BMI less than 18.5' },
-      { id: '2', name: 'Normal Weight', min_bmi: 18.5, max_bmi: 24.9, description: 'BMI 18.5 - 24.9' },
-      { id: '3', name: 'Overweight', min_bmi: 25, max_bmi: 29.9, description: 'BMI 25 - 29.9' },
-      { id: '4', name: 'Obese Class I', min_bmi: 30, max_bmi: 34.9, description: 'BMI 30 - 34.9' },
-      { id: '5', name: 'Obese Class II', min_bmi: 35, max_bmi: 39.9, description: 'BMI 35 - 39.9' },
-      { id: '6', name: 'Obese Class III', min_bmi: 40, max_bmi: 100, description: 'BMI 40 and above' },
-    ]);
-  };
+  // const loadDropdownData = () => {
+  //   // Mock data - replace with actual API calls
+  //   setPrisoners([
+  //     { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+  //     { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+  //     { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+  //     { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+  //     { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
+  //   ]);
+  //
+  //   setBmiClassifications([
+  //     { id: '1', name: 'Underweight', min_bmi: 0, max_bmi: 18.5, description: 'BMI less than 18.5' },
+  //     { id: '2', name: 'Normal Weight', min_bmi: 18.5, max_bmi: 24.9, description: 'BMI 18.5 - 24.9' },
+  //     { id: '3', name: 'Overweight', min_bmi: 25, max_bmi: 29.9, description: 'BMI 25 - 29.9' },
+  //     { id: '4', name: 'Obese Class I', min_bmi: 30, max_bmi: 34.9, description: 'BMI 30 - 34.9' },
+  //     { id: '5', name: 'Obese Class II', min_bmi: 35, max_bmi: 39.9, description: 'BMI 35 - 39.9' },
+  //     { id: '6', name: 'Obese Class III', min_bmi: 40, max_bmi: 100, description: 'BMI 40 and above' },
+  //   ]);
+  // };
 
   const calculateBMI = () => {
     const weight = parseFloat(formData.weight);
@@ -94,7 +101,7 @@ const BMIForm: React.FC<BMIFormProps> = ({
       setCalculatedBMI(bmi);
       
       // Auto-select classification based on BMI
-      const classification = bmiClassifications.find(
+      const classification = classifications.find(
         (c) => bmi >= c.min_bmi && bmi < c.max_bmi
       );
       if (classification) {
@@ -146,40 +153,48 @@ const BMIForm: React.FC<BMIFormProps> = ({
       return;
     }
 
-    setLoading(true);
+    const submitData: Bmi = {
+      ...formData,
+      is_active: true,
+      deleted_datetime: null,
+      deleted_by: null
+    };
+
+    setLoader(true);
+    onSubmit(submitData);
 
     // Simulate API call
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedClassification = bmiClassifications.find(
-        (c) => c.id === formData.bmi_classification
-      );
-
-      const submitData: BMIRecord = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        prisoner_number: selectedPrisoner?.prisoner_number || '',
-        classification_name: selectedClassification?.name || '',
-      };
-
-      onSubmit(submitData);
-      setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('BMI record created successfully');
-        // Reset form
-        setFormData({
-          weight: '',
-          height: '',
-          bmi: '',
-          prisoner: '',
-          bmi_classification: '',
-        });
-        setCalculatedBMI(null);
-      } else {
-        toast.success('BMI record updated successfully');
-      }
-    }, 500);
+    // setTimeout(() => {
+    //   const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
+    //   const selectedClassification = classifications.find(
+    //     (c) => c.id === formData.bmi_classification
+    //   );
+    //
+    //   const submitData: BMIRecord = {
+    //     ...formData,
+    //     prisoner_name: selectedPrisoner?.full_name || '',
+    //     prisoner_number: selectedPrisoner?.prisoner_number || '',
+    //     classification_name: selectedClassification?.name || '',
+    //   };
+    //
+    //   onSubmit(submitData);
+    //   setLoader(false);
+    //
+    //   if (mode === 'create') {
+    //     toast.success('BMI record created successfully');
+    //     // Reset form
+    //     setFormData({
+    //       weight: '',
+    //       height: '',
+    //       bmi: '',
+    //       prisoner: '',
+    //       bmi_classification: '',
+    //     });
+    //     setCalculatedBMI(null);
+    //   } else {
+    //     toast.success('BMI record updated successfully');
+    //   }
+    // }, 500);
   };
 
   const isReadOnly = mode === 'view';
@@ -217,7 +232,7 @@ const BMIForm: React.FC<BMIFormProps> = ({
                   <SelectContent>
                     {prisoners.map((prisoner) => (
                       <SelectItem key={prisoner.id} value={prisoner.id}>
-                        {prisoner.prisoner_number} - {prisoner.full_name}
+                        {prisoner.prisoner_number_value} - {prisoner.full_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -323,7 +338,7 @@ const BMIForm: React.FC<BMIFormProps> = ({
                     <SelectValue placeholder="Select BMI classification" />
                   </SelectTrigger>
                   <SelectContent>
-                    {bmiClassifications.map((classification) => (
+                    {classifications.map((classification) => (
                       <SelectItem key={classification.id} value={classification.id}>
                         {classification.name} ({classification.description})
                       </SelectItem>
@@ -372,7 +387,7 @@ const BMIForm: React.FC<BMIFormProps> = ({
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                disabled={loading}
+                disabled={loader}
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -381,10 +396,10 @@ const BMIForm: React.FC<BMIFormProps> = ({
                 type="submit"
                 style={{ backgroundColor: '#650000' }}
                 className="text-white hover:opacity-90"
-                disabled={loading}
+                disabled={loader}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
+                {loader ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
               </Button>
             </div>
           )}

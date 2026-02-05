@@ -14,7 +14,8 @@ import DiagnosisScreen from './diagnosis/DiagnosisScreen';
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 
 export interface Loading {
-  record: boolean
+  record: boolean,
+  bmi: boolean,
 }
 
 export default function MedicalDetails() {
@@ -23,7 +24,7 @@ export default function MedicalDetails() {
 
   // API Integration
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
-  const [loading, setLoading] = useState<Loading>({ record: true })
+  const [loading, setLoading] = useState<Loading>({ record: true, bmi: true })
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -181,7 +182,7 @@ export default function MedicalDetails() {
 
           {activeTab === 'bmi' && (
             <div>
-              <BMIScreen />
+              <BMIScreen prisoners={prisoners} setPrisoners={setPrisoners} loading={loading} setLoading={setLoading}/>
             </div>
           )}
 

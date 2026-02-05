@@ -18,14 +18,14 @@ import {Loading} from "../MedicalDetails";
 import {Card, CardContent} from "../../../ui/card";
 import {Input} from "../../../ui/input";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "../../../ui/table";
-import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../../services/medical/medicalApis";
+import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../../services/medical/medicalInformation/medicalGetApis";
 import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
 import {
   addMedicalRecord,
   deleteMedicalRecord,
   MedicalRecord,
   updateMedicalRecord
-} from "../../../../services/medical/medical";
+} from "../../../../services/medical/medicalInformation/medical";
 import {toast} from "sonner";
 
 interface ChildProps {
@@ -70,7 +70,7 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
 
   const handleCreateClick = () => {
     if (!prisoners.length){
-      toast.error("You can create a medical record without prisoners")
+      toast.error("You can't create a medical record without prisoners")
       return
     }
     if (!bloodGroups.length){
@@ -143,16 +143,12 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
 
       setShowDialog(false);
       setSelectedRecord(null);
+      setLoader(false)
     }
     catch (error) {
       handleCatchError(error)
     }
-    finally {
-      setLoader(false)
-    }
-    // setShowDialog(false);
-    // setSelectedRecord(null);
-    // setRefreshTrigger((prev) => prev + 1);
+
   };
 
   const handleCancel = () => {

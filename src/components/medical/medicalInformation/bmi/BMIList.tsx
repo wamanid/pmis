@@ -35,6 +35,7 @@ import {
   Minus,
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {BmiClassification} from "../../../../services/medical/medicalInformation/medical";
 
 interface BMIRecord {
   id: string;
@@ -54,16 +55,19 @@ interface BMIListProps {
   onDelete: (id: string) => void;
   refreshTrigger?: number;
   prisonerId?: string;
+  classifications: BmiClassification
+  bmiRecords: BMIRecord
 }
 
 const BMIList: React.FC<BMIListProps> = ({
+  bmiRecords, classifications,
   onView,
   onEdit,
   onDelete,
   refreshTrigger,
   prisonerId,
 }) => {
-  const [bmiRecords, setBmiRecords] = useState<BMIRecord[]>([]);
+  // const [bmiRecords, setBmiRecords] = useState<BMIRecord[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<BMIRecord[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('all');
@@ -75,140 +79,140 @@ const BMIList: React.FC<BMIListProps> = ({
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
   // Mock data
-  const mockBmiRecords: BMIRecord[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'PR-2024-001',
-      classification_name: 'Normal Weight',
-      weight: '70',
-      height: '175',
-      bmi: '22.86',
-      prisoner: '1',
-      bmi_classification: '2',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'PR-2024-002',
-      classification_name: 'Underweight',
-      weight: '48',
-      height: '165',
-      bmi: '17.63',
-      prisoner: '2',
-      bmi_classification: '1',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      prisoner_number: 'PR-2024-003',
-      classification_name: 'Overweight',
-      weight: '85',
-      height: '170',
-      bmi: '29.41',
-      prisoner: '3',
-      bmi_classification: '3',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Emily Davis',
-      prisoner_number: 'PR-2024-004',
-      classification_name: 'Normal Weight',
-      weight: '62',
-      height: '168',
-      bmi: '21.97',
-      prisoner: '4',
-      bmi_classification: '2',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Robert Lee',
-      prisoner_number: 'PR-2024-005',
-      classification_name: 'Obese Class I',
-      weight: '95',
-      height: '178',
-      bmi: '29.98',
-      prisoner: '5',
-      bmi_classification: '4',
-    },
-    {
-      id: '6',
-      prisoner_name: 'David Wilson',
-      prisoner_number: 'PR-2024-006',
-      classification_name: 'Normal Weight',
-      weight: '75',
-      height: '180',
-      bmi: '23.15',
-      prisoner: '6',
-      bmi_classification: '2',
-    },
-    {
-      id: '7',
-      prisoner_name: 'Sarah Martinez',
-      prisoner_number: 'PR-2024-007',
-      classification_name: 'Underweight',
-      weight: '52',
-      height: '172',
-      bmi: '17.58',
-      prisoner: '7',
-      bmi_classification: '1',
-    },
-    {
-      id: '8',
-      prisoner_name: 'Thomas White',
-      prisoner_number: 'PR-2024-008',
-      classification_name: 'Obese Class II',
-      weight: '110',
-      height: '175',
-      bmi: '35.92',
-      prisoner: '8',
-      bmi_classification: '5',
-    },
-    {
-      id: '9',
-      prisoner_name: 'Lisa Anderson',
-      prisoner_number: 'PR-2024-009',
-      classification_name: 'Normal Weight',
-      weight: '58',
-      height: '160',
-      bmi: '22.66',
-      prisoner: '9',
-      bmi_classification: '2',
-    },
-    {
-      id: '10',
-      prisoner_name: 'James Taylor',
-      prisoner_number: 'PR-2024-010',
-      classification_name: 'Overweight',
-      weight: '88',
-      height: '182',
-      bmi: '26.58',
-      prisoner: '10',
-      bmi_classification: '3',
-    },
-  ];
+  // const mockBmiRecords: BMIRecord[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     prisoner_number: 'PR-2024-001',
+  //     classification_name: 'Normal Weight',
+  //     weight: '70',
+  //     height: '175',
+  //     bmi: '22.86',
+  //     prisoner: '1',
+  //     bmi_classification: '2',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     prisoner_number: 'PR-2024-002',
+  //     classification_name: 'Underweight',
+  //     weight: '48',
+  //     height: '165',
+  //     bmi: '17.63',
+  //     prisoner: '2',
+  //     bmi_classification: '1',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     prisoner_number: 'PR-2024-003',
+  //     classification_name: 'Overweight',
+  //     weight: '85',
+  //     height: '170',
+  //     bmi: '29.41',
+  //     prisoner: '3',
+  //     bmi_classification: '3',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Emily Davis',
+  //     prisoner_number: 'PR-2024-004',
+  //     classification_name: 'Normal Weight',
+  //     weight: '62',
+  //     height: '168',
+  //     bmi: '21.97',
+  //     prisoner: '4',
+  //     bmi_classification: '2',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Robert Lee',
+  //     prisoner_number: 'PR-2024-005',
+  //     classification_name: 'Obese Class I',
+  //     weight: '95',
+  //     height: '178',
+  //     bmi: '29.98',
+  //     prisoner: '5',
+  //     bmi_classification: '4',
+  //   },
+  //   {
+  //     id: '6',
+  //     prisoner_name: 'David Wilson',
+  //     prisoner_number: 'PR-2024-006',
+  //     classification_name: 'Normal Weight',
+  //     weight: '75',
+  //     height: '180',
+  //     bmi: '23.15',
+  //     prisoner: '6',
+  //     bmi_classification: '2',
+  //   },
+  //   {
+  //     id: '7',
+  //     prisoner_name: 'Sarah Martinez',
+  //     prisoner_number: 'PR-2024-007',
+  //     classification_name: 'Underweight',
+  //     weight: '52',
+  //     height: '172',
+  //     bmi: '17.58',
+  //     prisoner: '7',
+  //     bmi_classification: '1',
+  //   },
+  //   {
+  //     id: '8',
+  //     prisoner_name: 'Thomas White',
+  //     prisoner_number: 'PR-2024-008',
+  //     classification_name: 'Obese Class II',
+  //     weight: '110',
+  //     height: '175',
+  //     bmi: '35.92',
+  //     prisoner: '8',
+  //     bmi_classification: '5',
+  //   },
+  //   {
+  //     id: '9',
+  //     prisoner_name: 'Lisa Anderson',
+  //     prisoner_number: 'PR-2024-009',
+  //     classification_name: 'Normal Weight',
+  //     weight: '58',
+  //     height: '160',
+  //     bmi: '22.66',
+  //     prisoner: '9',
+  //     bmi_classification: '2',
+  //   },
+  //   {
+  //     id: '10',
+  //     prisoner_name: 'James Taylor',
+  //     prisoner_number: 'PR-2024-010',
+  //     classification_name: 'Overweight',
+  //     weight: '88',
+  //     height: '182',
+  //     bmi: '26.58',
+  //     prisoner: '10',
+  //     bmi_classification: '3',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadBmiRecords();
-  }, [refreshTrigger, prisonerId]);
+  // useEffect(() => {
+  //   loadBmiRecords();
+  // }, [refreshTrigger, prisonerId]);
 
   useEffect(() => {
     filterRecords();
   }, [bmiRecords, searchTerm, classificationFilter, bmiRangeFilter]);
 
-  const loadBmiRecords = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      let data = mockBmiRecords;
-      // Filter by prisonerId if provided
-      if (prisonerId) {
-        data = data.filter((record) => record.prisoner === prisonerId);
-      }
-      setBmiRecords(data);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadBmiRecords = () => {
+  //   setLoading(true);
+  //   // Simulate API call
+  //   setTimeout(() => {
+  //     let data = mockBmiRecords;
+  //     // Filter by prisonerId if provided
+  //     if (prisonerId) {
+  //       data = data.filter((record) => record.prisoner === prisonerId);
+  //     }
+  //     setBmiRecords(data);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterRecords = () => {
     let filtered = [...bmiRecords];
@@ -319,10 +323,10 @@ const BMIList: React.FC<BMIListProps> = ({
   const handleConfirmDelete = () => {
     if (recordToDelete) {
       onDelete(recordToDelete);
-      setBmiRecords((prev) => prev.filter((record) => record.id !== recordToDelete));
-      toast.success('BMI record deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
+      // setBmiRecords((prev) => prev.filter((record) => record.id !== recordToDelete));
+      // toast.success('BMI record deleted successfully');
+      // setDeleteDialogOpen(false);
+      // setRecordToDelete(null);
     }
   };
 
@@ -403,12 +407,11 @@ const BMIList: React.FC<BMIListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Classifications</SelectItem>
-                <SelectItem value="Underweight">Underweight</SelectItem>
-                <SelectItem value="Normal Weight">Normal Weight</SelectItem>
-                <SelectItem value="Overweight">Overweight</SelectItem>
-                <SelectItem value="Obese Class I">Obese Class I</SelectItem>
-                <SelectItem value="Obese Class II">Obese Class II</SelectItem>
-                <SelectItem value="Obese Class III">Obese Class III</SelectItem>
+                {
+                  classifications.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
 

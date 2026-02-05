@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, {useEffect, useState} from 'react';
 import { Activity, Plus } from 'lucide-react';
 import { Button } from '../../../ui/button';
 import {
@@ -9,14 +9,74 @@ import {
 } from '../../../ui/dialog';
 import BMIForm from './BMIForm';
 import BMIList from './BMIList';
+import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
+import {Loading} from "../MedicalDetails";
+import {
+  getBloodGroupList, getBmiList, getClassifications,
+  getMedicalRecordsList,
+  getPrisonersList
+} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
+import {
+  addBmiRecord,
+  addMedicalRecord,
+  Bmi,
+  BmiClassification,
+  BmiRecord, updateBmiRecord,
+  updateMedicalRecord
+} from "../../../../services/medical/medicalInformation/medical";
+import {toast} from "sonner";
 
-const BMIScreen: React.FC = () => {
+interface ChildProps {
+  prisoners: PrisonerItem
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  loading: Loading
+  setLoading: React.Dispatch<React.SetStateAction<Loading>>
+}
+
+const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
+  // API integration
+  const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
+  const [classifications, setClassifications] = useState<BmiClassification[]>([])
+  const [loader, setLoader] = useState(false);
+
+  useEffect(() => {
+    if (loading.bmi){
+      fetchData()
+    }
+  }, [loading.bmi]);
+
+  async function fetchData() {
+    try {
+      if (!prisoners.length) {
+        await getPrisonersList(setPrisoners)
+      }
+      await getBmiList(setBmiRecords)
+      await getClassifications(setClassifications)
+    } catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        bmi: false
+      }))
+    }
+  }
+
   const handleCreateClick = () => {
+    if (!prisoners.length){
+      toast.error("You can't create a bmi record without prisoners")
+      return
+    }
+    if (!classifications.length){
+      toast.error("You can create a bmi record without Classifications")
+      return;
+    }
     setDialogMode('create');
     setSelectedRecord(null);
     setShowDialog(true);
@@ -38,10 +98,44 @@ const BMIScreen: React.FC = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  const handleSubmit = (data: any) => {
-    setShowDialog(false);
-    setSelectedRecord(null);
-    setRefreshTrigger((prev) => prev + 1);
+  const handleSubmit = async (data: Bmi) => {
+    // console.log(data)
+    try {
+      let response
+      if (selectedRecord) {
+        response = await updateBmiRecord(data, selectedRecord.id)
+      }
+      else {
+        response = await addBmiRecord(data)
+      }
+      if (handleResponseError(response)) return;
+
+      if (!('id' in response)) {
+        toast.error("Failed to update the bmi records table");
+        return;
+      }
+
+      if (selectedRecord) {
+        setBmiRecords(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+        toast.success('BMI record updated successfully');
+      }
+      else {
+        setBmiRecords(prev => [response, ...prev]);
+        toast.success('BMI record created successfully');
+      }
+
+      setShowDialog(false);
+      setSelectedRecord(null);
+      setLoader(false)
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    // setShowDialog(false);
+    // setSelectedRecord(null);
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleCancel = () => {
@@ -51,31 +145,50 @@ const BMIScreen: React.FC = () => {
 
   return (
     <div className="w-full h-full p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between w-full">
-        <div>
-          <h1 style={{ color: '#650000' }}>BMI Records</h1>
-          <p className="text-gray-600">
-            Track and monitor prisoner Body Mass Index measurements and classifications
-          </p>
-        </div>
-        <Button
-          onClick={handleCreateClick}
-          style={{ backgroundColor: '#650000' }}
-          className="text-white hover:opacity-90"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          New BMI Record
-        </Button>
-      </div>
 
-      {/* BMI List */}
-      <BMIList
-        onView={handleView}
-        onEdit={handleEdit}
-        onDelete={handleDelete}
-        refreshTrigger={refreshTrigger}
-      />
+       {
+        loading.bmi ? (
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching BMI information, Please wait...
+                    </p>
+              </div>
+            </div>
+        ) : (
+            <>
+               {/* Header */}
+                <div className="flex items-center justify-between w-full">
+                  <div>
+                    <h1 style={{ color: '#650000' }}>BMI Records</h1>
+                    <p className="text-gray-600">
+                      Track and monitor prisoner Body Mass Index measurements and classifications
+                    </p>
+                  </div>
+                  <Button
+                    onClick={handleCreateClick}
+                    style={{ backgroundColor: '#650000' }}
+                    className="text-white hover:opacity-90"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    New BMI Record
+                  </Button>
+                </div>
+
+                {/* BMI List */}
+                <BMIList
+                  setBmiRecords={setBmiRecords}
+                  bmiRecords={bmiRecords}
+                  classifications={classifications}
+                  onView={handleView}
+                  onEdit={handleEdit}
+                  onDelete={handleDelete}
+                  refreshTrigger={refreshTrigger}
+                />
+            </>
+        )
+       }
 
       {/* Dialog for Create/Edit/View */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
@@ -89,6 +202,10 @@ const BMIScreen: React.FC = () => {
             </DialogTitle>
           </DialogHeader>
           <BMIForm
+            classifications={classifications}
+            prisoners={prisoners}
+            loader={loader}
+            setLoader={setLoader}
             bmiRecord={selectedRecord}
             onSubmit={handleSubmit}
             onCancel={handleCancel}
