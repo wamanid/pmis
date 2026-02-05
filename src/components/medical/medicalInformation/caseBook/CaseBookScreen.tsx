@@ -10,7 +10,7 @@ import {
 } from '../../../ui/dialog';
 import CaseBookForm from './CaseBookForm';
 import CaseBookList from './CaseBookList';
-import {CaseBook, getPresentationTypes} from "../../../../services/medical/medicalInformation/medical";
+import {BmiRecord, CaseBook, getPresentationTypes} from "../../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Loading} from "../MedicalDetails";
@@ -32,9 +32,14 @@ export interface ChildProps {
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   loading: Loading
   setLoading: React.Dispatch<React.SetStateAction<Loading>>
+  // bmiRecords: BmiRecord[]
+  // setBmiRecords: React.Dispatch<React.SetStateAction<BmiRecord[]>>
+  bloodGroups: Unit[]
+  setBloodGroups: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
-const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, caseBooks, checkupTypes, setCaseBooks, setCheckupTypes, presentations, setPresentations }) => {
+const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, caseBooks, checkupTypes,
+                                                setCaseBooks, setCheckupTypes, presentations, setPresentations, setBloodGroups, bloodGroups }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCaseBook, setSelectedCaseBook] = useState<any>(null);
@@ -163,6 +168,13 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             mode={dialogMode}
+            loader={loader}
+            setLoader={setLoader}
+            checkupTypes={checkupTypes}
+            bloodGroups={bloodGroups}
+            setBloodGroups={setBloodGroups}
+            prisoners={prisoners}
+            setPrisoners={setPrisoners}
           />
         </DialogContent>
       </Dialog>

@@ -8,6 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Checkbox } from '../../../ui/checkbox';
 import { FileText, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {handleCatchError} from "../../../../services/stationServices/utils";
+import {
+  getBloodGroupList,
+  getBmiList,
+  getPrisonersList
+} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
+import {BmiRecord} from "../../../../services/medical/medicalInformation/medical";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
 interface CaseBook {
   id?: string;
@@ -35,9 +44,19 @@ interface CaseBookFormProps {
   onSubmit: (caseBook: CaseBook) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  prisoners: PrisonerItem[]
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
+  // bmiRecords: BmiRecord[]
+  // setBmiRecords: React.Dispatch<React.SetStateAction<BmiRecord[]>>
+  bloodGroups: Unit[]
+  setBloodGroups: React.Dispatch<React.SetStateAction<Unit[]>>
+   checkupTypes: Unit[];
+  loader: boolean
+  setLoader:  React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const CaseBookForm: React.FC<CaseBookFormProps> = ({
+  setBloodGroups, bloodGroups, prisoners, setPrisoners, loader, setLoader, checkupTypes,
   caseBook,
   onSubmit,
   onCancel,
@@ -59,12 +78,12 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
     blood_group: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [checkTypes, setCheckTypes] = useState<any[]>([]);
+  // const [prisoners, setPrisoners] = useState<any[]>([]);
+  // const [checkTypes, setCheckTypes] = useState<any[]>([]);
   const [bmiRecords, setBmiRecords] = useState<any[]>([]);
-  const [bloodGroups, setBloodGroups] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // const [bloodGroups, setBloodGroups] = useState<any[]>([]);
+  // const [loader, setLoader] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(true);
 
   useEffect(() => {
     loadDropdownData();
@@ -76,42 +95,68 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
     }
   }, [caseBook, dataLoaded]);
 
-  const loadDropdownData = () => {
+  const loadDropdownData = async () => {
+    try {
+      let prisonersOk = true
+      let bloodGroupsOk = true
+
+      if (!prisoners.length) {
+        prisonersOk = await getPrisonersList(setPrisoners)
+      }
+      // if (!bmiRecords.length) {
+      //   await getBmiList(setBmiRecords)
+      // }
+      if (!bloodGroups.length) {
+        bloodGroupsOk = await getBloodGroupList(setBloodGroups)
+      }
+
+      if (prisonersOk && bloodGroupsOk) {
+        setDataLoaded(false)
+      }
+      else {
+        toast.error("Please make sure you have prisoners and blood groups")
+        onCancel()
+      }
+
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
     // Mock data - replace with actual API calls
-    setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-    ]);
+    // setPrisoners([
+    //   { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
+    //   { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
+    //   { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
+    //   { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
+    // ]);
+    //
+    // setCheckTypes([
+    //   { id: '1', name: 'General Check-up' },
+    //   { id: '2', name: 'Emergency' },
+    //   { id: '3', name: 'Follow-up' },
+    //   { id: '4', name: 'Routine Examination' },
+    //   { id: '5', name: 'Specialist Consultation' },
+    // ]);
+    //
+    // setBmiRecords([
+    //   { id: '1', bmi_value: 18.5, category: 'Normal Weight' },
+    //   { id: '2', bmi_value: 22.3, category: 'Normal Weight' },
+    //   { id: '3', bmi_value: 27.1, category: 'Overweight' },
+    //   { id: '4', bmi_value: 16.2, category: 'Underweight' },
+    // ]);
+    //
+    // setBloodGroups([
+    //   { id: '1', name: 'A+' },
+    //   { id: '2', name: 'A-' },
+    //   { id: '3', name: 'B+' },
+    //   { id: '4', name: 'B-' },
+    //   { id: '5', name: 'AB+' },
+    //   { id: '6', name: 'AB-' },
+    //   { id: '7', name: 'O+' },
+    //   { id: '8', name: 'O-' },
+    // ]);
 
-    setCheckTypes([
-      { id: '1', name: 'General Check-up' },
-      { id: '2', name: 'Emergency' },
-      { id: '3', name: 'Follow-up' },
-      { id: '4', name: 'Routine Examination' },
-      { id: '5', name: 'Specialist Consultation' },
-    ]);
-
-    setBmiRecords([
-      { id: '1', bmi_value: 18.5, category: 'Normal Weight' },
-      { id: '2', bmi_value: 22.3, category: 'Normal Weight' },
-      { id: '3', bmi_value: 27.1, category: 'Overweight' },
-      { id: '4', bmi_value: 16.2, category: 'Underweight' },
-    ]);
-
-    setBloodGroups([
-      { id: '1', name: 'A+' },
-      { id: '2', name: 'A-' },
-      { id: '3', name: 'B+' },
-      { id: '4', name: 'B-' },
-      { id: '5', name: 'AB+' },
-      { id: '6', name: 'AB-' },
-      { id: '7', name: 'O+' },
-      { id: '8', name: 'O-' },
-    ]);
-
-    setDataLoaded(true);
+    // setDataLoaded(true);
   };
 
   const handleInputChange = (field: keyof CaseBook, value: any) => {
@@ -143,12 +188,12 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
       return;
     }
 
-    setLoading(true);
+    setLoader(true);
 
     // Simulate API call
     setTimeout(() => {
       const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedCheckType = checkTypes.find((ct) => ct.id === formData.check_type);
+      const selectedCheckType = checkupTypes.find((ct) => ct.id === formData.check_type);
       const selectedBloodGroup = bloodGroups.find((bg) => bg.id === formData.blood_group);
 
       const submitData: CaseBook = {
@@ -160,7 +205,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
       };
 
       onSubmit(submitData);
-      setLoading(false);
+      setLoader(false);
 
       if (mode === 'create') {
         toast.success('Case book entry created successfully');
@@ -199,7 +244,18 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {
+          dataLoaded ? (
+              <div className="size-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground text-sm">
+                        Fetching additional information, Please wait...
+                      </p>
+                </div>
+              </div>
+          ) : (
+             <form onSubmit={handleSubmit} className="space-y-6">
           {/* Prisoner Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
@@ -225,7 +281,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
                     <SelectContent>
                       {prisoners.map((prisoner) => (
                         <SelectItem key={prisoner.id} value={prisoner.id}>
-                          {prisoner.prisoner_number} - {prisoner.full_name}
+                          {prisoner.prisoner_number_value} - {prisoner.full_name}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -254,7 +310,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
                     <SelectValue placeholder="Select check-up type" />
                   </SelectTrigger>
                   <SelectContent>
-                    {checkTypes.map((type) => (
+                    {checkupTypes.map((type) => (
                       <SelectItem key={type.id} value={type.id}>
                         {type.name}
                       </SelectItem>
@@ -443,7 +499,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
                 type="button"
                 variant="outline"
                 onClick={onCancel}
-                disabled={loading}
+                disabled={loader}
               >
                 <X className="h-4 w-4 mr-2" />
                 Cancel
@@ -452,10 +508,10 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
                 type="submit"
                 style={{ backgroundColor: '#650000' }}
                 className="text-white hover:opacity-90"
-                disabled={loading}
+                disabled={loader}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Entry' : 'Update Entry'}
+                {loader ? 'Saving...' : mode === 'create' ? 'Create Entry' : 'Update Entry'}
               </Button>
             </div>
           )}
@@ -471,7 +527,10 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
               </Button>
             </div>
           )}
-        </form>
+        </form> 
+          )
+        }
+        
       </CardContent>
     </Card>
   );

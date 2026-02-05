@@ -12,26 +12,27 @@ import {
 } from "./medical";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
+import {flatten} from "react-hook-form/dist/utils/flatten";
 
 // Get prisoners
-export async function getPrisonersList(setData: React.Dispatch<React.SetStateAction<PrisonerItem[]>>){
+export async function getPrisonersList(setData: React.Dispatch<React.SetStateAction<PrisonerItem[]>>): Promise<boolean>{
     const response = await getPrisoners()
-    populateList(response, "There are no prisoners available", setData)
+    return populateList(response, "There are no prisoners available", setData)
 }
 
-function populateList(response: any, msg: string, setData: any) {
-    if (handleServerError2(response)) return true
+function populateList(response: any, msg: string, setData: any): boolean {
+    if (handleServerError2(response)) return false
 
     if ("results" in response) {
       const data = response.results
         // console.log(data)
       if (!data.length) {
         toast.error(msg)
-        return true
+        return false
       }
       setData(data)
     }
-    return false
+    return true
 }
 
 // Get medical records
@@ -41,9 +42,9 @@ export async function getMedicalRecordsList(setData: React.Dispatch<React.SetSta
 }
 
 // Get blood groups
-export async function getBloodGroupList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+export async function getBloodGroupList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
     const response = await getBloodGroups()
-    populateList(response, "There are no blood groups", setData)
+    return populateList(response, "There are no blood groups", setData)
 }
 
 // Get BMI classifications
@@ -53,9 +54,9 @@ export async function getClassifications(setData: React.Dispatch<React.SetStateA
 }
 
 // Get BMI records
-export async function getBmiList(setData: React.Dispatch<React.SetStateAction<BmiRecord[]>>) {
+export async function getBmiList(setData: React.Dispatch<React.SetStateAction<BmiRecord[]>>): Promise<boolean> {
     const response = await getBmiRecords()
-    populateList(response, "There are no BMI records", setData)
+    return populateList(response, "There are no BMI records", setData)
 }
 
 // Get case book list

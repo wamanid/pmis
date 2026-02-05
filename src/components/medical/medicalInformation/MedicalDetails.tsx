@@ -225,6 +225,8 @@ export default function MedicalDetails() {
           {activeTab === 'casebook' && (
             <div>
               <CaseBookScreen
+                  bloodGroups={bloodGroups}
+                  setBloodGroups={setBloodGroups}
                   prisoners={prisoners}
                   setPrisoners={setPrisoners}
                   loading={loading}

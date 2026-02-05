@@ -125,6 +125,13 @@ export const getBmiRecords = async (): Promise<BmiRecordResponse<BmiRecord>> => 
   return response.data
 }
 
+export const getBmiRecord = async (id): Promise<BmiRecordResponse<BmiRecord>> => {
+  const response = await axiosInstance.get<Paginated<BmiRecord>>(
+    '/medical-management/bmi-records/'
+  )
+  return response.data
+}
+
 export const addBmiRecord = async (bmi: Bmi) : Promise<BmiResponse> => {
   const response = await axiosInstance.post<BmiResponse>('/medical-management/bmi-records/', bmi);
   return response.data;
