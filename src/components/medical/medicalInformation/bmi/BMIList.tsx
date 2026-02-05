@@ -57,10 +57,12 @@ interface BMIListProps {
   prisonerId?: string;
   classifications: BmiClassification
   bmiRecords: BMIRecord
+  deleteDialogOpen: boolean
+  setDeleteDialogOpen: React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const BMIList: React.FC<BMIListProps> = ({
-  bmiRecords, classifications,
+  bmiRecords, classifications, setDeleteDialogOpen, deleteDialogOpen,
   onView,
   onEdit,
   onDelete,
@@ -75,7 +77,7 @@ const BMIList: React.FC<BMIListProps> = ({
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [loading, setLoading] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  // const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
   // Mock data

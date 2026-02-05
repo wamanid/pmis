@@ -134,3 +134,7 @@ export const updateBmiRecord = async (bmi: Bmi, id: string) : Promise<BmiRespons
   const response = await axiosInstance.put<BmiResponse>(`/medical-management/bmi-records/${id}/`, bmi);
   return response.data;
 }
+
+export const deleteBmiRecord = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/bmi-records/${id}/`);
+};

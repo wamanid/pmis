@@ -22,7 +22,7 @@ import {
   addMedicalRecord,
   Bmi,
   BmiClassification,
-  BmiRecord, updateBmiRecord,
+  BmiRecord, deleteBmiRecord, deleteMedicalRecord, updateBmiRecord,
   updateMedicalRecord
 } from "../../../../services/medical/medicalInformation/medical";
 import {toast} from "sonner";
@@ -44,6 +44,7 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
   const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
   const [classifications, setClassifications] = useState<BmiClassification[]>([])
   const [loader, setLoader] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   useEffect(() => {
     if (loading.bmi){
@@ -94,8 +95,19 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
     setShowDialog(true);
   };
 
-  const handleDelete = (id: string) => {
-    setRefreshTrigger((prev) => prev + 1);
+  const handleDelete = async (id: string) => {
+    if (!id) return
+
+    try {
+      await deleteBmiRecord(id)
+      setBmiRecords(prev => prev.filter(rec => rec.id !== id))
+      toast.success('BMI record deleted successfully');
+      setDeleteDialogOpen(false)
+
+    }catch (error) {
+      handleCatchError(error)
+    }
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleSubmit = async (data: Bmi) => {
@@ -178,6 +190,8 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
 
                 {/* BMI List */}
                 <BMIList
+                  deleteDialogOpen={deleteDialogOpen}
+                  setDeleteDialogOpen={setDeleteDialogOpen}
                   setBmiRecords={setBmiRecords}
                   bmiRecords={bmiRecords}
                   classifications={classifications}
