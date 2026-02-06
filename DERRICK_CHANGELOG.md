@@ -1,8 +1,81 @@
 # Changelog
 
+---
+**Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
+**Created**: February 6, 2026 | **Last Updated**: February 6, 2026
+---
+
 All notable changes to this project should be documented in this file.
 
 ## [Released] - 2026-02-06
+
+### Added
+- **Property Management - Grouped Table Views with DataTable (UX ENHANCEMENT)**:
+  - Extended grouped table pattern to Property Management module screens
+  - **PrisonerPropertyAccountScreen.tsx Updates**:
+    - Added grouped view for Accounts tab with prisoner_number grouping
+    - Added grouped view for Transactions tab with prisoner_number grouping
+    - View toggle (Grouped/Flat) for both accounts and transactions tables
+    - Updated columns to use `prisoner_number` as key with dual display (number + name)
+    - Account group headers show: prisoner_number | prisoner_name, total balances per currency, account counts
+    - Transaction group headers show: prisoner_number | prisoner_name, Credits/Debits/Net amounts per currency, transaction counts
+    - Conditional config using spread operator to preserve expandable functionality in both views
+    - Color coding: green for credits, red for debits, brand color for totals
+  - **PrisonerPropertyScreen.tsx Updates**:
+    - Added grouped view for Property records with prisoner_number grouping
+    - View toggle (Grouped/Flat) above property table
+    - Updated prisoner column from prisoner_name to prisoner_number key
+    - Property group headers show: prisoner_number | prisoner_name (with Users icon), total amounts per currency, property counts by status
+    - Summary stats with status badges (Stored, Released, Damaged, etc.)
+    - Wrapped in Card component for consistent styling
+  - **Implementation Pattern**:
+    - All use DataTable's built-in `config.grouping` option (not separate components)
+    - Conditional config: `viewMode === 'grouped' ? { grouping: {...} } : {}`
+    - Group by unique `prisoner_number` to prevent confusion with similar names
+    - Display format: "PRISONER_NUMBER | PRISONER_NAME" in all group headers
+    - Default to grouped view for better organization
+    - Seamless toggle with same DataTable component
+  - **Files Modified**: PrisonerPropertyAccountScreen.tsx, PrisonerPropertyScreen.tsx
+  - **Benefit**: Consistent UX across Medical and Property modules, better data organization for prisoners with multiple accounts/transactions/properties
+
+- **Medical Restriction Management - Grouped Table View with DataTable (UX ENHANCEMENT)**:
+  - Implemented grouped/collapsible table using DataTable's built-in grouping feature
+  - **DataTable Grouping Configuration**:
+    - Groups restrictions by prisoner_number (unique identifier prevents name confusion)
+    - Custom `renderGroupHeader` displays: `PRISONER_NUMBER | PRISONER_NAME` format
+    - Summary statistics per prisoner: Active (green), Inactive (gray), Total (brand color) restriction counts
+    - Date range display: earliest start date → latest end date with calendar icon
+    - Collapsible/expandable rows: click entire header to expand/collapse
+    - ChevronDown (expanded) / ChevronRight (collapsed) icons
+    - `defaultExpanded: false` - groups start collapsed for cleaner initial view
+  - **View Toggle**: Added Grouped vs Flat view tabs in `PrisonerRestrictionList.tsx`
+    - Default to grouped view for better UX
+    - Switch to flat view when filtering by specific prisoner
+    - Icons: Users for grouped, List for flat
+    - Seamless switching with same DataTable component
+  - **DataTable Features Maintained**:
+    - All standard DataTable features work in grouped mode: pagination, search, CSV/PDF export, print
+    - Expand All / Collapse All buttons automatically appear in grouped mode
+    - Server-side pagination compatibility
+    - Sort and filter capabilities
+  - **UX Improvements**:
+    - Prevents confusion with similar prisoner names by showing unique prisoner_number first
+    - Better data scan-ability - see all restrictions per prisoner at a glance
+    - Summary stats eliminate need to count manually
+    - Reduced scrolling through mixed records
+    - Visual hierarchy with icons (User, Calendar)
+    - Color-coded statistics for quick assessment
+  - **Implementation Approach**: Uses DataTable's `grouping` config option (not separate component)
+    - `groupBy: 'prisoner_number'` - column to group by
+    - `renderGroupHeader` - custom React component for group header rendering
+    - Conditional config based on viewMode state
+    - Single unified component handles both flat and grouped views
+  - **Files Modified**: PrisonerRestrictionList.tsx (added viewMode state, tableConfig with grouping, view toggle tabs)
+  - **Documentation**: 
+    - `GROUPED_DATATABLE_PATTERN.md` - comprehensive guide with DataTable grouping config examples
+    - `MEDICAL_RESTRICTION_GROUPED_TABLE_SUMMARY.md` - visual summary and usage guide
+    - `BACKEND_INTEGRATION_PROMPT.md` - when to use grouped tables in new modules
+  - **Benefit**: Dramatically improves UX for viewing prisoner restrictions, especially when prisoners have multiple restrictions, while maintaining all DataTable features
 
 ### Fixed
 - **Medical Restriction Management - Edit Mode Dropdown Population (CRITICAL FIX)**:

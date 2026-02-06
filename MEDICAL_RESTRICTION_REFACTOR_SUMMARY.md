@@ -1,5 +1,10 @@
 # Medical Restriction Management - Module Refactoring Summary
 
+---
+**Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
+**Created**: February 6, 2026 | **Last Updated**: February 6, 2026
+---
+
 ## Overview
 Successfully refactored the Medical Restriction Management module from mock data to full backend integration with server-side pagination, following the established patterns from Housing Allocation, Journal, and Complaints modules.
 

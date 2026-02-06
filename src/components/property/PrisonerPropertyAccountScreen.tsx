@@ -31,7 +31,9 @@ import {
   FileText,
   Calendar,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Users,
+  List
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { DataTable } from "../common/DataTable";
@@ -117,6 +119,10 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [transactionsTotal, setTransactionsTotal] = useState(0);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
+
+  // view modes for grouping
+  const [accountsViewMode, setAccountsViewMode] = useState<'flat' | 'grouped'>('grouped');
+  const [transactionsViewMode, setTransactionsViewMode] = useState<'flat' | 'grouped'>('grouped');
 
   // lookups
   const [prisoners, setPrisoners] = useState<any[]>([]);
@@ -667,12 +673,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   // Columns for DataTable
   const accountColumns = [
     { 
-      key: 'prisoner_name', 
+      key: 'prisoner_number', 
       label: 'Prisoner',
       render: (v: any, r: any) => (
         <div className="flex flex-col">
-          <span className="font-medium">{v}</span>
-          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+          <span className="font-medium">{r.prisoner_name || 'N/A'}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500 font-mono">{r.prisoner_number}</span>}
         </div>
       )
     },
@@ -766,12 +772,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       ),
     },
     { 
-      key: 'prisoner_name', 
+      key: 'prisoner_number', 
       label: 'Prisoner',
       render: (v: any, r: any) => (
         <div className="flex flex-col">
-          <span className="font-medium">{v}</span>
-          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+          <span className="font-medium">{r.prisoner_name || 'N/A'}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500 font-mono">{r.prisoner_number}</span>}
         </div>
       )
     },
@@ -1377,15 +1383,32 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           {/* Accounts Table (DataTable) */}
           <Card>
             <CardContent className="pt-6">
+              {/* View Toggle for Accounts */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Prisoner Accounts</h3>
+                <Tabs value={accountsViewMode} onValueChange={(v: string) => setAccountsViewMode(v as 'flat' | 'grouped')}>
+                  <TabsList>
+                    <TabsTrigger value="grouped" className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Grouped
+                    </TabsTrigger>
+                    <TabsTrigger value="flat" className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      Flat
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <DataTable
                 key={accountsTableKey}
                 url="/property-management/prisoner-accounts/"
                 title="Accounts"
                 columns={accountColumns}
                 config={{
-                  grouping: {
-                    groupBy: 'prisoner_name',
-                    defaultExpanded: false,
+                  ...(accountsViewMode === 'grouped' ? {
+                    grouping: {
+                      groupBy: 'prisoner_number',
+                      defaultExpanded: false,
                     renderGroupHeader: (groupValue: string, items: any[]) => {
                       const firstItem = items[0];
                       
@@ -1404,8 +1427,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       return (
                         <div className="flex items-center justify-between py-2 px-4">
                           <div className="flex items-center gap-3">
+                            <Users className="h-5 w-5" style={{ color: '#650000' }} />
                             <div className="flex flex-col">
-                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                              <span className="font-semibold text-base">{groupValue} | {firstItem?.prisoner_name || 'Unknown'}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-6">
@@ -1470,7 +1494,8 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                         </div>
                       );
                     }
-                  },
+                    }
+                  } : {}),
                   expandable: {
                     isExpanded: (row: any) => expandedAccounts.has(row.id),
                     onToggle: (row: any) => toggleAccountExpansion(row.id),
@@ -1704,14 +1729,30 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           {/* Transactions Table (DataTable) */}
           <Card>
             <CardContent className="pt-6">
+              {/* View Toggle for Transactions */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Prisoner Transactions</h3>
+                <Tabs value={transactionsViewMode} onValueChange={(v: string) => setTransactionsViewMode(v as 'flat' | 'grouped')}>
+                  <TabsList>
+                    <TabsTrigger value="grouped" className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Grouped
+                    </TabsTrigger>
+                    <TabsTrigger value="flat" className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      Flat
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <DataTable
                 key={transactionsTableKey}
                 url="/property-management/transactions/"
                 title="Transactions"
                 columns={updatedTransactionColumns}
-                config={{
+                config={transactionsViewMode === 'grouped' ? {
                   grouping: {
-                    groupBy: 'prisoner_name',
+                    groupBy: 'prisoner_number',
                     defaultExpanded: false,
                     renderGroupHeader: (groupValue: string, items: any[]) => {
                       const firstItem = items[0];
@@ -1760,8 +1801,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       return (
                         <div className="flex items-center justify-between py-2 px-4">
                           <div className="flex items-center gap-3">
+                            <Users className="h-5 w-5" style={{ color: '#650000' }} />
                             <div className="flex flex-col">
-                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                              <span className="font-semibold text-base">{groupValue} | {firstItem?.prisoner_name || 'Unknown'}</span>
                               {moreCurrencies && <span className="text-xs text-gray-500">{moreCurrencies}</span>}
                             </div>
                           </div>
@@ -1787,7 +1829,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       );
                     }
                   }
-                }}
+                } : {}}
               />
             </CardContent>
           </Card>

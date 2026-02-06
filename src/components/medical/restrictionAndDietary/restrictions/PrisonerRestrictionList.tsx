@@ -2,12 +2,13 @@
 import { Button } from '../../../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../ui/dialog';
 import { Badge } from '../../../ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '../../../ui/tabs';
 import ConfirmDialog from '../../../common/ConfirmDialog';
-import { Eye, Pencil, Plus, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, Trash2, List, Users, Calendar } from 'lucide-react';
 import { toast } from 'sonner';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { DataTable } from '../../../common/DataTable';
-import { DataTableColumn } from '../../../common/DataTable.types';
+import { DataTableColumn, DataTableConfig } from '../../../common/DataTable.types';
 import PrisonerRestrictionForm from './PrisonerRestrictionForm';
 import {
   fetchRestrictions,
@@ -24,9 +25,12 @@ interface PrisonerRestrictionListProps {
   selectedPrisonerId?: string;
 }
 
+type ViewMode = 'flat' | 'grouped';
+
 const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
   selectedPrisonerId,
 }) => {
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped'); // Default to grouped view
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerRestriction | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create');
@@ -65,8 +69,9 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
    */
   const columns: DataTableColumn[] = useMemo(
     () => [
+      // Prisoner number column - used for grouping, will be hidden in grouped view
       {
-        key: 'prisoner_name',
+        key: 'prisoner_number',
         label: 'Prisoner',
         sortable: true,
         render: (_: any, row: any) => (
@@ -177,6 +182,106 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
   );
 
   /**
+   * DataTable configuration with conditional grouping
+   */
+  const tableConfig: DataTableConfig = useMemo(() => {
+    // If viewing grouped mode and not filtering by specific prisoner
+    if (viewMode === 'grouped' && !selectedPrisonerId) {
+      return {
+        search: true,
+        export: {
+          pdf: true,
+          csv: true,
+          print: true,
+        },
+        lengthMenu: [10, 50, 100, -1],
+        pagination: true,
+        summary: true,
+        rowSpacing: 'normal',
+        grouping: {
+          groupBy: 'prisoner_number',
+          defaultExpanded: false,
+          renderGroupHeader: (groupValue, items) => {
+            // Calculate summary stats
+            const activeCount = items.filter((item: any) => item.is_active).length;
+            const inactiveCount = items.length - activeCount;
+            
+            // Get prisoner info from first item
+            const prisonerName = items[0]?.prisoner_name || 'Unknown';
+            const prisonerNumber = groupValue;
+            
+            // Get date range
+            const startDates = items
+              .map((item: any) => item.start_date)
+              .filter(Boolean)
+              .sort();
+            const endDates = items
+              .map((item: any) => item.end_date)
+              .filter(Boolean)
+              .sort();
+            
+            const earliestStart = startDates[0];
+            const latestEnd = endDates[endDates.length - 1];
+            
+            return (
+              <div className="flex items-center justify-between w-full">
+                {/* Prisoner Info */}
+                <div className="flex items-center gap-3">
+                  <Users className="h-5 w-5" style={{ color: '#650000' }} />
+                  <div>
+                    <div className="font-semibold text-base">
+                      {prisonerNumber} | {prisonerName}
+                    </div>
+                    {earliestStart && (
+                      <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        {format(parseISO(earliestStart), 'PP')}
+                        {latestEnd && ` → ${format(parseISO(latestEnd), 'PP')}`}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                
+                {/* Summary Stats */}
+                <div className="flex items-center gap-6 mr-4">
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground">Active</div>
+                    <div className="text-lg font-semibold text-green-600">{activeCount}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground">Inactive</div>
+                    <div className="text-lg font-semibold text-gray-500">{inactiveCount}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="text-xs text-muted-foreground">Total</div>
+                    <div className="text-lg font-semibold" style={{ color: '#650000' }}>
+                      {items.length}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          },
+        },
+      };
+    }
+    
+    // Flat view configuration (no grouping)
+    return {
+      search: true,
+      export: {
+        pdf: true,
+        csv: true,
+        print: true,
+      },
+      lengthMenu: [10, 50, 100, -1],
+      pagination: true,
+      summary: true,
+      rowSpacing: 'normal',
+    };
+  }, [viewMode, selectedPrisonerId]);
+
+  /**
    * Handlers
    */
   const handleCreate = () => {
@@ -265,11 +370,30 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
   return (
     <>
       <div className="space-y-4">
-        {/* Header with Add Button */}
+        {/* Header with View Toggle and Add Button */}
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-bold" style={{ color: '#650000' }}>
-            Prisoner Restrictions
-          </h2>
+          <div className="flex items-center gap-4">
+            <h2 className="text-2xl font-bold" style={{ color: '#650000' }}>
+              Prisoner Restrictions
+            </h2>
+            
+            {/* View Mode Toggle - Only show when not filtering by specific prisoner */}
+            {!selectedPrisonerId && (
+              <Tabs value={viewMode} onValueChange={(v: string) => setViewMode(v as ViewMode)}>
+                <TabsList>
+                  <TabsTrigger value="grouped" className="flex items-center gap-2">
+                    <Users className="h-4 w-4" />
+                    Grouped
+                  </TabsTrigger>
+                  <TabsTrigger value="flat" className="flex items-center gap-2">
+                    <List className="h-4 w-4" />
+                    Flat
+                  </TabsTrigger>
+                </TabsList>
+              </Tabs>
+            )}
+          </div>
+          
           <Button
             onClick={handleCreate}
             style={{ backgroundColor: '#650000' }}
@@ -280,13 +404,14 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
           </Button>
         </div>
 
-        {/* DataTable */}
+        {/* DataTable with conditional grouping */}
         <DataTable
           key={tableKey}
           url={tableUrl}
           title="Prisoner Restrictions"
           columns={columns}
           searchPlaceholder="Search by prisoner, reason, or facility..."
+          config={tableConfig}
         />
       </div>
 
