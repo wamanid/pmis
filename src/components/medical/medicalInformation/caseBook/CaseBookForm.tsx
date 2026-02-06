@@ -114,6 +114,12 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
     }
   }
 
+  useEffect(() => {
+    if (caseBook && bmiRecords.length > 0) {
+      setFormData(caseBook)
+    }
+  }, [bmiRecords])
+
   const loadDropdownData = async () => {
     try {
       let prisonersOk = true
