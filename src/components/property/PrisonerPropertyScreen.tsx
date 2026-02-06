@@ -751,6 +751,27 @@ export default function PrisonerPropertyScreen() {
     };
   }, [properties]); // Only recalculate when properties array changes
 
+  // Helper to get currency text color for visual differentiation
+  const getCurrencyColor = (currencyCode: string) => {
+    const code = String(currencyCode).toUpperCase();
+    const colorMap: Record<string, string> = {
+      USD: '#166534',
+      US: '#166534',
+      EUR: '#1e40af',
+      EURO: '#1e40af',
+      GBP: '#6b21a8',
+      UGX: '#9a3412',
+      UGANDA: '#9a3412',
+      KES: '#991b1b',
+      KENYA: '#991b1b',
+      TZS: '#155e75',
+      TANZANIA: '#155e75',
+      RWF: '#3f6212',
+      RWANDA: '#3f6212',
+    };
+    return colorMap[code] || '#374151'; // Gray fallback
+  };
+
   // Define DataTable columns
   const columns: DataTableColumn[] = [
     { 
@@ -1077,17 +1098,6 @@ export default function PrisonerPropertyScreen() {
                   
                   // Format totals display
                   const currencyKeys = Object.keys(currencyTotals);
-                  let totalsDisplay = '';
-                  
-                  if (currencyKeys.length > 0) {
-                    totalsDisplay = currencyKeys.map(currencyName => {
-                      const { symbol, total } = currencyTotals[currencyName];
-                      const formattedTotal = new Intl.NumberFormat('en-US').format(total);
-                      return `${symbol} ${formattedTotal}`;
-                    }).join(' | ');
-                  } else {
-                    totalsDisplay = 'No currency items';
-                  }
                   
                   const statusCounts = items.reduce((acc, item) => {
                     acc[item.property_status_name] = (acc[item.property_status_name] || 0) + 1;
@@ -1106,9 +1116,25 @@ export default function PrisonerPropertyScreen() {
                         </span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium">
-                          Total: {totalsDisplay}
-                        </span>
+                        <div className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-gray-500">Total:</span>
+                          {currencyKeys.length > 0 ? (
+                            currencyKeys.map((currencyName, idx) => {
+                              const { symbol, total } = currencyTotals[currencyName];
+                              const color = getCurrencyColor(symbol);
+                              const formattedTotal = new Intl.NumberFormat('en-US').format(total);
+                              return (
+                                <span key={idx}>
+                                  <span style={{ color, fontWeight: '600' }}>{symbol}</span>{' '}
+                                  <span style={{ fontWeight: '600' }}>{formattedTotal}</span>
+                                  {idx < currencyKeys.length - 1 && <span className="mx-2"> |</span>}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span>No currency items</span>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           {Object.entries(statusCounts).map(([status, count]) => (
                             <Badge key={status} variant="outline" className="text-xs">
