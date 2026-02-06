@@ -1,36 +1,38 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Input } from '../../../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { ShieldAlert, Save, X, Calendar as CalendarIcon } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { format } from 'date-fns';
-
-interface PrisonerRestriction {
-  id?: string;
-  prisoner_name?: string;
-  reason_name?: string;
-  station_name?: string;
-  state_of_prisoner: string;
-  start_date: string;
-  end_date: string;
-  prisoner: string;
-  reason: string;
-  place_of_medical_attention: string;
-}
+import SearchableSelect from '../../../common/SearchableSelect';
+import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
+import {
+  fetchRestrictionReasons,
+  fetchStations,
+  fetchRestrictionReasonById,
+  fetchStationById,
+  PrisonerRestriction,
+} from '../../../../services/medical/restrictionAndDietary/restrictionService';
 
 interface PrisonerRestrictionFormProps {
   restriction?: PrisonerRestriction | null;
-  onSubmit: (restriction: PrisonerRestriction) => void;
+  onSubmit: (restriction: PrisonerRestriction) => Promise<void>;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  dialogOpen?: boolean;
 }
 
-const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restriction, onSubmit, onCancel, mode }) => {
+const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({
+  restriction,
+  onSubmit,
+  onCancel,
+  mode,
+  dialogOpen = true,
+}) => {
   const [formData, setFormData] = useState<PrisonerRestriction>({
     state_of_prisoner: '',
     start_date: '',
@@ -40,100 +42,114 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
     place_of_medical_attention: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
-  const [restrictionReasons, setRestrictionReasons] = useState<any[]>([]);
-  const [stations, setStations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  useEffect(() => {
-    if (restriction && dataLoaded) {
-      setFormData(restriction);
+  // Local state for SearchableSelect controlled components - initialize with correct value immediately
+  const [localReasonValue, setLocalReasonValue] = useState<string | null>(() => {
+    if (restriction && (mode === 'edit' || mode === 'view') && restriction.reason) {
+      return restriction.reason;
     }
-  }, [restriction, dataLoaded]);
+    return null;
+  });
+  
+  const [localStationValue, setLocalStationValue] = useState<string | null>(() => {
+    if (restriction && (mode === 'edit' || mode === 'view') && restriction.place_of_medical_attention) {
+      return restriction.place_of_medical_attention;
+    }
+    return null;
+  });
 
-  const loadDropdownData = () => {
-    setPrisoners([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
+  // Pre-fetched items for edit mode - derive from restriction prop
+  const initialReason = (restriction && (mode === 'edit' || mode === 'view') && restriction.reason && restriction.reason_name)
+    ? { id: restriction.reason, name: restriction.reason_name }
+    : null;
+  
+  const initialStation = (restriction && (mode === 'edit' || mode === 'view') && restriction.place_of_medical_attention && restriction.station_name)
+    ? { id: restriction.place_of_medical_attention, name: restriction.station_name }
+    : null;
 
-    setRestrictionReasons([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'Medical Condition', code: 'MED-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'Security Risk', code: 'SEC-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'Behavioral Issues', code: 'BEH-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'Injury Recovery', code: 'INJ-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'Mental Health', code: 'MH-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb6', name: 'Infectious Disease', code: 'INF-001' },
-    ]);
+  /**
+   * Load initial data for edit mode
+   * Populate formData with restriction data
+   */
+  useEffect(() => {
+    if (restriction && (mode === 'edit' || mode === 'view')) {
+      setFormData(restriction);
+      setLocalReasonValue(restriction.reason || null);
+      setLocalStationValue(restriction.place_of_medical_attention || null);
+    }
+  }, [restriction, mode]);
 
-    setStations([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc1', name: 'Central Prison Hospital', code: 'CPH-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc2', name: 'East Wing Medical Center', code: 'EWMC-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc3', name: 'West Block Infirmary', code: 'WBI-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc4', name: 'North Facility Clinic', code: 'NFC-001' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc5', name: 'South Station Medical Unit', code: 'SSMU-001' },
-    ]);
-
-    setDataLoaded(true);
-  };
+  /**
+   * Reset form when switching between create/edit modes
+   */
+  useEffect(() => {
+    if (mode === 'create') {
+      setFormData({
+        state_of_prisoner: '',
+        start_date: '',
+        end_date: '',
+        prisoner: '',
+        reason: '',
+        place_of_medical_attention: '',
+      });
+      setLocalReasonValue(null);
+      setLocalStationValue(null);
+      setErrors({});
+    }
+  }, [mode, dialogOpen]);
 
   const handleInputChange = (field: keyof PrisonerRestriction, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
+    // Clear error for this field
+    if (errors[field]) {
+      setErrors((prev) => ({ ...prev, [field]: '' }));
+    }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  /**
+   * Validate form fields
+   */
+  const validateForm = (): boolean => {
+    const newErrors: { [key: string]: string } = {};
 
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
-    if (!formData.state_of_prisoner) {
-      toast.error('Please enter state of prisoner');
-      return;
+    if (!formData.state_of_prisoner.trim()) {
+      newErrors.state_of_prisoner = 'State of prisoner is required';
     }
     if (!formData.reason) {
-      toast.error('Please select a restriction reason');
-      return;
+      newErrors.reason = 'Restriction reason is required';
     }
     if (!formData.start_date) {
-      toast.error('Please select a start date');
-      return;
+      newErrors.start_date = 'Start date is required';
     }
     if (!formData.place_of_medical_attention) {
-      toast.error('Please select place of medical attention');
+      newErrors.place_of_medical_attention = 'Place of medical attention is required';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      toast.error('Please fill in all required fields');
       return;
     }
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedReason = restrictionReasons.find((r) => r.id === formData.reason);
-      const selectedStation = stations.find((s) => s.id === formData.place_of_medical_attention);
-
-      const submitData: PrisonerRestriction = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        reason_name: selectedReason?.name || '',
-        station_name: selectedStation?.name || '',
-      };
-
-      onSubmit(submitData);
-      setLoading(false);
+    try {
+      await onSubmit(formData);
 
       if (mode === 'create') {
-        toast.success('Restriction created successfully');
         setFormData({
           state_of_prisoner: '',
           start_date: '',
@@ -142,32 +158,44 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
           reason: '',
           place_of_medical_attention: '',
         });
-      } else {
-        toast.success('Restriction updated successfully');
+        setLocalReasonValue(null);
+        setLocalStationValue(null);
       }
-    }, 500);
+    } catch (error: any) {
+      console.error('Form submission error:', error);
+      toast.error(error.response?.data?.message || 'Failed to save restriction');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isReadOnly = mode === 'view';
 
-  // Get display values for view mode
-  const getDisplayValue = (field: string, id: string) => {
-    if (!id) return 'N/A';
-    
-    switch (field) {
-      case 'prisoner':
-        const prisoner = prisoners.find(p => p.id === id);
-        return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'reason':
-        const reason = restrictionReasons.find(r => r.id === id);
-        return reason ? `${reason.name} (${reason.code})` : id;
-      case 'place_of_medical_attention':
-        const station = stations.find(s => s.id === id);
-        return station ? `${station.name} (${station.code})` : id;
-      default:
-        return id;
-    }
-  };
+  // Server-side paginated fetch callbacks
+  const fetchRestrictionReasonsCallback = useCallback(
+    async (opts: any, signal?: AbortSignal) => {
+      return await fetchRestrictionReasons(
+        {
+          search: opts?.search ?? '',
+          page: opts?.page ?? 1,
+          page_size: opts?.page_size ?? 50,
+        },
+        signal
+      );
+    },
+    []
+  );
+
+  const fetchStationsCallback = useCallback(async (opts: any, signal?: AbortSignal) => {
+    return await fetchStations(
+      {
+        search: opts?.search ?? '',
+        page: opts?.page ?? 1,
+        page_size: opts?.page_size ?? 50,
+      },
+      signal
+    );
+  }, []);
 
   return (
     <Card className="w-full">
@@ -192,24 +220,28 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('prisoner', formData.prisoner)}
+                    {restriction?.prisoner_name || 'N/A'}
+                    {restriction?.prisoner_number && ` (${restriction.prisoner_number})`}
+                  </div>
+                ) : mode === 'edit' ? (
+                  <div className="p-2 bg-muted rounded border">
+                    {restriction?.prisoner_name || 'N/A'}
+                    {restriction?.prisoner_number && ` (${restriction.prisoner_number})`}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.prisoner}
-                    onValueChange={(value) => handleInputChange('prisoner', value)}
-                  >
-                    <SelectTrigger id="prisoner">
-                      <SelectValue placeholder="Select prisoner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {prisoners.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.prisoner_number} - {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <CustomPrisonerSearch
+                      key={`prisoner-${dialogOpen}`}
+                      value={formData.prisoner}
+                      onChange={(val) => handleInputChange('prisoner', val)}
+                      placeholder="Search prisoner..."
+                      disabled={loading}
+                      pageSize={50}
+                    />
+                    {errors.prisoner && (
+                      <p className="text-sm text-red-500">{errors.prisoner}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -219,15 +251,23 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.state_of_prisoner || 'N/A'}
+                    {restriction?.state_of_prisoner || 'N/A'}
                   </div>
                 ) : (
-                  <Input
-                    id="state_of_prisoner"
-                    value={formData.state_of_prisoner}
-                    onChange={(e) => handleInputChange('state_of_prisoner', e.target.value)}
-                    placeholder="Enter state of prisoner"
-                  />
+                  <>
+                    <Input
+                      id="state_of_prisoner"
+                      value={formData.state_of_prisoner}
+                      onChange={(e) =>
+                        handleInputChange('state_of_prisoner', e.target.value)
+                      }
+                      placeholder="Enter state of prisoner"
+                      disabled={loading}
+                    />
+                    {errors.state_of_prisoner && (
+                      <p className="text-sm text-red-500">{errors.state_of_prisoner}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -244,24 +284,29 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('reason', formData.reason)}
+                    {restriction?.reason_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.reason}
-                    onValueChange={(value) => handleInputChange('reason', value)}
-                  >
-                    <SelectTrigger id="reason">
-                      <SelectValue placeholder="Select restriction reason" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {restrictionReasons.map((reason) => (
-                        <SelectItem key={reason.id} value={reason.id}>
-                          {reason.name} ({reason.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <SearchableSelect
+                      key={`reason-${dialogOpen}-${restriction?.id}`}
+                      fetchPaginated={fetchRestrictionReasonsCallback}
+                      value={localReasonValue}
+                      onChange={(val) => {
+                        setLocalReasonValue(val);
+                        handleInputChange('reason', val);
+                      }}
+                      placeholder="Select restriction reason"
+                      idField="id"
+                      labelField="name"
+                      pageSize={50}
+                      initialItem={initialReason ?? undefined}
+                      disabled={loading}
+                    />
+                    {errors.reason && (
+                      <p className="text-sm text-red-500">{errors.reason}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -271,24 +316,31 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('place_of_medical_attention', formData.place_of_medical_attention)}
+                    {restriction?.station_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.place_of_medical_attention}
-                    onValueChange={(value) => handleInputChange('place_of_medical_attention', value)}
-                  >
-                    <SelectTrigger id="place_of_medical_attention">
-                      <SelectValue placeholder="Select place of medical attention" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stations.map((station) => (
-                        <SelectItem key={station.id} value={station.id}>
-                          {station.name} ({station.code})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <>
+                    <SearchableSelect
+                      key={`station-${dialogOpen}-${restriction?.id}`}
+                      fetchPaginated={fetchStationsCallback}
+                      value={localStationValue}
+                      onChange={(val) => {
+                        setLocalStationValue(val);
+                        handleInputChange('place_of_medical_attention', val);
+                      }}
+                      placeholder="Select place of medical attention"
+                      idField="id"
+                      labelField="name"
+                      pageSize={50}
+                      initialItem={initialStation ?? undefined}
+                      disabled={loading}
+                    />
+                    {errors.place_of_medical_attention && (
+                      <p className="text-sm text-red-500">
+                        {errors.place_of_medical_attention}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -300,33 +352,39 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'N/A'}
+                    {restriction?.start_date ? format(new Date(restriction.start_date), 'PPP') : 'N/A'}
                   </div>
                 ) : (
-                  <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        className="w-full justify-start text-left"
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.start_date ? format(new Date(formData.start_date), 'PPP') : 'Select date'}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={formData.start_date ? new Date(formData.start_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('start_date', format(date, 'yyyy-MM-dd'));
+                  <>
+                    <Popover open={startDateOpen} onOpenChange={setStartDateOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-start text-left font-normal"
+                          disabled={loading}
+                        >
+                          <CalendarIcon className="mr-2 h-4 w-4" />
+                          {formData.start_date
+                            ? format(new Date(formData.start_date), 'PPP')
+                            : 'Pick a date'}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0">
+                        <Calendar
+                          mode="single"
+                          selected={formData.start_date ? new Date(formData.start_date) : undefined}
+                          onSelect={(date: Date | undefined) => {
+                            handleInputChange('start_date', date ? format(date, 'yyyy-MM-dd') : '');
                             setStartDateOpen(false);
-                          }
-                        }}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
+                          }}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    {errors.start_date && (
+                      <p className="text-sm text-red-500">{errors.start_date}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -334,28 +392,29 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 <Label htmlFor="end_date">End Date</Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'N/A'}
+                    {restriction?.end_date ? format(new Date(restriction.end_date), 'PPP') : 'N/A'}
                   </div>
                 ) : (
                   <Popover open={endDateOpen} onOpenChange={setEndDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
-                        className="w-full justify-start text-left"
+                        className="w-full justify-start text-left font-normal"
+                        disabled={loading}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.end_date ? format(new Date(formData.end_date), 'PPP') : 'Select date'}
+                        {formData.end_date
+                          ? format(new Date(formData.end_date), 'PPP')
+                          : 'Pick a date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
                         selected={formData.end_date ? new Date(formData.end_date) : undefined}
-                        onSelect={(date) => {
-                          if (date) {
-                            handleInputChange('end_date', format(date, 'yyyy-MM-dd'));
-                            setEndDateOpen(false);
-                          }
+                        onSelect={(date: Date | undefined) => {
+                          handleInputChange('end_date', date ? format(date, 'yyyy-MM-dd') : '');
+                          setEndDateOpen(false);
                         }}
                         initialFocus
                       />
@@ -379,7 +438,11 @@ const PrisonerRestrictionForm: React.FC<PrisonerRestrictionFormProps> = ({ restr
                 disabled={loading}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Restriction' : 'Update Restriction'}
+                {loading
+                  ? 'Saving...'
+                  : mode === 'create'
+                  ? 'Create Restriction'
+                  : 'Update Restriction'}
               </Button>
             </div>
           )}
