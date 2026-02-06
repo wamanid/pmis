@@ -23,7 +23,7 @@ import {
 } from '../../../ui/alert-dialog';
 import { Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
-import {MedicalRecord} from "../../../../services/medical/medical";
+import {MedicalRecord} from "../../../../services/medical/medicalInformation/medical";
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
@@ -41,9 +41,9 @@ interface MedicalRecordListProps {
   onEdit: (medicalRecord: MedicalRecord) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
-  medicalRecords: MedicalRecord
+  medicalRecords: MedicalRecord[]
   setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
-  bloodGroups: Unit
+  bloodGroups: Unit[]
   deleteDialogOpen: boolean
   setDeleteDialogOpen: React.Dispatch<React.SetStateAction<Boolean>>
 }

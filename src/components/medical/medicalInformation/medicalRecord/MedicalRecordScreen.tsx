@@ -18,32 +18,35 @@ import {Loading} from "../MedicalDetails";
 import {Card, CardContent} from "../../../ui/card";
 import {Input} from "../../../ui/input";
 import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "../../../ui/table";
-import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../../services/medical/medicalApis";
+import {getBloodGroupList, getMedicalRecordsList, getPrisonersList} from "../../../../services/medical/medicalInformation/medicalGetApis";
 import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
 import {
   addMedicalRecord,
   deleteMedicalRecord,
   MedicalRecord,
   updateMedicalRecord
-} from "../../../../services/medical/medical";
+} from "../../../../services/medical/medicalInformation/medical";
 import {toast} from "sonner";
 
 interface ChildProps {
-  prisoners: PrisonerItem
+  prisoners: PrisonerItem[]
   setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem[]>>
   loading: Loading
   setLoading: React.Dispatch<React.SetStateAction<Loading>>
+  medicalRecords: MedicalRecord[]
+  setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
+  bloodGroups: Unit[]
+  setBloodGroups: React.Dispatch<React.SetStateAction<Unit[]>>
 }
 
-const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading }) => {
+const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, medicalRecords, setMedicalRecords, bloodGroups, setBloodGroups }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedRecord, setSelectedRecord] = useState<any>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // API Integration
-  const [medicalRecords, setMedicalRecords] = useState<MedicalRecord[]>([]);
-  const [bloodGroups, setBloodGroups] = useState<Unit[]>([]);
+
   const [loader, setLoader] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
@@ -70,7 +73,7 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
 
   const handleCreateClick = () => {
     if (!prisoners.length){
-      toast.error("You can create a medical record without prisoners")
+      toast.error("You can't create a medical record without prisoners")
       return
     }
     if (!bloodGroups.length){
@@ -150,9 +153,6 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
     finally {
       setLoader(false)
     }
-    // setShowDialog(false);
-    // setSelectedRecord(null);
-    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleCancel = () => {

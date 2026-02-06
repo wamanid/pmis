@@ -35,6 +35,8 @@ import {
   Activity,
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {  } from "../../../../services/medical/medicalInformation/medical";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
 interface CaseBook {
   id: string;
@@ -63,16 +65,20 @@ interface CaseBookListProps {
   onDelete: (id: string) => void;
   refreshTrigger?: number;
   prisonerId?: string;
+  caseBooks: CaseBook[];
+  checkupTypes: Unit[];
+  presentations: Unit[];
 }
 
 const CaseBookList: React.FC<CaseBookListProps> = ({
+  caseBooks, presentations, checkupTypes,
   onView,
   onEdit,
   onDelete,
   refreshTrigger,
   prisonerId,
 }) => {
-  const [caseBooks, setCaseBooks] = useState<CaseBook[]>([]);
+  // const [caseBooks, setCaseBooks] = useState<CaseBook[]>([]);
   const [filteredCaseBooks, setFilteredCaseBooks] = useState<CaseBook[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [checkTypeFilter, setCheckTypeFilter] = useState('all');
@@ -85,190 +91,190 @@ const CaseBookList: React.FC<CaseBookListProps> = ({
   const [caseBookToDelete, setCaseBookToDelete] = useState<string | null>(null);
 
   // Mock data
-  const mockCaseBooks: CaseBook[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'PR-2024-001',
-      check_type_name: 'General Check-up',
-      blood_group_name: 'A+',
-      present_complaint: 'Headache and fever for 3 days',
-      history: 'No previous chronic conditions',
-      grade: 'Moderate',
-      referral: 'Referred to specialist for further evaluation',
-      doctors_name: 'Dr. Sarah Johnson',
-      mental_case: false,
-      presentation_of_patient: 'Walking',
-      notes: 'Patient responding well to treatment',
-      edoctor_video_link: 'https://example.com/video1',
-      prisoner: '1',
-      check_type: '1',
-      bmi: '1',
-      blood_group: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'PR-2024-002',
-      check_type_name: 'Emergency',
-      blood_group_name: 'O+',
-      present_complaint: 'Severe chest pain and breathing difficulty',
-      history: 'History of hypertension',
-      grade: 'Severe',
-      referral: 'Immediate hospital transfer required',
-      doctors_name: 'Dr. Michael Chen',
-      mental_case: false,
-      presentation_of_patient: 'Stretcher',
-      notes: 'Emergency case - transferred to central hospital',
-      edoctor_video_link: '',
-      prisoner: '2',
-      check_type: '2',
-      bmi: '2',
-      blood_group: '7',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      prisoner_number: 'PR-2024-003',
-      check_type_name: 'Follow-up',
-      blood_group_name: 'B+',
-      present_complaint: 'Follow-up for previous injury',
-      history: 'Fractured arm treated 2 weeks ago',
-      grade: 'Mild',
-      referral: 'Continue physiotherapy',
-      doctors_name: 'Dr. Emily Williams',
-      mental_case: false,
-      presentation_of_patient: 'Walking',
-      notes: 'Recovery progressing as expected',
-      edoctor_video_link: 'https://example.com/video3',
-      prisoner: '3',
-      check_type: '3',
-      bmi: '3',
-      blood_group: '3',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Emily Davis',
-      prisoner_number: 'PR-2024-004',
-      check_type_name: 'Specialist Consultation',
-      blood_group_name: 'AB+',
-      present_complaint: 'Anxiety and sleep disturbances',
-      history: 'Previous diagnosis of depression',
-      grade: 'Moderate',
-      referral: 'Psychiatric evaluation recommended',
-      doctors_name: 'Dr. Robert Lee',
-      mental_case: true,
-      presentation_of_patient: 'Walking',
-      notes: 'Patient requires counseling sessions',
-      edoctor_video_link: '',
-      prisoner: '4',
-      check_type: '5',
-      bmi: '4',
-      blood_group: '5',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Robert Lee',
-      prisoner_number: 'PR-2024-005',
-      check_type_name: 'Routine Examination',
-      blood_group_name: 'O-',
-      present_complaint: 'Routine health check',
-      history: 'No significant medical history',
-      grade: 'Normal',
-      referral: 'None required',
-      doctors_name: 'Dr. Patricia Brown',
-      mental_case: false,
-      presentation_of_patient: 'Walking',
-      notes: 'All vital signs normal',
-      edoctor_video_link: 'https://example.com/video5',
-      prisoner: '5',
-      check_type: '4',
-      bmi: '2',
-      blood_group: '8',
-    },
-    {
-      id: '6',
-      prisoner_name: 'David Wilson',
-      prisoner_number: 'PR-2024-006',
-      check_type_name: 'Emergency',
-      blood_group_name: 'A-',
-      present_complaint: 'Accident injury - leg laceration',
-      history: 'No allergies',
-      grade: 'Moderate',
-      referral: 'Wound care and tetanus shot',
-      doctors_name: 'Dr. Lisa Anderson',
-      mental_case: false,
-      presentation_of_patient: 'Wheelchair',
-      notes: 'Wound cleaned and stitched',
-      edoctor_video_link: '',
-      prisoner: '6',
-      check_type: '2',
-      bmi: '1',
-      blood_group: '2',
-    },
-    {
-      id: '7',
-      prisoner_name: 'Sarah Martinez',
-      prisoner_number: 'PR-2024-007',
-      check_type_name: 'Specialist Consultation',
-      blood_group_name: 'B-',
-      present_complaint: 'Chronic back pain',
-      history: 'Old spinal injury',
-      grade: 'Moderate',
-      referral: 'Orthopedic consultation',
-      doctors_name: 'Dr. James Taylor',
-      mental_case: false,
-      presentation_of_patient: 'Assisted',
-      notes: 'Pain management prescribed',
-      edoctor_video_link: 'https://example.com/video7',
-      prisoner: '7',
-      check_type: '5',
-      bmi: '3',
-      blood_group: '4',
-    },
-    {
-      id: '8',
-      prisoner_name: 'Thomas White',
-      prisoner_number: 'PR-2024-008',
-      check_type_name: 'General Check-up',
-      blood_group_name: 'AB-',
-      present_complaint: 'Persistent cough and cold',
-      history: 'Seasonal allergies',
-      grade: 'Mild',
-      referral: 'None',
-      doctors_name: 'Dr. Jennifer Garcia',
-      mental_case: false,
-      presentation_of_patient: 'Walking',
-      notes: 'Prescribed cough syrup and rest',
-      edoctor_video_link: '',
-      prisoner: '8',
-      check_type: '1',
-      bmi: '2',
-      blood_group: '6',
-    },
-  ];
+  // const mockCaseBooks: CaseBook[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     prisoner_number: 'PR-2024-001',
+  //     check_type_name: 'General Check-up',
+  //     blood_group_name: 'A+',
+  //     present_complaint: 'Headache and fever for 3 days',
+  //     history: 'No previous chronic conditions',
+  //     grade: 'Moderate',
+  //     referral: 'Referred to specialist for further evaluation',
+  //     doctors_name: 'Dr. Sarah Johnson',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Walking',
+  //     notes: 'Patient responding well to treatment',
+  //     edoctor_video_link: 'https://example.com/video1',
+  //     prisoner: '1',
+  //     check_type: '1',
+  //     bmi: '1',
+  //     blood_group: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     prisoner_number: 'PR-2024-002',
+  //     check_type_name: 'Emergency',
+  //     blood_group_name: 'O+',
+  //     present_complaint: 'Severe chest pain and breathing difficulty',
+  //     history: 'History of hypertension',
+  //     grade: 'Severe',
+  //     referral: 'Immediate hospital transfer required',
+  //     doctors_name: 'Dr. Michael Chen',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Stretcher',
+  //     notes: 'Emergency case - transferred to central hospital',
+  //     edoctor_video_link: '',
+  //     prisoner: '2',
+  //     check_type: '2',
+  //     bmi: '2',
+  //     blood_group: '7',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     prisoner_number: 'PR-2024-003',
+  //     check_type_name: 'Follow-up',
+  //     blood_group_name: 'B+',
+  //     present_complaint: 'Follow-up for previous injury',
+  //     history: 'Fractured arm treated 2 weeks ago',
+  //     grade: 'Mild',
+  //     referral: 'Continue physiotherapy',
+  //     doctors_name: 'Dr. Emily Williams',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Walking',
+  //     notes: 'Recovery progressing as expected',
+  //     edoctor_video_link: 'https://example.com/video3',
+  //     prisoner: '3',
+  //     check_type: '3',
+  //     bmi: '3',
+  //     blood_group: '3',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Emily Davis',
+  //     prisoner_number: 'PR-2024-004',
+  //     check_type_name: 'Specialist Consultation',
+  //     blood_group_name: 'AB+',
+  //     present_complaint: 'Anxiety and sleep disturbances',
+  //     history: 'Previous diagnosis of depression',
+  //     grade: 'Moderate',
+  //     referral: 'Psychiatric evaluation recommended',
+  //     doctors_name: 'Dr. Robert Lee',
+  //     mental_case: true,
+  //     presentation_of_patient: 'Walking',
+  //     notes: 'Patient requires counseling sessions',
+  //     edoctor_video_link: '',
+  //     prisoner: '4',
+  //     check_type: '5',
+  //     bmi: '4',
+  //     blood_group: '5',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Robert Lee',
+  //     prisoner_number: 'PR-2024-005',
+  //     check_type_name: 'Routine Examination',
+  //     blood_group_name: 'O-',
+  //     present_complaint: 'Routine health check',
+  //     history: 'No significant medical history',
+  //     grade: 'Normal',
+  //     referral: 'None required',
+  //     doctors_name: 'Dr. Patricia Brown',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Walking',
+  //     notes: 'All vital signs normal',
+  //     edoctor_video_link: 'https://example.com/video5',
+  //     prisoner: '5',
+  //     check_type: '4',
+  //     bmi: '2',
+  //     blood_group: '8',
+  //   },
+  //   {
+  //     id: '6',
+  //     prisoner_name: 'David Wilson',
+  //     prisoner_number: 'PR-2024-006',
+  //     check_type_name: 'Emergency',
+  //     blood_group_name: 'A-',
+  //     present_complaint: 'Accident injury - leg laceration',
+  //     history: 'No allergies',
+  //     grade: 'Moderate',
+  //     referral: 'Wound care and tetanus shot',
+  //     doctors_name: 'Dr. Lisa Anderson',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Wheelchair',
+  //     notes: 'Wound cleaned and stitched',
+  //     edoctor_video_link: '',
+  //     prisoner: '6',
+  //     check_type: '2',
+  //     bmi: '1',
+  //     blood_group: '2',
+  //   },
+  //   {
+  //     id: '7',
+  //     prisoner_name: 'Sarah Martinez',
+  //     prisoner_number: 'PR-2024-007',
+  //     check_type_name: 'Specialist Consultation',
+  //     blood_group_name: 'B-',
+  //     present_complaint: 'Chronic back pain',
+  //     history: 'Old spinal injury',
+  //     grade: 'Moderate',
+  //     referral: 'Orthopedic consultation',
+  //     doctors_name: 'Dr. James Taylor',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Assisted',
+  //     notes: 'Pain management prescribed',
+  //     edoctor_video_link: 'https://example.com/video7',
+  //     prisoner: '7',
+  //     check_type: '5',
+  //     bmi: '3',
+  //     blood_group: '4',
+  //   },
+  //   {
+  //     id: '8',
+  //     prisoner_name: 'Thomas White',
+  //     prisoner_number: 'PR-2024-008',
+  //     check_type_name: 'General Check-up',
+  //     blood_group_name: 'AB-',
+  //     present_complaint: 'Persistent cough and cold',
+  //     history: 'Seasonal allergies',
+  //     grade: 'Mild',
+  //     referral: 'None',
+  //     doctors_name: 'Dr. Jennifer Garcia',
+  //     mental_case: false,
+  //     presentation_of_patient: 'Walking',
+  //     notes: 'Prescribed cough syrup and rest',
+  //     edoctor_video_link: '',
+  //     prisoner: '8',
+  //     check_type: '1',
+  //     bmi: '2',
+  //     blood_group: '6',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadCaseBooks();
-  }, [refreshTrigger, prisonerId]);
+  // useEffect(() => {
+  //   loadCaseBooks();
+  // }, [refreshTrigger, prisonerId]);
 
   useEffect(() => {
     filterCaseBooks();
   }, [caseBooks, searchTerm, checkTypeFilter, mentalCaseFilter, presentationFilter]);
 
-  const loadCaseBooks = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      let data = mockCaseBooks;
-      // Filter by prisonerId if provided
-      if (prisonerId) {
-        data = data.filter((caseBook) => caseBook.prisoner === prisonerId);
-      }
-      setCaseBooks(data);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadCaseBooks = () => {
+  //   setLoading(true);
+  //   // Simulate API call
+  //   setTimeout(() => {
+  //     let data = mockCaseBooks;
+  //     // Filter by prisonerId if provided
+  //     if (prisonerId) {
+  //       data = data.filter((caseBook) => caseBook.prisoner === prisonerId);
+  //     }
+  //     setCaseBooks(data);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterCaseBooks = () => {
     let filtered = [...caseBooks];
@@ -346,10 +352,10 @@ const CaseBookList: React.FC<CaseBookListProps> = ({
   const handleConfirmDelete = () => {
     if (caseBookToDelete) {
       onDelete(caseBookToDelete);
-      setCaseBooks((prev) => prev.filter((caseBook) => caseBook.id !== caseBookToDelete));
-      toast.success('Case book entry deleted successfully');
-      setDeleteDialogOpen(false);
-      setCaseBookToDelete(null);
+      // setCaseBooks((prev) => prev.filter((caseBook) => caseBook.id !== caseBookToDelete));
+      // toast.success('Case book entry deleted successfully');
+      // setDeleteDialogOpen(false);
+      // setCaseBookToDelete(null);
     }
   };
 
@@ -383,11 +389,11 @@ const CaseBookList: React.FC<CaseBookListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Check Types</SelectItem>
-                <SelectItem value="General Check-up">General Check-up</SelectItem>
-                <SelectItem value="Emergency">Emergency</SelectItem>
-                <SelectItem value="Follow-up">Follow-up</SelectItem>
-                <SelectItem value="Routine Examination">Routine Examination</SelectItem>
-                <SelectItem value="Specialist Consultation">Specialist Consultation</SelectItem>
+                {
+                  checkupTypes.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
 
@@ -410,10 +416,11 @@ const CaseBookList: React.FC<CaseBookListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Presentations</SelectItem>
-                <SelectItem value="Walking">Walking</SelectItem>
-                <SelectItem value="Assisted">Assisted</SelectItem>
-                <SelectItem value="Wheelchair">Wheelchair</SelectItem>
-                <SelectItem value="Stretcher">Stretcher</SelectItem>
+                {
+                  presentations.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
 

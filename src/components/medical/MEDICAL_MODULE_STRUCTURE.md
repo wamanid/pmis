@@ -97,7 +97,7 @@ src/components/medical/
 ```
 src/services/medical/
 ├── index.ts                                      # Main barrel exports
-├── medicalApis.ts                               # API endpoint definitions
+├── medicalGetApis.ts                               # API endpoint definitions
 ├── medical.ts                                   # Core medical service
 │
 ├── medicalInformation/
