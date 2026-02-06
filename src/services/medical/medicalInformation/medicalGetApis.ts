@@ -7,8 +7,8 @@ import {
     getBloodGroups,
     getBmiClassifications, getBmiRecord,
     getBmiRecords, getCaseBooks, getCheckupTypes,
-    getMedicalRecords, getPresentationTypes,
-    MedicalRecord
+    getMedicalRecords, getPresentationTypes, getSchedules,
+    MedicalRecord, Schedule
 } from "./medical";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -25,7 +25,7 @@ function populateList(response: any, msg: string, setData: any): boolean {
 
     if ("results" in response) {
       const data = response.results
-        console.log(data)
+        // console.log(data)
       if (!data.length) {
         toast.error(msg)
         return false
@@ -65,9 +65,9 @@ export async function getBmi(setData: React.Dispatch<React.SetStateAction<BmiRec
 }
 
 // Get case book list
-export async function getCasebookList(setData: React.Dispatch<React.SetStateAction<CaseBook[]>>) {
+export async function getCasebookList(setData: React.Dispatch<React.SetStateAction<CaseBook[]>>): Promise<boolean> {
     const response = await getCaseBooks()
-    populateList(response, "There are no case records", setData)
+    return populateList(response, "There are no case records", setData)
 }
 
 // Get presentation types
@@ -80,4 +80,10 @@ export async function getPresentations(setData: React.Dispatch<React.SetStateAct
 export async function getCheckupTypesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
     const response = await getCheckupTypes()
     populateList(response, "There are no checkup types", setData)
+}
+
+// Get Schedule
+export async function getScheduleList(setData: React.Dispatch<React.SetStateAction<Schedule[]>>) {
+    const response = await getSchedules()
+    populateList(response, "There are no schedules", setData)
 }

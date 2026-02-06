@@ -239,3 +239,56 @@ export const updateCaseBook = async (book: Case, id: string) : Promise<CaseBookR
 export const deleteCaseBook = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/case-books/${id}/`);
 };
+
+
+// Schedules
+export interface Schedule {
+  id: string;
+  prisoner_name: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string;
+  followup_date: string;
+  is_active: boolean;
+  attendance_status: boolean;
+  notes: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  medical_case_book: string;
+}
+
+export interface NewSchedule {
+  is_active: boolean;
+  deleted_datetime: string | null;   
+  followup_date: string;      
+  attendance_status: boolean;
+  notes: string;
+  deleted_by: number | null;
+  medical_case_book: string;  
+}
+
+
+export type SchedulesResponse<T> = Paginated<T> | ErrorResponse
+export type ScheduleResponse = Schedule | ErrorResponse
+
+export const getSchedules = async (): Promise<SchedulesResponse<Schedule>> => {
+  const response = await axiosInstance.get<Paginated<Schedule>>(
+    '/medical-management/schedules/'
+  )
+  return response.data
+}
+
+export const addSchedule = async (schedule: NewSchedule) : Promise<ScheduleResponse> => {
+  const response = await axiosInstance.post<ScheduleResponse>('/medical-management/schedules/', schedule);
+  return response.data;
+}
+
+export const updateSchedule = async (schedule: NewSchedule, id: string) : Promise<ScheduleResponse> => {
+  const response = await axiosInstance.put<ScheduleResponse>(`/medical-management/schedules/${id}/`, schedule);
+  return response.data;
+}
+
+export const deleteSchedule = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/schedules/${id}/`);
+};

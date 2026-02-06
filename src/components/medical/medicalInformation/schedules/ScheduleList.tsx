@@ -39,10 +39,11 @@ interface ScheduleListProps {
   onEdit: (schedule: Schedule) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  schedules: Schedule[]
 }
 
-const ScheduleList: React.FC<ScheduleListProps> = ({ onView, onEdit, onDelete, refreshTrigger }) => {
-  const [schedules, setSchedules] = useState<Schedule[]>([]);
+const ScheduleList: React.FC<ScheduleListProps> = ({ onView, onEdit, onDelete, refreshTrigger, schedules }) => {
+  // const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [filteredSchedules, setFilteredSchedules] = useState<Schedule[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [attendanceFilter, setAttendanceFilter] = useState('all');
@@ -52,64 +53,64 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ onView, onEdit, onDelete, r
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
-  const mockSchedules: Schedule[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      followup_date: '2025-11-15',
-      attendance_status: true,
-      notes: 'Regular check-up completed successfully',
-      medical_case_book: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      followup_date: '2025-11-20',
-      attendance_status: false,
-      notes: 'Patient did not attend scheduled appointment',
-      medical_case_book: '2',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      followup_date: '2025-11-18',
-      attendance_status: true,
-      notes: 'Wound dressing changed, healing well',
-      medical_case_book: '3',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Emily Davis',
-      followup_date: '2025-11-22',
-      attendance_status: true,
-      notes: 'Blood pressure monitoring',
-      medical_case_book: '4',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Robert Lee',
-      followup_date: '2025-11-25',
-      attendance_status: false,
-      notes: 'Rescheduled due to court appearance',
-      medical_case_book: '5',
-    },
-  ];
+  // const mockSchedules: Schedule[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     followup_date: '2025-11-15',
+  //     attendance_status: true,
+  //     notes: 'Regular check-up completed successfully',
+  //     medical_case_book: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     followup_date: '2025-11-20',
+  //     attendance_status: false,
+  //     notes: 'Patient did not attend scheduled appointment',
+  //     medical_case_book: '2',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     followup_date: '2025-11-18',
+  //     attendance_status: true,
+  //     notes: 'Wound dressing changed, healing well',
+  //     medical_case_book: '3',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Emily Davis',
+  //     followup_date: '2025-11-22',
+  //     attendance_status: true,
+  //     notes: 'Blood pressure monitoring',
+  //     medical_case_book: '4',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Robert Lee',
+  //     followup_date: '2025-11-25',
+  //     attendance_status: false,
+  //     notes: 'Rescheduled due to court appearance',
+  //     medical_case_book: '5',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadSchedules();
-  }, [refreshTrigger]);
+  // useEffect(() => {
+  //   loadSchedules();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
     filterSchedules();
   }, [schedules, searchTerm, attendanceFilter]);
 
-  const loadSchedules = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setSchedules(mockSchedules);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadSchedules = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setSchedules(mockSchedules);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterSchedules = () => {
     let filtered = [...schedules];
@@ -139,13 +140,14 @@ const ScheduleList: React.FC<ScheduleListProps> = ({ onView, onEdit, onDelete, r
   };
 
   const handleConfirmDelete = () => {
-    if (recordToDelete) {
-      onDelete(recordToDelete);
-      setSchedules((prev) => prev.filter((schedule) => schedule.id !== recordToDelete));
-      toast.success('Schedule deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
-    }
+    onDelete(recordToDelete);
+    // if (recordToDelete) {
+    //   onDelete(recordToDelete);
+    //   setSchedules((prev) => prev.filter((schedule) => schedule.id !== recordToDelete));
+    //   toast.success('Schedule deleted successfully');
+    //   setDeleteDialogOpen(false);
+    //   setRecordToDelete(null);
+    // }
   };
 
   const indexOfLastItem = currentPage * itemsPerPage;
