@@ -125,9 +125,14 @@ export const getBmiRecords = async (): Promise<BmiRecordResponse<BmiRecord>> => 
   return response.data
 }
 
-export const getBmiRecord = async (id): Promise<BmiRecordResponse<BmiRecord>> => {
+export const getBmiRecord = async (prisonerId: string): Promise<BmiRecordResponse<BmiRecord>> => {
   const response = await axiosInstance.get<Paginated<BmiRecord>>(
-    '/medical-management/bmi-records/'
+    '/medical-management/bmi-records/',
+      {
+        params: {
+          prisoner: prisonerId,
+        }
+      }
   )
   return response.data
 }
@@ -175,10 +180,30 @@ export interface CaseBook {
   blood_group: string;
 }
 
+export interface Case {
+  is_active: boolean;
+  deleted_datetime: string | null;
+  present_complaint: string;
+  history: string;
+  grade: string;
+  referral: string;
+  doctors_name: string;
+  mental_case: boolean;
+  notes: string;
+  edoctor_video_link: string;
+  deleted_by: number | null;
+  prisoner: string;
+  check_type: string;
+  bmi: string;
+  presentation_of_patient: string;
+  blood_group: string;
+}
+
 
 export type PresentationTypesResponse<T> = Paginated<T> | ErrorResponse
 export type CheckupTypesResponse<T> = Paginated<T> | ErrorResponse
 export type CaseBooksResponse<T> = Paginated<T> | ErrorResponse
+export type CaseBookResponse = CaseBook | ErrorResponse
 
 export const getPresentationTypes = async (): Promise<PresentationTypesResponse<Unit>> => {
   const response = await axiosInstance.get<Paginated<Unit>>(
@@ -200,3 +225,17 @@ export const getCaseBooks = async (): Promise<CaseBooksResponse<CaseBook>> => {
   )
   return response.data
 }
+
+export const addCaseBook = async (book: Case) : Promise<CaseBookResponse> => {
+  const response = await axiosInstance.post<CaseBookResponse>('/medical-management/case-books/', book);
+  return response.data;
+}
+
+export const updateCaseBook = async (book: Case, id: string) : Promise<CaseBookResponse> => {
+  const response = await axiosInstance.put<CaseBookResponse>(`/medical-management/case-books/${id}/`, book);
+  return response.data;
+}
+
+export const deleteCaseBook = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/case-books/${id}/`);
+};

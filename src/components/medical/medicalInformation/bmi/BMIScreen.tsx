@@ -143,10 +143,12 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
 
       setShowDialog(false);
       setSelectedRecord(null);
-      setLoader(false)
     }
     catch (error) {
       handleCatchError(error)
+    }
+    finally {
+      setLoader(false)
     }
     // setShowDialog(false);
     // setSelectedRecord(null);

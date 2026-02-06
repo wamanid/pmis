@@ -4,13 +4,20 @@ import { Button } from '../../../ui/button';
 import { Card, CardContent } from '../../../ui/card';
 import {
   Dialog,
-  DialogContent,
+  DialogContent, DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '../../../ui/dialog';
 import CaseBookForm from './CaseBookForm';
 import CaseBookList from './CaseBookList';
-import {BmiRecord, CaseBook, getPresentationTypes} from "../../../../services/medical/medicalInformation/medical";
+import {
+  addBmiRecord, addCaseBook,
+  BmiRecord,
+  Case,
+  CaseBook, deleteBmiRecord, deleteCaseBook,
+  getPresentationTypes,
+  updateBmiRecord, updateCaseBook
+} from "../../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Loading} from "../MedicalDetails";
@@ -19,7 +26,8 @@ import {
   getClassifications, getPresentations,
   getPrisonersList
 } from "../../../../services/medical/medicalInformation/medicalGetApis";
-import {handleCatchError} from "../../../../services/stationServices/utils";
+import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
+import {toast} from "sonner";
 
 export interface ChildProps {
   caseBooks: CaseBook[];
@@ -48,6 +56,7 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
   //API Integration
   const [loader, setLoader] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [newDialogLoader, setNewDialogLoader] = useState(false)
 
   useEffect(() => {
     if (loading.case){
@@ -74,6 +83,14 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
   }
 
   const handleCreateClick = () => {
+    if (!checkupTypes.length){
+       toast.error("You can't create a case book record without check up types")
+      return
+    }
+    if (!presentations.length){
+       toast.error("You can't create a case book record without presentation types")
+      return
+    }
     setDialogMode('create');
     setSelectedCaseBook(null);
     setShowDialog(true);
@@ -91,15 +108,62 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
     setShowDialog(true);
   };
 
-  const handleDelete = (id: string) => {
-    // The delete is handled in the list component
-    setRefreshTrigger((prev) => prev + 1);
+  const handleDelete = async (id: string) => {
+    if (!id) return
+
+    try {
+      await deleteCaseBook(id)
+      setCaseBooks(prev => prev.filter(rec => rec.id !== id))
+      toast.success('Case book record deleted successfully');
+      setDeleteDialogOpen(false)
+
+    }catch (error) {
+      handleCatchError(error)
+    }
   };
 
-  const handleSubmit = (data: any) => {
-    setShowDialog(false);
-    setSelectedCaseBook(null);
-    setRefreshTrigger((prev) => prev + 1);
+  const handleSubmit = async (data: Case) => {
+
+    // console.log(data)
+    try {
+      let response
+      if (selectedCaseBook) {
+        response = await updateCaseBook(data, selectedCaseBook.id)
+      }
+      else {
+        response = await addCaseBook(data)
+      }
+      if (handleResponseError(response)) return;
+
+      if (!('id' in response)) {
+        toast.error("Failed to update the case book records table");
+        return;
+      }
+
+      if (selectedCaseBook) {
+        setCaseBooks(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+        toast.success('Case book record updated successfully');
+      }
+      else {
+        setCaseBooks(prev => [response, ...prev]);
+        toast.success('Case book record created successfully');
+      }
+
+      setShowDialog(false);
+      setSelectedCaseBook(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    finally {
+      setLoader(false)
+    }
+
+    // setShowDialog(false);
+    // setSelectedCaseBook(null);
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleCancel = () => {
@@ -164,8 +228,10 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
             </DialogTitle>
           </DialogHeader>
           <CaseBookForm
+            setNewDialogLoader={setNewDialogLoader}
             caseBook={selectedCaseBook}
             onSubmit={handleSubmit}
+            presentations={presentations}
             onCancel={handleCancel}
             mode={dialogMode}
             loader={loader}
@@ -176,6 +242,26 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
             prisoners={prisoners}
             setPrisoners={setPrisoners}
           />
+        </DialogContent>
+      </Dialog>
+
+      {/* Loading Dialog */}
+      <Dialog open={newDialogLoader} onOpenChange={setNewDialogLoader}>
+        <DialogContent className="max-w-[95vw] w-[1300px] overflow-hidden">
+          <div className="flex-1 p-6">
+            <DialogHeader>
+              <DialogTitle style={{ color: '#650000' }}></DialogTitle>
+              <DialogDescription></DialogDescription>
+            </DialogHeader>
+            <div className="size-full flex items-center justify-center">
+              <div className="text-center">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                  <p className="text-muted-foreground text-sm">
+                    Fetching patient BMI records
+                  </p>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

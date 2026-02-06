@@ -146,12 +146,13 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
 
       setShowDialog(false);
       setSelectedRecord(null);
-      setLoader(false)
     }
     catch (error) {
       handleCatchError(error)
     }
-
+    finally {
+      setLoader(false)
+    }
   };
 
   const handleCancel = () => {

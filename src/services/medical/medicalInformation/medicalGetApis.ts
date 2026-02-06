@@ -5,7 +5,7 @@ import { getPrisoners } from "../../stationServices/visitorsServices/VisitorsSer
 import {
     BmiClassification, BmiRecord, CaseBook,
     getBloodGroups,
-    getBmiClassifications,
+    getBmiClassifications, getBmiRecord,
     getBmiRecords, getCaseBooks, getCheckupTypes,
     getMedicalRecords, getPresentationTypes,
     MedicalRecord
@@ -25,7 +25,7 @@ function populateList(response: any, msg: string, setData: any): boolean {
 
     if ("results" in response) {
       const data = response.results
-        // console.log(data)
+        console.log(data)
       if (!data.length) {
         toast.error(msg)
         return false
@@ -57,6 +57,11 @@ export async function getClassifications(setData: React.Dispatch<React.SetStateA
 export async function getBmiList(setData: React.Dispatch<React.SetStateAction<BmiRecord[]>>): Promise<boolean> {
     const response = await getBmiRecords()
     return populateList(response, "There are no BMI records", setData)
+}
+
+export async function getBmi(setData: React.Dispatch<React.SetStateAction<BmiRecord[]>>, prisonerId: string): Promise<boolean> {
+    const response = await getBmiRecord(prisonerId)
+    return populateList(response, "There are no BMI records for this prisoner", setData)
 }
 
 // Get case book list
