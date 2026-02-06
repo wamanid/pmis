@@ -1,6 +1,298 @@
 # Changelog
 
+---
+**Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
+**Created**: February 6, 2026 | **Last Updated**: February 6, 2026
+---
+
 All notable changes to this project should be documented in this file.
+
+## [Released] - 2026-02-06
+
+### Added
+- **Property Management - Grouped Table Views with DataTable (UX ENHANCEMENT)**:
+  - Extended grouped table pattern to Property Management module screens
+  - **PrisonerPropertyAccountScreen.tsx Updates**:
+    - Added grouped view for Accounts tab with prisoner_number grouping
+    - Added grouped view for Transactions tab with prisoner_number grouping
+    - View toggle (Grouped/Flat) for both accounts and transactions tables
+    - Updated columns to use `prisoner_number` as key with dual display (number + name)
+    - Account group headers show: prisoner_number | prisoner_name, total balances per currency, account counts
+    - Transaction group headers show: prisoner_number | prisoner_name, Credits/Debits/Net amounts per currency, transaction counts
+    - Conditional config using spread operator to preserve expandable functionality in both views
+    - Color coding: green for credits, red for debits, brand color for totals
+  - **PrisonerPropertyScreen.tsx Updates**:
+    - Added grouped view for Property records with prisoner_number grouping
+    - View toggle (Grouped/Flat) above property table
+    - Updated prisoner column from prisoner_name to prisoner_number key
+    - Property group headers show: prisoner_number | prisoner_name (with Users icon), total amounts per currency, property counts by status
+    - Summary stats with status badges (Stored, Released, Damaged, etc.)
+    - Wrapped in Card component for consistent styling
+  - **Implementation Pattern**:
+    - All use DataTable's built-in `config.grouping` option (not separate components)
+    - Conditional config: `viewMode === 'grouped' ? { grouping: {...} } : {}`
+    - Group by unique `prisoner_number` to prevent confusion with similar names
+    - Display format: "PRISONER_NUMBER | PRISONER_NAME" in all group headers
+    - Default to grouped view for better organization
+    - Seamless toggle with same DataTable component
+  - **Files Modified**: PrisonerPropertyAccountScreen.tsx, PrisonerPropertyScreen.tsx
+  - **Benefit**: Consistent UX across Medical and Property modules, better data organization for prisoners with multiple accounts/transactions/properties
+
+- **Medical Restriction Management - Grouped Table View with DataTable (UX ENHANCEMENT)**:
+  - Implemented grouped/collapsible table using DataTable's built-in grouping feature
+  - **DataTable Grouping Configuration**:
+    - Groups restrictions by prisoner_number (unique identifier prevents name confusion)
+    - Custom `renderGroupHeader` displays: `PRISONER_NUMBER | PRISONER_NAME` format
+    - Summary statistics per prisoner: Active (green), Inactive (gray), Total (brand color) restriction counts
+    - Date range display: earliest start date → latest end date with calendar icon
+    - Collapsible/expandable rows: click entire header to expand/collapse
+    - ChevronDown (expanded) / ChevronRight (collapsed) icons
+    - `defaultExpanded: false` - groups start collapsed for cleaner initial view
+  - **View Toggle**: Added Grouped vs Flat view tabs in `PrisonerRestrictionList.tsx`
+    - Default to grouped view for better UX
+    - Switch to flat view when filtering by specific prisoner
+    - Icons: Users for grouped, List for flat
+    - Seamless switching with same DataTable component
+  - **DataTable Features Maintained**:
+    - All standard DataTable features work in grouped mode: pagination, search, CSV/PDF export, print
+    - Expand All / Collapse All buttons automatically appear in grouped mode
+    - Server-side pagination compatibility
+    - Sort and filter capabilities
+  - **UX Improvements**:
+    - Prevents confusion with similar prisoner names by showing unique prisoner_number first
+    - Better data scan-ability - see all restrictions per prisoner at a glance
+    - Summary stats eliminate need to count manually
+    - Reduced scrolling through mixed records
+    - Visual hierarchy with icons (User, Calendar)
+    - Color-coded statistics for quick assessment
+  - **Implementation Approach**: Uses DataTable's `grouping` config option (not separate component)
+    - `groupBy: 'prisoner_number'` - column to group by
+    - `renderGroupHeader` - custom React component for group header rendering
+    - Conditional config based on viewMode state
+    - Single unified component handles both flat and grouped views
+  - **Files Modified**: PrisonerRestrictionList.tsx (added viewMode state, tableConfig with grouping, view toggle tabs)
+  - **Documentation**: 
+    - `GROUPED_DATATABLE_PATTERN.md` - comprehensive guide with DataTable grouping config examples
+    - `MEDICAL_RESTRICTION_GROUPED_TABLE_SUMMARY.md` - visual summary and usage guide
+    - `BACKEND_INTEGRATION_PROMPT.md` - when to use grouped tables in new modules
+  - **Benefit**: Dramatically improves UX for viewing prisoner restrictions, especially when prisoners have multiple restrictions, while maintaining all DataTable features
+
+### Fixed
+- **Medical Restriction Management - Edit Mode Dropdown Population (CRITICAL FIX)**:
+  - Fixed dropdowns showing empty/placeholder text when editing restrictions after page refresh
+  - **Root Cause**: Row data from DataTable didn't include nested name fields (reason_name, station_name) needed for dropdown population
+  - **Solution**: Implemented fetchById pattern in edit handlers
+    - `handleEdit` and `handleView` now call `fetchRestrictionById(record.id)` to get complete record data
+    - Full API response includes all nested fields: reason_name, station_name, prisoner_name, prisoner_number
+    - Added proper error handling with toast notifications for failed fetches
+  - **Local State Initialization**: Changed from `useState(null)` to `useState(() => restriction?.field_id || null)`
+    - Initializes with correct value immediately if restriction data available
+    - Prevents SearchableSelect from caching empty state before value arrives
+    - Applied to both `localReasonValue` and `localStationValue`
+  - **Derived initialItem Pattern**: Compute initialItem directly from restriction prop before render
+    - `const initialReason = (restriction && mode === 'edit' && restriction.reason && restriction.reason_name) ? {id, name} : null`
+    - Pass to SearchableSelect as `initialItem={initialReason ?? undefined}`
+    - Provides display name immediately without additional fetch
+  - **useEffect Synchronization**: Added proper state sync when restriction data changes
+    - Watches `restriction?.reason` and `restriction?.place_of_medical_attention` for changes
+    - Updates local state to keep controlled components in sync
+  - **Pattern Applied**: Follows SEARCHABLE_DROPDOWN_EDIT_MODE_GUIDE.md universal solution
+  - **Files Modified**: PrisonerRestrictionList.tsx (handleEdit/handleView, imports), PrisonerRestrictionForm.tsx (local state initialization)
+  - **Benefit**: Edit mode now works correctly after page refresh with all dropdowns properly populated
+
+- **Medical Restriction Management - CORS Error Resolution**:
+  - Fixed "Cross-Origin Request Blocked" errors when fetching restrictions data
+  - **Root Cause**: Service functions using raw `axios` instead of configured `axiosInstance`
+  - **Solution**: Changed all service functions to use `axiosInstance` from `../../axiosInstance`
+    - axiosInstance includes auth headers, base URL, and proper CORS configuration
+    - All fetch functions (fetchRestrictions, fetchRestrictionReasons, fetchStations, etc.) now use axiosInstance
+  - **Files Modified**: restrictionService.ts (all CRUD and fetch functions)
+
+- **Medical Restriction Management - API Endpoint Correction**:
+  - Fixed stations dropdown using wrong API endpoint
+  - **Changed**: `/station-management/stations/` → `/system-administration/stations/`
+  - **Files Modified**: restrictionService.ts (RESTRICTION_API_ENDPOINTS.STATIONS, fetchStations function)
+
+- **Medical Restriction Management - View Mode Display Fix**:
+  - Fixed start/end date and state fields showing "N/A" in view mode when valid data exists
+  - **Root Cause**: View mode displaying `formData` state instead of original `restriction` prop
+  - **Solution**: Changed view mode read-only fields to use `restriction` prop directly
+    - Start date: `restriction?.start_date ? format(new Date(restriction.start_date), 'PPP') : 'N/A'`
+    - End date: `restriction?.end_date ? format(new Date(restriction.end_date), 'PPP') : 'N/A'`
+    - State: `restriction?.state_of_prisoner || 'N/A'`
+  - **Files Modified**: PrisonerRestrictionForm.tsx (view mode field rendering)
+
+- **Medical Restriction Management - Prisoner Field Edit Mode Lock**:
+  - Disabled prisoner field in edit mode to prevent changing prisoner for existing restrictions
+  - **Implementation**: 
+    - Edit mode shows prisoner name/number in muted disabled div with `bg-muted` styling
+    - View mode shows prisoner name/number in gray read-only div with `bg-gray-50` styling
+    - Create mode retains full CustomPrisonerSearch functionality
+  - **Data Integrity**: Prevents orphaned restrictions by locking prisoner association
+  - **Files Modified**: PrisonerRestrictionForm.tsx (prisoner field conditional rendering)
+
+### Changed
+- **Medical Restriction Management - Delete Confirmation UX Enhancement**:
+  - Replaced AlertDialog with reusable ConfirmDialog component for delete operations
+  - **Improvements**:
+    - Shows rich record details before deletion: prisoner name/number, restriction reason, medical facility
+    - Store full record object in state instead of just ID for better context
+    - Uses `details` prop with styled gray box for record preview
+    - Consistent delete confirmation pattern across application
+    - Better error handling with throw pattern for ConfirmDialog cleanup
+  - **State Changes**: 
+    - `recordToDelete` now stores `PrisonerRestriction | null` instead of `string | null`
+    - Renamed `showDeleteDialog` to `deleteDialogOpen` for consistency
+  - **Files Modified**: PrisonerRestrictionList.tsx (imports, state, handlers, delete dialog)
+
+### Added
+- **Backend Integration Prompt Template Enhancement**:
+  - Created comprehensive prompt template at `ma_ignore/BACKEND_INTEGRATION_PROMPT.md`
+  - **Includes Complete Patterns For**:
+    - Backend integration with centralized API endpoints
+    - DataTable migration with server-side pagination
+    - Server-side dropdown conversion (SearchableSelect, StaffProfileSelect, CustomPrisonerSearch)
+    - **Edit mode dropdown fixes** (CRITICAL section with 7-step implementation guide)
+    - Delete confirmation with ConfirmDialog component (full code examples)
+    - Form component patterns (disabled fields, date pickers, validation)
+    - Dialog behavior (onInteractOutside, key props)
+  - **Code Examples**: Complete handleEdit/handleView async patterns, local state initialization, initialItem derivation
+  - **Success Criteria Checklist**: 11 items covering API, DataTable, dropdowns, CRUD operations
+  - **Common Issues Prevention**: Lists 6 common pitfalls with solutions
+  - **Reference Implementation**: Links to Medical Restriction Management files and guides
+  - **Template Version**: 2.0 (Created February 6, 2026)
+  - **Purpose**: Ensures all future module refactoring automatically handles edit mode dropdown population correctly
+
+## [Released] - 2026-02-05
+
+### Added
+- **Medical Restriction Management - Comprehensive Module Refactoring (14M+ Ready)**:
+  - Fully refactored Prisoner Restrictions module with backend integration and server-side pagination
+  - **Service Layer**: Created `restrictionService.ts` with centralized API endpoints
+    - `RESTRICTION_API_ENDPOINTS` constant: RESTRICTIONS, RESTRICTION_REASONS, PRISONERS, STATIONS
+    - `fetchRestrictions()`: Paginated fetch with search/filtering (50 items/page)
+    - `fetchRestrictionReasons()`: Server-side dropdown pagination for restriction reasons
+    - `fetchStations()`: Server-side dropdown pagination for medical facilities
+    - `fetchRestrictionReasonById()`, `fetchStationById()`: Single item fetch for edit mode
+    - `createRestriction()`, `updateRestriction()`, `deleteRestriction()`: Full CRUD operations
+    - All fetch functions silence cancellation errors (CanceledError, ERR_CANCELED, AbortError)
+  - **PrisonerRestrictionForm Enhancements**:
+    - Converted prisoner dropdown to `CustomPrisonerSearch` with server-side pagination
+    - Converted restriction reason dropdown to `SearchableSelect` with `fetchRestrictionReasons` callback
+    - Converted place of medical attention dropdown to `SearchableSelect` with `fetchStations` callback
+    - Added comprehensive field validation with inline error messages below each required field
+    - Implemented proper edit mode data loading using `fetchRestrictionReasonById` and `fetchStationById`
+    - Added `key` props to all dropdowns: `key={field-${dialogOpen}}` to prevent state leakage
+    - Functional setState pattern: `prev => ({ ...prev, field: value })` for all form updates
+    - Added `onInteractOutside={(e) => e.preventDefault()}` to DialogContent to prevent accidental closes
+    - Proper form reset on mode change (create/edit/view)
+  - **PrisonerRestrictionList Migration to DataTable**:
+    - Replaced custom table implementation with enterprise `DataTable` component
+    - Integrated `useFilterRefresh` hook for global filter synchronization (region/district/station)
+    - Removed manual pagination, search, and loading states (DataTable handles internally)
+    - Added rich column definitions with formatted dates, badges for status, prisoner info with numbers
+    - Actions column: View (blue), Edit (amber), Delete (red) with icon-only buttons
+    - Proper CRUD operations: Create/Update use toast notifications, Delete has confirmation dialog
+    - DataTable automatically refreshes after CRUD operations via URL state management
+    - Supports filtering by `selectedPrisonerId` prop for prisoner-specific restriction views
+  - **Benefits**: Scalable for 14M+ records, consistent with Housing Allocation/Journal/Complaints patterns, improved UX, production-ready polish
+  - Files created: `src/services/medical/restrictionAndDietary/restrictionService.ts`
+  - Files refactored: `PrisonerRestrictionForm.tsx`, `PrisonerRestrictionList.tsx`
+
+## [Released] - 2026-02-04
+
+### Added
+- **Medical Records Management - Modular Folder Structure Refactoring**:
+  - Reorganized 48 medical component files from flat structure into menu-aligned modular architecture
+  - Created 5 main sub-modules matching UI navigation: medicalInformation, restrictionAndDietary, stationsAndAssessment, recommendations, deathDetails
+  - Each sub-module contains organized feature folders (e.g., bmi, caseBook, schedules under medicalInformation)
+  - Created parallel services folder structure with barrel export index.ts files for future service implementations
+  - Updated medical.routes.tsx imports to reflect new component paths
+  - Used `git mv` for all file moves to preserve Git history
+  - Created comprehensive MEDICAL_MODULE_STRUCTURE.md documentation with import examples and design principles
+  - Benefits: Menu-aligned navigation, reduced merge conflicts, clear feature boundaries, scalable for future growth
+  - Pattern established for refactoring other flat modules (Discharge, Gate, Station, Rehabilitation)
+  - Files modified: 48 component files moved, 19 component subfolders created, 5 service subfolders created, medical.routes.tsx updated
+  - Commits: 9d6c64a (refactoring), af3e233 (documentation), 3998234 (template to ma_ignore)
+
+- **Module Refactoring Prompt Template**:
+  - Created reusable prompt template for reorganizing flat module structures
+  - Includes step-by-step customization guide for any module
+  - Example implementation for Discharge module
+  - Quick checklist and expected output structure
+  - References Medical module refactoring (9d6c64a) as pattern
+  - Moved to ma_ignore/ folder for personal reference (not shared with team)
+  - Location: ma_ignore/MODULE_REFACTORING_PROMPT_TEMPLATE.md
+  - **Enhanced with comprehensive import fixing guidance**:
+    - Added detailed "Import Path Correction Strategy" section with file depth calculation guide
+    - Included PowerShell bulk fix commands for 2-level and 3-level deep files
+    - Step-by-step fix order: routes → containers → 2-level → 3-level → verify
+    - Common import patterns and examples for different file depths
+    - "Common Pitfalls to Avoid" section warning about import path errors, inconsistent depth, overcorrection
+    - Updated deliverables, best practices, quick checklist, and example sections with import fixing steps
+    - Template now provides complete end-to-end guidance from restructuring through import corrections
+    - Commit: b6ed521
+
+### Fixed
+- **Medical Records Management - Import Path Corrections After Restructuring** (CRITICAL):
+  - Fixed all broken import paths caused by moving 48 files from flat to nested folder structure
+  - **Problem**: Moving files to different depths broke relative imports (e.g., `../ui/button` worked at 1 level, broke at 2-3 levels deep)
+  - **Solution**: Systematic correction based on file depth from `src/components/`:
+    - Files at 2 levels deep (e.g., `medical/subfolder/Component.tsx`): `../ui/` → `../../ui/`
+    - Files at 3 levels deep (e.g., `medical/sub1/sub2/Component.tsx`): `../ui/` → `../../../ui/`
+    - Container files: `./Component` → `./subfolder/Component`
+  - **Fix Order Applied**:
+    1. Updated route file imports first (medical.routes.tsx)
+    2. Fixed container component imports to subfolders (MedicalDetails, DeathDetails, RestrictionAndDietaryDetails, StationsAndAssessmentDetails, RecommendationsDetails)
+    3. Bulk PowerShell corrections for 2-level deep files
+    4. Bulk PowerShell corrections for 3-level deep files
+    5. Corrected overcorrected paths (reduced `../../../../` to `../../../` where files were only 3 levels deep)
+  - **Container Import Fixes**:
+    - MedicalDetails: 8 Screen components now import from respective subfolders (bmi/BMIScreen, caseBook/CaseBookScreen, etc.)
+    - DeathDetails: imports from deathConfirmation/, deathNotification/, deathRecipient/
+    - RestrictionAndDietaryDetails: imports from restrictions/, dietary/
+    - StationsAndAssessmentDetails: imports from stationState/, foodAssessment/
+    - RecommendationsDetails: imports from wardRecommendations/, transferRecommendations/, releaseRecommendations/
+  - **PowerShell Bulk Corrections**:
+    - Pattern: `Get-ChildItem -Recurse | ForEach-Object { $c = (Get-Content) -replace 'pattern', 'replacement'; Set-Content }`
+    - Applied regex replacements across all 48 medical component files
+    - Final pass corrected overcorrections (4 levels → 3 levels)
+  - **Result**: All Vite import resolution errors resolved, dev server runs without errors on port 3001
+  - **Impact**: 55 files changed (48 component files + 7 documentation/service files)
+  - Commit: b6ed521
+
+- **Property Management - DataTable Not Refreshing After CRUD Operations**:
+  - **Problem**: When creating/updating/deleting accounts or transactions, stat cards updated but DataTable didn't refresh until manual page reload
+  - **Root Cause**: DataTable component has internal data fetching that only refetches when dependencies change (url, region, district, station). Since none changed after CRUD operations, DataTable didn't know to refetch.
+  - **Solution**: Force DataTable remount using React key prop pattern
+    - Added two state variables: `accountsTableKey` and `transactionsTableKey`
+    - Added `key` props to both DataTable components: `<DataTable key={accountsTableKey} ... />`
+    - Increment keys after every CRUD operation to force React remount
+  - **CRUD Handlers Updated**:
+    - `handleCreateAccount`: Increments both keys after successful account creation
+    - `handleUpdateAccount`: Increments both keys after successful account update
+    - `handleDeleteAccount`: Increments both keys after successful account deletion
+    - `handleCreateTransaction`: Increments both keys after successful transaction creation
+    - `handleUpdateTransaction`: Increments both keys after successful transaction update
+    - `handleDeleteTransaction`: Increments both keys after successful transaction deletion
+  - **Benefits**:
+    - DataTable remounts trigger internal `useEffect` to refetch data
+    - Both stat cards and tables now update synchronously after CRUD operations
+    - No manual page refresh needed
+    - Clean implementation without modifying DataTable component itself
+  - File modified: PrisonerPropertyAccountScreen.tsx
+  - Commit: 934d2cc
+
+### Changed
+- **Git Branch Synchronization - Upstream Integration**:
+  - Successfully merged upstream/staging into pmis_team branch with selective conflict resolution
+  - Resolved 58 merge conflicts across components, services, and configuration files
+  - Strategy: Kept pmis_team versions for custom work (property, station modules, services), accepted upstream versions for shared components (gate, layout, routes, utilities)
+  - Integrated 150+ new files from upstream: medical module, discipline module, reports, earning scheme, comprehensive documentation guides
+  - Updated package-lock.json from upstream and ran npm install for dependency consistency
+  - Preserved all local Property Management enhancements from 2026-02-02
+  - Merge commit: fa67114 on pmis_team branch
+  - Branch now synchronized with team repository while maintaining local innovations
 
 ## [Released] - 2026-02-02
 

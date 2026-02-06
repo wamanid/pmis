@@ -1,10 +1,10 @@
 import { RouteObject } from 'react-router-dom';
 import MedicalOverview from '../components/medical/MedicalOverview';
-import MedicalDetails from '../components/medical/MedicalDetails';
-import RestrictionAndDietaryDetails from '../components/medical/restrictionAndDietaryDetails';
-import StationsAndAssessmentDetails from '../components/medical/stationsAndAssessmentDetails';
-import RecommendationsDetails from '../components/medical/RecommendationsDetails';
-import DeathDetails from '../components/medical/DeathDetails';
+import MedicalDetails from '../components/medical/medicalInformation/MedicalDetails';
+import RestrictionAndDietaryDetails from '../components/medical/restrictionAndDietary/RestrictionAndDietaryDetails';
+import StationsAndAssessmentDetails from '../components/medical/stationsAndAssessment/StationsAndAssessmentDetails';
+import RecommendationsDetails from '../components/medical/recommendations/RecommendationsDetails';
+import DeathDetails from '../components/medical/deathDetails/DeathDetails';
 
 /**
  * Medical Management Routes
