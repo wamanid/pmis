@@ -1,17 +1,11 @@
 ﻿import React, { useState } from 'react';
 import { Card, CardContent } from '../../ui/card';
 import { ClipboardList } from 'lucide-react';
-import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
 import StationStateList from './stationState/StationStateList';
 import FoodAssessmentList from './foodAssessment/FoodAssessmentList';
 
 export default function StationsAndAssessmentDetails() {
-  const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'station' | 'food'>('station');
-
-  const handlePrisonerChange = (prisonerId: string) => {
-    setSelectedPrisonerId(prisonerId);
-  };
 
   return (
     <div className="space-y-6">
@@ -20,17 +14,6 @@ export default function StationsAndAssessmentDetails() {
         <ClipboardList className="h-6 w-6" />
         <h1 className="text-2xl">Stations and Assessment</h1>
       </div>
-
-      {/* Prisoner Information Section */}
-      <Card style={{ borderTop: '3px solid #650000' }}>
-        <CardContent className="pt-6">
-          <PrisonerSearchScreenWider
-            value={selectedPrisonerId}
-            onChange={handlePrisonerChange}
-            showTitle={true}
-          />
-        </CardContent>
-      </Card>
 
       {/* Assessment Tabs */}
       <Card>
@@ -68,13 +51,13 @@ export default function StationsAndAssessmentDetails() {
           {/* Tab Content */}
           {activeTab === 'station' && (
             <div>
-              <StationStateList selectedPrisonerId={selectedPrisonerId} />
+              <StationStateList />
             </div>
           )}
 
           {activeTab === 'food' && (
             <div>
-              <FoodAssessmentList selectedPrisonerId={selectedPrisonerId} />
+              <FoodAssessmentList />
             </div>
           )}
         </CardContent>

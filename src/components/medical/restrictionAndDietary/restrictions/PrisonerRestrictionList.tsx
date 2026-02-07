@@ -21,15 +21,9 @@ import {
 } from '../../../../services/medical/restrictionAndDietary/restrictionService';
 import { useFilters } from '../../../../contexts/FilterContext';
 
-interface PrisonerRestrictionListProps {
-  selectedPrisonerId?: string;
-}
-
 type ViewMode = 'flat' | 'grouped';
 
-const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
-  selectedPrisonerId,
-}) => {
+const PrisonerRestrictionList: React.FC = () => {
   const [viewMode, setViewMode] = useState<ViewMode>('grouped'); // Default to grouped view
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<PrisonerRestriction | null>(null);
@@ -46,7 +40,6 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
    */
   const buildTableUrl = () => {
     const params = new URLSearchParams();
-    if (selectedPrisonerId) params.append('prisoner', selectedPrisonerId);
     if (globalStation) params.append('station', globalStation);
     if (globalDistrict) params.append('district', globalDistrict);
     if (globalRegion) params.append('region', globalRegion);
@@ -62,7 +55,7 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
   // Update table URL when filters or prisoner selection changes
   React.useEffect(() => {
     setTableUrl(buildTableUrl());
-  }, [selectedPrisonerId, globalStation, globalDistrict, globalRegion]);
+  }, [globalStation, globalDistrict, globalRegion]);
 
   /**
    * Table columns definition
@@ -178,15 +171,15 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
         ),
       },
     ],
-    [selectedPrisonerId]
+    [] // No dependencies needed for static columns
   );
 
   /**
    * DataTable configuration with conditional grouping
    */
   const tableConfig: DataTableConfig = useMemo(() => {
-    // If viewing grouped mode and not filtering by specific prisoner
-    if (viewMode === 'grouped' && !selectedPrisonerId) {
+    // If viewing grouped mode
+    if (viewMode === 'grouped') {
       return {
         search: true,
         export: {
@@ -279,7 +272,7 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
       summary: true,
       rowSpacing: 'normal',
     };
-  }, [viewMode, selectedPrisonerId]);
+  }, [viewMode]); // Only viewMode dependency
 
   /**
    * Handlers
@@ -377,21 +370,19 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
               Prisoner Restrictions
             </h2>
             
-            {/* View Mode Toggle - Only show when not filtering by specific prisoner */}
-            {!selectedPrisonerId && (
-              <Tabs value={viewMode} onValueChange={(v: string) => setViewMode(v as ViewMode)}>
-                <TabsList>
-                  <TabsTrigger value="grouped" className="flex items-center gap-2">
-                    <Users className="h-4 w-4" />
-                    Grouped
-                  </TabsTrigger>
-                  <TabsTrigger value="flat" className="flex items-center gap-2">
-                    <List className="h-4 w-4" />
-                    Flat
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-            )}
+            {/* View Mode Toggle */}
+            <Tabs value={viewMode} onValueChange={(v: string) => setViewMode(v as ViewMode)}>
+              <TabsList>
+                <TabsTrigger value="grouped" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Grouped
+                </TabsTrigger>
+                <TabsTrigger value="flat" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
+                  Flat
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
           </div>
           
           <Button

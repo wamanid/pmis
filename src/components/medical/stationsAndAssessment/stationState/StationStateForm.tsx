@@ -1,37 +1,18 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Input } from '../../../ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Building2, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
-
-interface Rating {
-  id: string;
-  name: string;
-  description: string;
-}
-
-interface Station {
-  id: string;
-  name: string;
-  region?: string;
-  district?: string;
-}
-
-interface StationState {
-  id?: string;
-  station_name?: string;
-  level_of_conjestion: string;
-  station: string;
-  state_of_buildings: string;
-  ventilation: string;
-  lighting: string;
-  fencing: string;
-  general_environment: string;
-  ward_environment: string;
-}
+import { toast } from 'sonner';
+import SearchableSelect from '../../../common/SearchableSelect';
+import {
+  StationState,
+  Station,
+  Rating,
+  fetchStations,
+  fetchRatings,
+} from '../../../../services/medical/stationsAndAssessment/stationStateService';
 
 interface StationStateFormProps {
   stationState?: StationState | null;
@@ -52,42 +33,160 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
     ward_environment: '',
   });
 
-  const [stations, setStations] = useState<Station[]>([]);
-  const [ratings, setRatings] = useState<Rating[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
 
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  useEffect(() => {
-    if (stationState && dataLoaded) {
-      setFormData(stationState);
+  // Local state for dropdown values
+  const [localStation, setLocalStation] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.station) {
+      return stationState.station;
     }
-  }, [stationState, dataLoaded]);
+    return null;
+  });
 
-  const loadDropdownData = () => {
-    // Mock Stations
-    setStations([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', name: 'Luzira Maximum Security Prison', region: 'Central', district: 'Kampala' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', name: 'Kigo Prison', region: 'Central', district: 'Wakiso' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', name: 'Murchison Bay Prison', region: 'Central', district: 'Kampala' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', name: 'Gulu Main Prison', region: 'Northern', district: 'Gulu' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', name: 'Mbarara Main Prison', region: 'Western', district: 'Mbarara' },
-    ]);
+  const [localStateOfBuildings, setLocalStateOfBuildings] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.state_of_buildings) {
+      return stationState.state_of_buildings;
+    }
+    return null;
+  });
 
-    // Mock Ratings
-    setRatings([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'Excellent', description: 'Outstanding condition, meets all standards' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'Good', description: 'Satisfactory condition, minor improvements needed' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'Fair', description: 'Acceptable condition, several improvements required' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'Poor', description: 'Below standard, significant improvements needed' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'Critical', description: 'Urgent attention required, major deficiencies' },
-    ]);
+  const [localVentilation, setLocalVentilation] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.ventilation) {
+      return stationState.ventilation;
+    }
+    return null;
+  });
 
-    setDataLoaded(true);
-  };
+  const [localLighting, setLocalLighting] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.lighting) {
+      return stationState.lighting;
+    }
+    return null;
+  });
+
+  const [localFencing, setLocalFencing] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.fencing) {
+      return stationState.fencing;
+    }
+    return null;
+  });
+
+  const [localGeneralEnv, setLocalGeneralEnv] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.general_environment) {
+      return stationState.general_environment;
+    }
+    return null;
+  });
+
+  const [localWardEnv, setLocalWardEnv] = useState<string | null>(() => {
+    if (stationState && (mode === 'edit' || mode === 'view') && stationState.ward_environment) {
+      return stationState.ward_environment;
+    }
+    return null;
+  });
+
+  // Sync local state with stationState prop
+  useEffect(() => {
+    if (stationState && (mode === 'edit' || mode === 'view')) {
+      setFormData(stationState);
+      setLocalStation(stationState.station || null);
+      setLocalStateOfBuildings(stationState.state_of_buildings || null);
+      setLocalVentilation(stationState.ventilation || null);
+      setLocalLighting(stationState.lighting || null);
+      setLocalFencing(stationState.fencing || null);
+      setLocalGeneralEnv(stationState.general_environment || null);
+      setLocalWardEnv(stationState.ward_environment || null);
+    }
+  }, [stationState, mode]);
+
+  // Reset form when switching to create mode
+  useEffect(() => {
+    if (mode === 'create') {
+      setFormData({
+        level_of_conjestion: '',
+        station: '',
+        state_of_buildings: '',
+        ventilation: '',
+        lighting: '',
+        fencing: '',
+        general_environment: '',
+        ward_environment: '',
+      });
+      setLocalStation(null);
+      setLocalStateOfBuildings(null);
+      setLocalVentilation(null);
+      setLocalLighting(null);
+      setLocalFencing(null);
+      setLocalGeneralEnv(null);
+      setLocalWardEnv(null);
+    }
+  }, [mode]);
+
+  // Fetch callbacks wrapped in useCallback to prevent unnecessary re-fetches
+  const fetchStationsCallback = useCallback(
+    async (
+      opts: { [key: string]: any; search?: string; page?: number; page_size?: number },
+      signal?: AbortSignal
+    ) => {
+      return await fetchStations(opts.page || 1, opts.page_size || 50, opts.search || '', signal);
+    },
+    []
+  );
+
+  const fetchRatingsCallback = useCallback(
+    async (
+      opts: { [key: string]: any; search?: string; page?: number; page_size?: number },
+      signal?: AbortSignal
+    ) => {
+      return await fetchRatings(opts.page || 1, opts.page_size || 50, opts.search || '', signal);
+    },
+    []
+  );
+
+  // Derive initialItem for edit mode
+  const initialStation =
+    stationState && (mode === 'edit' || mode === 'view') && stationState.station && stationState.station_name
+      ? { id: stationState.station, name: stationState.station_name }
+      : null;
+
+  const initialStateOfBuildings =
+    stationState &&
+    (mode === 'edit' || mode === 'view') &&
+    stationState.state_of_buildings &&
+    stationState.state_of_buildings_name
+      ? { id: stationState.state_of_buildings, name: stationState.state_of_buildings_name }
+      : null;
+
+  const initialVentilation =
+    stationState && (mode === 'edit' || mode === 'view') && stationState.ventilation && stationState.ventilation_name
+      ? { id: stationState.ventilation, name: stationState.ventilation_name }
+      : null;
+
+  const initialLighting =
+    stationState && (mode === 'edit' || mode === 'view') && stationState.lighting && stationState.lighting_name
+      ? { id: stationState.lighting, name: stationState.lighting_name }
+      : null;
+
+  const initialFencing =
+    stationState && (mode === 'edit' || mode === 'view') && stationState.fencing && stationState.fencing_name
+      ? { id: stationState.fencing, name: stationState.fencing_name }
+      : null;
+
+  const initialGeneralEnv =
+    stationState &&
+    (mode === 'edit' || mode === 'view') &&
+    stationState.general_environment &&
+    stationState.general_environment_name
+      ? { id: stationState.general_environment, name: stationState.general_environment_name }
+      : null;
+
+  const initialWardEnv =
+    stationState &&
+    (mode === 'edit' || mode === 'view') &&
+    stationState.ward_environment &&
+    stationState.ward_environment_name
+      ? { id: stationState.ward_environment, name: stationState.ward_environment_name }
+      : null;
 
   const handleInputChange = (field: keyof StationState, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -96,6 +195,7 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validation
     if (!formData.station) {
       toast.error('Please select a station');
       return;
@@ -131,52 +231,14 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedStation = stations.find((s) => s.id === formData.station);
-
-      const submitData: StationState = {
-        ...formData,
-        station_name: selectedStation?.name || '',
-      };
-
-      onSubmit(submitData);
+    try {
+      onSubmit(formData);
+    } catch (error) {
       setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('Station state record created successfully');
-        setFormData({
-          level_of_conjestion: '',
-          station: '',
-          state_of_buildings: '',
-          ventilation: '',
-          lighting: '',
-          fencing: '',
-          general_environment: '',
-          ward_environment: '',
-        });
-      } else {
-        toast.success('Station state record updated successfully');
-      }
-    }, 500);
+    }
   };
 
   const isReadOnly = mode === 'view';
-
-  // Get display values for view mode
-  const getDisplayValue = (field: string, id: string) => {
-    if (!id) return 'N/A';
-    
-    switch (field) {
-      case 'station':
-        const station = stations.find(s => s.id === id);
-        return station ? `${station.name} (${station.region}, ${station.district})` : id;
-      case 'rating':
-        const rating = ratings.find(r => r.id === id);
-        return rating ? `${rating.name} - ${rating.description}` : id;
-      default:
-        return id;
-    }
-  };
 
   return (
     <Card className="w-full">
@@ -190,6 +252,7 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
       </CardHeader>
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Station Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Station Information
@@ -199,26 +262,25 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 <Label htmlFor="station">
                   Station <span className="text-red-500">*</span>
                 </Label>
-                {isReadOnly ? (
+                {mode === 'view' || mode === 'edit' ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('station', formData.station)}
+                    {stationState?.station_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.station}
-                    onValueChange={(value) => handleInputChange('station', value)}
-                  >
-                    <SelectTrigger id="station">
-                      <SelectValue placeholder="Select station" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {stations.map((station) => (
-                        <SelectItem key={station.id} value={station.id}>
-                          {station.name} ({station.region}, {station.district})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchStationsCallback}
+                    value={localStation}
+                    onChange={(val) => {
+                      setLocalStation(val);
+                      handleInputChange('station', val);
+                    }}
+                    placeholder="Select station"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialStation ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
 
@@ -234,12 +296,13 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                   value={formData.level_of_conjestion}
                   onChange={(e) => handleInputChange('level_of_conjestion', e.target.value)}
                   placeholder="Enter congestion level (e.g., 188)"
-                  disabled={isReadOnly}
+                  disabled={isReadOnly || loading}
                 />
               </div>
             </div>
           </div>
 
+          {/* Building & Infrastructure Ratings */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Building & Infrastructure Ratings
@@ -251,24 +314,23 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.state_of_buildings)}
+                    {stationState?.state_of_buildings_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.state_of_buildings}
-                    onValueChange={(value) => handleInputChange('state_of_buildings', value)}
-                  >
-                    <SelectTrigger id="state_of_buildings">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localStateOfBuildings}
+                    onChange={(val) => {
+                      setLocalStateOfBuildings(val);
+                      handleInputChange('state_of_buildings', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialStateOfBuildings ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
 
@@ -278,24 +340,23 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.ventilation)}
+                    {stationState?.ventilation_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.ventilation}
-                    onValueChange={(value) => handleInputChange('ventilation', value)}
-                  >
-                    <SelectTrigger id="ventilation">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localVentilation}
+                    onChange={(val) => {
+                      setLocalVentilation(val);
+                      handleInputChange('ventilation', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialVentilation ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
 
@@ -305,24 +366,23 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.lighting)}
+                    {stationState?.lighting_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.lighting}
-                    onValueChange={(value) => handleInputChange('lighting', value)}
-                  >
-                    <SelectTrigger id="lighting">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localLighting}
+                    onChange={(val) => {
+                      setLocalLighting(val);
+                      handleInputChange('lighting', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialLighting ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
 
@@ -332,29 +392,29 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.fencing)}
+                    {stationState?.fencing_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.fencing}
-                    onValueChange={(value) => handleInputChange('fencing', value)}
-                  >
-                    <SelectTrigger id="fencing">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localFencing}
+                    onChange={(val) => {
+                      setLocalFencing(val);
+                      handleInputChange('fencing', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialFencing ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
             </div>
           </div>
 
+          {/* Environment Ratings */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Environment Ratings
@@ -366,24 +426,23 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.general_environment)}
+                    {stationState?.general_environment_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.general_environment}
-                    onValueChange={(value) => handleInputChange('general_environment', value)}
-                  >
-                    <SelectTrigger id="general_environment">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localGeneralEnv}
+                    onChange={(val) => {
+                      setLocalGeneralEnv(val);
+                      handleInputChange('general_environment', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialGeneralEnv ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
 
@@ -393,29 +452,29 @@ const StationStateForm: React.FC<StationStateFormProps> = ({ stationState, onSub
                 </Label>
                 {isReadOnly ? (
                   <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('rating', formData.ward_environment)}
+                    {stationState?.ward_environment_name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.ward_environment}
-                    onValueChange={(value) => handleInputChange('ward_environment', value)}
-                  >
-                    <SelectTrigger id="ward_environment">
-                      <SelectValue placeholder="Select rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ratings.map((rating) => (
-                        <SelectItem key={rating.id} value={rating.id}>
-                          {rating.name} - {rating.description}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect
+                    fetchPaginated={fetchRatingsCallback}
+                    value={localWardEnv}
+                    onChange={(val) => {
+                      setLocalWardEnv(val);
+                      handleInputChange('ward_environment', val);
+                    }}
+                    placeholder="Select rating"
+                    idField="id"
+                    labelField="name"
+                    pageSize={50}
+                    initialItem={initialWardEnv ?? undefined}
+                    disabled={loading}
+                  />
                 )}
               </div>
             </div>
           </div>
 
+          {/* Form Actions */}
           {!isReadOnly && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>

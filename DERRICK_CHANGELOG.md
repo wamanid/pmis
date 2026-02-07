@@ -2,10 +2,178 @@
 
 ---
 **Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
-**Created**: February 6, 2026 | **Last Updated**: February 6, 2026
+**Created**: February 6, 2026 | **Last Updated**: February 7, 2026
 ---
 
 All notable changes to this project should be documented in this file.
+
+## [Unreleased]
+
+### Added
+- **Medical Food Assessment Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Food Assessment module with live backend API integration
+  - **Service Layer**: Created `foodAssessmentService.ts` with centralized API endpoints
+    - `FOOD_ASSESSMENT_API_ENDPOINTS` constant: FOOD_ASSESSMENTS, STATIONS, FOOD_ITEMS, FOOD_QUALITIES
+    - CRUD functions: `createFoodAssessment`, `updateFoodAssessment`, `deleteFoodAssessment`, `fetchFoodAssessmentById`
+    - Paginated fetch functions with cancellation error handling: `fetchFoodAssessments`, `fetchStations`, `fetchFoodItems`, `fetchFoodQualities`
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+  - **FoodAssessmentList Migration to DataTable**:
+    - Replaced manual table implementation with enterprise `DataTable` component
+    - Server-side pagination, search, sort, and filter capabilities
+    - Rich column definitions with color-coded badges for quality ratings
+    - Quality badges: Excellent (green), Good (blue), Fair (yellow), Poor (orange), Unacceptable (red)
+    - Notes column with truncation (60 chars) and full text on hover
+    - Actions column with View/Edit/Delete icon buttons
+    - DataTable auto-refresh pattern with `tableKey` state for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+  - **FoodAssessmentForm Server-Side Dropdowns**:
+    - Converted station dropdown to `SearchableSelect` with server-side pagination (read-only in edit mode)
+    - Food item dropdown uses `SearchableSelect` with `fetchFoodItemsCallback`
+    - Quality rating dropdown uses `SearchableSelect` with `fetchFoodQualitiesCallback`
+    - All fetch callbacks wrapped in `useCallback` to prevent unnecessary API calls
+    - Edit mode dropdown population pattern: fetchById, local state initialization, initialItem derivation
+    - Station field disabled in edit mode (consistent with Station State module)
+    - Proper validation with user-friendly toast error messages
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information: station name, food item, quality rating, notes preview (100 chars)
+    - Better error handling with throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e: Event) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={\`form-\${dialogKey}-\${formMode}\`}` forces remount on mode change
+  - **Benefits**: Scalable for 14M+ records, consistent with Station State/Medical Restrictions patterns, improved UX, production-ready
+
+- **Medical Station State Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Station State module with live backend API integration
+  - **Service Layer**: Created `stationStateService.ts` with centralized API endpoints
+    - `STATION_STATE_API_ENDPOINTS` constant: STATION_STATES, STATIONS, RATINGS
+    - CRUD functions: `createStationState`, `updateStationState`, `deleteStationState`, `fetchStationStateById`
+    - Paginated fetch functions with cancellation error handling: `fetchStationStates`, `fetchStations`, `fetchRatings`
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+  - **StationStateList Migration to DataTable**:
+    - Replaced manual table implementation with enterprise `DataTable` component
+    - Server-side pagination, search, sort, and filter capabilities
+    - Rich column definitions with color-coded badges for congestion and ratings
+    - Congestion badges: Red (≥200%), Orange (≥150%), Yellow (≥100%), Green (<100%)
+    - Rating badges: Excellent (green), Good (blue), Fair (yellow), Poor (orange), Critical (red)
+    - UUID fallback display: Shows truncated UUID (first 8 chars) with tooltip when _name fields missing
+    - Actions column with View/Edit/Delete icon buttons
+    - DataTable auto-refresh pattern with `tableKey` state for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+  - **StationStateForm Server-Side Dropdowns**:
+    - Converted station dropdown to `SearchableSelect` with server-side pagination (read-only in edit mode)
+    - All 6 rating dropdowns use `SearchableSelect` with shared `fetchRatingsCallback`
+    - All fetch callbacks wrapped in `useCallback` to prevent unnecessary API calls
+    - Edit mode dropdown population pattern: fetchById, local state initialization, initialItem derivation
+    - Station field disabled in edit mode to prevent station changes
+    - Proper validation with user-friendly toast error messages
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information before deletion: station name, congestion level, building rating, environment rating
+    - Better error handling with throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e: Event) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={\`form-\${dialogKey}-\${formMode}\`}` forces remount on mode change
+  - **Benefits**: Scalable for 14M+ records, consistent with Medical Restrictions/Dietary patterns, improved UX, production-ready
+
+- **Medical Dietary Requirements - Grouped Table View with DataTable (UX ENHANCEMENT)**:
+  - Implemented grouped/collapsible table using DataTable's built-in grouping feature
+  - **DataTable Grouping Configuration**:
+    - Groups dietary requirements by prisoner_name (API currently doesn't provide prisoner_number)
+    - Displays prisoner name with count of dietary requirements per prisoner
+    - Shows summary statistics: Active (green), Inactive (gray), Total (brand color #650000)
+    - Date range display showing earliest start date to latest end date per prisoner
+    - `defaultExpanded: false` - groups start collapsed for cleaner initial view
+  - **View Toggle**: Added Grouped vs Flat view tabs in `DietaryRequirementList.tsx`
+    - Default to grouped view for better UX
+    - Users icon for grouped view, flat list for standard view
+    - Seamless switching with same DataTable component
+  - **Implementation Approach**: Uses DataTable's `grouping` config option (matches Prisoner Restrictions pattern)
+    - `groupBy: 'prisoner_name'` - groups by prisoner name (will update to prisoner_number when API adds it)
+    - `renderGroupHeader` shows prisoner info, requirement count, date range, and summary stats
+    - Single unified component handles both flat and grouped views
+  - **Files Modified**: DietaryRequirementList.tsx (added viewMode state, tableConfig with grouping, view toggle tabs)
+  - **Benefit**: Dramatically improves UX for viewing dietary requirements, especially when prisoners have multiple requirements, while maintaining all DataTable features
+
+### Fixed
+- **Medical Dietary Requirements - DataTable URL Format (CRITICAL FIX)**:
+  - Fixed 404 error when DataTable tried to fetch from `/api/data-table/` endpoint
+  - **Root Cause**: tableUrl used wrapper format that doesn't exist on backend
+  - **Solution**: Changed to direct endpoint `medical-management/dietary-requirements/`
+  - **Files Modified**: DietaryRequirementList.tsx (buildTableUrl function)
+  - **Benefit**: DataTable now fetches from correct API endpoint without errors
+
+- **Medical Dietary Requirements - Column Definition Format Mismatch**:
+  - Fixed "Each child in a list should have a unique 'key' prop" warnings
+  - **Root Cause**: Used TanStack Table format (`accessorKey`, `header`, `cell`) instead of DataTable format
+  - **Solution**: Converted all columns to DataTable format (`key`, `label`, `render`)
+  - **Files Modified**: DietaryRequirementList.tsx (columns definition)
+  - **Benefit**: Table renders correctly without console warnings
+
+- **Medical Dietary Requirements - Backend Filter Parameter Issue**:
+  - Removed `prisoner_restriction` filter parameter that was causing 400 Bad Request errors
+  - **Root Cause**: Backend doesn't support filtering by prisoner_restriction parameter
+  - **Solution**: Commented out filter logic with TODO notes for when backend adds support
+  - **Files Modified**: DietaryRequirementList.tsx (removed selectedPrisonerId filtering)
+  - **Benefit**: Table loads without API errors
+
+- **Medical Dietary Requirements - API Calls on Every Keystroke (PERFORMANCE FIX)**:
+  - Fixed unnecessary API calls to prisoner restrictions endpoint on every keystroke in form fields
+  - **Root Cause**: `fetchRestrictionsCallback` function recreated on every render, triggering SearchableSelect re-fetch
+  - **Solution**: Wrapped `fetchRestrictionsCallback` in `useCallback` with empty dependency array
+  - **Pattern**: `const fetchRestrictionsCallback = useCallback(async (opts, signal) => { ... }, [])`
+  - **Files Modified**: DietaryRequirementForm.tsx (added useCallback import, wrapped fetch function)
+  - **Benefit**: Eliminates unnecessary API calls, improves performance and user experience
+
+- **Medical Dietary Requirements - Prisoner Field Edit Mode Lock**:
+  - Disabled prisoner restriction field in edit mode to prevent changing prisoner for existing requirements
+  - **Implementation**: Edit mode shows prisoner name in muted disabled div with `bg-gray-50` styling
+  - **Display Fallback**: Shows `prisoner_restriction_info` if available, otherwise `prisoner_name`, or "N/A"
+  - **Data Integrity**: Prevents orphaned dietary requirements by locking prisoner association
+  - **Files Modified**: DietaryRequirementForm.tsx (prisoner field conditional rendering)
+
+- **Medical Dietary Requirements - Multiple Syntax Errors During Refactoring**:
+  - Fixed cascading syntax errors that occurred during conversion from custom grouped component to DataTable grouping
+  - **Issues Fixed**: JSX code inserted inside tableConfig useMemo, missing button closing tags, duplicate JSX sections, corrupted comment markers
+  - **Solution**: Multiple targeted replacements to remove misplaced code, complete JSX elements, remove duplicates
+  - **Files Modified**: DietaryRequirementList.tsx (multiple syntax corrections)
+  - **Benefit**: File compiles without errors
+
+### Changed
+- **Medical Restriction & Dietary Module - Global Prisoner Search Removal (UX IMPROVEMENT)**:
+  - Removed global prisoner search component from module for cleaner, simpler interface
+  - **Rationale**: 
+    - Redundant with DataTable search (searches prisoner names already)
+    - Caused confusion with two different search behaviors
+    - Inconsistent behavior across tabs (worked on restrictions, failed on dietary due to backend limitations)
+    - Reduced visual clutter and cognitive load
+  - **Changes**:
+    - Removed `PrisonerSearchScreenWider` component and entire "Prisoner Information Section" card
+    - Removed `selectedPrisonerId` state and `handlePrisonerChange` function
+    - Removed `selectedPrisonerId` prop from both `PrisonerRestrictionList` and `DietaryRequirementList`
+    - Removed `DietaryRequirementListProps` and `PrisonerRestrictionListProps` interfaces
+    - Removed all references to `selectedPrisonerId` in URL building and filtering logic
+    - Removed conditional rendering of view toggle tabs (now always visible)
+  - **Files Modified**: RestrictionAndDietaryDetails.tsx, PrisonerRestrictionList.tsx, DietaryRequirementList.tsx
+  - **Benefit**: Cleaner UI, consistent UX, users can still search by prisoner name using DataTable search
+
+- **Medical Stations & Assessment Module - Global Prisoner Search Removal (UX IMPROVEMENT)**:
+  - Removed global prisoner search component for consistency with Restriction & Dietary module
+  - **Changes**:
+    - Removed `PrisonerSearchScreenWider` component and "Prisoner Information Section" card
+    - Removed `selectedPrisonerId` state and `handlePrisonerChange` function  
+    - Removed `selectedPrisonerId` prop from both `StationStateList` and `FoodAssessmentList`
+  - **Files Modified**: StationsAndAssessmentDetails.tsx, StationStateList.tsx, FoodAssessmentList.tsx
+  - **Benefit**: Consistent UX across medical modules, simpler interface
+
+- **Backend Integration Prompt Template Enhancement - API Call Prevention Pattern**:
+  - Added comprehensive guidance to prevent API calls on every keystroke in forms
+  - **New Section**: "Preventing Unnecessary API Calls (CRITICAL)" with wrong vs correct code examples
+  - **Pattern**: Wrap ALL fetchPaginated callbacks in `useCallback` with empty dependency array
+  - **Code Example**: Shows incorrect function recreation vs memoized callback
+  - **Common Issues**: Added "API calls on every keystroke - Fixed by wrapping fetchPaginated in useCallback"
+  - **Files Modified**: ma_ignore/BACKEND_INTEGRATION_PROMPT.md
+  - **Benefit**: Prevents performance issues in all future module implementations
 
 ## [Released] - 2026-02-06
 
