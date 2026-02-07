@@ -5,6 +5,7 @@ import RestrictionAndDietaryDetails from '../components/medical/restrictionAndDi
 import StationsAndAssessmentDetails from '../components/medical/stationsAndAssessment/StationsAndAssessmentDetails';
 import RecommendationsDetails from '../components/medical/recommendations/RecommendationsDetails';
 import DeathDetails from '../components/medical/deathDetails/DeathDetails';
+import TreatmentPlanDemo from '../components/medical/treatment/TreatmentPlanDemo';
 
 /**
  * Medical Management Routes
@@ -34,5 +35,9 @@ export const medicalRoutes: RouteObject[] = [
   {
     path: '/medical-records/death-details',
     element: <DeathDetails />,
+  },
+  {
+    path: '/medical-records/treatment-plan-demo',
+    element: <TreatmentPlanDemo />,
   },
 ];
