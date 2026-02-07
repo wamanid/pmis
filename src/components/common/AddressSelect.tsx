@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { Label } from '../ui/label';
 import { RegionSelect } from './RegionSelect';
 import { DistrictSelect } from './DistrictSelect';
@@ -51,78 +51,41 @@ export function AddressSelect({
   gridCols = 2,
   enableReverseCascade = true,
 }: AddressSelectProps) {
-  const prevRegion = useRef<string | undefined>(region);
-  const prevDistrict = useRef<string | undefined>(district);
-  const prevCounty = useRef<string | undefined>(county);
-  const prevSubCounty = useRef<string | undefined>(subCounty);
-  const prevParish = useRef<string | undefined>(parish);
-
-  // Forward cascade: Reset dependent fields when parent actually changes.
-  // Important: TabsContent unmount/remount can re-run effects; we must avoid clearing on initial mount.
+  // Forward cascade: Reset dependent fields when parent changes
   useEffect(() => {
-    const previous = prevRegion.current;
-    prevRegion.current = region;
-
-    if (previous === undefined) return;
-    if (previous === region) return;
-    if (!enableReverseCascade) return;
-
+    // When region changes, clear district and all dependent fields
     if (district) {
       onDistrictChange?.('');
     }
-  }, [region, district, enableReverseCascade, onDistrictChange]);
+  }, [region]);
 
   useEffect(() => {
-    const previous = prevDistrict.current;
-    prevDistrict.current = district;
-
-    if (previous === undefined) return;
-    if (previous === district) return;
-    if (!enableReverseCascade) return;
-
+    // When district changes, clear county and all dependent fields
     if (county) {
       onCountyChange?.('');
     }
-  }, [district, county, enableReverseCascade, onCountyChange]);
+  }, [district]);
 
   useEffect(() => {
-    const previous = prevCounty.current;
-    prevCounty.current = county;
-
-    if (previous === undefined) return;
-    if (previous === county) return;
-    if (!enableReverseCascade) return;
-
+    // When county changes, clear sub-county and all dependent fields
     if (subCounty) {
       onSubCountyChange?.('');
     }
-  }, [county, subCounty, enableReverseCascade, onSubCountyChange]);
+  }, [county]);
 
   useEffect(() => {
-    const previous = prevSubCounty.current;
-    prevSubCounty.current = subCounty;
-
-    if (previous === undefined) return;
-    if (previous === subCounty) return;
-    if (!enableReverseCascade) return;
-
+    // When sub-county changes, clear parish and all dependent fields
     if (parish) {
       onParishChange?.('');
     }
-  }, [subCounty, parish, enableReverseCascade, onParishChange]);
+  }, [subCounty]);
 
   useEffect(() => {
-    const previous = prevParish.current;
-    prevParish.current = parish;
-
-    if (previous === undefined) return;
-    if (previous === parish) return;
-    if (!enableReverseCascade) return;
-
+    // When parish changes, clear village
     if (village) {
       onVillageChange?.('');
     }
-  }, [parish, village, enableReverseCascade, onVillageChange]);
+  }, [parish]);
 
   const gridClass = `grid grid-cols-1 md:grid-cols-${gridCols} gap-4`;
 

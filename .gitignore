@@ -26,14 +26,19 @@ lerna-debug.log*
 pnpm-debug.log*
 
 # Editor directories and files
-.vscode/*
-!.vscode/extensions.json
+.vscode/
 .idea
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# VS Code workspace files
+PMIS_V2.code-workspace
+
+# Custom ignore folder
+ma_ignore/
 
 # OS files
 Thumbs.db

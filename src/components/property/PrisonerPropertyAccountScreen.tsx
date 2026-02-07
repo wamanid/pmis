@@ -31,7 +31,9 @@ import {
   FileText,
   Calendar,
   Check,
-  ChevronsUpDown
+  ChevronsUpDown,
+  Users,
+  List
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { DataTable } from "../common/DataTable";
@@ -118,6 +120,10 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [transactionsTotal, setTransactionsTotal] = useState(0);
   const [transactionsLoading, setTransactionsLoading] = useState(false);
 
+  // view modes for grouping
+  const [accountsViewMode, setAccountsViewMode] = useState<'flat' | 'grouped'>('grouped');
+  const [transactionsViewMode, setTransactionsViewMode] = useState<'flat' | 'grouped'>('grouped');
+
   // lookups
   const [prisoners, setPrisoners] = useState<any[]>([]);
   const [accountTypes, setAccountTypes] = useState<any[]>([]);
@@ -156,6 +162,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   const [accountFormErrors, setAccountFormErrors] = useState<Record<string,string>>({});
   // force remount AccountForm to reset its internal state when opening create/edit
   const [accountFormKey, setAccountFormKey] = useState(0);
+  // force DataTable remount to trigger refetch after CRUD operations
+  const [accountsTableKey, setAccountsTableKey] = useState(0);
+  const [transactionsTableKey, setTransactionsTableKey] = useState(0);
   const [transactionFormData, setTransactionFormData] = useState({
     property_prisoner_account: '',
     transaction_type: '',
@@ -344,9 +353,18 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
         balance: data.balance ?? '0',
       });
       toast.success('Account created');
+      // Reload accounts first to ensure table updates
+      await loadAccounts();
+      // Also reload transactions to update stats cards
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
       setIsCreateAccountDialogOpen(false);
-      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX' });
-      loadAccounts();
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+      setAccountFormErrors({});
+      // Force form remount
+      setAccountFormKey(prev => prev + 1);
     } catch (err) {
       console.error('create account error', err);
       toast.error('Failed to create account');
@@ -401,10 +419,16 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       });
       console.debug('updateAccount response', res);
       toast.success('Account updated');
+      // Reload both accounts and transactions to update table and stats
+      await loadAccounts();
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
       setIsEditAccountDialogOpen(false);
       setSelectedAccount(null);
-      // authoritative reload
-      await loadAccounts();
+      setAccountFormData({ prisoner: '', account_type: '', currency: 'UGX', balance: '0' });
+      setAccountFormErrors({});
     } catch (err) {
       console.debug('updateAccount error', err);
       console.error('update account error', err);
@@ -419,7 +443,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       console.debug('deleteAccount success', deleteAccountId);
       toast.success('Account deleted');
       setDeleteAccountId(null);
+      // Reload both accounts and transactions to update table and stats
       await loadAccounts();
+      await loadTransactions();
+      // Force DataTable remount to trigger refetch
+      setAccountsTableKey(prev => prev + 1);
+      setTransactionsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('deleteAccount error', err);
       console.error('delete account error', err);
@@ -453,6 +482,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reload
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('createTransaction error', err);
       console.error('create tx error', err);
@@ -497,6 +529,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reloads
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('updateTransaction error', err);
       console.error('update tx error', err);
@@ -518,6 +553,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       // authoritative reloads
       await loadTransactions();
       await loadAccounts();
+      // Force DataTable remount to trigger refetch
+      setTransactionsTableKey(prev => prev + 1);
+      setAccountsTableKey(prev => prev + 1);
     } catch (err) {
       console.debug('deleteTransaction error', err);
       console.error('delete tx error', err);
@@ -635,12 +673,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
   // Columns for DataTable
   const accountColumns = [
     { 
-      key: 'prisoner_name', 
+      key: 'prisoner_number', 
       label: 'Prisoner',
       render: (v: any, r: any) => (
         <div className="flex flex-col">
-          <span className="font-medium">{v}</span>
-          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+          <span className="font-medium">{r.prisoner_name || 'N/A'}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500 font-mono">{r.prisoner_number}</span>}
         </div>
       )
     },
@@ -734,12 +772,12 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       ),
     },
     { 
-      key: 'prisoner_name', 
+      key: 'prisoner_number', 
       label: 'Prisoner',
       render: (v: any, r: any) => (
         <div className="flex flex-col">
-          <span className="font-medium">{v}</span>
-          {r.prisoner_number && <span className="text-xs text-gray-500">{r.prisoner_number}</span>}
+          <span className="font-medium">{r.prisoner_name || 'N/A'}</span>
+          {r.prisoner_number && <span className="text-xs text-gray-500 font-mono">{r.prisoner_number}</span>}
         </div>
       )
     },
@@ -1345,14 +1383,32 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           {/* Accounts Table (DataTable) */}
           <Card>
             <CardContent className="pt-6">
+              {/* View Toggle for Accounts */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Prisoner Accounts</h3>
+                <Tabs value={accountsViewMode} onValueChange={(v: string) => setAccountsViewMode(v as 'flat' | 'grouped')}>
+                  <TabsList>
+                    <TabsTrigger value="grouped" className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Grouped
+                    </TabsTrigger>
+                    <TabsTrigger value="flat" className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      Flat
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <DataTable
+                key={accountsTableKey}
                 url="/property-management/prisoner-accounts/"
                 title="Accounts"
                 columns={accountColumns}
                 config={{
-                  grouping: {
-                    groupBy: 'prisoner_name',
-                    defaultExpanded: false,
+                  ...(accountsViewMode === 'grouped' ? {
+                    grouping: {
+                      groupBy: 'prisoner_number',
+                      defaultExpanded: false,
                     renderGroupHeader: (groupValue: string, items: any[]) => {
                       const firstItem = items[0];
                       
@@ -1371,8 +1427,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       return (
                         <div className="flex items-center justify-between py-2 px-4">
                           <div className="flex items-center gap-3">
+                            <Users className="h-5 w-5" style={{ color: '#650000' }} />
                             <div className="flex flex-col">
-                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                              <span className="font-semibold text-base">{groupValue} | {firstItem?.prisoner_name || 'Unknown'}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-6">
@@ -1437,7 +1494,8 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                         </div>
                       );
                     }
-                  },
+                    }
+                  } : {}),
                   expandable: {
                     isExpanded: (row: any) => expandedAccounts.has(row.id),
                     onToggle: (row: any) => toggleAccountExpansion(row.id),
@@ -1671,13 +1729,30 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           {/* Transactions Table (DataTable) */}
           <Card>
             <CardContent className="pt-6">
+              {/* View Toggle for Transactions */}
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-semibold">Prisoner Transactions</h3>
+                <Tabs value={transactionsViewMode} onValueChange={(v: string) => setTransactionsViewMode(v as 'flat' | 'grouped')}>
+                  <TabsList>
+                    <TabsTrigger value="grouped" className="flex items-center gap-2">
+                      <Users className="h-4 w-4" />
+                      Grouped
+                    </TabsTrigger>
+                    <TabsTrigger value="flat" className="flex items-center gap-2">
+                      <List className="h-4 w-4" />
+                      Flat
+                    </TabsTrigger>
+                  </TabsList>
+                </Tabs>
+              </div>
               <DataTable
+                key={transactionsTableKey}
                 url="/property-management/transactions/"
                 title="Transactions"
                 columns={updatedTransactionColumns}
-                config={{
+                config={transactionsViewMode === 'grouped' ? {
                   grouping: {
-                    groupBy: 'prisoner_name',
+                    groupBy: 'prisoner_number',
                     defaultExpanded: false,
                     renderGroupHeader: (groupValue: string, items: any[]) => {
                       const firstItem = items[0];
@@ -1726,8 +1801,9 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       return (
                         <div className="flex items-center justify-between py-2 px-4">
                           <div className="flex items-center gap-3">
+                            <Users className="h-5 w-5" style={{ color: '#650000' }} />
                             <div className="flex flex-col">
-                              <span className="font-semibold text-base">{groupValue || 'Unknown'}</span>
+                              <span className="font-semibold text-base">{groupValue} | {firstItem?.prisoner_name || 'Unknown'}</span>
                               {moreCurrencies && <span className="text-xs text-gray-500">{moreCurrencies}</span>}
                             </div>
                           </div>
@@ -1753,7 +1829,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                       );
                     }
                   }
-                }}
+                } : {}}
               />
             </CardContent>
           </Card>

@@ -43,7 +43,7 @@ const defaultConfig: DataTableConfig = {
   summary: true,
 };
 
-export function DataTable({ url, title, columns, config, searchPlaceholder = 'Search' }: DataTableProps) {
+export function DataTable({ url, title, columns, config }: DataTableProps) {
   const mergedConfig = { ...defaultConfig, ...config };
   const { region, district, station } = useFilters();
   
@@ -370,7 +370,7 @@ export function DataTable({ url, title, columns, config, searchPlaceholder = 'Se
                 <Search className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="text"
-                  placeholder={searchPlaceholder}
+                  placeholder="Search..."
                   value={searchTerm}
                   onChange={(e) => {
                     setSearchTerm(e.target.value);

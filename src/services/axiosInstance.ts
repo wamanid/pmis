@@ -50,12 +50,12 @@ axiosInstance.interceptors.request.use(
     }
     
     // Log request for debugging (remove in production)
-    console.log('API Request:', {
-      method: config.method?.toUpperCase(),
-      url: config.url,
-      params: config.params,
-      data: config.data,
-    });
+    // console.log('API Request:', {
+    //   method: config.method?.toUpperCase(),
+    //   url: config.url,
+    //   params: config.params,
+    //   data: config.data,
+    // });
     
     return config;
   },
@@ -69,11 +69,11 @@ axiosInstance.interceptors.request.use(
    axiosInstance.interceptors.response.use(
   (response) => {
     // Log response for debugging (remove in production)
-    console.log('API Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data,
-    });
+    // console.log('API Response:', {
+    //   status: response.status,
+    //   url: response.config.url,
+    //   data: response.data,
+    // });
     
     // Handle cases where backend returns 200 but with success: false
     if (response.data && response.data.success === false) {
@@ -93,7 +93,7 @@ axiosInstance.interceptors.request.use(
     if (error.response) {
       // Server responded with error status
       const { status, data } = error.response;
-      
+      console.log(error.response)
       switch (status) {
         case 400:
           toast.error(data?.message || 'Bad request. Please check your input.');

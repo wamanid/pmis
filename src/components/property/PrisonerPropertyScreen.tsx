@@ -24,6 +24,8 @@ import {
   ChevronRight,
   Package,
   User,
+  Users,
+  List,
   Tag,
   DollarSign,
   FileText,
@@ -491,6 +493,7 @@ export default function PrisonerPropertyScreen() {
   const [dataTableRefreshKey, setDataTableRefreshKey] = useState(0);
   const [previousPropertyStatus, setPreviousPropertyStatus] = useState('');
   const [statusChangeData, setStatusChangeData] = useState<any>(null);
+  const [viewMode, setViewMode] = useState<'flat' | 'grouped'>('grouped');
 
   // APIs integration
   const [propertyLoading, setPropertyLoading] = useState(true)
@@ -748,12 +751,38 @@ export default function PrisonerPropertyScreen() {
     };
   }, [properties]); // Only recalculate when properties array changes
 
+  // Helper to get currency text color for visual differentiation
+  const getCurrencyColor = (currencyCode: string) => {
+    const code = String(currencyCode).toUpperCase();
+    const colorMap: Record<string, string> = {
+      USD: '#166534',
+      US: '#166534',
+      EUR: '#1e40af',
+      EURO: '#1e40af',
+      GBP: '#6b21a8',
+      UGX: '#9a3412',
+      UGANDA: '#9a3412',
+      KES: '#991b1b',
+      KENYA: '#991b1b',
+      TZS: '#155e75',
+      TANZANIA: '#155e75',
+      RWF: '#3f6212',
+      RWANDA: '#3f6212',
+    };
+    return colorMap[code] || '#374151'; // Gray fallback
+  };
+
   // Define DataTable columns
   const columns: DataTableColumn[] = [
-    // Prisoner name column hidden when grouping is enabled (redundant)
     { 
-      key: 'prisoner_name', 
-      label: 'Prisoner', 
+      key: 'prisoner_number', 
+      label: 'Prisoner',
+      render: (v: any, r: any) => (
+        <div className="flex flex-col">
+          <span className="font-medium">{v}</span>
+          <span className="text-xs text-gray-500">{r.prisoner_name}</span>
+        </div>
+      ),
       sortable: true,
       filterable: true
     },
@@ -1011,9 +1040,27 @@ export default function PrisonerPropertyScreen() {
             </div>
 
             {/* Properties DataTable */}
-            <DataTable
-              key={dataTableRefreshKey}
-              url="/property-management/properties/"
+            <Card>
+              <CardContent className="pt-6">
+                {/* View Toggle */}
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold">Property Records</h3>
+                  <Tabs value={viewMode} onValueChange={(v: string) => setViewMode(v as 'flat' | 'grouped')}>
+                    <TabsList>
+                      <TabsTrigger value="grouped" className="flex items-center gap-2">
+                        <Users className="h-4 w-4" />
+                        Grouped
+                      </TabsTrigger>
+                      <TabsTrigger value="flat" className="flex items-center gap-2">
+                        <List className="h-4 w-4" />
+                        Flat
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                <DataTable
+                  key={dataTableRefreshKey}
+                  url="/property-management/properties/"
               title="Property Records"
               columns={columns}
               config={{
@@ -1026,11 +1073,13 @@ export default function PrisonerPropertyScreen() {
                 lengthMenu: [10, 25, 50, 100, -1],
                 pagination: true,
                 summary: true,
-                grouping: {
-                  groupBy: 'prisoner_name',
-                  defaultExpanded: false,
+                ...(viewMode === 'grouped' ? {
+                  grouping: {
+                    groupBy: 'prisoner_number',
+                    defaultExpanded: false,
 
-                renderGroupHeader: (prisonerName, items) => {
+                    renderGroupHeader: (groupValue, items) => {
+                      const firstItem = items[0];
                   // Calculate totals per currency
                   const currencyTotals: Record<string, { symbol: string; total: number }> = {};
                   
@@ -1049,17 +1098,6 @@ export default function PrisonerPropertyScreen() {
                   
                   // Format totals display
                   const currencyKeys = Object.keys(currencyTotals);
-                  let totalsDisplay = '';
-                  
-                  if (currencyKeys.length > 0) {
-                    totalsDisplay = currencyKeys.map(currencyName => {
-                      const { symbol, total } = currencyTotals[currencyName];
-                      const formattedTotal = new Intl.NumberFormat('en-US').format(total);
-                      return `${symbol} ${formattedTotal}`;
-                    }).join(' | ');
-                  } else {
-                    totalsDisplay = 'No currency items';
-                  }
                   
                   const statusCounts = items.reduce((acc, item) => {
                     acc[item.property_status_name] = (acc[item.property_status_name] || 0) + 1;
@@ -1069,17 +1107,34 @@ export default function PrisonerPropertyScreen() {
                   return (
                     <div className="flex items-center justify-between w-full py-1">
                       <div className="flex items-center gap-4">
-                        <span className="font-semibold text-base" style={{ color: '#650000' }}>
-                          {prisonerName}
+                        <Users className="h-5 w-5" style={{ color: '#650000' }} />
+                        <span className="font-semibold text-base">
+                          {groupValue} | {firstItem?.prisoner_name || 'Unknown'}
                         </span>
                         <span className="text-sm text-muted-foreground font-normal">
                           {items.length} {items.length === 1 ? 'property' : 'properties'}
                         </span>
                       </div>
                       <div className="flex items-center gap-4">
-                        <span className="text-sm font-medium">
-                          Total: {totalsDisplay}
-                        </span>
+                        <div className="text-sm font-medium flex items-center gap-2">
+                          <span className="text-gray-500">Total:</span>
+                          {currencyKeys.length > 0 ? (
+                            currencyKeys.map((currencyName, idx) => {
+                              const { symbol, total } = currencyTotals[currencyName];
+                              const color = getCurrencyColor(symbol);
+                              const formattedTotal = new Intl.NumberFormat('en-US').format(total);
+                              return (
+                                <span key={idx}>
+                                  <span style={{ color, fontWeight: '600' }}>{symbol}</span>{' '}
+                                  <span style={{ fontWeight: '600' }}>{formattedTotal}</span>
+                                  {idx < currencyKeys.length - 1 && <span className="mx-2"> |</span>}
+                                </span>
+                              );
+                            })
+                          ) : (
+                            <span>No currency items</span>
+                          )}
+                        </div>
                         <div className="flex gap-2">
                           {Object.entries(statusCounts).map(([status, count]) => (
                             <Badge key={status} variant="outline" className="text-xs">
@@ -1090,10 +1145,13 @@ export default function PrisonerPropertyScreen() {
                       </div>
                     </div>
                   );
-                },
-              },
-            }}
-          />
+                  },
+                }
+                } : {})
+              }}
+            />
+              </CardContent>
+            </Card>
           </>
         )
       }

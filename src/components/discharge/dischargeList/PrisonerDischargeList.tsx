@@ -793,116 +793,116 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
               </Card>
 
               {/* Property Accounts */}
-              {selectedRecord.property_accounts && selectedRecord.property_accounts.length > 0 && (
-                <Card>
-                  <div
-                    className="px-6 py-3"
-                    style={{ backgroundColor: '#faebd7', color: '#650000' }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Wallet className="h-5 w-5" />
-                      <h2>Property Accounts</h2>
-                    </div>
-                  </div>
-                  <CardContent className="pt-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {selectedRecord.property_accounts.map((account) => (
-                        <div
-                          key={account.id}
-                          className="p-4 border rounded-lg bg-gray-50"
-                        >
-                          <div className="flex justify-between items-center">
-                            <div>
-                              <p className="font-medium">{account.account_type_name}</p>
-                              <p className="text-sm text-gray-500">Account Type</p>
-                            </div>
-                            <div className="text-right">
-                              <p className="text-xl font-semibold" style={{ color: '#10B981' }}>
-                                {parseFloat(account.balance).toLocaleString()} {account.currency}
-                              </p>
-                              <p className="text-sm text-gray-500">Balance</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                      <div className="flex justify-between items-center">
-                        <p className="font-medium text-gray-700">Total Balance</p>
-                        <p className="text-2xl font-bold" style={{ color: '#10B981' }}>
-                          {selectedRecord.property_accounts.reduce(
-                            (sum, acc) => sum + parseFloat(acc.balance),
-                            0
-                          ).toLocaleString()} UGX
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/*{selectedRecord.property_accounts && selectedRecord.property_accounts.length > 0 && (*/}
+              {/*  <Card>*/}
+              {/*    <div*/}
+              {/*      className="px-6 py-3"*/}
+              {/*      style={{ backgroundColor: '#faebd7', color: '#650000' }}*/}
+              {/*    >*/}
+              {/*      <div className="flex items-center gap-2">*/}
+              {/*        <Wallet className="h-5 w-5" />*/}
+              {/*        <h2>Property Accounts</h2>*/}
+              {/*      </div>*/}
+              {/*    </div>*/}
+              {/*    <CardContent className="pt-6">*/}
+              {/*      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">*/}
+              {/*        {selectedRecord.property_accounts.map((account) => (*/}
+              {/*          <div*/}
+              {/*            key={account.id}*/}
+              {/*            className="p-4 border rounded-lg bg-gray-50"*/}
+              {/*          >*/}
+              {/*            <div className="flex justify-between items-center">*/}
+              {/*              <div>*/}
+              {/*                <p className="font-medium">{account.account_type_name}</p>*/}
+              {/*                <p className="text-sm text-gray-500">Account Type</p>*/}
+              {/*              </div>*/}
+              {/*              <div className="text-right">*/}
+              {/*                <p className="text-xl font-semibold" style={{ color: '#10B981' }}>*/}
+              {/*                  {parseFloat(account.balance).toLocaleString()} {account.currency}*/}
+              {/*                </p>*/}
+              {/*                <p className="text-sm text-gray-500">Balance</p>*/}
+              {/*              </div>*/}
+              {/*            </div>*/}
+              {/*          </div>*/}
+              {/*        ))}*/}
+              {/*      </div>*/}
+              {/*      <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">*/}
+              {/*        <div className="flex justify-between items-center">*/}
+              {/*          <p className="font-medium text-gray-700">Total Balance</p>*/}
+              {/*          <p className="text-2xl font-bold" style={{ color: '#10B981' }}>*/}
+              {/*            {selectedRecord.property_accounts.reduce(*/}
+              {/*              (sum, acc) => sum + parseFloat(acc.balance),*/}
+              {/*              0*/}
+              {/*            ).toLocaleString()} UGX*/}
+              {/*          </p>*/}
+              {/*        </div>*/}
+              {/*      </div>*/}
+              {/*    </CardContent>*/}
+              {/*  </Card>*/}
+              {/*)}*/}
 
               {/* Properties */}
-              {selectedRecord.properties && selectedRecord.properties.length > 0 && (
-                <Card>
-                  <div
-                    className="px-6 py-3"
-                    style={{ backgroundColor: '#faebd7', color: '#650000' }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Package className="h-5 w-5" />
-                      <h2>Prisoner Properties</h2>
-                    </div>
-                  </div>
-                  <CardContent className="pt-6">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-gray-100">
-                            <TableHead className="font-bold">Property Type</TableHead>
-                            <TableHead className="font-bold">Property Item</TableHead>
-                            <TableHead className="font-bold">Quantity</TableHead>
-                            <TableHead className="font-bold">Unit</TableHead>
-                            <TableHead className="font-bold">Status</TableHead>
-                            <TableHead className="font-bold">Bag Number</TableHead>
-                            <TableHead className="font-bold">Note</TableHead>
-                            <TableHead className="font-bold">Destination</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {selectedRecord.properties.map((property) => (
-                            <TableRow key={property.id} className="hover:bg-gray-50">
-                              <TableCell>{property.property_type_name}</TableCell>
-                              <TableCell className="font-medium">{property.property_item_name}</TableCell>
-                              <TableCell>{property.quantity}</TableCell>
-                              <TableCell>{property.measurement_unit_name}</TableCell>
-                              <TableCell>
-                                <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">
-                                  {property.property_status_name}
-                                </span>
-                              </TableCell>
-                              <TableCell className="font-mono text-sm">{property.bag_number}</TableCell>
-                              <TableCell className="max-w-xs">{property.note}</TableCell>
-                              <TableCell>{property.destination || '-'}</TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                    <div className="mt-4 p-3 bg-gray-50 border rounded-lg">
-                      <p className="text-sm text-gray-600">
-                        Total Items: <span className="font-medium">{selectedRecord.properties.length}</span>
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+              {/*{selectedRecord.properties && selectedRecord.properties.length > 0 && (*/}
+              {/*  <Card>*/}
+              {/*    <div*/}
+              {/*      className="px-6 py-3"*/}
+              {/*      style={{ backgroundColor: '#faebd7', color: '#650000' }}*/}
+              {/*    >*/}
+              {/*      <div className="flex items-center gap-2">*/}
+              {/*        <Package className="h-5 w-5" />*/}
+              {/*        <h2>Prisoner Properties</h2>*/}
+              {/*      </div>*/}
+              {/*    </div>*/}
+              {/*    <CardContent className="pt-6">*/}
+              {/*      <div className="overflow-x-auto">*/}
+              {/*        <Table>*/}
+              {/*          <TableHeader>*/}
+              {/*            <TableRow className="bg-gray-100">*/}
+              {/*              <TableHead className="font-bold">Property Type</TableHead>*/}
+              {/*              <TableHead className="font-bold">Property Item</TableHead>*/}
+              {/*              <TableHead className="font-bold">Quantity</TableHead>*/}
+              {/*              <TableHead className="font-bold">Unit</TableHead>*/}
+              {/*              <TableHead className="font-bold">Status</TableHead>*/}
+              {/*              <TableHead className="font-bold">Bag Number</TableHead>*/}
+              {/*              <TableHead className="font-bold">Note</TableHead>*/}
+              {/*              <TableHead className="font-bold">Destination</TableHead>*/}
+              {/*            </TableRow>*/}
+              {/*          </TableHeader>*/}
+              {/*          <TableBody>*/}
+              {/*            {selectedRecord.properties.map((property) => (*/}
+              {/*              <TableRow key={property.id} className="hover:bg-gray-50">*/}
+              {/*                <TableCell>{property.property_type_name}</TableCell>*/}
+              {/*                <TableCell className="font-medium">{property.property_item_name}</TableCell>*/}
+              {/*                <TableCell>{property.quantity}</TableCell>*/}
+              {/*                <TableCell>{property.measurement_unit_name}</TableCell>*/}
+              {/*                <TableCell>*/}
+              {/*                  <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-sm">*/}
+              {/*                    {property.property_status_name}*/}
+              {/*                  </span>*/}
+              {/*                </TableCell>*/}
+              {/*                <TableCell className="font-mono text-sm">{property.bag_number}</TableCell>*/}
+              {/*                <TableCell className="max-w-xs">{property.note}</TableCell>*/}
+              {/*                <TableCell>{property.destination || '-'}</TableCell>*/}
+              {/*              </TableRow>*/}
+              {/*            ))}*/}
+              {/*          </TableBody>*/}
+              {/*        </Table>*/}
+              {/*      </div>*/}
+              {/*      <div className="mt-4 p-3 bg-gray-50 border rounded-lg">*/}
+              {/*        <p className="text-sm text-gray-600">*/}
+              {/*          Total Items: <span className="font-medium">{selectedRecord.properties.length}</span>*/}
+              {/*        </p>*/}
+              {/*      </div>*/}
+              {/*    </CardContent>*/}
+              {/*  </Card>*/}
+              {/*)}*/}
             </div>
           )}
           <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setIsViewOpen(false)}>
               Close
             </Button>
-            {selectedRecord && mockDischargeTypes[selectedRecord.discharge_type]?.on_premise && (
+            {selectedRecord && types[selectedRecord.discharge_type]?.on_premise && (
               <Button 
                 onClick={() => {
                   // Prepare prisoner data for gate pass
