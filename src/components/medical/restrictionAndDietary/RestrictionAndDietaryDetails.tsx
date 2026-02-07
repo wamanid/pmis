@@ -67,13 +67,13 @@ export default function RestrictionAndDietaryDetails() {
 
           {/* Tab Content */}
           {activeTab === 'restrictions' && (
-            <div>
+            <div className="p-6">
               <PrisonerRestrictionList selectedPrisonerId={selectedPrisonerId} />
             </div>
           )}
 
           {activeTab === 'dietary' && (
-            <div>
+            <div className="p-6">
               <DietaryRequirementList selectedPrisonerId={selectedPrisonerId} />
             </div>
           )}

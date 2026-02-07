@@ -369,7 +369,7 @@ const PrisonerRestrictionList: React.FC<PrisonerRestrictionListProps> = ({
 
   return (
     <>
-      <div className="space-y-4">
+      <div className="space-y-6">
         {/* Header with View Toggle and Add Button */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
