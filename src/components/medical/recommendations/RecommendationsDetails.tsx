@@ -1,17 +1,12 @@
 ﻿import React, { useState } from 'react';
 import { Card, CardContent } from '../../ui/card';
 import { ThumbsUp } from 'lucide-react';
-import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
 import WardRecommendationList from './wardRecommendations/WardRecommendationList';
 import TransferRecommendationList from './transferRecommendations/TransferRecommendationList';
 
 export default function RecommendationsDetails() {
-  const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
+  const [selectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'ward' | 'transfer'>('ward');
-
-  const handlePrisonerChange = (prisonerId: string) => {
-    setSelectedPrisonerId(prisonerId);
-  };
 
   return (
     <div className="space-y-6">
@@ -20,17 +15,6 @@ export default function RecommendationsDetails() {
         <ThumbsUp className="h-6 w-6" />
         <h1 className="text-2xl">Medical Recommendations</h1>
       </div>
-
-      {/* Prisoner Information Section */}
-      <Card style={{ borderTop: '3px solid #650000' }}>
-        <CardContent className="pt-6">
-          <PrisonerSearchScreenWider
-            value={selectedPrisonerId}
-            onChange={handlePrisonerChange}
-            showTitle={true}
-          />
-        </CardContent>
-      </Card>
 
       {/* Recommendations Tabs */}
       <Card>

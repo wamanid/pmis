@@ -1,94 +1,148 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Bed, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
-
-interface Prisoner {
-  id: string;
-  prisoner_number: string;
-  full_name: string;
-}
-
-interface Ward {
-  id: string;
-  name: string;
-  capacity?: number;
-  location?: string;
-}
-
-interface WardRecommendation {
-  id?: string;
-  prisoner_name?: string;
-  prisoner_number?: string;
-  ward_name?: string;
-  recommendation_notes: string;
-  prisoner: string;
-  recommended_ward: string;
-}
+import { toast } from 'sonner';
+import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
+import SearchableSelect from '../../../common/SearchableSelect';
+import {
+  WardRecommendation,
+  Ward,
+  fetchWards,
+} from '../../../../services/medical/recommendations/wardRecommendationService';
 
 interface WardRecommendationFormProps {
-  recommendation?: WardRecommendation | null;
+  initialData?: WardRecommendation | null;
   onSubmit: (recommendation: WardRecommendation) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
 }
 
-const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recommendation, onSubmit, onCancel, mode }) => {
-  const [formData, setFormData] = useState<WardRecommendation>({
-    recommendation_notes: '',
+const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
+  initialData,
+  onSubmit,
+  onCancel,
+  mode,
+}) => {
+  const [formData, setFormData] = useState<Partial<WardRecommendation>>({
     prisoner: '',
     recommended_ward: '',
+    recommendation_notes: '',
   });
 
-  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
-  const [wards, setWards] = useState<Ward[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
-
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  useEffect(() => {
-    if (recommendation && dataLoaded) {
-      setFormData(recommendation);
+  const [selectedPrisoner, setSelectedPrisoner] = useState<any>(null);
+  const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
+  
+  // Initialize ward value immediately - CRITICAL for edit mode
+  const isWardInitialized = React.useRef(false);
+  const [localWardValue, setLocalWardValue] = useState<string | null>(() => {
+    if (initialData && mode !== 'create' && initialData.recommended_ward) {
+      isWardInitialized.current = true;
+      return initialData.recommended_ward;
     }
-  }, [recommendation, dataLoaded]);
+    return null;
+  });
+  
+  const [loading, setLoading] = useState(false);
 
-  const loadDropdownData = () => {
-    // Mock Prisoners
-    setPrisoners([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
+  // Derive initialItem for ward dropdown - CRITICAL for edit mode
+  const initialWardItem = React.useMemo(() => {
+    if (initialData && mode !== 'create' && initialData.recommended_ward && initialData.ward_name) {
+      return {
+        id: initialData.recommended_ward,
+        name: initialData.ward_name,
+        ward_number: '',
+        ward_area: '',
+        description: '',
+        station_name: '',
+        ward_type_name: '',
+        block_name: '',
+        security_classification_name: '',
+        ward_capacity: '',
+        occupancy: '',
+        congestion: '',
+        is_active: true,
+      };
+    }
+    return null;
+  }, [initialData, mode]);
 
-    // Mock Wards
-    setWards([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'General Ward A', capacity: 20, location: 'Block A' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'Intensive Care Unit (ICU)', capacity: 5, location: 'Block B' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'Isolation Ward', capacity: 10, location: 'Block C' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'Psychiatric Ward', capacity: 15, location: 'Block D' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'Recovery Ward', capacity: 12, location: 'Block A' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb6', name: 'Tuberculosis Ward', capacity: 8, location: 'Block E' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb7', name: 'HIV/AIDS Ward', capacity: 10, location: 'Block F' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb8', name: 'General Ward B', capacity: 25, location: 'Block G' },
-    ]);
+  // Initialize form data on edit/view mode
+  useEffect(() => {
+    if (initialData && mode !== 'create') {
+      setFormData({
+        prisoner: initialData.prisoner,
+        recommended_ward: initialData.recommended_ward,
+        recommendation_notes: initialData.recommendation_notes || '',
+      });
 
-    setDataLoaded(true);
+      // Set local ward value only if not already initialized OR if value changed
+      const newWardId = initialData.recommended_ward || null;
+      if (newWardId && (!isWardInitialized.current || localWardValue !== newWardId)) {
+        setLocalWardValue(newWardId);
+        isWardInitialized.current = true;
+      }
+
+      // For edit/view mode, set initial values for display
+      if (initialData.prisoner) {
+        setSelectedPrisoner({
+          id: initialData.prisoner,
+          full_name: initialData.prisoner_name,
+          prisoner_number: initialData.prisoner_number,
+        });
+      }
+
+      if (initialData.recommended_ward && initialWardItem) {
+        setSelectedWard(initialWardItem);
+      }
+    } else if (mode === 'create') {
+      // Reset on create mode
+      setLocalWardValue(null);
+      isWardInitialized.current = false;
+    }
+  }, [initialData, mode, initialWardItem, localWardValue]);
+
+  // Fetch wards callback for SearchableSelect
+  const fetchWardsPaginated = useCallback(
+    async (opts: { search?: string; page?: number; page_size?: number }, signal?: AbortSignal) => {
+      try {
+        const page = opts.page || 1;
+        const pageSize = opts.page_size || 25;
+        const search = opts.search || '';
+        const response = await fetchWards(page, pageSize, search, signal);
+        return response;
+      } catch (error) {
+        console.error('Failed to fetch wards:', error);
+        return { items: [], count: 0, next: null };
+      }
+    },
+    []
+  );
+
+  const handlePrisonerSelect = (val: string | null) => {
+    setFormData((prev) => ({ ...prev, prisoner: val || '' }));
+  };
+
+  const handlePrisonerItemSelect = (prisoner: any) => {
+    setSelectedPrisoner(prisoner);
+  };
+
+  const handleWardSelect = (val: string | null) => {
+    setLocalWardValue(val);
+    setFormData((prev) => ({ ...prev, recommended_ward: val || '' }));
+  };
+
+  const handleWardItemSelect = (ward: Ward | null) => {
+    setSelectedWard(ward);
   };
 
   const handleInputChange = (field: keyof WardRecommendation, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.prisoner) {
@@ -102,50 +156,43 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedWard = wards.find((w) => w.id === formData.recommended_ward);
-
+    try {
       const submitData: WardRecommendation = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        prisoner_number: selectedPrisoner?.prisoner_number || '',
-        ward_name: selectedWard?.name || '',
+        id: initialData?.id,
+        prisoner: formData.prisoner!,
+        prisoner_name: selectedPrisoner?.full_name || initialData?.prisoner_name || '',
+        prisoner_number: selectedPrisoner?.prisoner_number || initialData?.prisoner_number || '',
+        recommended_ward: formData.recommended_ward!,
+        ward_name: selectedWard?.name || initialData?.ward_name || '',
+        recommendation_notes: formData.recommendation_notes || '',
+        created_datetime: initialData?.created_datetime,
+        updated_datetime: initialData?.updated_datetime,
+        deleted_datetime: initialData?.deleted_datetime,
+        created_by: initialData?.created_by,
+        updated_by: initialData?.updated_by,
+        deleted_by: initialData?.deleted_by,
+        is_active: initialData?.is_active,
       };
 
-      onSubmit(submitData);
-      setLoading(false);
+      await onSubmit(submitData);
 
       if (mode === 'create') {
-        toast.success('Ward recommendation created successfully');
         setFormData({
-          recommendation_notes: '',
           prisoner: '',
           recommended_ward: '',
+          recommendation_notes: '',
         });
-      } else {
-        toast.success('Ward recommendation updated successfully');
+        setSelectedPrisoner(null);
+        setSelectedWard(null);
       }
-    }, 500);
+    } catch (error) {
+      // Error already handled in parent component
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isReadOnly = mode === 'view';
-
-  // Get display values for view mode
-  const getDisplayValue = (field: string, id: string) => {
-    if (!id) return 'N/A';
-    
-    switch (field) {
-      case 'prisoner':
-        const prisoner = prisoners.find(p => p.id === id);
-        return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'recommended_ward':
-        const ward = wards.find(w => w.id === id);
-        return ward ? `${ward.name} (${ward.location}) - Capacity: ${ward.capacity}` : id;
-      default:
-        return id;
-    }
-  };
 
   return (
     <Card className="w-full">
@@ -164,74 +211,74 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({ recomme
               Recommendation Details
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Prisoner Selection */}
               <div className="space-y-2">
                 <Label htmlFor="prisoner">
                   Prisoner <span className="text-red-500">*</span>
                 </Label>
-                {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('prisoner', formData.prisoner)}
+                {isReadOnly || mode === 'edit' ? (
+                  <div className="p-2 bg-gray-50 rounded border text-sm">
+                    {selectedPrisoner ? (
+                      <>
+                        {selectedPrisoner.prisoner_number} - {selectedPrisoner.full_name}
+                      </>
+                    ) : (
+                      'N/A'
+                    )}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.prisoner}
-                    onValueChange={(value) => handleInputChange('prisoner', value)}
-                  >
-                    <SelectTrigger id="prisoner">
-                      <SelectValue placeholder="Select prisoner" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {prisoners.map((p) => (
-                        <SelectItem key={p.id} value={p.id}>
-                          {p.prisoner_number} - {p.full_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <CustomPrisonerSearch
+                    value={formData.prisoner || null}
+                    onChange={handlePrisonerSelect}
+                    onSelectItem={handlePrisonerItemSelect}
+                    disabled={loading}
+                    idField="id"
+                    labelField="full_name"
+                  />
                 )}
               </div>
 
+              {/* Ward Selection */}
               <div className="space-y-2">
                 <Label htmlFor="recommended_ward">
                   Recommended Ward <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('recommended_ward', formData.recommended_ward)}
+                  <div className="p-2 bg-gray-50 rounded border text-sm">
+                    {selectedWard?.name || 'N/A'}
                   </div>
                 ) : (
-                  <Select
-                    value={formData.recommended_ward}
-                    onValueChange={(value) => handleInputChange('recommended_ward', value)}
-                  >
-                    <SelectTrigger id="recommended_ward">
-                      <SelectValue placeholder="Select ward" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {wards.map((ward) => (
-                        <SelectItem key={ward.id} value={ward.id}>
-                          {ward.name} ({ward.location}) - Capacity: {ward.capacity}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <SearchableSelect<Ward>
+                    key={`ward-${initialData?.id}-${mode}`}
+                    value={localWardValue}
+                    onChange={handleWardSelect}
+                    fetchPaginated={fetchWardsPaginated}
+                    labelField="name"
+                    idField="id"
+                    onSelectItem={handleWardItemSelect}
+                    initialItem={initialWardItem ?? undefined}
+                    placeholder="Select ward"
+                    disabled={loading}
+                  />
                 )}
               </div>
             </div>
 
+            {/* Recommendation Notes */}
             <div className="space-y-2">
               <Label htmlFor="recommendation_notes">Recommendation Notes</Label>
               <Textarea
                 id="recommendation_notes"
-                value={formData.recommendation_notes}
+                value={formData.recommendation_notes || ''}
                 onChange={(e) => handleInputChange('recommendation_notes', e.target.value)}
                 placeholder="Enter reasons for recommending this ward, medical condition, required care level, treatment plan, special requirements, etc..."
                 rows={6}
-                disabled={isReadOnly}
+                disabled={isReadOnly || loading}
               />
             </div>
           </div>
 
+          {/* Action Buttons */}
           {!isReadOnly && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>

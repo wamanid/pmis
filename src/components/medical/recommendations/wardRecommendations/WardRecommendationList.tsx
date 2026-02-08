@@ -1,366 +1,290 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Button } from '../../../ui/button';
-import { Input } from '../../../ui/input';
-import { Label } from '../../../ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../../ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../../ui/alert-dialog';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import { Card, CardContent } from '../../../ui/card';
-import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { Button } from '../../../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+  DialogHeader,
+} from '../../../ui/dialog';
+import { Plus, Eye, Pencil, Trash } from 'lucide-react';
+import { toast } from 'sonner';
 import WardRecommendationForm from './WardRecommendationForm';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../ui/dialog';
-
-interface WardRecommendation {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  ward_name: string;
-  recommendation_notes: string;
-  prisoner: string;
-  recommended_ward: string;
-}
+import { DataTable } from '../../../common/DataTable';
+import { DataTableColumn } from '../../../common/DataTable.types';
+import ConfirmDialog from '../../../common/ConfirmDialog';
+import {
+  WardRecommendation,
+  fetchWardRecommendationById,
+  createWardRecommendation,
+  updateWardRecommendation,
+  deleteWardRecommendation,
+  WARD_RECOMMENDATION_API_ENDPOINTS,
+} from '../../../../services/medical/recommendations/wardRecommendationService';
 
 interface WardRecommendationListProps {
   selectedPrisonerId?: string;
 }
 
-// Mock data
-const mockWardRecommendations: WardRecommendation[] = [
-  {
-    id: '1',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    prisoner_name: 'John Doe',
-    prisoner_number: 'PR-2024-001',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
-    ward_name: 'Intensive Care Unit (ICU)',
-    recommendation_notes: 'Prisoner requires intensive medical care due to severe pneumonia with respiratory complications. Continuous monitoring and specialized treatment needed. Patient showing signs of respiratory distress and requires 24/7 nursing care with oxygen therapy and IV antibiotics.',
-  },
-  {
-    id: '2',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    prisoner_name: 'Jane Smith',
-    prisoner_number: 'PR-2024-002',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
-    ward_name: 'Isolation Ward',
-    recommendation_notes: 'Active tuberculosis case requiring isolation to prevent spread. Multi-drug treatment regimen to be administered. Patient tested positive for TB, requires strict isolation protocols and daily medication monitoring. Expected duration: 6 months.',
-  },
-  {
-    id: '3',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
-    prisoner_name: 'Michael Johnson',
-    prisoner_number: 'PR-2024-003',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
-    ward_name: 'Psychiatric Ward',
-    recommendation_notes: 'Prisoner showing signs of acute psychotic episode with aggressive behavior. Psychiatric evaluation completed by Dr. Mutesi. Requires controlled environment, medication management, and regular counseling sessions. Safety concerns require specialized psychiatric nursing care.',
-  },
-  {
-    id: '4',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
-    prisoner_name: 'Emily Davis',
-    prisoner_number: 'PR-2024-004',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb5',
-    ward_name: 'Recovery Ward',
-    recommendation_notes: 'Post-operative care following appendectomy performed on Nov 11, 2024. Requires monitoring during recovery period. Daily wound assessment and pain management needed. Expected stay 5-7 days with gradual mobilization and dietary progression.',
-  },
-  {
-    id: '5',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
-    prisoner_name: 'Robert Lee',
-    prisoner_number: 'PR-2024-005',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
-    ward_name: 'General Ward A',
-    recommendation_notes: 'Mild gastroenteritis requiring observation and IV fluid therapy. Non-critical condition but requires monitoring to prevent dehydration. Patient experiencing nausea, vomiting, and diarrhea. IV rehydration and anti-emetics prescribed. Expected recovery in 2-3 days.',
-  },
-  {
-    id: '6',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    prisoner_name: 'Jane Smith',
-    prisoner_number: 'PR-2024-002',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb7',
-    ward_name: 'HIV/AIDS Ward',
-    recommendation_notes: 'Patient diagnosed with HIV/AIDS, requires specialized care and antiretroviral therapy (ART). Opportunistic infections being managed. Requires nutritional support, counseling, and adherence monitoring for medication compliance.',
-  },
-  {
-    id: '7',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    prisoner_name: 'John Doe',
-    prisoner_number: 'PR-2024-001',
-    recommended_ward: '3fa85f64-5717-4562-b3fc-2c963f66afb8',
-    ward_name: 'General Ward B',
-    recommendation_notes: 'Follow-up care after ICU discharge. Patient condition stabilized, transferred for continued monitoring and rehabilitation. Still requires regular vital signs checks and medication management but no longer critical.',
-  },
-];
-
 const WardRecommendationList: React.FC<WardRecommendationListProps> = ({ selectedPrisonerId }) => {
-  const [records, setRecords] = useState<WardRecommendation[]>(mockWardRecommendations);
-  const [filteredRecords, setFilteredRecords] = useState<WardRecommendation[]>(mockWardRecommendations);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [tableKey, setTableKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogKey, setDialogKey] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<WardRecommendation | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<WardRecommendation | null>(null);
 
-  useEffect(() => {
-    filterRecords();
-  }, [searchTerm, records, selectedPrisonerId]);
+  // Build table URL with filters
+  const tableUrl = useMemo(() => {
+    let url = WARD_RECOMMENDATION_API_ENDPOINTS.WARD_RECOMMENDATIONS.replace(/^\//, '');
+    const params = new URLSearchParams();
 
-  const filterRecords = () => {
-    let filtered = [...records];
+    if (selectedPrisonerId) params.append('prisoner', selectedPrisonerId);
 
-    if (selectedPrisonerId) {
-      filtered = filtered.filter((record) => record.prisoner === selectedPrisonerId);
-    }
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  }, [selectedPrisonerId]);
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (record) =>
-          record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.prisoner_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.ward_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    setFilteredRecords(filtered);
-    setCurrentPage(1);
-  };
-
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedRecord(null);
     setFormMode('create');
+    setDialogKey((prev) => prev + 1);
     setDialogOpen(true);
-  };
+  }, []);
 
-  const handleView = (record: WardRecommendation) => {
-    setSelectedRecord(record);
-    setFormMode('view');
-    setDialogOpen(true);
-  };
-
-  const handleEdit = (record: WardRecommendation) => {
-    setSelectedRecord(record);
-    setFormMode('edit');
-    setDialogOpen(true);
-  };
-
-  const handleFormSubmit = (data: WardRecommendation) => {
-    if (formMode === 'create') {
-      const newRecord: WardRecommendation = {
-        ...data,
-        id: `${records.length + 1}`,
-      };
-      setRecords([...records, newRecord]);
-      toast.success('Ward recommendation created successfully');
-    } else if (formMode === 'edit') {
-      setRecords(records.map((r) => (r.id === selectedRecord?.id ? { ...data, id: r.id } : r)));
-      toast.success('Ward recommendation updated successfully');
+  const handleView = useCallback(async (record: WardRecommendation) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
     }
-    setDialogOpen(false);
+    try {
+      const fullRecord = await fetchWardRecommendationById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('view');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch ward recommendation details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
+  }, []);
+
+  const handleEdit = useCallback(async (record: WardRecommendation) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
+    }
+    try {
+      const fullRecord = await fetchWardRecommendationById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('edit');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch ward recommendation details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
+  }, []);
+
+  const handleFormSubmit = async (data: WardRecommendation) => {
+    try {
+      if (formMode === 'create') {
+        await createWardRecommendation(data);
+        toast.success('Ward recommendation created successfully');
+        setTableKey((prev) => prev + 1);
+      } else if (formMode === 'edit' && selectedRecord?.id) {
+        await updateWardRecommendation(selectedRecord.id, data);
+        toast.success('Ward recommendation updated successfully');
+        setTableKey((prev) => prev + 1);
+      }
+      setDialogOpen(false);
+    } catch (error: any) {
+      console.error('Failed to save ward recommendation:', error);
+      toast.error(error.response?.data?.message || 'Failed to save record');
+      throw error;
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setRecordToDelete(id);
-    setShowDeleteDialog(true);
-  };
+  const handleDeleteClick = useCallback((record: WardRecommendation) => {
+    setRecordToDelete(record);
+    setDeleteDialogOpen(true);
+  }, []);
 
-  const confirmDelete = () => {
-    if (recordToDelete) {
-      setRecords(records.filter((record) => record.id !== recordToDelete));
+  const handleDelete = useCallback(async () => {
+    if (!recordToDelete?.id) return;
+    try {
+      await deleteWardRecommendation(recordToDelete.id);
       toast.success('Ward recommendation deleted successfully');
-      setShowDeleteDialog(false);
+      setTableKey((prev) => prev + 1);
+      setRecordToDelete(null);
+    } catch (error: any) {
+      console.error('Failed to delete ward recommendation:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete record');
+      throw error;
     }
-  };
+  }, [recordToDelete]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentRecords = filteredRecords.slice(startIndex, endIndex);
+  // Column definitions - MUST be after handler functions
+  const columns: DataTableColumn[] = useMemo(
+    () => [
+      {
+        key: 'prisoner_name',
+        label: 'Prisoner Name',
+        render: (value: any) => (
+          <span className="font-medium">{value || 'N/A'}</span>
+        ),
+      },
+      {
+        key: 'prisoner_number',
+        label: 'Prisoner Number',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'ward_name',
+        label: 'Recommended Ward',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'recommendation_notes',
+        label: 'Recommendation Notes',
+        render: (value: any) => {
+          if (!value) return <span className="text-gray-400">No notes</span>;
+          const truncated = value.length > 80 ? `${value.substring(0, 80)}...` : value;
+          return <span title={value}>{truncated}</span>;
+        },
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (_: any, row: any) => (
+          <div className="flex items-center gap-2 justify-start">
+            <Button
+              key={`view-${row.id}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => handleView(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              key={`edit-${row.id}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              key={`delete-${row.id}`}
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteClick(row)}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [handleView, handleEdit, handleDeleteClick]
+  );
 
   return (
-    <>
-      <Card>
-        <CardContent className="p-6">
-          {/* Filters and Search */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Search by prisoner, number, or ward..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+    <div className="space-y-4 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Ward Recommendations</h1>
+          <p className="text-gray-600 text-sm mt-1">Manage ward recommendations for prisoners</p>
+        </div>
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Recommendation
+        </Button>
+      </div>
 
-            <div className="flex items-end">
-              <Button
-                onClick={handleCreate}
-                style={{ backgroundColor: '#650000' }}
-                className="text-white hover:opacity-90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Recommendation
-              </Button>
-            </div>
-          </div>
+      {/* DataTable */}
+      <DataTable
+        key={`table-${tableKey}`}
+        url={tableUrl}
+        title="Ward Recommendations"
+        columns={columns}
+        config={{
+          search: true,
+          export: {
+            csv: true,
+            pdf: true,
+            print: true,
+          },
+        }}
+      />
 
-          {/* Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>Prisoner Name</TableHead>
-                  <TableHead>Prisoner Number</TableHead>
-                  <TableHead>Recommended Ward</TableHead>
-                  <TableHead>Recommendation Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center py-8 text-gray-500">
-                      No ward recommendation records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentRecords.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{record.prisoner_name}</TableCell>
-                      <TableCell>{record.prisoner_number}</TableCell>
-                      <TableCell>{record.ward_name}</TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="line-clamp-2" title={record.recommendation_notes}>
-                          {record.recommendation_notes || 'No notes'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleView(record)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(record)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(record.id)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {filteredRecords.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-500">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of{' '}
-                {filteredRecords.length} entries
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
-          <DialogTitle>Ward Recommendation Form</DialogTitle>
-          <DialogDescription>
-            Recommend a prisoner for ward admission based on medical needs.
-          </DialogDescription>
+      {/* Form Dialog */}
+      <Dialog
+        key={`dialog-${dialogKey}`}
+        open={dialogOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) {
+            setDialogOpen(false);
+            setSelectedRecord(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e: Event) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {formMode === 'create' ? 'Create Ward Recommendation' : 
+               formMode === 'edit' ? 'Edit Ward Recommendation' : 
+               'View Ward Recommendation'}
+            </DialogTitle>
+          </DialogHeader>
           <WardRecommendationForm
-            recommendation={selectedRecord}
+            mode={formMode}
+            initialData={selectedRecord}
             onSubmit={handleFormSubmit}
             onCancel={() => setDialogOpen(false)}
-            mode={formMode}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the ward recommendation record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete Ward Recommendation"
+        description="Are you sure you want to delete this ward recommendation? This action cannot be undone."
+        details={
+          recordToDelete ? (
+            <div className="bg-gray-50 p-3 rounded-md text-sm space-y-1">
+              <p key="prisoner-info">
+                <span className="font-medium">Prisoner:</span>{' '}
+                {recordToDelete.prisoner_name} ({recordToDelete.prisoner_number})
+              </p>
+              <p key="ward-info">
+                <span className="font-medium">Recommended Ward:</span> {recordToDelete.ward_name || 'N/A'}
+              </p>
+              {recordToDelete.recommendation_notes ? (
+                <p key="notes-info">
+                  <span className="font-medium">Notes:</span>{' '}
+                  {recordToDelete.recommendation_notes.length > 100
+                    ? `${recordToDelete.recommendation_notes.substring(0, 100)}...`
+                    : recordToDelete.recommendation_notes}
+                </p>
+              ) : null}
+            </div>
+          ) : undefined
+        }
+      />
+    </div>
   );
 };
 
