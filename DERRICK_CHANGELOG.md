@@ -10,6 +10,90 @@ All notable changes to this project should be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Medical Transfer Recommendations Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Transfer Recommendations module with live backend API integration
+  - **Service Layer**: Created `transferRecommendationService.ts` with centralized API endpoints
+    - `TRANSFER_RECOMMENDATION_API_ENDPOINTS` constant: TRANSFER_RECOMMENDATIONS, TRANSFER_REASONS, STATIONS, HOSPITALS, REFERRAL_CATEGORIES, PRISONERS
+    - CRUD functions: `createTransferRecommendation`, `updateTransferRecommendation`, `deleteTransferRecommendation`, `fetchTransferRecommendationById`
+    - Paginated fetch functions with cancellation error handling: `fetchTransferRecommendations`, `fetchTransferReasons`, `fetchStations`, `fetchHospitals`, `fetchReferralCategories`
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+    - Interfaces: `TransferRecommendation` (15 fields), `TransferRecommendationReason`, `Station`, `Hospital`, `ReferralCategory`, `Prisoner`, `PaginatedResponse<T>`
+  - **TransferRecommendationList Migration to DataTable**:
+    - Replaced manual table implementation (removed 88 lines of manual table JSX) with enterprise `DataTable` component
+    - Server-side pagination, search, sort, and filter capabilities
+    - Column definitions: prisoner name (bold), prisoner number, reason name, hospital name, category (color-coded badges), notes (truncated at 80 chars with hover tooltip)
+    - Category badges: Emergency (red), Urgent (orange), Routine (blue), Elective (green), Follow-up (purple)
+    - Actions column with View/Edit/Delete icon buttons
+    - DataTable auto-refresh pattern with `tableKey` state (string prefix "table-") for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+    - Removed 157 lines of mock data and 23 lines of manual pagination controls
+  - **TransferRecommendationForm Server-Side Dropdowns**:
+    - Prisoner dropdown uses `CustomPrisonerSearch` component with built-in server-side pagination
+    - Prisoner field read-only in edit mode (consistent with other medical modules)
+    - Reason dropdown uses `SearchableSelect` with `fetchReasonsCallback` (transfer recommendation reasons)
+    - Station dropdown uses `SearchableSelect` with `fetchStationsCallback` (recommended prisons/stations)
+    - Hospital dropdown uses `SearchableSelect` with `fetchHospitalsCallback` (referral hospitals)
+    - Category dropdown uses `SearchableSelect` with `fetchCategoriesCallback` (referral categories)
+    - All fetch callbacks wrapped in `useCallback` to prevent unnecessary API calls
+    - Edit mode dropdown population pattern: fetchById, local state initialization with useState functions, initialItem derivation with useMemo
+    - Multi-line `Textarea` for recommendation notes with medical justification placeholder
+    - Proper validation with user-friendly toast error messages
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information: prisoner name & number, reason, hospital, category, notes preview (100 chars)
+    - Better error handling with async/await and throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e: Event) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={`dialog-${dialogKey}`}` forces remount on mode change (string prefix prevents React duplicate key warnings)
+    - All handlers use async/await with proper error handling and table refresh
+  - **Code Reduction**: Removed 281 lines total
+    - 157 lines of mock data
+    - 88 lines of manual table implementation
+    - 23 lines of manual pagination controls
+    - 13 lines of AlertDialog
+  - **Bug Fixes Applied**:
+    - Fixed edit mode dropdown blank issue with initialItem pattern
+    - Applied unique string-based keys to prevent React duplicate key warnings (`table-${n}`, `dialog-${n}`)
+    - Fixed TypeScript interface conflict by removing local duplicate interface
+  - **Benefits**: Scalable for 14M+ records, consistent with Ward Recommendations/Station State/Food Assessment patterns, improved UX, production-ready
+  - Files created: `src/services/medical/recommendations/transferRecommendationService.ts`, `TRANSFER_RECOMMENDATIONS_REFACTOR_SUMMARY.md`
+  - Files refactored: `TransferRecommendationForm.tsx` (298 lines), `TransferRecommendationList.tsx` (321 lines, reduced from 439)
+  - 2026-02-08
+
+- **Medical Ward Recommendations Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Ward Recommendations module with live backend API integration
+  - **Service Layer**: Created `wardRecommendationService.ts` with centralized API endpoints
+    - `WARD_RECOMMENDATION_API_ENDPOINTS` constant: WARD_RECOMMENDATIONS, WARDS, PRISONERS
+    - CRUD functions: `createWardRecommendation`, `updateWardRecommendation`, `deleteWardRecommendation`, `fetchWardRecommendationById`
+    - Paginated fetch functions with cancellation error handling: `fetchWardRecommendations`, `fetchWards`
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+    - Interfaces: `WardRecommendation` (12 fields), `Ward` (14 fields), `Prisoner` (8 fields), `PaginatedResponse<T>`
+  - **WardRecommendationList Migration to DataTable**:
+    - Replaced manual table implementation with enterprise `DataTable` component
+    - Server-side pagination, search, sort, and filter capabilities
+    - Column definitions: prisoner name (bold), prisoner number, ward name, notes (truncated at 80 chars with hover tooltip)
+    - Actions column with View/Edit/Delete icon buttons
+    - DataTable auto-refresh pattern with `tableKey` state for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+    - Prisoner filter integration via `selectedPrisonerId` prop in tableUrl
+  - **WardRecommendationForm Server-Side Dropdowns**:
+    - Prisoner dropdown uses `CustomPrisonerSearch` component with built-in server-side pagination
+    - Prisoner field read-only in edit mode (consistent with other medical modules)
+    - Ward dropdown uses `SearchableSelect` with `fetchWardsPaginated` callback
+    - Fetch callback wrapped in `useCallback` to prevent unnecessary API calls
+    - Edit mode dropdown population pattern: fetchById, local state initialization, initialItem for SearchableSelect
+    - Multi-line `Textarea` for recommendation notes (6 rows) with medical justification placeholder
+    - Proper validation with user-friendly toast error messages
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information: prisoner name & number, recommended ward, notes preview (100 chars)
+    - Better error handling with async/await and throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e: Event) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={dialogKey}` forces remount on mode change
+    - All handlers use async/await with proper error handling and table refresh
+  - **Benefits**: Scalable for 14M+ records, consistent with Station State/Food Assessment patterns, improved UX, production-ready
+
 - **Medical Food Assessment Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
   - Fully refactored Food Assessment module with live backend API integration
   - **Service Layer**: Created `foodAssessmentService.ts` with centralized API endpoints

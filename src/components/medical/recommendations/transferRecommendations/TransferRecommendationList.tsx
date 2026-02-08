@@ -1,250 +1,129 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useMemo, useCallback } from 'react';
 import { Button } from '../../../ui/button';
-import { Input } from '../../../ui/input';
-import { Label } from '../../../ui/label';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../../ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../../ui/alert-dialog';
-import { Card, CardContent } from '../../../ui/card';
-import { Badge } from '../../../ui/badge';
-import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DialogHeader,
+} from '../../../ui/dialog';
+import { Plus, Eye, Pencil, Trash } from 'lucide-react';
+import { toast } from 'sonner';
 import TransferRecommendationForm from './TransferRecommendationForm';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../ui/dialog';
-
-interface TransferRecommendation {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  reason_name: string;
-  station_name: string;
-  hospital_name: string;
-  category_name: string;
-  recommendation_notes: string;
-  prisoner: string;
-  reason_for_recommendation: string;
-  recommended_station: string;
-  refferal_hospital: string; // Note: API has typo "refferal"
-  referral_category: string;
-}
+import { DataTable } from '../../../common/DataTable';
+import { DataTableColumn } from '../../../common/DataTable.types';
+import ConfirmDialog from '../../../common/ConfirmDialog';
+import { Badge } from '../../../ui/badge';
+import {
+  TransferRecommendation,
+  fetchTransferRecommendationById,
+  createTransferRecommendation,
+  updateTransferRecommendation,
+  deleteTransferRecommendation,
+  TRANSFER_RECOMMENDATION_API_ENDPOINTS,
+} from '../../../../services/medical/recommendations/transferRecommendationService';
 
 interface TransferRecommendationListProps {
   selectedPrisonerId?: string;
 }
 
-// Mock data
-const mockTransferRecommendations: TransferRecommendation[] = [
-  {
-    id: '1',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    prisoner_name: 'John Doe',
-    prisoner_number: 'PR-2024-001',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
-    reason_name: 'Critical Medical Condition',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
-    station_name: 'Luzira Maximum Security Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd1',
-    hospital_name: 'Mulago National Referral Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe1',
-    category_name: 'Emergency',
-    recommendation_notes: 'Patient presenting with severe chest pain and respiratory distress. Suspected myocardial infarction. Requires immediate cardiac evaluation and intervention at specialized cardiac center. ECG shows ST elevation. Patient unstable, requires ambulance transport with medical escort.',
-  },
-  {
-    id: '2',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    prisoner_name: 'Jane Smith',
-    prisoner_number: 'PR-2024-002',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
-    reason_name: 'Psychiatric Evaluation',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
-    station_name: 'Kigo Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd2',
-    hospital_name: 'Butabika National Psychiatric Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe2',
-    category_name: 'Urgent',
-    recommendation_notes: 'Prisoner exhibiting signs of acute psychotic episode with hallucinations and aggressive behavior. Immediate psychiatric assessment required. Risk of self-harm or harm to others. Requires secure transport and specialized psychiatric care.',
-  },
-  {
-    id: '3',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
-    prisoner_name: 'Michael Johnson',
-    prisoner_number: 'PR-2024-003',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
-    reason_name: 'Surgical Intervention',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc5',
-    station_name: 'Mbarara Main Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd3',
-    hospital_name: 'Mbarara Regional Referral Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe4',
-    category_name: 'Elective',
-    recommendation_notes: 'Patient diagnosed with inguinal hernia requiring elective surgical repair. Non-emergency but causing discomfort and limiting physical activities. Surgery scheduled for next month. Pre-operative assessment completed.',
-  },
-  {
-    id: '4',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
-    prisoner_name: 'Emily Davis',
-    prisoner_number: 'PR-2024-004',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb5',
-    reason_name: 'Diagnostic Testing',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc4',
-    station_name: 'Gulu Main Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd4',
-    hospital_name: 'Gulu Regional Referral Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe3',
-    category_name: 'Routine',
-    recommendation_notes: 'Patient requires advanced imaging studies (CT scan and MRI) to investigate persistent headaches and vision changes. Neurological examination suggests need for detailed brain imaging. Routine referral for diagnostic workup.',
-  },
-  {
-    id: '5',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
-    prisoner_name: 'Robert Lee',
-    prisoner_number: 'PR-2024-005',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
-    reason_name: 'Specialized Treatment Required',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
-    station_name: 'Luzira Maximum Security Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd7',
-    hospital_name: 'Kiruddu National Referral Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe2',
-    category_name: 'Urgent',
-    recommendation_notes: 'Patient diagnosed with pulmonary tuberculosis with multi-drug resistance. Current facility lacks specialized TB treatment capacity. Requires transfer to facility with MDR-TB treatment protocols and isolation capabilities.',
-  },
-  {
-    id: '6',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    prisoner_name: 'Jane Smith',
-    prisoner_number: 'PR-2024-002',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb7',
-    reason_name: 'Chronic Disease Management',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc6',
-    station_name: 'Kitalya Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd5',
-    hospital_name: 'Kampala International Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe5',
-    category_name: 'Follow-up',
-    recommendation_notes: 'Follow-up care for diabetes mellitus Type 2 with complications. Patient requires endocrinology consultation and adjustment of insulin regimen. Regular monitoring and diabetic foot care needed.',
-  },
-  {
-    id: '7',
-    prisoner: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    prisoner_name: 'John Doe',
-    prisoner_number: 'PR-2024-001',
-    reason_for_recommendation: '3fa85f64-5717-4562-b3fc-2c963f66afb8',
-    reason_name: 'Rehabilitation Services',
-    recommended_station: '3fa85f64-5717-4562-b3fc-2c963f66afc3',
-    station_name: 'Murchison Bay Prison',
-    refferal_hospital: '3fa85f64-5717-4562-b3fc-2c963f66afd6',
-    hospital_name: 'Nakasero Hospital',
-    referral_category: '3fa85f64-5717-4562-b3fc-2c963f66afe3',
-    category_name: 'Routine',
-    recommendation_notes: 'Patient recovering from stroke with right-sided weakness. Requires intensive physiotherapy and occupational therapy for functional recovery. Transfer to facility with rehabilitation services recommended.',
-  },
-];
-
 const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({ selectedPrisonerId }) => {
-  const [records, setRecords] = useState<TransferRecommendation[]>(mockTransferRecommendations);
-  const [filteredRecords, setFilteredRecords] = useState<TransferRecommendation[]>(mockTransferRecommendations);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [tableKey, setTableKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogKey, setDialogKey] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<TransferRecommendation | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<TransferRecommendation | null>(null);
 
-  useEffect(() => {
-    filterRecords();
-  }, [searchTerm, records, selectedPrisonerId]);
+  // Build table URL with filters
+  const tableUrl = useMemo(() => {
+    let url = TRANSFER_RECOMMENDATION_API_ENDPOINTS.TRANSFER_RECOMMENDATIONS.replace(/^\//, '');
+    const params = new URLSearchParams();
 
-  const filterRecords = () => {
-    let filtered = [...records];
+    if (selectedPrisonerId) params.append('prisoner', selectedPrisonerId);
 
-    if (selectedPrisonerId) {
-      filtered = filtered.filter((record) => record.prisoner === selectedPrisonerId);
-    }
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  }, [selectedPrisonerId]);
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (record) =>
-          record.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.prisoner_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.reason_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.hospital_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.category_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
-
-    setFilteredRecords(filtered);
-    setCurrentPage(1);
-  };
-
-  const handleCreate = () => {
+  const handleCreate = useCallback(() => {
     setSelectedRecord(null);
     setFormMode('create');
+    setDialogKey((prev) => prev + 1);
     setDialogOpen(true);
-  };
+  }, []);
 
-  const handleView = (record: TransferRecommendation) => {
-    setSelectedRecord(record);
-    setFormMode('view');
-    setDialogOpen(true);
-  };
-
-  const handleEdit = (record: TransferRecommendation) => {
-    setSelectedRecord(record);
-    setFormMode('edit');
-    setDialogOpen(true);
-  };
-
-  const handleFormSubmit = (data: TransferRecommendation) => {
-    if (formMode === 'create') {
-      const newRecord: TransferRecommendation = {
-        ...data,
-        id: `${records.length + 1}`,
-      };
-      setRecords([...records, newRecord]);
-      toast.success('Transfer recommendation created successfully');
-    } else if (formMode === 'edit') {
-      setRecords(records.map((r) => (r.id === selectedRecord?.id ? { ...data, id: r.id } : r)));
-      toast.success('Transfer recommendation updated successfully');
+  const handleView = useCallback(async (record: TransferRecommendation) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
     }
-    setDialogOpen(false);
+    try {
+      const fullRecord = await fetchTransferRecommendationById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('view');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch transfer recommendation details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
+  }, []);
+
+  const handleEdit = useCallback(async (record: TransferRecommendation) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
+    }
+    try {
+      const fullRecord = await fetchTransferRecommendationById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('edit');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch transfer recommendation details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
+  }, []);
+
+  const handleFormSubmit = async (data: TransferRecommendation) => {
+    try {
+      if (formMode === 'create') {
+        await createTransferRecommendation(data);
+        toast.success('Transfer recommendation created successfully');
+        setTableKey((prev) => prev + 1);
+      } else if (formMode === 'edit' && selectedRecord?.id) {
+        await updateTransferRecommendation(selectedRecord.id, data);
+        toast.success('Transfer recommendation updated successfully');
+        setTableKey((prev) => prev + 1);
+      }
+      setDialogOpen(false);
+    } catch (error: any) {
+      console.error('Failed to save transfer recommendation:', error);
+      toast.error(error.response?.data?.message || 'Failed to save record');
+      throw error;
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setRecordToDelete(id);
-    setShowDeleteDialog(true);
-  };
+  const handleDeleteClick = useCallback((record: TransferRecommendation) => {
+    setRecordToDelete(record);
+    setDeleteDialogOpen(true);
+  }, []);
 
-  const confirmDelete = () => {
-    if (recordToDelete) {
-      setRecords(records.filter((record) => record.id !== recordToDelete));
+  const handleDelete = useCallback(async () => {
+    if (!recordToDelete?.id) return;
+    try {
+      await deleteTransferRecommendation(recordToDelete.id);
       toast.success('Transfer recommendation deleted successfully');
-      setShowDeleteDialog(false);
+      setTableKey((prev) => prev + 1);
+      setRecordToDelete(null);
+    } catch (error: any) {
+      console.error('Failed to delete transfer recommendation:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete record');
+      throw error;
     }
-  };
+  }, [recordToDelete]);
 
   const getCategoryBadge = (categoryName: string) => {
     const variants: { [key: string]: string } = {
@@ -262,176 +141,181 @@ const TransferRecommendationList: React.FC<TransferRecommendationListProps> = ({
     );
   };
 
-  // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentRecords = filteredRecords.slice(startIndex, endIndex);
+  // Column definitions - MUST be after handler functions
+  const columns: DataTableColumn[] = useMemo(
+    () => [
+      {
+        key: 'prisoner_name',
+        label: 'Prisoner Name',
+        render: (value: any) => (
+          <span className="font-medium">{value || 'N/A'}</span>
+        ),
+      },
+      {
+        key: 'prisoner_number',
+        label: 'Prisoner Number',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'reason_name',
+        label: 'Reason',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'hospital_name',
+        label: 'Hospital',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'category_name',
+        label: 'Category',
+        render: (value: any) => {
+          if (!value) return <span className="text-gray-400">N/A</span>;
+          return getCategoryBadge(value);
+        },
+      },
+      {
+        key: 'recommendation_notes',
+        label: 'Notes',
+        render: (value: any) => {
+          if (!value) return <span className="text-gray-400">No notes</span>;
+          const truncated = value.length > 80 ? `${value.substring(0, 80)}...` : value;
+          return <span title={value}>{truncated}</span>;
+        },
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (_: any, row: any) => (
+          <div className="flex items-center gap-2 justify-start">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleView(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteClick(row)}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    [handleView, handleEdit, handleDeleteClick]
+  );
 
   return (
-    <>
-      <Card>
-        <CardContent className="p-6">
-          {/* Filters and Search */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Search by prisoner, reason, hospital, or category..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-            </div>
+    <div className="space-y-4 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold">Transfer Recommendations</h1>
+          <p className="text-gray-600 text-sm mt-1">Manage transfer recommendations for prisoners</p>
+        </div>
+        <Button onClick={handleCreate}>
+          <Plus className="h-4 w-4 mr-2" />
+          New Recommendation
+        </Button>
+      </div>
 
-            <div className="flex items-end">
-              <Button
-                onClick={handleCreate}
-                style={{ backgroundColor: '#650000' }}
-                className="text-white hover:opacity-90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Recommendation
-              </Button>
-            </div>
-          </div>
+      {/* DataTable */}
+      <DataTable
+        key={`table-${tableKey}`}
+        url={tableUrl}
+        title="Transfer Recommendations"
+        columns={columns}
+        config={{
+          search: true,
+          export: {
+            csv: true,
+            pdf: true,
+            print: true,
+          },
+        }}
+      />
 
-          {/* Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>Prisoner</TableHead>
-                  <TableHead>Number</TableHead>
-                  <TableHead>Reason</TableHead>
-                  <TableHead>Hospital</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No transfer recommendation records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentRecords.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{record.prisoner_name}</TableCell>
-                      <TableCell>{record.prisoner_number}</TableCell>
-                      <TableCell>{record.reason_name}</TableCell>
-                      <TableCell>{record.hospital_name}</TableCell>
-                      <TableCell>{getCategoryBadge(record.category_name)}</TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="line-clamp-2" title={record.recommendation_notes}>
-                          {record.recommendation_notes || 'No notes'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleView(record)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(record)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(record.id)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {filteredRecords.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-500">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of{' '}
-                {filteredRecords.length} entries
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
-          <DialogTitle>Transfer Recommendation Form</DialogTitle>
-          <DialogDescription>
-            Recommend a prisoner for transfer to another station or hospital for specialized care.
-          </DialogDescription>
+      {/* Form Dialog */}
+      <Dialog
+        key={`dialog-${dialogKey}`}
+        open={dialogOpen}
+        onOpenChange={(open: boolean) => {
+          if (!open) {
+            setDialogOpen(false);
+            setSelectedRecord(null);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e: Event) => e.preventDefault()}
+        >
+          <DialogHeader>
+            <DialogTitle>
+              {formMode === 'create' ? 'Create Transfer Recommendation' : 
+               formMode === 'edit' ? 'Edit Transfer Recommendation' : 
+               'View Transfer Recommendation'}
+            </DialogTitle>
+          </DialogHeader>
           <TransferRecommendationForm
-            recommendation={selectedRecord}
+            mode={formMode}
+            initialData={selectedRecord}
             onSubmit={handleFormSubmit}
             onCancel={() => setDialogOpen(false)}
-            mode={formMode}
           />
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the transfer recommendation record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        onConfirm={handleDelete}
+        title="Delete Transfer Recommendation"
+        description="Are you sure you want to delete this transfer recommendation? This action cannot be undone."
+        details={
+          recordToDelete ? (
+            <div className="bg-gray-50 p-3 rounded-md text-sm space-y-1">
+              <p key="prisoner-info">
+                <span className="font-medium">Prisoner:</span>{' '}
+                {recordToDelete.prisoner_name} ({recordToDelete.prisoner_number})
+              </p>
+              <p key="reason-info">
+                <span className="font-medium">Reason:</span> {recordToDelete.reason_name || 'N/A'}
+              </p>
+              <p key="hospital-info">
+                <span className="font-medium">Hospital:</span> {recordToDelete.hospital_name || 'N/A'}
+              </p>
+              <p key="category-info">
+                <span className="font-medium">Category:</span> {recordToDelete.category_name || 'N/A'}
+              </p>
+              {recordToDelete.recommendation_notes ? (
+                <p key="notes-info">
+                  <span className="font-medium">Notes:</span>{' '}
+                  {recordToDelete.recommendation_notes.length > 100
+                    ? `${recordToDelete.recommendation_notes.substring(0, 100)}...`
+                    : recordToDelete.recommendation_notes}
+                </p>
+              ) : null}
+            </div>
+          ) : undefined
+        }
+      />
+    </div>
   );
 };
 
