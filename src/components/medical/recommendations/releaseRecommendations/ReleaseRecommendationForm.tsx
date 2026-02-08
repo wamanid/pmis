@@ -4,49 +4,18 @@ import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
 import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Switch } from '../../../ui/switch';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { FileCheck, Save, X, CalendarIcon } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { format } from 'date-fns';
-
-interface ReleaseRecommendation {
-  id?: string;
-  prisoner_name?: string;
-  prisoner_number?: string;
-  date_of_report: string;
-  abnormal_condition: string;
-  duration_of_condition: string;
-  cause_of_condition: string;
-  life_endangered: boolean;
-  illness_fatal: boolean;
-  aggravated_pain: boolean;
-  contracted_in_prison: boolean;
-  permanently_unfit_for_labour: boolean;
-  temporary_removal_to_hospital: boolean;
-  elderly_cripple_or_feeble: boolean;
-  mental_condition_due_to_imprisonment: boolean;
-  other_observations: string;
-  friends_support: boolean;
-  prisoner_wishes: string;
-  reoffend_possibility: boolean;
-  reoffend_possibility_reason: string;
-  hospital_support: boolean;
-  hospital_support_reason: string;
-  recommendation_date: string;
-  approval_status: string;
-  approved_by: string;
-  approval_date: string;
-  approval_notes: string;
-  recommendation_notes: string;
-  prisoner: string;
-}
+import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
+import { ReleaseRecommendation } from '../../../../services/medical/recommendations/releaseRecommendationService';
 
 interface ReleaseRecommendationFormProps {
   releaseRecommendation?: ReleaseRecommendation | null;
-  onSubmit: (releaseRecommendation: ReleaseRecommendation) => void;
+  onSubmit: (releaseRecommendation: Partial<ReleaseRecommendation>) => Promise<void>;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
 }
@@ -57,7 +26,7 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
   onCancel,
   mode,
 }) => {
-  const [formData, setFormData] = useState<ReleaseRecommendation>({
+  const [formData, setFormData] = useState<Partial<ReleaseRecommendation>>({
     date_of_report: '',
     abnormal_condition: '',
     duration_of_condition: '',
@@ -86,33 +55,64 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
     prisoner: '',
   });
 
-  const [prisoners, setPrisoners] = useState<any[]>([]);
+  const [localPrisonerId, setLocalPrisonerId] = useState<string | null>(() => {
+    if (releaseRecommendation && (mode === 'edit' || mode === 'view') && releaseRecommendation.prisoner) {
+      return releaseRecommendation.prisoner;
+    }
+    return null;
+  });
+
   const [loading, setLoading] = useState(false);
   const [reportDateOpen, setReportDateOpen] = useState(false);
   const [recDateOpen, setRecDateOpen] = useState(false);
+  const [approvalDateOpen, setApprovalDateOpen] = useState(false);
 
   useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  useEffect(() => {
-    if (releaseRecommendation) {
+    if (releaseRecommendation && (mode === 'edit' || mode === 'view')) {
       setFormData(releaseRecommendation);
+      setLocalPrisonerId(releaseRecommendation.prisoner || null);
     }
-  }, [releaseRecommendation]);
+  }, [releaseRecommendation, mode]);
 
-  const loadDropdownData = () => {
-    setPrisoners([
-      { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-    ]);
-  };
+  useEffect(() => {
+    if (mode === 'create') {
+      setFormData({
+        date_of_report: '',
+        abnormal_condition: '',
+        duration_of_condition: '',
+        cause_of_condition: '',
+        life_endangered: false,
+        illness_fatal: false,
+        aggravated_pain: false,
+        contracted_in_prison: false,
+        permanently_unfit_for_labour: false,
+        temporary_removal_to_hospital: false,
+        elderly_cripple_or_feeble: false,
+        mental_condition_due_to_imprisonment: false,
+        other_observations: '',
+        friends_support: false,
+        prisoner_wishes: '',
+        reoffend_possibility: false,
+        reoffend_possibility_reason: '',
+        hospital_support: false,
+        hospital_support_reason: '',
+        recommendation_date: '',
+        approval_status: '',
+        approved_by: '',
+        approval_date: '',
+        approval_notes: '',
+        recommendation_notes: '',
+        prisoner: '',
+      });
+      setLocalPrisonerId(null);
+    }
+  }, [mode]);
 
   const handleInputChange = (field: keyof ReleaseRecommendation, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.prisoner) {
@@ -126,24 +126,14 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-
-      const submitData: ReleaseRecommendation = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        prisoner_number: selectedPrisoner?.prisoner_number || '',
-      };
-
-      onSubmit(submitData);
+    try {
+      await onSubmit(formData);
+    } catch (error: any) {
+      console.error('Failed to submit form:', error);
+      toast.error(error.response?.data?.message || 'Failed to save release recommendation');
+    } finally {
       setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('Release recommendation created successfully');
-      } else {
-        toast.success('Release recommendation updated successfully');
-      }
-    }, 500);
+    }
   };
 
   const isReadOnly = mode === 'view';
@@ -169,22 +159,24 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 <Label htmlFor="prisoner">
                   Prisoner <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.prisoner}
-                  onValueChange={(value) => handleInputChange('prisoner', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="prisoner">
-                    <SelectValue placeholder="Select prisoner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prisoners.map((prisoner) => (
-                      <SelectItem key={prisoner.id} value={prisoner.id}>
-                        {prisoner.prisoner_number} - {prisoner.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                {mode === 'edit' || mode === 'view' ? (
+                  <Input
+                    value={`${releaseRecommendation?.prisoner_number || 'N/A'} - ${releaseRecommendation?.prisoner_name || 'N/A'}`}
+                    disabled
+                    readOnly
+                    className="bg-muted"
+                  />
+                ) : (
+                  <CustomPrisonerSearch
+                    value={localPrisonerId}
+                    onChange={(value) => {
+                      setLocalPrisonerId(value);
+                      handleInputChange('prisoner', value);
+                    }}
+                    placeholder="Search prisoner..."
+                    disabled={loading}
+                  />
+                )}
               </div>
 
               <div className="space-y-2">
@@ -202,7 +194,7 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                     <Calendar
                       mode="single"
                       selected={formData.date_of_report ? new Date(formData.date_of_report) : undefined}
-                      onSelect={(date) => {
+                      onSelect={(date: Date | undefined) => {
                         if (date) {
                           handleInputChange('date_of_report', format(date, 'yyyy-MM-dd'));
                           setReportDateOpen(false);
@@ -262,7 +254,7 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 <Switch
                   id="life_endangered"
                   checked={formData.life_endangered}
-                  onCheckedChange={(checked) => handleInputChange('life_endangered', checked)}
+                  onCheckedChange={(checked: boolean) => handleInputChange('life_endangered', checked)}
                   disabled={isReadOnly}
                 />
               </div>
@@ -271,16 +263,16 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 <Switch
                   id="illness_fatal"
                   checked={formData.illness_fatal}
-                  onCheckedChange={(checked) => handleInputChange('illness_fatal', checked)}
+                  onCheckedChange={(checked: boolean) => handleInputChange('illness_fatal', checked)}
                   disabled={isReadOnly}
                 />
               </div>
               <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                <Label htmlFor="permanently_unfit_for_labour">Permanently Unfit for Labour</Label>
+                <Label htmlFor="aggravated_pain">Aggravated Pain</Label>
                 <Switch
-                  id="permanently_unfit_for_labour"
-                  checked={formData.permanently_unfit_for_labour}
-                  onCheckedChange={(checked) => handleInputChange('permanently_unfit_for_labour', checked)}
+                  id="aggravated_pain"
+                  checked={formData.aggravated_pain}
+                  onCheckedChange={(checked: boolean) => handleInputChange('aggravated_pain', checked)}
                   disabled={isReadOnly}
                 />
               </div>
@@ -289,25 +281,231 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 <Switch
                   id="contracted_in_prison"
                   checked={formData.contracted_in_prison}
-                  onCheckedChange={(checked) => handleInputChange('contracted_in_prison', checked)}
+                  onCheckedChange={(checked: boolean) => handleInputChange('contracted_in_prison', checked)}
                   disabled={isReadOnly}
                 />
               </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="permanently_unfit_for_labour">Permanently Unfit for Labour</Label>
+                <Switch
+                  id="permanently_unfit_for_labour"
+                  checked={formData.permanently_unfit_for_labour}
+                  onCheckedChange={(checked: boolean) => handleInputChange('permanently_unfit_for_labour', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="temporary_removal_to_hospital">Temporary Removal to Hospital</Label>
+                <Switch
+                  id="temporary_removal_to_hospital"
+                  checked={formData.temporary_removal_to_hospital}
+                  onCheckedChange={(checked: boolean) => handleInputChange('temporary_removal_to_hospital', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="elderly_cripple_or_feeble">Elderly, Cripple or Feeble</Label>
+                <Switch
+                  id="elderly_cripple_or_feeble"
+                  checked={formData.elderly_cripple_or_feeble}
+                  onCheckedChange={(checked: boolean) => handleInputChange('elderly_cripple_or_feeble', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="mental_condition_due_to_imprisonment">Mental Condition Due to Imprisonment</Label>
+                <Switch
+                  id="mental_condition_due_to_imprisonment"
+                  checked={formData.mental_condition_due_to_imprisonment}
+                  onCheckedChange={(checked: boolean) => handleInputChange('mental_condition_due_to_imprisonment', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="other_observations">Other Observations</Label>
+              <Textarea
+                id="other_observations"
+                value={formData.other_observations}
+                onChange={(e) => handleInputChange('other_observations', e.target.value)}
+                placeholder="Enter other medical observations..."
+                rows={3}
+                disabled={isReadOnly}
+              />
             </div>
           </div>
 
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Recommendation Notes
+              Support Assessment
             </h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="friends_support">Friends/Family Support Available</Label>
+                <Switch
+                  id="friends_support"
+                  checked={formData.friends_support}
+                  onCheckedChange={(checked: boolean) => handleInputChange('friends_support', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="prisoner_wishes">Prisoner Wishes</Label>
+                <Textarea
+                  id="prisoner_wishes"
+                  value={formData.prisoner_wishes}
+                  onChange={(e) => handleInputChange('prisoner_wishes', e.target.value)}
+                  placeholder="Enter prisoner wishes and preferences..."
+                  rows={3}
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="reoffend_possibility">Reoffending Possibility</Label>
+                <Switch
+                  id="reoffend_possibility"
+                  checked={formData.reoffend_possibility}
+                  onCheckedChange={(checked: boolean) => handleInputChange('reoffend_possibility', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              {formData.reoffend_possibility && (
+                <div className="space-y-2">
+                  <Label htmlFor="reoffend_possibility_reason">Reoffending Possibility Reason</Label>
+                  <Textarea
+                    id="reoffend_possibility_reason"
+                    value={formData.reoffend_possibility_reason}
+                    onChange={(e) => handleInputChange('reoffend_possibility_reason', e.target.value)}
+                    placeholder="Explain reasons for reoffending possibility..."
+                    rows={3}
+                    disabled={isReadOnly}
+                  />
+                </div>
+              )}
+              <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                <Label htmlFor="hospital_support">Hospital Support Available</Label>
+                <Switch
+                  id="hospital_support"
+                  checked={formData.hospital_support}
+                  onCheckedChange={(checked: boolean) => handleInputChange('hospital_support', checked)}
+                  disabled={isReadOnly}
+                />
+              </div>
+              {formData.hospital_support && (
+                <div className="space-y-2">
+                  <Label htmlFor="hospital_support_reason">Hospital Support Details</Label>
+                  <Textarea
+                    id="hospital_support_reason"
+                    value={formData.hospital_support_reason}
+                    onChange={(e) => handleInputChange('hospital_support_reason', e.target.value)}
+                    placeholder="Provide details about hospital support..."
+                    rows={3}
+                    disabled={isReadOnly}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+              Recommendation Details
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="recommendation_date">Recommendation Date</Label>
+                <Popover open={recDateOpen} onOpenChange={setRecDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left" disabled={isReadOnly}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.recommendation_date ? format(new Date(formData.recommendation_date), 'PPP') : 'Select date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.recommendation_date ? new Date(formData.recommendation_date) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          handleInputChange('recommendation_date', format(date, 'yyyy-MM-dd'));
+                          setRecDateOpen(false);
+                        }
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="approval_status">Approval Status</Label>
+                <Input
+                  id="approval_status"
+                  value={formData.approval_status}
+                  onChange={(e) => handleInputChange('approval_status', e.target.value)}
+                  placeholder="Enter approval status"
+                  disabled={isReadOnly}
+                />
+              </div>
+            </div>
             <div className="space-y-2">
-              <Label htmlFor="recommendation_notes">Notes</Label>
+              <Label htmlFor="recommendation_notes">Recommendation Notes</Label>
               <Textarea
                 id="recommendation_notes"
                 value={formData.recommendation_notes}
                 onChange={(e) => handleInputChange('recommendation_notes', e.target.value)}
                 placeholder="Enter recommendation notes..."
                 rows={4}
+                disabled={isReadOnly}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+              Approval Information
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="approved_by">Approved By</Label>
+                <Input
+                  id="approved_by"
+                  value={formData.approved_by}
+                  onChange={(e) => handleInputChange('approved_by', e.target.value)}
+                  placeholder="Enter approver name"
+                  disabled={isReadOnly}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="approval_date">Approval Date</Label>
+                <Popover open={approvalDateOpen} onOpenChange={setApprovalDateOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start text-left" disabled={isReadOnly}>
+                      <CalendarIcon className="mr-2 h-4 w-4" />
+                      {formData.approval_date ? format(new Date(formData.approval_date), 'PPP') : 'Select date'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0">
+                    <Calendar
+                      mode="single"
+                      selected={formData.approval_date ? new Date(formData.approval_date) : undefined}
+                      onSelect={(date: Date | undefined) => {
+                        if (date) {
+                          handleInputChange('approval_date', format(date, 'yyyy-MM-dd'));
+                          setApprovalDateOpen(false);
+                        }
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="approval_notes">Approval Notes</Label>
+              <Textarea
+                id="approval_notes"
+                value={formData.approval_notes}
+                onChange={(e) => handleInputChange('approval_notes', e.target.value)}
+                placeholder="Enter approval notes..."
+                rows={3}
                 disabled={isReadOnly}
               />
             </div>

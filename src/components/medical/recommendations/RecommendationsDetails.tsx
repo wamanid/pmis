@@ -3,10 +3,11 @@ import { Card, CardContent } from '../../ui/card';
 import { ThumbsUp } from 'lucide-react';
 import WardRecommendationList from './wardRecommendations/WardRecommendationList';
 import TransferRecommendationList from './transferRecommendations/TransferRecommendationList';
+import ReleaseRecommendationList from './releaseRecommendations/ReleaseRecommendationList';
 
 export default function RecommendationsDetails() {
   const [selectedPrisonerId] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'ward' | 'transfer'>('ward');
+  const [activeTab, setActiveTab] = useState<'ward' | 'transfer' | 'release'>('ward');
 
   return (
     <div className="space-y-6">
@@ -47,6 +48,19 @@ export default function RecommendationsDetails() {
             >
               Transfer Recommendations
             </button>
+            <button
+              onClick={() => setActiveTab('release')}
+              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
+                activeTab === 'release'
+                  ? 'text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'release' ? '#650000' : undefined,
+              }}
+            >
+              Release Recommendations
+            </button>
           </div>
 
           {/* Tab Content */}
@@ -59,6 +73,12 @@ export default function RecommendationsDetails() {
           {activeTab === 'transfer' && (
             <div>
               <TransferRecommendationList selectedPrisonerId={selectedPrisonerId} />
+            </div>
+          )}
+
+          {activeTab === 'release' && (
+            <div>
+              <ReleaseRecommendationList selectedPrisonerId={selectedPrisonerId} />
             </div>
           )}
         </CardContent>

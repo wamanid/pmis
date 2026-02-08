@@ -2,7 +2,7 @@
 
 ---
 **Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
-**Created**: February 6, 2026 | **Last Updated**: February 7, 2026
+**Created**: February 6, 2026 | **Last Updated**: February 8, 2026
 ---
 
 All notable changes to this project should be documented in this file.
@@ -10,6 +10,88 @@ All notable changes to this project should be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Medical Death Confirmation Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Death Confirmation module with live backend API integration
+  - **Service Layer**: Created `deathConfirmationService.ts` with centralized API endpoints
+    - `DEATH_CONFIRMATION_API_ENDPOINTS` constant: DEATH_CONFIRMATIONS, PRISONERS, STAFF_PROFILES
+    - CRUD functions: `createDeathConfirmation`, `updateDeathConfirmation`, `deleteDeathConfirmation`, `fetchDeathConfirmationById`
+    - Paginated fetch functions: `fetchDeathConfirmations`, `fetchPrisoners`, `fetchStaffProfiles` with cancellation error handling
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+    - Interfaces: `DeathConfirmation` (18+ fields including death details, officer info, document attachments), `Prisoner`, `StaffProfile`, `PaginatedResponse<T>`
+  - **DeathConfirmationList Migration to DataTable**:
+    - Replaced manual table implementation (removed 300+ lines of mock data) with enterprise `DataTable` component
+    - Server-side pagination (50 items per page), search, sort, and filter capabilities
+    - Column definitions: prisoner number (monospace), prisoner name (bold), date of death (formatted), place of death (truncated), cause of death (truncated), officer in charge, medical officer, actions
+    - Actions column with individual icon buttons: View (Eye), Edit (Pencil), Delete (Trash2 with red styling)
+    - DataTable auto-refresh pattern with `tableKey` state for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+    - Removed manual pagination controls and search input
+  - **DeathConfirmationForm Server-Side Dropdowns**:
+    - Prisoner dropdown uses `CustomPrisonerSearch` component with built-in server-side pagination
+    - Prisoner field disabled (read-only Input) in edit mode with muted background
+    - Officer in Charge dropdown uses `StaffProfileSelect` with `fetchStaffProfilesCallback`
+    - Medical Officer dropdown uses `StaffProfileSelect` with `fetchStaffProfilesCallback`
+    - All fetch callbacks wrapped in `useCallback` to prevent unnecessary API calls
+    - Edit mode dropdown population pattern: fetchById in handleEdit, local state initialization with useState functions, initialItem derivation
+    - State synchronization: useEffect syncs formData with confirmation prop for edit/view modes
+    - Reset pattern: useEffect resets form and local state when switching to create mode
+    - Document attachments: death_certificate, medical_form, pathologist_attachment, other_attachment (URL/path input fields)
+    - View mode: All fields read-only with bg-gray-50 styling, document links displayed
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information: prisoner name & number, date of death (formatted), cause of death
+    - Better error handling with async/await and throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={\`form-\${dialogKey}-\${formMode}\`}` forces remount on mode change
+    - All handlers use async/await with proper error handling and table refresh
+  - **Code Quality**: Replaced 400+ lines of mock data and manual table with 300 lines of DataTable integration
+  - **Files Created**: `src/services/medical/deathDetails/deathConfirmationService.ts` (250 lines)
+  - **Files Modified**: `DeathConfirmationList.tsx` (net -150 lines), `DeathConfirmationForm.tsx` (net -100 lines with server-side dropdowns)
+  - **Documentation**: Created `ma_ignore/DEATH_CONFIRMATION_REFACTOR_SUMMARY.md` with complete implementation details
+
+- **Medical Release Recommendations Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Release Recommendations module with live backend API integration
+  - **Service Layer**: Created `releaseRecommendationService.ts` with centralized API endpoints
+    - `RELEASE_RECOMMENDATION_API_ENDPOINTS` constant: RELEASE_RECOMMENDATIONS, PRISONERS
+    - CRUD functions: `createReleaseRecommendation`, `updateReleaseRecommendation`, `deleteReleaseRecommendation`, `fetchReleaseRecommendationById`
+    - Paginated fetch functions: `fetchReleaseRecommendations`, `fetchPrisoners` with cancellation error handling
+    - All service functions return paginated responses: `{items: [], count: number, next: string | null}`
+    - Interfaces: `ReleaseRecommendation` (30+ fields including medical assessment flags, support details, approval info), `PaginatedResponse<T>`
+  - **ReleaseRecommendationList Migration to DataTable**:
+    - Replaced manual table implementation with enterprise `DataTable` component
+    - Server-side pagination (50 items per page), search, sort, and filter capabilities
+    - Column definitions: prisoner number (monospace), prisoner name, date of report (formatted), abnormal condition (truncated), critical status (color-coded badge), approval status (badge), actions dropdown
+    - Critical status badges: Yes (red), No (gray)
+    - Actions column with View/Edit/Delete in dropdown menu
+    - DataTable auto-refresh pattern with `tableKey` state for CRUD operations
+    - Table refreshes immediately after create, edit, or delete operations
+    - Removed manual pagination controls and search input
+  - **ReleaseRecommendationForm Comprehensive Sections**:
+    - **Prisoner Selection**: `CustomPrisonerSearch` with server-side pagination (disabled in edit/view modes)
+    - **Medical Condition**: Abnormal condition, duration, cause fields
+    - **Medical Assessment Flags** (8 switches): Life endangered, illness fatal, aggravated pain, contracted in prison, permanently unfit for labour, temporary removal to hospital, elderly/cripple/feeble, mental condition due to imprisonment, other observations textarea
+    - **Support Assessment**: Friends/family support (switch), prisoner wishes (textarea), reoffending possibility (switch with conditional reason textarea), hospital support (switch with conditional details textarea)
+    - **Recommendation Details**: Recommendation date, approval status, recommendation notes (textarea)
+    - **Approval Information**: Approved by, approval date, approval notes (textarea)
+    - Total 30+ fields organized into 6 logical sections
+    - Prisoner field read-only in edit mode with muted background
+    - Edit mode: Local state initialization with useState functions to prevent empty dropdowns
+    - View mode: All fields read-only, displays data from `releaseRecommendation` prop
+    - Async submit handler with proper error handling and toast notifications
+  - **Delete Confirmation Enhancement**:
+    - Replaced AlertDialog with reusable `ConfirmDialog` component
+    - Shows detailed record information: prisoner name & number, abnormal condition, date of report
+    - Better error handling with async/await and throw pattern for ConfirmDialog cleanup
+  - **Dialog Behavior**:
+    - Added `onInteractOutside={(e) => e.preventDefault()}` to prevent accidental closes
+    - Dialog key pattern: `key={\`form-${dialogKey}-${formMode}\`}` forces remount on mode change
+    - All handlers use async/await with proper error handling and table refresh
+  - **Code Quality**: Replaced 300+ lines of mock data and manual table with 150 lines of DataTable integration
+  - **Files Created**: `src/services/medical/recommendations/releaseRecommendationService.ts` (205 lines)
+  - **Files Modified**: `ReleaseRecommendationList.tsx` (net -150 lines), `ReleaseRecommendationForm.tsx` (net +200 lines for comprehensive sections)
+  - **Documentation**: Created `ma_ignore/RELEASE_RECOMMENDATION_REFACTOR_SUMMARY.md` with complete implementation details
+
 - **Medical Transfer Recommendations Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
   - Fully refactored Transfer Recommendations module with live backend API integration
   - **Service Layer**: Created `transferRecommendationService.ts` with centralized API endpoints
