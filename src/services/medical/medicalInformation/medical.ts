@@ -292,3 +292,62 @@ export const updateSchedule = async (schedule: NewSchedule, id: string) : Promis
 export const deleteSchedule = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/schedules/${id}/`);
 };
+
+// Examination Results
+export interface ExaminationResult {
+  id: string
+  prisoner_name: string
+  exam_name: string
+  created_datetime: string
+  updated_datetime: string
+  deleted_datetime: string | null
+  is_active: boolean
+  notes: string
+  created_by: number
+  updated_by: number
+  deleted_by: number
+  medical_case_book: string
+  medical_exam: string
+}
+
+export interface Result {
+  is_active: boolean
+  deleted_datetime: string | null
+  notes: string
+  deleted_by: number | null
+  medical_case_book: string
+  medical_exam: string
+}
+
+
+export type ExamsResponse<T> = Paginated<T> | ErrorResponse
+export type ExaminationResultResponse<T> = Paginated<T> | ErrorResponse
+export type ResultResponse = ExaminationResult | ErrorResponse
+
+export const getExams = async (): Promise<ExamsResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/medical-exams/'
+  )
+  return response.data
+}
+
+export const getExaminationResults = async (): Promise<ExaminationResultResponse<ExaminationResult>> => {
+  const response = await axiosInstance.get<Paginated<ExaminationResult>>(
+    '/medical-management/exam-results/'
+  )
+  return response.data
+}
+
+export const addResult = async (result: Result) : Promise<ResultResponse> => {
+  const response = await axiosInstance.post<ResultResponse>('/medical-management/exam-results/', result);
+  return response.data;
+}
+
+export const updateResult = async (result: Result, id: string) : Promise<ResultResponse> => {
+  const response = await axiosInstance.put<ResultResponse>(`/medical-management/exam-results/${id}/`, result);
+  return response.data;
+}
+
+export const deleteResult = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/exam-results/${id}/`);
+};

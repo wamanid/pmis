@@ -3,10 +3,10 @@ import {toast} from "sonner";
 import {PrisonerItem} from "../../stationServices/visitorsServices/VisitorsService";
 import { getPrisoners } from "../../stationServices/visitorsServices/VisitorsService"
 import {
-    BmiClassification, BmiRecord, CaseBook,
+    BmiClassification, BmiRecord, CaseBook, ExaminationResult,
     getBloodGroups,
     getBmiClassifications, getBmiRecord,
-    getBmiRecords, getCaseBooks, getCheckupTypes,
+    getBmiRecords, getCaseBooks, getCheckupTypes, getExaminationResults, getExams,
     getMedicalRecords, getPresentationTypes, getSchedules,
     MedicalRecord, Schedule
 } from "./medical";
@@ -86,4 +86,16 @@ export async function getCheckupTypesList(setData: React.Dispatch<React.SetState
 export async function getScheduleList(setData: React.Dispatch<React.SetStateAction<Schedule[]>>) {
     const response = await getSchedules()
     populateList(response, "There are no schedules", setData)
+}
+
+// Get Exams
+export async function getExamsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getExams()
+    populateList(response, "There are no medical exams", setData)
+}
+
+// Get Examination Results
+export async function getExaminationResultsList(setData: React.Dispatch<React.SetStateAction<ExaminationResult[]>>) {
+    const response = await getExaminationResults()
+    populateList(response, "There are no examination results", setData)
 }

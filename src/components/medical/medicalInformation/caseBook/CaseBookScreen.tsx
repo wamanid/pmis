@@ -47,7 +47,8 @@ export interface ChildProps {
 }
 
 const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, caseBooks, checkupTypes,
-                                                setCaseBooks, setCheckupTypes, presentations, setPresentations, setBloodGroups, bloodGroups }) => {
+                                                setCaseBooks, setCheckupTypes, presentations, setPresentations,
+                                                setBloodGroups, bloodGroups }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCaseBook, setSelectedCaseBook] = useState<any>(null);
