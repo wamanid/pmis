@@ -490,7 +490,7 @@ const BMIList: React.FC<BMIListProps> = ({
                   currentItems.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
                       <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{record.prisoner_number}</TableCell>
+                      <TableCell className="font-mono text-sm">{record.prisoner_number_value}</TableCell>
                       <TableCell>{record.weight}</TableCell>
                       <TableCell>{record.height}</TableCell>
                       <TableCell>{getBMIBadge(record.bmi)}</TableCell>

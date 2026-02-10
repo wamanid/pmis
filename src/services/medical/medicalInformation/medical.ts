@@ -9,6 +9,7 @@ export interface MedicalRecord {
   id: string
   prisoner_name: string
   prisoner_number: string
+  prisoner_number_value: string
   blood_group_name: string
   created_datetime: string
   updated_datetime: string
@@ -81,6 +82,7 @@ export interface BmiRecord {
   id: string;
   prisoner_name: string;
   prisoner_number: string;
+  prisoner_number_value: string;
   classification_name: string;
   created_datetime: string;
   updated_datetime: string;
@@ -156,6 +158,7 @@ export interface CaseBook {
   id: string;
   prisoner_name: string;
   prisoner_number: string;
+  prisoner_number_value: string;
   check_type_name: string;
   blood_group_name: string;
   created_datetime: string;
@@ -350,4 +353,77 @@ export const updateResult = async (result: Result, id: string) : Promise<ResultR
 
 export const deleteResult = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/exam-results/${id}/`);
+};
+
+// Diagnosis
+export interface Diagnosis {
+  id: string;
+  prisoner_name: string;
+  disease_name: string;
+  regiment_name: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  is_active: boolean;
+  differential: boolean;
+  unfit_for_labor: boolean;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number | null;
+  medical_case_book: string;
+  disease: string;
+  regiment: string;
+}
+
+export interface DiagnosisItem {
+  is_active: boolean;
+  deleted_datetime: string | null;
+  deleted_by: number | null;
+  differential: boolean;
+  unfit_for_labor: boolean;
+  remarks: string;
+  medical_case_book: string;
+  disease: string;
+  regiment: string;
+}
+
+export type DiagnosisItemResponse = Diagnosis | ErrorResponse
+export type DiagnosisResponse<T> = Paginated<T> | ErrorResponse
+export type DiseaseResponse<T> = Paginated<T> | ErrorResponse
+export type RegimentResponse<T> = Paginated<T> | ErrorResponse
+
+export const getDiseases = async (): Promise<DiseaseResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/diseases/'
+  )
+  return response.data
+}
+
+export const getRegiments = async (): Promise<RegimentResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/regiments/'
+  )
+  return response.data
+}
+
+export const getDiagnosis = async (): Promise<DiagnosisResponse<Diagnosis>> => {
+  const response = await axiosInstance.get<Paginated<Diagnosis>>(
+    '/medical-management/diagnoses/'
+  )
+  return response.data
+}
+
+export const addDiagnosis = async (diagnosis: DiagnosisItem) : Promise<DiagnosisItemResponse> => {
+  const response = await axiosInstance.post<DiagnosisItemResponse>('/medical-management/diagnoses/', diagnosis);
+  return response.data;
+}
+
+export const updateDiagnosis = async (diagnosis: DiagnosisItem, id: string) : Promise<DiagnosisItemResponse> => {
+  const response = await axiosInstance.put<DiagnosisItemResponse>(`/medical-management/diagnoses/${id}/`, diagnosis);
+  return response.data;
+}
+
+export const deleteDiagnosis = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/diagnoses/${id}/`);
 };

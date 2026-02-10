@@ -15,7 +15,7 @@ import {PrisonerItem} from "../../../services/stationServices/visitorsServices/V
 import {
   BmiClassification,
   BmiRecord,
-  CaseBook, ExaminationResult,
+  CaseBook, Diagnosis, ExaminationResult,
   MedicalRecord, Schedule
 } from "../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
@@ -26,6 +26,7 @@ export interface Loading {
   case: boolean,
   schedule: boolean,
   exam: boolean,
+  diagnosis: boolean,
 }
 
 export default function MedicalDetails() {
@@ -35,7 +36,7 @@ export default function MedicalDetails() {
   // API Integration
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [loading, setLoading] = useState<Loading>({
-    record: true, bmi: true, case: true, schedule: true, exam: true })
+    record: true, bmi: true, case: true, schedule: true, exam: true, diagnosis: true })
   // BIM
   const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
   const [classifications, setClassifications] = useState<BmiClassification[]>([])
@@ -51,6 +52,10 @@ export default function MedicalDetails() {
   // Examination Results
   const [exams, setExams] = useState<Unit[]>([])
   const [examinationResults, setExaminationResults] = useState<ExaminationResult[]>([])
+  // Diagnosis
+  const [diagnosis, setDiagnosis] = useState<Diagnosis[]>([])
+  const [regiments, setRegiments] = useState<Unit[]>([])
+  const [diseases, setDiseases] = useState<Unit[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -297,7 +302,18 @@ export default function MedicalDetails() {
 
           {activeTab === 'diagnosis' && (
             <div>
-              <DiagnosisScreen />
+              <DiagnosisScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  caseBooks={caseBooks}
+                  setCaseBooks={setCaseBooks}
+                  diagnosis={diagnosis}
+                  setDiagnosis={setDiagnosis}
+                  regiments={regiments}
+                  setRegiments={setRegiments}
+                  diseases={diseases}
+                  setDiseases={setDiseases}
+              />
             </div>
           )}
         </CardContent>

@@ -7,18 +7,22 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Switch } from '../../../ui/switch';
 import { ClipboardList, Save, X } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {CaseBook, DiagnosisItem} from "../../../../services/medical/medicalInformation/medical";
+import {getCasebookList, getRegimentList} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {handleCatchError} from "../../../../services/stationServices/utils";
 
 interface Diagnosis {
   id?: string;
   prisoner_name?: string;
   disease_name?: string;
-  regiment_name?: string;
+  regiments_name?: string;
   differential: boolean;
   unfit_for_labor: boolean;
   remarks: string;
   medical_case_book: string;
   disease: string;
-  regiment: string;
+  regiments: string;
 }
 
 interface DiagnosisFormProps {
@@ -26,23 +30,33 @@ interface DiagnosisFormProps {
   onSubmit: (diagnosis: Diagnosis) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  regiments: Unit[];
+  setRegiments: React.Dispatch<React.SetStateAction<Unit[]>>;
+  diseases: Unit[];
+  caseBooks: CaseBook[];
+  setCaseBooks: React.Dispatch<React.SetStateAction<CaseBook[]>>;
+  loader: Boolean
+  setLoader: React.Dispatch<React.SetStateAction<Boolean>>;
 }
 
-const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCancel, mode }) => {
-  const [formData, setFormData] = useState<Diagnosis>({
+const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCancel, mode, caseBooks, setCaseBooks, loader, setLoader, setRegiments, regiments, diseases }) => {
+  const [formData, setFormData] = useState<DiagnosisItem>({
     differential: false,
     unfit_for_labor: false,
     remarks: '',
     medical_case_book: '',
     disease: '',
     regiment: '',
+    is_active: true,
+    deleted_datetime: null,
+    deleted_by: null,
   });
 
-  const [caseBooks, setCaseBooks] = useState<any[]>([]);
-  const [diseases, setDiseases] = useState<any[]>([]);
-  const [regiments, setRegiments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // const [caseBooks, setCaseBooks] = useState<any[]>([]);
+  // const [diseases, setDiseases] = useState<any[]>([]);
+  // const [regimentss, setRegimentss] = useState<any[]>([]);
+  // const [loader, setLoader] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(true);
 
   useEffect(() => {
     loadDropdownData();
@@ -54,29 +68,52 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
     }
   }, [diagnosis, dataLoaded]);
 
-  const loadDropdownData = () => {
-    setCaseBooks([
-      { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },
-      { id: '2', prisoner_name: 'Jane Smith', case_number: 'CB-2024-002' },
-      { id: '3', prisoner_name: 'Michael Johnson', case_number: 'CB-2024-003' },
-    ]);
+  const loadDropdownData = async () => {
+    try {
+      let casebooksOk = true
+      let regimentsOk = true
 
-    setDiseases([
-      { id: '1', name: 'Tuberculosis', category: 'Infectious' },
-      { id: '2', name: 'Malaria', category: 'Infectious' },
-      { id: '3', name: 'Pneumonia', category: 'Respiratory' },
-      { id: '4', name: 'Hepatitis B', category: 'Infectious' },
-      { id: '5', name: 'COVID-19', category: 'Infectious' },
-    ]);
+      if (!caseBooks.length) {
+        casebooksOk = await getCasebookList(setCaseBooks)
+      }
+      if (!regiments.length) {
+        regimentsOk = await getRegimentList(setRegiments)
+      }
 
-    setRegiments([
-      { id: '1', name: 'Antibiotic Course', description: '14 days treatment' },
-      { id: '2', name: 'Antiviral Medication', description: '21 days treatment' },
-      { id: '3', name: 'Isolation Protocol', description: 'Quarantine required' },
-      { id: '4', name: 'Observation', description: 'Monitor symptoms' },
-    ]);
-    
-    setDataLoaded(true);
+      if (casebooksOk && regimentsOk) {
+        setDataLoaded(false)
+      }
+      else {
+        toast.error("Please make sure you have case books and regiments")
+        onCancel()
+      }
+
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    // setCaseBooks([
+    //   { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },
+    //   { id: '2', prisoner_name: 'Jane Smith', case_number: 'CB-2024-002' },
+    //   { id: '3', prisoner_name: 'Michael Johnson', case_number: 'CB-2024-003' },
+    // ]);
+    //
+    // setDiseases([
+    //   { id: '1', name: 'Tuberculosis', category: 'Infectious' },
+    //   { id: '2', name: 'Malaria', category: 'Infectious' },
+    //   { id: '3', name: 'Pneumonia', category: 'Respiratory' },
+    //   { id: '4', name: 'Hepatitis B', category: 'Infectious' },
+    //   { id: '5', name: 'COVID-19', category: 'Infectious' },
+    // ]);
+    //
+    // setRegimentss([
+    //   { id: '1', name: 'Antibiotic Course', description: '14 days treatment' },
+    //   { id: '2', name: 'Antiviral Medication', description: '21 days treatment' },
+    //   { id: '3', name: 'Isolation Protocol', description: 'Quarantine required' },
+    //   { id: '4', name: 'Observation', description: 'Monitor symptoms' },
+    // ]);
+    //
+    // setDataLoaded(true);
   };
 
   const handleInputChange = (field: keyof Diagnosis, value: any) => {
@@ -98,38 +135,43 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
       toast.error('Please select a treatment regiment');
       return;
     }
+    if (!formData.remarks) {
+      toast.error('Please enter remarks');
+      return;
+    }
 
-    setLoading(true);
+    setLoader(true);
+    onSubmit(formData);
 
-    setTimeout(() => {
-      const selectedCaseBook = caseBooks.find((cb) => cb.id === formData.medical_case_book);
-      const selectedDisease = diseases.find((d) => d.id === formData.disease);
-      const selectedRegiment = regiments.find((r) => r.id === formData.regiment);
-
-      const submitData: Diagnosis = {
-        ...formData,
-        prisoner_name: selectedCaseBook?.prisoner_name || '',
-        disease_name: selectedDisease?.name || '',
-        regiment_name: selectedRegiment?.name || '',
-      };
-
-      onSubmit(submitData);
-      setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('Diagnosis created successfully');
-        setFormData({
-          differential: false,
-          unfit_for_labor: false,
-          remarks: '',
-          medical_case_book: '',
-          disease: '',
-          regiment: '',
-        });
-      } else {
-        toast.success('Diagnosis updated successfully');
-      }
-    }, 500);
+    // setTimeout(() => {
+    //   const selectedCaseBook = caseBooks.find((cb) => cb.id === formData.medical_case_book);
+    //   const selectedDisease = diseases.find((d) => d.id === formData.disease);
+    //   const selectedRegiments = regimentss.find((r) => r.id === formData.regiments);
+    //
+    //   const submitData: Diagnosis = {
+    //     ...formData,
+    //     prisoner_name: selectedCaseBook?.prisoner_name || '',
+    //     disease_name: selectedDisease?.name || '',
+    //     regiments_name: selectedRegiments?.name || '',
+    //   };
+    //
+    //   onSubmit(submitData);
+    //   setLoader(false);
+    //
+    //   if (mode === 'create') {
+    //     toast.success('Diagnosis created successfully');
+    //     setFormData({
+    //       differential: false,
+    //       unfit_for_labor: false,
+    //       remarks: '',
+    //       medical_case_book: '',
+    //       disease: '',
+    //       regiments: '',
+    //     });
+    //   } else {
+    //     toast.success('Diagnosis updated successfully');
+    //   }
+    // }, 500);
   };
 
   const isReadOnly = mode === 'view';
@@ -145,163 +187,177 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Case Book Information
-            </h3>
-            <div className="grid grid-cols-1 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="medical_case_book">
-                  Medical Case Book <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.medical_case_book}
-                  onValueChange={(value) => handleInputChange('medical_case_book', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="medical_case_book">
-                    <SelectValue placeholder="Select case book" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {caseBooks.map((cb) => (
-                      <SelectItem key={cb.id} value={cb.id}>
-                        {cb.case_number} - {cb.prisoner_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Diagnosis Details
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="disease">
-                  Disease <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.disease}
-                  onValueChange={(value) => handleInputChange('disease', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="disease">
-                    <SelectValue placeholder="Select disease" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {diseases.map((disease) => (
-                      <SelectItem key={disease.id} value={disease.id}>
-                        {disease.name} ({disease.category})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="regiment">
-                  Treatment Regiment <span className="text-red-500">*</span>
-                </Label>
-                <Select
-                  value={formData.regiment}
-                  onValueChange={(value) => handleInputChange('regiment', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="regiment">
-                    <SelectValue placeholder="Select regiment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {regiments.map((regiment) => (
-                      <SelectItem key={regiment.id} value={regiment.id}>
-                        {regiment.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Status Flags
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="differential">Differential Diagnosis</Label>
-                  <p className="text-sm text-gray-600">Mark if diagnosis is differential</p>
+        {
+          dataLoaded ? (
+              <div className="size-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground text-sm">
+                        Fetching additional information, Please wait...
+                      </p>
                 </div>
-                <Switch
-                  id="differential"
-                  checked={formData.differential}
-                  onCheckedChange={(checked) => handleInputChange('differential', checked)}
-                  disabled={isReadOnly}
-                />
               </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                <div className="space-y-0.5">
-                  <Label htmlFor="unfit_for_labor">Unfit for Labor</Label>
-                  <p className="text-sm text-gray-600">Mark if prisoner unfit for work</p>
+          ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+                    Case Book Information
+                  </h3>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="medical_case_book">
+                        Medical Case Book <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.medical_case_book}
+                        onValueChange={(value) => handleInputChange('medical_case_book', value)}
+                        disabled={isReadOnly}
+                      >
+                        <SelectTrigger id="medical_case_book">
+                          <SelectValue placeholder="Select case book" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {caseBooks.map((cb) => (
+                            <SelectItem key={cb.id} value={cb.id}>
+                              {cb.check_type_name} - {cb.prisoner_name} - Doctor: {cb.doctors_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
                 </div>
-                <Switch
-                  id="unfit_for_labor"
-                  checked={formData.unfit_for_labor}
-                  onCheckedChange={(checked) => handleInputChange('unfit_for_labor', checked)}
-                  disabled={isReadOnly}
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Additional Information
-            </h3>
-            <div className="space-y-2">
-              <Label htmlFor="remarks">Remarks</Label>
-              <Textarea
-                id="remarks"
-                value={formData.remarks}
-                onChange={(e) => handleInputChange('remarks', e.target.value)}
-                placeholder="Enter any additional remarks or observations..."
-                rows={4}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          {!isReadOnly && (
-            <div className="flex items-center justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
-                <X className="h-4 w-4 mr-2" />
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                style={{ backgroundColor: '#650000' }}
-                className="text-white hover:opacity-90"
-                disabled={loading}
-              >
-                <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Diagnosis' : 'Update Diagnosis'}
-              </Button>
-            </div>
-          )}
-
-          {isReadOnly && (
-            <div className="flex items-center justify-end pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onCancel}>
-                Close
-              </Button>
-            </div>
-          )}
-        </form>
+      
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+                    Diagnosis Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="disease">
+                        Disease <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.disease}
+                        onValueChange={(value) => handleInputChange('disease', value)}
+                        disabled={isReadOnly}
+                      >
+                        <SelectTrigger id="disease">
+                          <SelectValue placeholder="Select disease" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {diseases.map((disease) => (
+                            <SelectItem key={disease.id} value={disease.id}>
+                              {disease.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+      
+                    <div className="space-y-2">
+                      <Label htmlFor="regiments">
+                        Treatment Regiments <span className="text-red-500">*</span>
+                      </Label>
+                      <Select
+                        value={formData.regiment}
+                        onValueChange={(value) => handleInputChange('regiment', value)}
+                        disabled={isReadOnly}
+                      >
+                        <SelectTrigger id="regiment">
+                          <SelectValue placeholder="Select regiment" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {regiments.map((regiment) => (
+                            <SelectItem key={regiment.id} value={regiment.id}>
+                              {regiment.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+      
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+                    Status Flags
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="differential">Differential Diagnosis</Label>
+                        <p className="text-sm text-gray-600">Mark if diagnosis is differential</p>
+                      </div>
+                      <Switch
+                        id="differential"
+                        checked={formData.differential}
+                        onCheckedChange={(checked) => handleInputChange('differential', checked)}
+                        disabled={isReadOnly}
+                      />
+                    </div>
+      
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div className="space-y-0.5">
+                        <Label htmlFor="unfit_for_labor">Unfit for Labor</Label>
+                        <p className="text-sm text-gray-600">Mark if prisoner unfit for work</p>
+                      </div>
+                      <Switch
+                        id="unfit_for_labor"
+                        checked={formData.unfit_for_labor}
+                        onCheckedChange={(checked) => handleInputChange('unfit_for_labor', checked)}
+                        disabled={isReadOnly}
+                      />
+                    </div>
+                  </div>
+                </div>
+      
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+                    Additional Information
+                  </h3>
+                  <div className="space-y-2">
+                    <Label htmlFor="remarks">Remarks <span className="text-red-500">*</span></Label>
+                    <Textarea
+                      id="remarks"
+                      value={formData.remarks}
+                      onChange={(e) => handleInputChange('remarks', e.target.value)}
+                      placeholder="Enter any additional remarks or observations..."
+                      rows={4}
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+      
+                {!isReadOnly && (
+                  <div className="flex items-center justify-end gap-3 pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={onCancel} disabled={loader}>
+                      <X className="h-4 w-4 mr-2" />
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      style={{ backgroundColor: '#650000' }}
+                      className="text-white hover:opacity-90"
+                      disabled={loader}
+                    >
+                      <Save className="h-4 w-4 mr-2" />
+                      {loader ? 'Saving...' : mode === 'create' ? 'Create Diagnosis' : 'Update Diagnosis'}
+                    </Button>
+                  </div>
+                )}
+      
+                {isReadOnly && (
+                  <div className="flex items-center justify-end pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={onCancel}>
+                      Close
+                    </Button>
+                  </div>
+                )}
+              </form>
+          )
+        }
+        
       </CardContent>
     </Card>
   );
