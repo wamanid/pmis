@@ -3,10 +3,10 @@
 export interface TreatmentMedication {
   id: string;
   medication_name: string;
-  medication_type: 'Tablet' | 'Syrup' | 'Injection' | 'Ointment' | 'IV' | 'Capsule' | 'Drop' | 'Inhaler';
+  medication_form: 'Tablet' | 'Syrup' | 'Injection' | 'Ointment' | 'IV' | 'Capsule' | 'Drop' | 'Inhaler' | 'Cream';
   is_quantifiable: boolean;
-  quantity?: number;
-  quantity_unit?: string;
+  quantity_dispensed?: number;
+  dispensing_unit?: 'Individual' | 'Strip' | 'Packet' | 'Bottle' | 'Vial' | 'Ampule' | 'Tube';
   dosage_quantity: string;
   dosage_frequency: string;
   dosage_duration?: number;
@@ -33,7 +33,7 @@ export interface TreatmentPlan {
   updated_at?: string;
 }
 
-export const MEDICATION_TYPES = [
+export const MEDICATION_FORMS = [
   'Tablet',
   'Syrup',
   'Injection',
@@ -42,7 +42,32 @@ export const MEDICATION_TYPES = [
   'Capsule',
   'Drop',
   'Inhaler',
+  'Cream',
 ] as const;
+
+// Context-aware dispensing units based on medication form
+export const DISPENSING_UNITS: Record<string, Array<'Individual' | 'Strip' | 'Packet' | 'Bottle' | 'Vial' | 'Ampule' | 'Tube'>> = {
+  Tablet: ['Individual', 'Strip', 'Packet'],
+  Capsule: ['Individual', 'Strip', 'Packet'],
+  Syrup: ['Bottle'],
+  Injection: ['Vial', 'Ampule'],
+  IV: ['Bottle'],
+  Ointment: ['Tube'],
+  Cream: ['Tube'],
+  Drop: ['Bottle'],
+  Inhaler: ['Individual'],
+};
+
+// Display labels for dispensing units
+export const DISPENSING_UNIT_LABELS: Record<string, string> = {
+  Individual: 'Individual units',
+  Strip: 'Strip (typically 10 units)',
+  Packet: 'Packet (multiple strips)',
+  Bottle: 'Bottle',
+  Vial: 'Vial',
+  Ampule: 'Ampule',
+  Tube: 'Tube',
+};
 
 export const QUANTITY_UNITS = [
   'tablets',

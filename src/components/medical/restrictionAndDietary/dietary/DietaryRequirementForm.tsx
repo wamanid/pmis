@@ -1,23 +1,21 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
+import SearchableSelect from '../../../common/SearchableSelect';
 import { UtensilsCrossed, Save, X, Calendar as CalendarIcon } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { format } from 'date-fns';
-
-interface DietaryRequirement {
-  id?: string;
-  prisoner_restriction_info?: string;
-  dietary_requirement: string;
-  start_date: string;
-  end_date: string;
-  prisoner_restriction: string;
-}
+import {
+  DietaryRequirement,
+  PrisonerRestriction,
+  fetchPrisonerRestrictions,
+  createDietaryRequirement,
+  updateDietaryRequirement,
+} from '../../../../services/medical/restrictionAndDietary/dietaryRequirementService';
 
 interface DietaryRequirementFormProps {
   requirement?: DietaryRequirement | null;
@@ -34,70 +32,57 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
     prisoner_restriction: '',
   });
 
-  const [prisonerRestrictions, setPrisonerRestrictions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);
 
-  useEffect(() => {
-    loadDropdownData();
-  }, []);
-
-  useEffect(() => {
-    if (requirement && dataLoaded) {
-      setFormData(requirement);
+  // Local state for dropdown value
+  const [localRestrictionValue, setLocalRestrictionValue] = useState<string | null>(() => {
+    if (requirement && (mode === 'edit' || mode === 'view') && requirement.prisoner_restriction) {
+      return requirement.prisoner_restriction;
     }
-  }, [requirement, dataLoaded]);
+    return null;
+  });
 
-  const loadDropdownData = () => {
-    // Mock Prisoner Restrictions data
-    setPrisonerRestrictions([
-      { 
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', 
-        prisoner_name: 'John Doe',
-        prisoner_number: 'PR-2024-001',
-        reason_name: 'Medical Condition',
-        state_of_prisoner: 'Under medical observation'
-      },
-      { 
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', 
-        prisoner_name: 'Jane Smith',
-        prisoner_number: 'PR-2024-002',
-        reason_name: 'Security Risk',
-        state_of_prisoner: 'Restricted movement'
-      },
-      { 
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', 
-        prisoner_name: 'Michael Johnson',
-        prisoner_number: 'PR-2024-003',
-        reason_name: 'Behavioral Issues',
-        state_of_prisoner: 'Under monitoring'
-      },
-      { 
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', 
-        prisoner_name: 'Emily Davis',
-        prisoner_number: 'PR-2024-004',
-        reason_name: 'Injury Recovery',
-        state_of_prisoner: 'Post-surgery care'
-      },
-      { 
-        id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', 
-        prisoner_name: 'Robert Lee',
-        prisoner_number: 'PR-2024-005',
-        reason_name: 'Mental Health',
-        state_of_prisoner: 'Psychiatric evaluation'
-      },
-    ]);
+  // Sync form data when requirement changes
+  useEffect(() => {
+    if (requirement && (mode === 'edit' || mode === 'view')) {
+      setFormData(requirement);
+      setLocalRestrictionValue(requirement.prisoner_restriction || null);
+    }
+  }, [requirement, mode]);
 
-    setDataLoaded(true);
-  };
+  // Reset form when switching to create mode
+  useEffect(() => {
+    if (mode === 'create') {
+      setFormData({
+        dietary_requirement: '',
+        start_date: '',
+        end_date: '',
+        prisoner_restriction: '',
+      });
+      setLocalRestrictionValue(null);
+    }
+  }, [mode]);
 
   const handleInputChange = (field: keyof DietaryRequirement, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Fetch callback for prisoner restrictions dropdown (memoized to prevent re-fetching on every render)
+  const fetchRestrictionsCallback = useCallback(async (
+    opts: { [key: string]: any; search?: string; page?: number; page_size?: number },
+    signal?: AbortSignal
+  ) => {
+    return await fetchPrisonerRestrictions(
+      opts.page || 1,
+      opts.page_size || 50,
+      opts.search || '',
+      signal
+    );
+  }, []);
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.prisoner_restriction) {
@@ -115,49 +100,54 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedRestriction = prisonerRestrictions.find((r) => r.id === formData.prisoner_restriction);
-
-      const submitData: DietaryRequirement = {
-        ...formData,
-        prisoner_restriction_info: selectedRestriction 
-          ? `${selectedRestriction.prisoner_number} - ${selectedRestriction.prisoner_name} (${selectedRestriction.reason_name})`
-          : '',
+    try {
+      const payload = {
+        dietary_requirement: formData.dietary_requirement,
+        start_date: formData.start_date,
+        end_date: formData.end_date || '',
+        prisoner_restriction: formData.prisoner_restriction,
       };
 
-      onSubmit(submitData);
-      setLoading(false);
-
       if (mode === 'create') {
+        const created = await createDietaryRequirement(payload);
         toast.success('Dietary requirement created successfully');
+        onSubmit(created);
+        
+        // Reset form
         setFormData({
           dietary_requirement: '',
           start_date: '',
           end_date: '',
           prisoner_restriction: '',
         });
-      } else {
+        setLocalRestrictionValue(null);
+      } else if (mode === 'edit' && requirement?.id) {
+        const updated = await updateDietaryRequirement(requirement.id, payload);
         toast.success('Dietary requirement updated successfully');
+        onSubmit(updated);
       }
-    }, 500);
+    } catch (error: any) {
+      console.error('Error saving dietary requirement:', error);
+      toast.error(error.response?.data?.message || 'Failed to save dietary requirement');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const isReadOnly = mode === 'view';
 
-  // Get display values for view mode
-  const getDisplayValue = (field: string, id: string) => {
-    if (!id) return 'N/A';
-    
-    switch (field) {
-      case 'prisoner_restriction':
-        const restriction = prisonerRestrictions.find(r => r.id === id);
-        return restriction 
-          ? `${restriction.prisoner_number} - ${restriction.prisoner_name} (${restriction.reason_name})`
-          : id;
-      default:
-        return id;
-    }
-  };
+  // Derive initialItem for SearchableSelect in edit/view mode
+  const initialRestrictionItem =
+    requirement && (mode === 'edit' || mode === 'view') && requirement.prisoner_restriction
+      ? {
+          id: requirement.prisoner_restriction,
+          name: requirement.prisoner_restriction_info || '',
+          prisoner_number: requirement.prisoner_restriction_info?.split(' - ')[0] || '',
+          prisoner_name: requirement.prisoner_restriction_info?.split(' - ')[1]?.split(' (')[0] || '',
+          reason_name: requirement.prisoner_restriction_info?.match(/\(([^)]+)\)/)?.[1] || '',
+          state_of_prisoner: '',
+        }
+      : null;
 
   return (
     <Card className="w-full">
@@ -179,26 +169,34 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
               <Label htmlFor="prisoner_restriction">
                 Prisoner Restriction <span className="text-red-500">*</span>
               </Label>
-              {isReadOnly ? (
+              {isReadOnly || mode === 'edit' ? (
                 <div className="p-2 bg-gray-50 rounded border">
-                  {getDisplayValue('prisoner_restriction', formData.prisoner_restriction)}
+                  {requirement?.prisoner_restriction_info || requirement?.prisoner_name || 'N/A'}
                 </div>
               ) : (
-                <Select
-                  value={formData.prisoner_restriction}
-                  onValueChange={(value) => handleInputChange('prisoner_restriction', value)}
-                >
-                  <SelectTrigger id="prisoner_restriction">
-                    <SelectValue placeholder="Select prisoner restriction" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prisonerRestrictions.map((restriction) => (
-                      <SelectItem key={restriction.id} value={restriction.id}>
-                        {restriction.prisoner_number} - {restriction.prisoner_name} ({restriction.reason_name})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <SearchableSelect
+                  key={`restriction-${mode}-${requirement?.id}`}
+                  fetchPaginated={fetchRestrictionsCallback}
+                  value={localRestrictionValue}
+                  onChange={(val) => {
+                    setLocalRestrictionValue(val);
+                    handleInputChange('prisoner_restriction', val);
+                  }}
+                  placeholder="Select prisoner restriction"
+                  idField="id"
+                  labelField="name"
+                  renderItem={(item: any) => (
+                    <div>
+                      <div className="font-medium">{item.prisoner_name}</div>
+                      <div className="text-sm text-gray-500">
+                        {item.prisoner_number} - {item.reason_name}
+                      </div>
+                    </div>
+                  )}
+                  pageSize={50}
+                  initialItem={initialRestrictionItem ?? undefined}
+                  disabled={loading}
+                />
               )}
             </div>
           </div>
@@ -245,7 +243,7 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
                       <Calendar
                         mode="single"
                         selected={formData.start_date ? new Date(formData.start_date) : undefined}
-                        onSelect={(date) => {
+                        onSelect={(date: Date | undefined) => {
                           if (date) {
                             handleInputChange('start_date', format(date, 'yyyy-MM-dd'));
                             setStartDateOpen(false);
@@ -279,7 +277,7 @@ const DietaryRequirementForm: React.FC<DietaryRequirementFormProps> = ({ require
                       <Calendar
                         mode="single"
                         selected={formData.end_date ? new Date(formData.end_date) : undefined}
-                        onSelect={(date) => {
+                        onSelect={(date: Date | undefined) => {
                           if (date) {
                             handleInputChange('end_date', format(date, 'yyyy-MM-dd'));
                             setEndDateOpen(false);

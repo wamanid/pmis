@@ -1,379 +1,269 @@
-﻿import React, { useState, useEffect } from 'react';
-import { Button } from '../../../ui/button';
-import { Input } from '../../../ui/input';
-import { Label } from '../../../ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '../../../ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../../ui/dropdown-menu';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '../../../ui/alert-dialog';
+﻿import React, { useState, useMemo } from 'react';
 import { Card, CardContent } from '../../../ui/card';
 import { Badge } from '../../../ui/badge';
-import { Search, Plus, Eye, Edit, ChevronLeft, ChevronRight, MoreVertical, Trash2 } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { Button } from '../../../ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from '../../../ui/dialog';
+import { Plus, Eye, Pencil, Trash } from 'lucide-react';
+import { toast } from 'sonner';
 import FoodAssessmentForm from './FoodAssessmentForm';
-import { Dialog, DialogContent, DialogDescription, DialogTitle } from '../../../ui/dialog';
-
-interface FoodAssessment {
-  id: string;
-  notes: string;
-  station: string;
-  station_name: string;
-  item: string;
-  item_name: string;
-  item_category?: string;
-  quality: string;
-  quality_name: string;
-}
+import { DataTable } from '../../../common/DataTable';
+import { DataTableColumn } from '../../../common/DataTable.types';
+import ConfirmDialog from '../../../common/ConfirmDialog';
+import {
+  FoodAssessment,
+  fetchFoodAssessmentById,
+  createFoodAssessment,
+  updateFoodAssessment,
+  deleteFoodAssessment,
+  FOOD_ASSESSMENT_API_ENDPOINTS,
+} from '../../../../services/medical/stationsAndAssessment/foodAssessmentService';
 
 interface FoodAssessmentListProps {
   selectedStationId?: string;
 }
 
-// Mock data
-const mockFoodAssessments: FoodAssessment[] = [
-  {
-    id: '1',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    station_name: 'Luzira Maximum Security Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb1',
-    item_name: 'Posho (Maize Meal)',
-    item_category: 'Staple',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
-    quality_name: 'Good',
-    notes: 'Well-prepared posho with good consistency. Properly cooked and served hot. Prisoners reported satisfaction with the quality and portion size.',
-  },
-  {
-    id: '2',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa6',
-    station_name: 'Luzira Maximum Security Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb2',
-    item_name: 'Beans',
-    item_category: 'Protein',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc3',
-    quality_name: 'Fair',
-    notes: 'Beans were slightly undercooked. Need to increase cooking time by 15-20 minutes. Some prisoners complained about hardness. Recommend quality improvement.',
-  },
-  {
-    id: '3',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    station_name: 'Kigo Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb3',
-    item_name: 'Matoke (Plantain)',
-    item_category: 'Staple',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
-    quality_name: 'Excellent',
-    notes: 'Perfectly steamed matoke, soft and well-prepared. Excellent taste and presentation. All prisoners satisfied with the meal.',
-  },
-  {
-    id: '4',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa8',
-    station_name: 'Murchison Bay Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb4',
-    item_name: 'Rice',
-    item_category: 'Staple',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc4',
-    quality_name: 'Poor',
-    notes: 'Rice was overcooked and mushy. Temperature was too cold when served. Multiple complaints received. Immediate action required to improve preparation standards.',
-  },
-  {
-    id: '5',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa7',
-    station_name: 'Kigo Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb6',
-    item_name: 'Vegetables (Greens)',
-    item_category: 'Vegetable',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
-    quality_name: 'Good',
-    notes: 'Fresh vegetables, properly washed and cooked. Good nutritional value maintained. Minor salt adjustment needed for better taste.',
-  },
-  {
-    id: '6',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afa9',
-    station_name: 'Gulu Main Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afb8',
-    item_name: 'Meat Stew',
-    item_category: 'Protein',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc1',
-    quality_name: 'Excellent',
-    notes: 'Well-seasoned meat stew with tender meat. Adequate portion of meat per serving. Hygiene standards maintained throughout preparation.',
-  },
-  {
-    id: '7',
-    station: '3fa85f64-5717-4562-b3fc-2c963f66afaa',
-    station_name: 'Mbarara Main Prison',
-    item: '3fa85f64-5717-4562-b3fc-2c963f66afbc',
-    item_name: 'Porridge',
-    item_category: 'Breakfast',
-    quality: '3fa85f64-5717-4562-b3fc-2c963f66afc2',
-    quality_name: 'Good',
-    notes: 'Nutritious morning porridge served at appropriate temperature. Good sweetness level. Prisoners reported satisfaction with breakfast meal.',
-  },
-];
-
 const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedStationId }) => {
-  const [records, setRecords] = useState<FoodAssessment[]>(mockFoodAssessments);
-  const [filteredRecords, setFilteredRecords] = useState<FoodAssessment[]>(mockFoodAssessments);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [currentPage, setCurrentPage] = useState(1);
-  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [tableKey, setTableKey] = useState(0);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogKey, setDialogKey] = useState(0);
   const [selectedRecord, setSelectedRecord] = useState<FoodAssessment | null>(null);
   const [formMode, setFormMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [recordToDelete, setRecordToDelete] = useState<FoodAssessment | null>(null);
 
-  useEffect(() => {
-    filterRecords();
-  }, [searchTerm, records, selectedStationId]);
+  // Build table URL with filters
+  const tableUrl = useMemo(() => {
+    let url = FOOD_ASSESSMENT_API_ENDPOINTS.FOOD_ASSESSMENTS.replace(/^\//, '');
+    const params = new URLSearchParams();
 
-  const filterRecords = () => {
-    let filtered = [...records];
+    if (selectedStationId) params.append('station', selectedStationId);
 
-    if (selectedStationId) {
-      filtered = filtered.filter((record) => record.station === selectedStationId);
-    }
+    const queryString = params.toString();
+    return queryString ? `${url}?${queryString}` : url;
+  }, [selectedStationId]);
 
-    if (searchTerm) {
-      filtered = filtered.filter(
-        (record) =>
-          record.station_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.item_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          record.quality_name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    }
+  // Column definitions
+  const columns: DataTableColumn[] = useMemo(
+    () => [
+      {
+        key: 'station_name',
+        label: 'Station',
+        render: (value: any) => (
+          <span className="font-medium">{value || 'N/A'}</span>
+        ),
+      },
+      {
+        key: 'item_name',
+        label: 'Food Item',
+        render: (value: any) => value || 'N/A',
+      },
+      {
+        key: 'quality_name',
+        label: 'Quality Rating',
+        render: (value: any) => {
+          if (!value) return <Badge>N/A</Badge>;
+          
+          const variants: { [key: string]: string } = {
+            Excellent: 'bg-green-100 text-green-800',
+            Good: 'bg-blue-100 text-blue-800',
+            Fair: 'bg-yellow-100 text-yellow-800',
+            Poor: 'bg-orange-100 text-orange-800',
+            Unacceptable: 'bg-red-100 text-red-800',
+          };
 
-    setFilteredRecords(filtered);
-    setCurrentPage(1);
-  };
+          return (
+            <Badge className={variants[value] || 'bg-gray-100 text-gray-800'}>
+              {value}
+            </Badge>
+          );
+        },
+      },
+      {
+        key: 'notes',
+        label: 'Notes',
+        render: (value: any) => {
+          if (!value) return <span className="text-gray-400">No notes</span>;
+          const truncated = value.length > 60 ? `${value.substring(0, 60)}...` : value;
+          return <span title={value}>{truncated}</span>;
+        },
+      },
+      {
+        key: 'actions',
+        label: 'Actions',
+        render: (_: any, row: any) => (
+          <div className="flex items-center gap-2 justify-start">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleView(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleEdit(row)}
+              className="h-8 w-8 p-0"
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDeleteClick(row)}
+              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50"
+            >
+              <Trash className="h-4 w-4" />
+            </Button>
+          </div>
+        ),
+      },
+    ],
+    []
+  );
 
   const handleCreate = () => {
     setSelectedRecord(null);
     setFormMode('create');
+    setDialogKey((prev) => prev + 1);
     setDialogOpen(true);
   };
 
-  const handleView = (record: FoodAssessment) => {
-    setSelectedRecord(record);
-    setFormMode('view');
-    setDialogOpen(true);
-  };
-
-  const handleEdit = (record: FoodAssessment) => {
-    setSelectedRecord(record);
-    setFormMode('edit');
-    setDialogOpen(true);
-  };
-
-  const handleFormSubmit = (data: FoodAssessment) => {
-    if (formMode === 'create') {
-      const newRecord: FoodAssessment = {
-        ...data,
-        id: `${records.length + 1}`,
-      };
-      setRecords([...records, newRecord]);
-      toast.success('Food assessment created successfully');
-    } else if (formMode === 'edit') {
-      setRecords(records.map((r) => (r.id === selectedRecord?.id ? { ...data, id: r.id } : r)));
-      toast.success('Food assessment updated successfully');
+  const handleView = async (record: FoodAssessment) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
     }
-    setDialogOpen(false);
+    try {
+      const fullRecord = await fetchFoodAssessmentById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('view');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch food assessment details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setRecordToDelete(id);
-    setShowDeleteDialog(true);
+  const handleEdit = async (record: FoodAssessment) => {
+    if (!record.id) {
+      toast.error('Invalid record');
+      return;
+    }
+    try {
+      const fullRecord = await fetchFoodAssessmentById(record.id);
+      setSelectedRecord(fullRecord);
+      setFormMode('edit');
+      setDialogKey((prev) => prev + 1);
+      setDialogOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch food assessment details:', error);
+      toast.error(error.response?.data?.message || 'Failed to load record details');
+    }
   };
 
-  const confirmDelete = () => {
-    if (recordToDelete) {
-      setRecords(records.filter((record) => record.id !== recordToDelete));
+  const handleFormSubmit = async (data: FoodAssessment) => {
+    try {
+      if (formMode === 'create') {
+        await createFoodAssessment(data);
+        toast.success('Food assessment created successfully');
+        setTableKey((prev) => prev + 1);
+      } else if (formMode === 'edit' && selectedRecord?.id) {
+        await updateFoodAssessment(selectedRecord.id, data);
+        toast.success('Food assessment updated successfully');
+        setTableKey((prev) => prev + 1);
+      }
+      setDialogOpen(false);
+    } catch (error: any) {
+      console.error('Failed to save food assessment:', error);
+      toast.error(error.response?.data?.message || 'Failed to save record');
+      throw error;
+    }
+  };
+
+  const handleDeleteClick = (record: FoodAssessment) => {
+    setRecordToDelete(record);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!recordToDelete?.id) return;
+    try {
+      await deleteFoodAssessment(recordToDelete.id);
       toast.success('Food assessment deleted successfully');
-      setShowDeleteDialog(false);
+      setTableKey((prev) => prev + 1);
+      setRecordToDelete(null);
+    } catch (error: any) {
+      console.error('Failed to delete food assessment:', error);
+      toast.error(error.response?.data?.message || 'Failed to delete record');
+      throw error;
     }
   };
-
-  const getQualityBadge = (qualityName: string) => {
-    const variants: { [key: string]: string } = {
-      Excellent: 'bg-green-100 text-green-800',
-      Good: 'bg-blue-100 text-blue-800',
-      Fair: 'bg-yellow-100 text-yellow-800',
-      Poor: 'bg-orange-100 text-orange-800',
-      Unacceptable: 'bg-red-100 text-red-800',
-    };
-
-    return (
-      <Badge className={variants[qualityName] || 'bg-gray-100 text-gray-800'}>
-        {qualityName}
-      </Badge>
-    );
-  };
-
-  // Pagination
-  const totalPages = Math.ceil(filteredRecords.length / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentRecords = filteredRecords.slice(startIndex, endIndex);
 
   return (
     <>
       <Card>
         <CardContent className="p-6">
-          {/* Filters and Search */}
-          <div className="flex flex-col md:flex-row gap-4 mb-6">
-            <div className="flex-1">
-              <Label htmlFor="search">Search</Label>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Input
-                  id="search"
-                  placeholder="Search by station, food item, or quality..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
+                Food Assessment Records
+              </h3>
+              <p className="text-sm text-gray-500">
+                Track food quality assessments and observations for station meals
+              </p>
             </div>
-
-            <div className="flex items-end">
-              <Button
-                onClick={handleCreate}
-                style={{ backgroundColor: '#650000' }}
-                className="text-white hover:opacity-90"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Add Assessment
-              </Button>
-            </div>
+            <Button
+              onClick={handleCreate}
+              style={{ backgroundColor: '#650000' }}
+              className="text-white hover:opacity-90"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Add Assessment
+            </Button>
           </div>
 
-          {/* Table */}
-          <div className="border rounded-lg overflow-hidden">
-            <Table>
-              <TableHeader>
-                <TableRow className="bg-gray-50">
-                  <TableHead>Station</TableHead>
-                  <TableHead>Food Item</TableHead>
-                  <TableHead>Category</TableHead>
-                  <TableHead>Quality Rating</TableHead>
-                  <TableHead>Notes</TableHead>
-                  <TableHead className="text-right">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {currentRecords.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
-                      No food assessment records found
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  currentRecords.map((record) => (
-                    <TableRow key={record.id} className="hover:bg-gray-50">
-                      <TableCell className="font-medium">{record.station_name}</TableCell>
-                      <TableCell>{record.item_name}</TableCell>
-                      <TableCell>
-                        <Badge variant="outline">{record.item_category}</Badge>
-                      </TableCell>
-                      <TableCell>{getQualityBadge(record.quality_name)}</TableCell>
-                      <TableCell className="max-w-md">
-                        <div className="line-clamp-2" title={record.notes}>
-                          {record.notes || 'No notes'}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => handleView(record)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleEdit(record)}>
-                              <Edit className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => handleDelete(record.id)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </div>
-
-          {/* Pagination */}
-          {filteredRecords.length > 0 && (
-            <div className="flex items-center justify-between mt-4">
-              <div className="text-sm text-gray-500">
-                Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of{' '}
-                {filteredRecords.length} entries
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                  disabled={currentPage === 1}
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                <span className="text-sm">
-                  Page {currentPage} of {totalPages}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                  disabled={currentPage === totalPages}
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
-              </div>
-            </div>
-          )}
+          <DataTable
+            key={tableKey}
+            url={tableUrl}
+            title="Food Assessments"
+            columns={columns}
+            searchPlaceholder="Search by station, food item, or quality..."
+            config={{
+              search: true,
+              export: { csv: true, pdf: true, print: true },
+              lengthMenu: [10, 25, 50, 100, -1],
+              pagination: true,
+              summary: true,
+              rowSpacing: 'normal',
+            }}
+          />
         </CardContent>
       </Card>
 
-      {/* Dialog */}
+      {/* Form Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto">
-          <DialogTitle>Food Assessment Form</DialogTitle>
+        <DialogContent
+          className="max-w-[600px] max-h-[90vh] overflow-y-auto"
+          onInteractOutside={(e: Event) => e.preventDefault()}
+        >
+          <DialogTitle>
+            {formMode === 'create' && 'New Food Assessment'}
+            {formMode === 'edit' && 'Edit Food Assessment'}
+            {formMode === 'view' && 'View Food Assessment'}
+          </DialogTitle>
           <DialogDescription>
             Assess food quality and record observations for station meals.
           </DialogDescription>
           <FoodAssessmentForm
+            key={`form-${dialogKey}-${formMode}`}
             assessment={selectedRecord}
             onSubmit={handleFormSubmit}
             onCancel={() => setDialogOpen(false)}
@@ -382,21 +272,40 @@ const FoodAssessmentList: React.FC<FoodAssessmentListProps> = ({ selectedStation
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the food assessment record.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete}>Delete</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        title="Delete Food Assessment"
+        description="Are you absolutely sure? This action cannot be undone."
+        details={
+          recordToDelete ? (
+            <div className="space-y-2 p-4 bg-gray-50 rounded-md">
+              <div>
+                <span className="font-semibold">Station:</span>{' '}
+                {recordToDelete.station_name || 'N/A'}
+              </div>
+              <div>
+                <span className="font-semibold">Food Item:</span>{' '}
+                {recordToDelete.item_name || 'N/A'}
+              </div>
+              <div>
+                <span className="font-semibold">Quality Rating:</span>{' '}
+                {recordToDelete.quality_name || 'N/A'}
+              </div>
+              {recordToDelete.notes && (
+                <div>
+                  <span className="font-semibold">Notes:</span>{' '}
+                  <span className="text-sm">{recordToDelete.notes.substring(0, 100)}</span>
+                </div>
+              )}
+            </div>
+          ) : null
+        }
+        confirmLabel="Delete"
+        cancelLabel="Cancel"
+        onConfirm={handleDelete}
+      />
     </>
   );
 };

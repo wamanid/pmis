@@ -1,3 +1,7 @@
+// ⚠️ DEPRECATED: This file uses outdated field names (medication_type, quantity, quantity_unit)
+// Use TreatmentPlanFormV2.tsx instead which uses: medication_form, quantity_dispensed, dispensing_unit
+// This file is kept for backwards compatibility only
+
 import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Button } from '../../ui/button';

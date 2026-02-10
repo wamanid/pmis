@@ -1,18 +1,12 @@
 ﻿import React, { useState } from 'react';
 import { Card, CardContent } from '../../ui/card';
 import { FileX } from 'lucide-react';
-import PrisonerSearchScreenWider from '../../common/PrisonerSearchScreen-wider';
 import DeathConfirmationList from './deathConfirmation/DeathConfirmationList';
 import DeathNotificationList from './deathNotification/DeathNotificationList';
 import DeathRecipientList from './deathRecipient/DeathRecipientList';
 
 export default function DeathDetails() {
-  const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>('');
   const [activeTab, setActiveTab] = useState<'confirmation' | 'notification' | 'recipient'>('confirmation');
-
-  const handlePrisonerChange = (prisonerId: string) => {
-    setSelectedPrisonerId(prisonerId);
-  };
 
   return (
     <div className="space-y-6">
@@ -21,17 +15,6 @@ export default function DeathDetails() {
         <FileX className="h-6 w-6" />
         <h1 className="text-2xl">Death Details Management</h1>
       </div>
-
-      {/* Prisoner Information Section */}
-      <Card style={{ borderTop: '3px solid #650000' }}>
-        <CardContent className="pt-6">
-          <PrisonerSearchScreenWider
-            value={selectedPrisonerId}
-            onChange={handlePrisonerChange}
-            showTitle={true}
-          />
-        </CardContent>
-      </Card>
 
       {/* Death Details Tabs */}
       <Card>
@@ -82,19 +65,19 @@ export default function DeathDetails() {
           {/* Tab Content */}
           {activeTab === 'confirmation' && (
             <div>
-              <DeathConfirmationList selectedPrisonerId={selectedPrisonerId} />
+              <DeathConfirmationList />
             </div>
           )}
 
           {activeTab === 'notification' && (
             <div>
-              <DeathNotificationList selectedPrisonerId={selectedPrisonerId} />
+              <DeathNotificationList />
             </div>
           )}
 
           {activeTab === 'recipient' && (
             <div>
-              <DeathRecipientList selectedPrisonerId={selectedPrisonerId} />
+              <DeathRecipientList />
             </div>
           )}
         </CardContent>

@@ -24,7 +24,9 @@ import { cn } from '../../ui/utils';
 import {
   TreatmentPlan,
   TreatmentMedication,
-  MEDICATION_TYPES,
+  MEDICATION_FORMS,
+  DISPENSING_UNITS,
+  DISPENSING_UNIT_LABELS,
   QUANTITY_UNITS,
   DOSAGE_FREQUENCIES,
   DOSAGE_TIMING,
@@ -64,10 +66,10 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
   const [currentMed, setCurrentMed] = useState<TreatmentMedication>({
     id: '',
     medication_name: '',
-    medication_type: 'Tablet',
+    medication_form: 'Tablet',
     is_quantifiable: true,
-    quantity: undefined,
-    quantity_unit: 'tablets',
+    quantity_dispensed: undefined,
+    dispensing_unit: 'Individual',
     dosage_quantity: '',
     dosage_frequency: '1x daily',
     dosage_duration: undefined,
@@ -84,10 +86,10 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
     setCurrentMed({
       id: '',
       medication_name: '',
-      medication_type: 'Tablet',
+      medication_form: 'Tablet',
       is_quantifiable: true,
-      quantity: undefined,
-      quantity_unit: 'tablets',
+      quantity_dispensed: undefined,
+      dispensing_unit: 'Individual',
       dosage_quantity: '',
       dosage_frequency: '1x daily',
       dosage_duration: undefined,
@@ -105,7 +107,7 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
       alert('Please enter medication name');
       return;
     }
-    if (currentMed.is_quantifiable && !currentMed.quantity) {
+    if (currentMed.is_quantifiable && !currentMed.quantity_dispensed) {
       alert('Please enter quantity for quantifiable medication');
       return;
     }
@@ -376,24 +378,30 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                       </datalist>
                     </div>
 
-                    {/* Type & Quantifiable */}
+                    {/* Form & Quantifiable */}
                     <div className="space-y-2">
                       <Label>
-                        Type <span className="text-red-500">*</span>
+                        Form <span className="text-red-500">*</span>
                       </Label>
                       <Select
-                        value={currentMed.medication_type}
-                        onValueChange={(value: any) =>
-                          setCurrentMed({ ...currentMed, medication_type: value })
-                        }
+                        value={currentMed.medication_form}
+                        onValueChange={(value: any) => {
+                          const firstUnit = DISPENSING_UNITS[value]?.[0];
+                          setCurrentMed({ 
+                            ...currentMed, 
+                            medication_form: value,
+                            // Reset dispensing unit to first option when form changes
+                            dispensing_unit: firstUnit as any
+                          });
+                        }}
                       >
                         <SelectTrigger>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          {MEDICATION_TYPES.map((type) => (
-                            <SelectItem key={type} value={type}>
-                              {type}
+                          {MEDICATION_FORMS.map((form) => (
+                            <SelectItem key={form} value={form}>
+                              {form}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -410,20 +418,20 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                       <Label>Quantifiable</Label>
                     </div>
 
-                    {/* Quantity & Unit */}
+                    {/* Quantity Dispensed & Dispensing Unit */}
                     {currentMed.is_quantifiable && (
                       <>
                         <div className="space-y-2">
                           <Label>
-                            Quantity <span className="text-red-500">*</span>
+                            Quantity Dispensed <span className="text-red-500">*</span>
                           </Label>
                           <Input
                             type="number"
-                            value={currentMed.quantity || ''}
+                            value={currentMed.quantity_dispensed || ''}
                             onChange={(e) =>
                               setCurrentMed({
                                 ...currentMed,
-                                quantity: parseFloat(e.target.value),
+                                quantity_dispensed: parseFloat(e.target.value),
                               })
                             }
                             placeholder="Enter quantity"
@@ -432,21 +440,21 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
 
                         <div className="space-y-2">
                           <Label>
-                            Unit <span className="text-red-500">*</span>
+                            Dispensing Unit <span className="text-red-500">*</span>
                           </Label>
                           <Select
-                            value={currentMed.quantity_unit}
-                            onValueChange={(value: string) =>
-                              setCurrentMed({ ...currentMed, quantity_unit: value })
+                            value={currentMed.dispensing_unit}
+                            onValueChange={(value: any) =>
+                              setCurrentMed({ ...currentMed, dispensing_unit: value })
                             }
                           >
                             <SelectTrigger>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
-                              {QUANTITY_UNITS.map((unit) => (
+                              {(DISPENSING_UNITS[currentMed.medication_form] || ['Individual']).map((unit) => (
                                 <SelectItem key={unit} value={unit}>
-                                  {unit}
+                                  {DISPENSING_UNIT_LABELS[unit] || unit}
                                 </SelectItem>
                               ))}
                             </SelectContent>
@@ -612,8 +620,8 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                       <tr>
                         <th className="text-left p-3 text-sm font-semibold">#</th>
                         <th className="text-left p-3 text-sm font-semibold">Medication</th>
-                        <th className="text-left p-3 text-sm font-semibold">Type</th>
-                        <th className="text-left p-3 text-sm font-semibold">Quantity</th>
+                        <th className="text-left p-3 text-sm font-semibold">Form</th>
+                        <th className="text-left p-3 text-sm font-semibold">Dispensed</th>
                         <th className="text-left p-3 text-sm font-semibold">Dosage</th>
                         <th className="text-left p-3 text-sm font-semibold">Instructions</th>
                         {!isReadOnly && (
@@ -629,11 +637,11 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                             <div className="font-medium">{med.medication_name}</div>
                           </td>
                           <td className="p-3 text-sm text-muted-foreground">
-                            {med.medication_type}
+                            {med.medication_form}
                           </td>
                           <td className="p-3 text-sm">
-                            {med.is_quantifiable && med.quantity
-                              ? `${med.quantity} ${med.quantity_unit}`
+                            {med.is_quantifiable && med.quantity_dispensed
+                              ? `${med.quantity_dispensed} ${med.dispensing_unit || ''}`
                               : '—'}
                           </td>
                           <td className="p-3 text-sm">

@@ -31,10 +31,14 @@ src/components/medical/
 │   │   ├── LabTestScreen.tsx
 │   │   ├── LabTestForm.tsx
 │   │   └── LabTestList.tsx
-│   ├── treatments/
-│   │   ├── TreatmentScreen.tsx
-│   │   ├── TreatmentForm.tsx
-│   │   └── TreatmentList.tsx
+│   ├── treatment/                               # Treatment Plans
+│   │   ├── TreatmentPlanList.tsx
+│   │   ├── TreatmentPlanList_GROUPED.tsx
+│   │   ├── TreatmentPlanForm.tsx                # ⚠️ Deprecated
+│   │   ├── TreatmentPlanFormV2.tsx              # ✅ Active version
+│   │   ├── TreatmentPlan.types.ts               # Type definitions
+│   │   ├── TreatmentPlan.mock.ts                # Mock data
+│   │   └── TreatmentVisualization.tsx
 │   ├── examinationResults/
 │   │   ├── ExamResultScreen.tsx
 │   │   ├── ExamResultForm.tsx
@@ -209,6 +213,17 @@ Routes updated in `src/routes/medical.routes.tsx`:
 **Routes Updated**: 6 import paths  
 **Git History**: Preserved with `git mv`  
 
+## Recent Updates
+
+### February 8, 2026 - Treatment Plan Improvements
+- ✅ Renamed `medication_type` → `medication_form` for medical accuracy
+- ✅ Added hierarchical dispensing system (`quantity_dispensed` + `dispensing_unit`)
+- ✅ Implemented context-aware dispensing unit dropdowns
+- ✅ Added 'Cream' to medication forms
+- ✅ Updated TreatmentPlanFormV2.tsx with new field structure
+- ✅ Deprecated TreatmentPlanForm.tsx (old version)
+- 📄 See [TREATMENT_PLAN_IMPROVEMENTS.md](../../../ma_ignore/TREATMENT_PLAN_IMPROVEMENTS.md) for details
+
 ## Next Steps
 
 1. Create individual service files as needed in service subfolders
@@ -216,6 +231,7 @@ Routes updated in `src/routes/medical.routes.tsx`:
 3. Add shared/common medical components folder if needed
 4. Create corresponding test folders mirroring structure
 5. Update any remaining imports in other modules
+6. ⚠️ **Backend API**: Update treatment plan endpoints to support new field names
 
 ---
 

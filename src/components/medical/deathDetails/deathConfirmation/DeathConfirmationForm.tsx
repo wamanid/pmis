@@ -1,58 +1,35 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
-import { FileX, Save, X, Calendar as CalendarIcon, Upload, FileText } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { FileX, Save, X, Calendar as CalendarIcon, Upload, ExternalLink, Trash2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { format } from 'date-fns';
-
-interface Prisoner {
-  id: string;
-  prisoner_number: string;
-  full_name: string;
-}
-
-interface StaffProfile {
-  id: string;
-  name: string;
-  staff_number: string;
-  designation?: string;
-}
-
-interface DeathConfirmation {
-  id?: string;
-  prisoner_name?: string;
-  prisoner_number?: string;
-  officer_in_charge_name?: string;
-  medical_officer_name?: string;
-  pathologist_attachment: string;
-  other_attachment: string;
-  medical_form: string;
-  death_certificate: string;
-  presumed_cause_of_death: string;
-  actual_cause_of_death: string;
-  cause_of_death: string;
-  place_of_death: string;
-  date_of_death: string;
-  notes: string;
-  prisoner: string;
-  officer_in_charge: string;
-  medial_officer: string; // Note: API has typo "medial"
-}
+import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
+import StaffProfileSelect from '../../../common/StaffProfileSelect';
+import {
+  DeathConfirmation,
+} from '../../../../services/medical/deathDetails/deathConfirmationService';
+import { uploadFile } from '../../../../services/fileUploadService';
+import axiosInstance from '../../../../services/axiosInstance';
 
 interface DeathConfirmationFormProps {
   confirmation?: DeathConfirmation | null;
-  onSubmit: (confirmation: DeathConfirmation) => void;
+  onComplete: () => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
 }
 
-const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmation, onSubmit, onCancel, mode }) => {
+const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
+  confirmation,
+  onComplete,
+  onCancel,
+  mode,
+}) => {
   const [formData, setFormData] = useState<DeathConfirmation>({
     pathologist_attachment: '',
     other_attachment: '',
@@ -69,88 +46,193 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
     medial_officer: '',
   });
 
-  const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
-  const [officers, setOfficers] = useState<StaffProfile[]>([]);
-  const [medicalOfficers, setMedicalOfficers] = useState<StaffProfile[]>([]);
   const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
   const [deathDateOpen, setDeathDateOpen] = useState(false);
 
-  // File upload states
-  const [pathologistFile, setPathologistFile] = useState<File | null>(null);
-  const [otherFile, setOtherFile] = useState<File | null>(null);
-  const [medicalFormFile, setMedicalFormFile] = useState<File | null>(null);
-  const [deathCertificateFile, setDeathCertificateFile] = useState<File | null>(null);
+  // Local state for pending file uploads (stores File objects before upload)
+  const [pendingFiles, setPendingFiles] = useState<{
+    death_certificate: File | null;
+    medical_form: File | null;
+    pathologist_attachment: File | null;
+    other_attachment: File | null;
+  }>({
+    death_certificate: null,
+    medical_form: null,
+    pathologist_attachment: null,
+    other_attachment: null,
+  });
 
-  useEffect(() => {
-    loadDropdownData();
+  // Upload progress tracking
+  const [uploadProgress, setUploadProgress] = useState<{
+    death_certificate: number;
+    medical_form: number;
+    pathologist_attachment: number;
+    other_attachment: number;
+  }>({
+    death_certificate: 0,
+    medical_form: 0,
+    pathologist_attachment: 0,
+    other_attachment: 0,
+  });
+
+  // Local state for document editing
+  const [editingDoc, setEditingDoc] = useState<{
+    death_certificate: boolean;
+    medical_form: boolean;
+    pathologist_attachment: boolean;
+    other_attachment: boolean;
+  }>({
+    death_certificate: false,
+    medical_form: false,
+    pathologist_attachment: false,
+    other_attachment: false,
+  });
+
+  // Local state for dropdowns (with initialization functions)
+  const [localPrisonerId, setLocalPrisonerId] = useState<string | null>(() => {
+    if (confirmation && (mode === 'edit' || mode === 'view') && confirmation.prisoner) {
+      return confirmation.prisoner;
+    }
+    return null;
+  });
+
+  const [localOfficerInChargeId, setLocalOfficerInChargeId] = useState<string | null>(() => {
+    if (confirmation && (mode === 'edit' || mode === 'view') && confirmation.officer_in_charge) {
+      return confirmation.officer_in_charge;
+    }
+    return null;
+  });
+
+  const [localMedicalOfficerId, setLocalMedicalOfficerId] = useState<string | null>(() => {
+    if (confirmation && (mode === 'edit' || mode === 'view') && confirmation.medial_officer) {
+      return confirmation.medial_officer;
+    }
+    return null;
+  });
+
+  // Derive initialItems from confirmation prop (memoized to prevent re-renders)
+  const initialPrisonerItem = useMemo(() =>
+    confirmation && (mode === 'edit' || mode === 'view') && confirmation.prisoner && confirmation.prisoner_name
+      ? {
+          id: confirmation.prisoner,
+          prisoner_number: confirmation.prisoner_number || '',
+          full_name: confirmation.prisoner_name,
+        }
+      : null,
+    [confirmation, mode]
+  );
+
+  const initialOfficerInChargeItem = useMemo(() =>
+    confirmation &&
+    (mode === 'edit' || mode === 'view') &&
+    confirmation.officer_in_charge &&
+    confirmation.officer_in_charge_name
+      ? {
+          id: confirmation.officer_in_charge,
+          full_name: confirmation.officer_in_charge_name,
+          force_number: '',
+        }
+      : null,
+    [confirmation, mode]
+  );
+
+  const initialMedicalOfficerItem = useMemo(() =>
+    confirmation &&
+    (mode === 'edit' || mode === 'view') &&
+    confirmation.medial_officer &&
+    confirmation.medical_officer_name
+      ? {
+          id: confirmation.medial_officer,
+          full_name: confirmation.medical_officer_name,
+          force_number: '',
+        }
+      : null,
+    [confirmation, mode]
+  );
+
+  // CRITICAL: Define handleInputChange FIRST before other handlers use it
+  const handleInputChange = useCallback((field: keyof DeathConfirmation, value: any) => {
+    setFormData((prev) => ({ ...prev, [field]: value }));
   }, []);
 
+  // Memoized onChange handlers - inline state updates to avoid dependency issues
+  const handlePrisonerChange = useCallback((prisonerId: string | null) => {
+    setLocalPrisonerId(prisonerId);
+    setFormData((prev) => ({ ...prev, prisoner: prisonerId }));
+  }, []);
+
+  const handleOfficerInChargeChange = useCallback((val: string | null) => {
+    setLocalOfficerInChargeId(val);
+    setFormData((prev) => ({ ...prev, officer_in_charge: val }));
+  }, []);
+
+  const handleMedicalOfficerChange = useCallback((val: string | null) => {
+    setLocalMedicalOfficerId(val);
+    setFormData((prev) => ({ ...prev, medial_officer: val }));
+  }, []);
+
+  // Memoize dropdown components to prevent re-renders on formData changes
+  const prisonerSearchComponent = useMemo(() => (
+    <CustomPrisonerSearch
+      value={localPrisonerId}
+      onChange={handlePrisonerChange}
+      disabled={loading}
+    />
+  ), [localPrisonerId, handlePrisonerChange, loading]);
+
+  const officerInChargeSelectComponent = useMemo(() => (
+    <StaffProfileSelect
+      value={localOfficerInChargeId}
+      onChange={handleOfficerInChargeChange}
+      placeholder="Select officer in charge"
+      initialItem={initialOfficerInChargeItem ?? undefined}
+    />
+  ), [localOfficerInChargeId, handleOfficerInChargeChange, initialOfficerInChargeItem]);
+
+  const medicalOfficerSelectComponent = useMemo(() => (
+    <StaffProfileSelect
+      value={localMedicalOfficerId}
+      onChange={handleMedicalOfficerChange}
+      placeholder="Select medical officer"
+      initialItem={initialMedicalOfficerItem ?? undefined}
+    />
+  ), [localMedicalOfficerId, handleMedicalOfficerChange, initialMedicalOfficerItem]);
+
+  // Synchronize form data with confirmation prop
   useEffect(() => {
-    if (confirmation && dataLoaded) {
+    if (confirmation && (mode === 'edit' || mode === 'view')) {
       setFormData(confirmation);
+      setLocalPrisonerId(confirmation.prisoner || null);
+      setLocalOfficerInChargeId(confirmation.officer_in_charge || null);
+      setLocalMedicalOfficerId(confirmation.medial_officer || null);
     }
-  }, [confirmation, dataLoaded]);
+  }, [confirmation, mode]);
 
-  const loadDropdownData = () => {
-    // Mock Prisoners
-    setPrisoners([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa6', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa7', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa8', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afa9', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afaa', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-    ]);
-
-    // Mock Officers in Charge
-    setOfficers([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb1', name: 'SSP David Okello', staff_number: 'OIC-001', designation: 'Senior Superintendent' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb2', name: 'SP Sarah Namuganza', staff_number: 'OIC-002', designation: 'Superintendent' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb3', name: 'ASP James Mutumba', staff_number: 'OIC-003', designation: 'Assistant Superintendent' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb4', name: 'IP Grace Nalwanga', staff_number: 'OIC-004', designation: 'Inspector' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afb5', name: 'SSP Robert Ssemakula', staff_number: 'OIC-005', designation: 'Senior Superintendent' },
-    ]);
-
-    // Mock Medical Officers
-    setMedicalOfficers([
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc1', name: 'Dr. David Makumbi', staff_number: 'MED-001', designation: 'General Medicine' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc2', name: 'Dr. Sarah Kisakye', staff_number: 'MED-002', designation: 'Internal Medicine' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc3', name: 'Dr. James Okello', staff_number: 'MED-003', designation: 'Surgery' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc4', name: 'Dr. Patricia Mutesi', staff_number: 'MED-004', designation: 'Psychiatry' },
-      { id: '3fa85f64-5717-4562-b3fc-2c963f66afc5', name: 'Dr. Richard Ssemakula', staff_number: 'MED-005', designation: 'Infectious Diseases' },
-    ]);
-
-    setDataLoaded(true);
-  };
-
-  const handleInputChange = (field: keyof DeathConfirmation, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
-  };
-
-  const handleFileChange = (field: string, file: File | null) => {
-    if (file) {
-      // In real app, this would upload to server and get back URL
-      const mockUrl = `uploads/${field}/${file.name}`;
-      handleInputChange(field as keyof DeathConfirmation, mockUrl);
-      
-      switch (field) {
-        case 'pathologist_attachment':
-          setPathologistFile(file);
-          break;
-        case 'other_attachment':
-          setOtherFile(file);
-          break;
-        case 'medical_form':
-          setMedicalFormFile(file);
-          break;
-        case 'death_certificate':
-          setDeathCertificateFile(file);
-          break;
-      }
+  // Reset form when switching to create mode
+  useEffect(() => {
+    if (mode === 'create') {
+      setFormData({
+        pathologist_attachment: '',
+        other_attachment: '',
+        medical_form: '',
+        death_certificate: '',
+        presumed_cause_of_death: '',
+        actual_cause_of_death: '',
+        cause_of_death: '',
+        place_of_death: '',
+        date_of_death: '',
+        notes: '',
+        prisoner: '',
+        officer_in_charge: '',
+        medial_officer: '',
+      });
+      setLocalPrisonerId(null);
+      setLocalOfficerInChargeId(null);
+      setLocalMedicalOfficerId(null);
     }
-  };
+  }, [mode]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!formData.prisoner) {
@@ -180,121 +262,97 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
 
     setLoading(true);
 
-    setTimeout(() => {
-      const selectedPrisoner = prisoners.find((p) => p.id === formData.prisoner);
-      const selectedOIC = officers.find((o) => o.id === formData.officer_in_charge);
-      const selectedMedical = medicalOfficers.find((m) => m.id === formData.medial_officer);
+    try {
+      // Check if we have any pending files to upload
+      const hasPendingFiles = Object.values(pendingFiles).some(file => file !== null);
 
-      const submitData: DeathConfirmation = {
-        ...formData,
-        prisoner_name: selectedPrisoner?.full_name || '',
-        prisoner_number: selectedPrisoner?.prisoner_number || '',
-        officer_in_charge_name: selectedOIC?.name || '',
-        medical_officer_name: selectedMedical?.name || '',
-      };
+      if (hasPendingFiles || mode === 'create') {
+        // Send as multipart/form-data with files + all form fields in ONE request
+        const formDataToSend = new FormData();
 
-      onSubmit(submitData);
-      setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('Death confirmation created successfully');
-        setFormData({
-          pathologist_attachment: '',
-          other_attachment: '',
-          medical_form: '',
-          death_certificate: '',
-          presumed_cause_of_death: '',
-          actual_cause_of_death: '',
-          cause_of_death: '',
-          place_of_death: '',
-          date_of_death: '',
-          notes: '',
-          prisoner: '',
-          officer_in_charge: '',
-          medial_officer: '',
+        // Add all text fields
+        Object.entries(formData).forEach(([key, value]) => {
+          if (value !== null && value !== undefined && value !== '') {
+            formDataToSend.append(key, String(value));
+          }
         });
-        setPathologistFile(null);
-        setOtherFile(null);
-        setMedicalFormFile(null);
-        setDeathCertificateFile(null);
-      } else {
-        toast.success('Death confirmation updated successfully');
+
+        // Add pending files (if any)
+        if (pendingFiles.death_certificate) {
+          formDataToSend.append('death_certificate', pendingFiles.death_certificate);
+        }
+        if (pendingFiles.medical_form) {
+          formDataToSend.append('medical_form', pendingFiles.medical_form);
+        }
+        if (pendingFiles.pathologist_attachment) {
+          formDataToSend.append('pathologist_attachment', pendingFiles.pathologist_attachment);
+        }
+        if (pendingFiles.other_attachment) {
+          formDataToSend.append('other_attachment', pendingFiles.other_attachment);
+        }
+
+        // Show uploading toast if there are files
+        if (hasPendingFiles) {
+          const fileCount = Object.values(pendingFiles).filter(f => f !== null).length;
+          toast.info(`Uploading ${fileCount} file(s) with form data...`);
+        }
+
+        // Send multipart request
+        const endpoint = mode === 'edit' && confirmation?.id 
+          ? `/medical-management/death-confirmations/${confirmation.id}/`
+          : '/medical-management/death-confirmations/';
+
+        const response = await axiosInstance({
+          method: mode === 'edit' ? 'put' : 'post',
+          url: endpoint,
+          data: formDataToSend,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        });
+
+        toast.success(mode === 'create' ? 'Death confirmation created successfully' : 'Death confirmation updated successfully');
+
+        if (mode === 'create') {
+          // Reset form
+          setFormData({
+            pathologist_attachment: '',
+            other_attachment: '',
+            medical_form: '',
+            death_certificate: '',
+            presumed_cause_of_death: '',
+            actual_cause_of_death: '',
+            cause_of_death: '',
+            place_of_death: '',
+            date_of_death: '',
+            notes: '',
+            prisoner: '',
+            officer_in_charge: '',
+            medial_officer: '',
+          });
+          setLocalPrisonerId(null);
+          setLocalOfficerInChargeId(null);
+          setLocalMedicalOfficerId(null);
+          setPendingFiles({
+            death_certificate: null,
+            medical_form: null,
+            pathologist_attachment: null,
+            other_attachment: null,
+          });
+        }
+
+        // Signal parent that submission is complete
+        onComplete();
       }
-    }, 500);
-  };
-
-  const isReadOnly = mode === 'view';
-
-  // Get display values for view mode
-  const getDisplayValue = (field: string, id: string) => {
-    if (!id) return 'N/A';
-    
-    switch (field) {
-      case 'prisoner':
-        const prisoner = prisoners.find(p => p.id === id);
-        return prisoner ? `${prisoner.prisoner_number} - ${prisoner.full_name}` : id;
-      case 'officer_in_charge':
-        const officer = officers.find(o => o.id === id);
-        return officer ? `${officer.staff_number} - ${officer.name} (${officer.designation})` : id;
-      case 'medial_officer':
-        const medicalOfficer = medicalOfficers.find(m => m.id === id);
-        return medicalOfficer ? `${medicalOfficer.staff_number} - ${medicalOfficer.name} (${medicalOfficer.designation})` : id;
-      default:
-        return id;
+    } catch (error: any) {
+      console.error('Error submitting form:', error);
+      toast.error(error.response?.data?.message || 'Failed to save death confirmation');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const renderFileUpload = (
-    label: string,
-    field: string,
-    file: File | null,
-    required: boolean = false
-  ) => {
-    const fieldValue = formData[field as keyof DeathConfirmation] as string;
-    
-    return (
-      <div className="space-y-2">
-        <Label htmlFor={field}>
-          {label} {required && <span className="text-red-500">*</span>}
-        </Label>
-        {isReadOnly ? (
-          <div className="p-2 bg-gray-50 rounded border">
-            {fieldValue ? (
-              <a href={fieldValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-2">
-                <FileText className="h-4 w-4" />
-                View Document
-              </a>
-            ) : (
-              'No file uploaded'
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center gap-2">
-              <Input
-                id={field}
-                type="file"
-                onChange={(e) => handleFileChange(field, e.target.files?.[0] || null)}
-                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                className="flex-1"
-              />
-              {file && (
-                <span className="text-sm text-green-600 flex items-center gap-1">
-                  <FileText className="h-4 w-4" />
-                  {file.name}
-                </span>
-              )}
-            </div>
-            {fieldValue && !file && (
-              <div className="text-sm text-gray-600">
-                Current file: <a href={fieldValue} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">View</a>
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    );
-  };
+  const isReadOnly = mode === 'view';
 
   return (
     <Card className="w-full">
@@ -308,6 +366,7 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
       </CardHeader>
       <CardContent className="p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Prisoner Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Prisoner Information
@@ -317,29 +376,24 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 Prisoner <span className="text-red-500">*</span>
               </Label>
               {isReadOnly ? (
-                <div className="p-2 bg-gray-50 rounded border">
-                  {getDisplayValue('prisoner', formData.prisoner)}
-                </div>
+                <Input
+                  value={`${confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
+                  disabled
+                  className="bg-gray-50"
+                />
+              ) : mode === 'edit' ? (
+                <Input
+                  value={`${confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
+                  disabled
+                  className="bg-muted"
+                />
               ) : (
-                <Select
-                  value={formData.prisoner}
-                  onValueChange={(value) => handleInputChange('prisoner', value)}
-                >
-                  <SelectTrigger id="prisoner">
-                    <SelectValue placeholder="Select prisoner" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {prisoners.map((p) => (
-                      <SelectItem key={p.id} value={p.id}>
-                        {p.prisoner_number} - {p.full_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                prisonerSearchComponent
               )}
             </div>
           </div>
 
+          {/* Death Details */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Death Details
@@ -350,27 +404,37 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                   Date of Death <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {formData.date_of_death || 'N/A'}
-                  </div>
+                  <Input
+                    value={
+                      formData.date_of_death
+                        ? format(new Date(formData.date_of_death), 'PPP')
+                        : 'N/A'
+                    }
+                    disabled
+                    className="bg-gray-50"
+                  />
                 ) : (
                   <Popover open={deathDateOpen} onOpenChange={setDeathDateOpen}>
                     <PopoverTrigger asChild>
                       <Button
                         variant="outline"
                         className="w-full justify-start text-left font-normal"
-                        id="date_of_death"
+                        disabled={loading}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {formData.date_of_death ? format(new Date(formData.date_of_death), 'PPP') : 'Select date'}
+                        {formData.date_of_death
+                          ? format(new Date(formData.date_of_death), 'PPP')
+                          : 'Pick a date'}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0">
                       <Calendar
                         mode="single"
                         selected={formData.date_of_death ? new Date(formData.date_of_death) : undefined}
-                        onSelect={(date) => {
-                          handleInputChange('date_of_death', date ? format(date, 'yyyy-MM-dd') : '');
+                        onSelect={(date: Date | undefined) => {
+                          if (date) {
+                            handleInputChange('date_of_death', format(date, 'yyyy-MM-dd'));
+                          }
                           setDeathDateOpen(false);
                         }}
                         initialFocus
@@ -388,8 +452,9 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                   id="place_of_death"
                   value={formData.place_of_death}
                   onChange={(e) => handleInputChange('place_of_death', e.target.value)}
-                  placeholder="e.g., Prison Hospital Ward, Cell Block A, etc."
-                  disabled={isReadOnly}
+                  placeholder="e.g., Prison Hospital Ward A"
+                  disabled={isReadOnly || loading}
+                  className={isReadOnly ? 'bg-gray-50' : ''}
                 />
               </div>
             </div>
@@ -404,7 +469,8 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 onChange={(e) => handleInputChange('cause_of_death', e.target.value)}
                 placeholder="Enter the primary cause of death..."
                 rows={3}
-                disabled={isReadOnly}
+                disabled={isReadOnly || loading}
+                className={isReadOnly ? 'bg-gray-50' : ''}
               />
             </div>
 
@@ -416,7 +482,8 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 onChange={(e) => handleInputChange('presumed_cause_of_death', e.target.value)}
                 placeholder="Enter the initial/presumed cause of death before investigation..."
                 rows={3}
-                disabled={isReadOnly}
+                disabled={isReadOnly || loading}
+                className={isReadOnly ? 'bg-gray-50' : ''}
               />
             </div>
 
@@ -428,11 +495,13 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 onChange={(e) => handleInputChange('actual_cause_of_death', e.target.value)}
                 placeholder="Enter the confirmed/actual cause of death after post-mortem or investigation..."
                 rows={3}
-                disabled={isReadOnly}
+                disabled={isReadOnly || loading}
+                className={isReadOnly ? 'bg-gray-50' : ''}
               />
             </div>
           </div>
 
+          {/* Responsible Officers */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Responsible Officers
@@ -443,25 +512,13 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                   Officer in Charge <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('officer_in_charge', formData.officer_in_charge)}
-                  </div>
+                  <Input
+                    value={confirmation?.officer_in_charge_name || 'N/A'}
+                    disabled
+                    className="bg-gray-50"
+                  />
                 ) : (
-                  <Select
-                    value={formData.officer_in_charge}
-                    onValueChange={(value) => handleInputChange('officer_in_charge', value)}
-                  >
-                    <SelectTrigger id="officer_in_charge">
-                      <SelectValue placeholder="Select officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {officers.map((officer) => (
-                        <SelectItem key={officer.id} value={officer.id}>
-                          {officer.staff_number} - {officer.name} ({officer.designation})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  officerInChargeSelectComponent
                 )}
               </div>
 
@@ -470,42 +527,439 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                   Medical Officer <span className="text-red-500">*</span>
                 </Label>
                 {isReadOnly ? (
-                  <div className="p-2 bg-gray-50 rounded border">
-                    {getDisplayValue('medial_officer', formData.medial_officer)}
-                  </div>
+                  <Input
+                    value={confirmation?.medical_officer_name || 'N/A'}
+                    disabled
+                    className="bg-gray-50"
+                  />
                 ) : (
-                  <Select
-                    value={formData.medial_officer}
-                    onValueChange={(value) => handleInputChange('medial_officer', value)}
-                  >
-                    <SelectTrigger id="medial_officer">
-                      <SelectValue placeholder="Select medical officer" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {medicalOfficers.map((officer) => (
-                        <SelectItem key={officer.id} value={officer.id}>
-                          {officer.staff_number} - {officer.name} ({officer.designation})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  medicalOfficerSelectComponent
                 )}
               </div>
             </div>
           </div>
 
+          {/* Documents & Attachments */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Documents & Attachments
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {renderFileUpload('Death Certificate', 'death_certificate', deathCertificateFile)}
-              {renderFileUpload('Medical Form', 'medical_form', medicalFormFile)}
-              {renderFileUpload('Pathologist Attachment', 'pathologist_attachment', pathologistFile)}
-              {renderFileUpload('Other Attachment', 'other_attachment', otherFile)}
+              {/* Death Certificate */}
+              <div className="space-y-2">
+                <Label htmlFor="death_certificate">Death Certificate</Label>
+                {isReadOnly ? (
+                  <div className="p-3 bg-gray-50 rounded border">
+                    {formData.death_certificate ? (
+                      <a
+                        href={formData.death_certificate}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">No file uploaded</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.death_certificate && !editingDoc.death_certificate ? (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <ExternalLink className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <a
+                          href={formData.death_certificate}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                          title={formData.death_certificate}
+                        >
+                          {formData.death_certificate.split('/').pop()?.substring(0, 30) || 'View Current Document'}
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingDoc(prev => ({ ...prev, death_certificate: true }))}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          disabled={loading}
+                          title="Replace document"
+                        >
+                          Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleInputChange('death_certificate', '');
+                            setPendingFiles(prev => ({ ...prev, death_certificate: null }));
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={loading}
+                          title="Remove document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : pendingFiles.death_certificate ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded border border-green-200">
+                          <span className="text-sm text-green-900 truncate flex-1">
+                            {pendingFiles.death_certificate.name}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPendingFiles(prev => ({ ...prev, death_certificate: null }));
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-600">File ready to upload. Click Save to upload.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Input
+                          type="file"
+                          id="death_certificate"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              console.log('Death certificate file selected:', file.name);
+                              setPendingFiles(prev => ({ ...prev, death_certificate: file }));
+                              setEditingDoc(prev => ({ ...prev, death_certificate: false }));
+                            }
+                          }}
+                          disabled={loading}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                        />
+                        <p className="text-xs text-gray-500">Upload PDF, JPG, or PNG file</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Medical Form */}
+              <div className="space-y-2">
+                <Label htmlFor="medical_form">Medical Form</Label>
+                {isReadOnly ? (
+                  <div className="p-3 bg-gray-50 rounded border">
+                    {formData.medical_form ? (
+                      <a
+                        href={formData.medical_form}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">No file uploaded</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.medical_form && !editingDoc.medical_form ? (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <ExternalLink className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <a
+                          href={formData.medical_form}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                          title={formData.medical_form}
+                        >
+                          {formData.medical_form.split('/').pop()?.substring(0, 30) || 'View Current Document'}
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingDoc(prev => ({ ...prev, medical_form: true }))}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          disabled={loading}
+                          title="Replace document"
+                        >
+                          Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleInputChange('medical_form', '');
+                            setPendingFiles(prev => ({ ...prev, medical_form: null }));
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={loading}
+                          title="Remove document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : pendingFiles.medical_form ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded border border-green-200">
+                          <span className="text-sm text-green-900 truncate flex-1">
+                            {pendingFiles.medical_form.name}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPendingFiles(prev => ({ ...prev, medical_form: null }));
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-600">File ready to upload. Click Save to upload.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Input
+                          type="file"
+                          id="medical_form"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              console.log('Medical form file selected:', file.name);
+                              setPendingFiles(prev => ({ ...prev, medical_form: file }));
+                              setEditingDoc(prev => ({ ...prev, medical_form: false }));
+                            }
+                          }}
+                          disabled={loading}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                        />
+                        <p className="text-xs text-gray-500">Upload PDF, JPG, or PNG file</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Pathologist Attachment */}
+              <div className="space-y-2">
+                <Label htmlFor="pathologist_attachment">Pathologist Attachment</Label>
+                {isReadOnly ? (
+                  <div className="p-3 bg-gray-50 rounded border">
+                    {formData.pathologist_attachment ? (
+                      <a
+                        href={formData.pathologist_attachment}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">No file uploaded</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.pathologist_attachment && !editingDoc.pathologist_attachment ? (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <ExternalLink className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <a
+                          href={formData.pathologist_attachment}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                          title={formData.pathologist_attachment}
+                        >
+                          {formData.pathologist_attachment.split('/').pop()?.substring(0, 30) || 'View Current Document'}
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingDoc(prev => ({ ...prev, pathologist_attachment: true }))}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          disabled={loading}
+                          title="Replace document"
+                        >
+                          Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleInputChange('pathologist_attachment', '');
+                            setPendingFiles(prev => ({ ...prev, pathologist_attachment: null }));
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={loading}
+                          title="Remove document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : pendingFiles.pathologist_attachment ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded border border-green-200">
+                          <span className="text-sm text-green-900 truncate flex-1">
+                            {pendingFiles.pathologist_attachment.name}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPendingFiles(prev => ({ ...prev, pathologist_attachment: null }));
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-600">File ready to upload. Click Save to upload.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Input
+                          type="file"
+                          id="pathologist_attachment"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              console.log('Pathologist attachment file selected:', file.name);
+                              setPendingFiles(prev => ({ ...prev, pathologist_attachment: file }));
+                              setEditingDoc(prev => ({ ...prev, pathologist_attachment: false }));
+                            }
+                          }}
+                          disabled={loading}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                        />
+                        <p className="text-xs text-gray-500">Upload PDF, JPG, or PNG file</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Other Attachment */}
+              <div className="space-y-2">
+                <Label htmlFor="other_attachment">Other Attachment</Label>
+                {isReadOnly ? (
+                  <div className="p-3 bg-gray-50 rounded border">
+                    {formData.other_attachment ? (
+                      <a
+                        href={formData.other_attachment}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-2 text-blue-600 hover:underline"
+                      >
+                        <ExternalLink className="h-4 w-4" />
+                        View Document
+                      </a>
+                    ) : (
+                      <span className="text-gray-500">No file uploaded</span>
+                    )}
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {formData.other_attachment && !editingDoc.other_attachment ? (
+                      <div className="flex items-center gap-2 p-3 bg-blue-50 border border-blue-200 rounded">
+                        <ExternalLink className="h-4 w-4 text-blue-600 flex-shrink-0" />
+                        <a
+                          href={formData.other_attachment}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline truncate flex-1"
+                          title={formData.other_attachment}
+                        >
+                          {formData.other_attachment.split('/').pop()?.substring(0, 30) || 'View Current Document'}
+                        </a>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setEditingDoc(prev => ({ ...prev, other_attachment: true }))}
+                          className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                          disabled={loading}
+                          title="Replace document"
+                        >
+                          Replace
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            handleInputChange('other_attachment', '');
+                            setPendingFiles(prev => ({ ...prev, other_attachment: null }));
+                          }}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                          disabled={loading}
+                          title="Remove document"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : pendingFiles.other_attachment ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded border border-green-200">
+                          <span className="text-sm text-green-900 truncate flex-1">
+                            {pendingFiles.other_attachment.name}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              setPendingFiles(prev => ({ ...prev, other_attachment: null }));
+                            }}
+                            className="text-red-600 hover:text-red-700"
+                            disabled={loading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <p className="text-xs text-green-600">File ready to upload. Click Save to upload.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <Input
+                          type="file"
+                          id="other_attachment"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              console.log('Other attachment file selected:', file.name);
+                              setPendingFiles(prev => ({ ...prev, other_attachment: file }));
+                              setEditingDoc(prev => ({ ...prev, other_attachment: false }));
+                            }
+                          }}
+                          disabled={loading}
+                          accept=".pdf,.jpg,.jpeg,.png"
+                        />
+                        <p className="text-xs text-gray-500">Upload PDF, JPG, or PNG file</p>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
+          {/* Additional Notes */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Additional Notes
@@ -518,11 +972,13 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 onChange={(e) => handleInputChange('notes', e.target.value)}
                 placeholder="Enter any additional notes, observations, or comments..."
                 rows={4}
-                disabled={isReadOnly}
+                disabled={isReadOnly || loading}
+                className={isReadOnly ? 'bg-gray-50' : ''}
               />
             </div>
           </div>
 
+          {/* Form Actions */}
           {!isReadOnly && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
               <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
@@ -536,7 +992,7 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({ confirmat
                 disabled={loading}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Confirmation' : 'Update Confirmation'}
+                {loading ? 'Saving...' : mode === 'create' ? 'Create' : 'Update'}
               </Button>
             </div>
           )}
