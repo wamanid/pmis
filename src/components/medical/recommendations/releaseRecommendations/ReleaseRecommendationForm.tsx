@@ -161,7 +161,7 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 </Label>
                 {mode === 'edit' || mode === 'view' ? (
                   <Input
-                    value={`${releaseRecommendation?.prisoner_number || 'N/A'} - ${releaseRecommendation?.prisoner_name || 'N/A'}`}
+                    value={`${releaseRecommendation?.prisoner_number_value || 'N/A'} - ${releaseRecommendation?.prisoner_name || 'N/A'}`}
                     disabled
                     readOnly
                     className="bg-muted"

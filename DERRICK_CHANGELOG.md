@@ -10,6 +10,51 @@ All notable changes to this project should be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **Medical Death Notification Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Death Notification module with live backend API integration
+  - Removed Death Recipient tab from Death Details page (simplified to Confirmation & Notification only)
+  - **Service Layer**: Created services for death notifications and notification templates
+    - `deathNotificationService.ts`: Full CRUD operations with `DEATH_NOTIFICATION_API_ENDPOINTS`
+    - `notificationService.ts`: System administration notification templates with server-side pagination
+    - All services return paginated format: `{items: [], count: number, next: string | null}`
+    - Interfaces: `DeathNotificationItem` (prisoner_name, death_confirmation, notification), `NotificationTemplate` with optional fields
+  - **DeathNotificationList Server-Side Integration with DataTable**:
+    - Replaced 400+ lines of manual table with enterprise DataTable component
+    - Individual action buttons pattern: Eye (View), Pencil (Edit), Trash2 (Delete) - matching existing modules
+    - Server-side pagination with automatic search/filter/sort from DataTable
+    - tableKey auto-refresh pattern: increments after create/edit/delete operations
+    - Fetch by ID pattern: `handleView` and `handleEdit` call `fetchDeathNotificationById` for complete data
+    - Column definitions: Prisoner Name, Death Confirmation ID, Notification Template ID, Actions
+    - Loading states, error handling with user-friendly toast messages
+    - ConfirmDialog for delete confirmations with notification details display
+  - **DeathNotificationForm Server-Side Dropdowns**:
+    - **Death Confirmation dropdown**: Enhanced UX with comprehensive display labels
+      - Shows: Prisoner Number, Name, Date of Death, and Cause of Death
+      - Format: "ARPC0000000001/26 - Kathryn Robinson | Died: 2026-02-10 | Cause: ggf"
+      - Addresses disambiguation: Multiple death records per prisoner now clearly distinguishable
+      - SearchableSelect with `fetchDeathConfirmationsCallback` with data transformation layer
+      - Search placeholder: "Search by prisoner number, name, or cause of death..."
+    - Notification Template dropdown: SearchableSelect with `fetchNotificationsCallback` showing subjects
+    - All fetch callbacks wrapped in `useCallback` to prevent API spam on form state changes
+    - Edit mode dropdown fixes: Local state initialization with functions, initialItem derivation via find
+    - Defensive coding: All optional fields handled with optional chaining
+    - Validation: Required field checks for death_confirmation and notification
+    - Recipients section removed per requirements (notification simplified to template selection only)
+  - **DeathNotificationView Component**:
+    - Updated to use service types with optional field handling
+    - Displays notification ID, prisoner name, death confirmation ID, notification template ID
+    - All fields have N/A fallbacks for missing data
+    - Recipients section removed per requirements
+  - **Type System Consolidation**:
+    - Centralized all interfaces in service files
+    - Made all critical fields optional in `DeathNotificationItem` and `Recipient`
+    - Consistent imports across List, Form, and View components
+    - Eliminated type mismatches between components
+  - **Code Quality**: Removed 500+ lines of mock data, improved maintainability
+  - **Files Created**: `deathNotificationService.ts`, `notificationService.ts` (360 lines total)
+  - **Files Modified**: `DeathNotificationList.tsx` (net -250 lines), `DeathNotificationForm.tsx` (net -180 lines), `DeathNotificationView.tsx`, `DeathDetails.tsx` (removed recipient tab)
+  - **Documentation**: Created `DEATH_NOTIFICATION_REFACTOR_SUMMARY.md` with comprehensive implementation details
+
 - **Medical Death Confirmation Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
   - Fully refactored Death Confirmation module with live backend API integration
   - **Service Layer**: Created `deathConfirmationService.ts` with centralized API endpoints

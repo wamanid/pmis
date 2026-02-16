@@ -57,7 +57,7 @@ const ReleaseRecommendationList: React.FC<ReleaseRecommendationListProps> = ({ s
   const columns = useMemo<DataTableColumn[]>(
     () => [
       {
-        key: 'prisoner_number',
+        key: 'prisoner_number_value',
         label: 'Prisoner Number',
         sortable: true,
         render: (value: string) => (
@@ -282,7 +282,7 @@ const ReleaseRecommendationList: React.FC<ReleaseRecommendationListProps> = ({ s
           recordToDelete ? (
             <div className="space-y-2">
               <div>
-                <span className="font-semibold">Prisoner:</span> {recordToDelete.prisoner_number} - {recordToDelete.prisoner_name}
+                <span className="font-semibold">Prisoner:</span> {recordToDelete.prisoner_number_value || recordToDelete.prisoner_number} - {recordToDelete.prisoner_name}
               </div>
               <div>
                 <span className="font-semibold">Condition:</span> {recordToDelete.abnormal_condition || 'N/A'}

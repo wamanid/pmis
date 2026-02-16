@@ -40,7 +40,7 @@ const DeathConfirmationList: React.FC<DeathConfirmationListProps> = () => {
   // Column definitions
   const columns: DataTableColumn[] = [
     {
-      key: 'prisoner_number',
+      key: 'prisoner_number_value',
       label: 'Prisoner Number',
       sortable: true,
       render: (value: any) => (
