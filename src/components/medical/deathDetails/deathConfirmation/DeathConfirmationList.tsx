@@ -236,7 +236,7 @@ const DeathConfirmationList: React.FC<DeathConfirmationListProps> = () => {
   };
 
   const handleFormComplete = () => {
-    // Form has already handled submission, just refresh table and close dialog
+    // Refresh table and close dialog
     setTableKey((prev) => prev + 1);
     setDialogOpen(false);
   };
@@ -336,7 +336,7 @@ const DeathConfirmationList: React.FC<DeathConfirmationListProps> = () => {
             <div className="space-y-2 text-sm">
               <div>
                 <span className="font-semibold">Prisoner:</span>{' '}
-                {recordToDelete.prisoner_number} - {recordToDelete.prisoner_name}
+                {recordToDelete.prisoner_number_value || recordToDelete.prisoner_number} - {recordToDelete.prisoner_name}
               </div>
               <div>
                 <span className="font-semibold">Date of Death:</span>{' '}

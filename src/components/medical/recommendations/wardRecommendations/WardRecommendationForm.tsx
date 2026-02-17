@@ -5,6 +5,7 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Bed, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
 import SearchableSelect from '../../../common/SearchableSelect';
 import {
@@ -54,6 +55,7 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   });
   
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Track if initial data has been loaded to prevent re-syncing on every change
   const initialDataLoadedRef = React.useRef<string | boolean>(false);
@@ -185,14 +187,22 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
     if (!formData.recommended_ward) {
-      toast.error('Please select a recommended ward');
+      newErrors.recommended_ward = 'Recommended Ward is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -261,21 +271,26 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
                   <div className="p-2 bg-gray-50 rounded border text-sm">
                     {selectedPrisoner ? (
                       <>
-                        {selectedPrisoner.prisoner_number} - {selectedPrisoner.full_name}
+                        {selectedPrisoner.prisoner_number_value || selectedPrisoner.prisoner_number} - {selectedPrisoner.full_name}
                       </>
                     ) : (
                       'N/A'
                     )}
                   </div>
                 ) : (
-                  <CustomPrisonerSearch
-                    value={localPrisonerValue}
-                    onChange={handlePrisonerSelect}
-                    onSelectItem={handlePrisonerItemSelect}
-                    disabled={loading}
-                    idField="id"
-                    labelField="full_name"
-                  />
+                  <>
+                    <CustomPrisonerSearch
+                      value={localPrisonerValue}
+                      onChange={handlePrisonerSelect}
+                      onSelectItem={handlePrisonerItemSelect}
+                      disabled={loading}
+                      idField="id"
+                      labelField="full_name"
+                    />
+                    {errors.prisoner && (
+                      <p className="text-sm text-red-600">{errors.prisoner}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -289,18 +304,23 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
                     {selectedWard?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<Ward>
-                    key={`ward-${initialData?.id}-${mode}`}
-                    value={localWardValue}
-                    onChange={handleWardSelect}
-                    fetchPaginated={fetchWardsPaginated}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleWardItemSelect}
-                    initialItem={initialWardItem ?? undefined}
-                    placeholder="Select ward"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<Ward>
+                      key={`ward-${initialData?.id}-${mode}`}
+                      value={localWardValue}
+                      onChange={handleWardSelect}
+                      fetchPaginated={fetchWardsPaginated}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleWardItemSelect}
+                      initialItem={initialWardItem ?? undefined}
+                      placeholder="Select ward"
+                      disabled={loading}
+                    />
+                    {errors.recommended_ward && (
+                      <p className="text-sm text-red-600">{errors.recommended_ward}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

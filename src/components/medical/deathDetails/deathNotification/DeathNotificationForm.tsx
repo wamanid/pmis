@@ -4,6 +4,7 @@ import { Button } from '../../../ui/button';
 import { Label } from '../../../ui/label';
 import { Bell, Save, X, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import SearchableSelect from '../../../common/SearchableSelect';
 import { fetchDeathConfirmations } from '../../../../services/medical/deathDetails/deathConfirmationService';
 import { fetchNotificationsPaginated } from '../../../../services/systemAdministration/notificationService';
@@ -26,6 +27,7 @@ const DeathNotificationForm: React.FC<DeathNotificationFormProps> = ({ notificat
   });
 
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [localDeathConfirmation, setLocalDeathConfirmation] = useState<string | null>(() => {
     if (notification && (mode === 'edit' || mode === 'view') && notification.death_confirmation) {
       return notification.death_confirmation;
@@ -55,7 +57,7 @@ const DeathNotificationForm: React.FC<DeathNotificationFormProps> = ({ notificat
       // Transform items to include comprehensive display labels for better UX
       const transformedItems = response.items.map((item: any) => ({
         ...item,
-        display_label: `${item.prisoner_number_value || 'N/A'} - ${item.prisoner_name || 'Unknown'} | Died: ${
+        display_label: `${item.prisoner_number_value || item.prisoner_number || 'N/A'} - ${item.prisoner_name || 'Unknown'} | Died: ${
           item.date_of_death || 'N/A'
         } | Cause: ${item.cause_of_death || 'Not specified'}`,
       }));
@@ -121,14 +123,22 @@ const DeathNotificationForm: React.FC<DeathNotificationFormProps> = ({ notificat
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.death_confirmation) {
-      toast.error('Please select a death confirmation');
-      return;
+      newErrors.death_confirmation = 'Death Confirmation is required';
     }
     if (!formData.notification) {
-      toast.error('Please select a notification template');
+      newErrors.notification = 'Notification Template is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -197,20 +207,25 @@ const DeathNotificationForm: React.FC<DeathNotificationFormProps> = ({ notificat
                   {notification?.prisoner_name || 'N/A'}
                 </div>
               ) : (
-                <SearchableSelect
-                  fetchPaginated={fetchDeathConfirmationsCallback}
-                  value={localDeathConfirmation}
-                  onChange={(val) => {
-                    setLocalDeathConfirmation(val);
-                    handleInputChange('death_confirmation', val);
-                  }}
-                  placeholder="Search by prisoner number, name, or cause of death..."
-                  idField="id"
-                  labelField="display_label"
-                  pageSize={50}
-                  initialItem={initialDeathConfirmationItem as any}
-                  disabled={loading}
-                />
+                <>
+                  <SearchableSelect
+                    fetchPaginated={fetchDeathConfirmationsCallback}
+                    value={localDeathConfirmation}
+                    onChange={(val) => {
+                      setLocalDeathConfirmation(val);
+                      handleInputChange('death_confirmation', val);
+                    }}
+                    placeholder="Search by prisoner number, name, or cause of death..."
+                    idField="id"
+                    labelField="display_label"
+                    pageSize={50}
+                    initialItem={initialDeathConfirmationItem as any}
+                    disabled={loading}
+                  />
+                  {errors.death_confirmation && (
+                    <p className="text-sm text-red-600">{errors.death_confirmation}</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -228,20 +243,25 @@ const DeathNotificationForm: React.FC<DeathNotificationFormProps> = ({ notificat
                   Notification Template
                 </div>
               ) : (
-                <SearchableSelect
-                  fetchPaginated={fetchNotificationsCallback}
-                  value={localNotification}
-                  onChange={(val) => {
-                    setLocalNotification(val);
-                    handleInputChange('notification', val);
-                  }}
-                  placeholder="Select notification template"
-                  idField="id"
-                  labelField="subject"
-                  pageSize={50}
-                  initialItem={initialNotificationItem as any}
-                  disabled={loading}
-                />
+                <>
+                  <SearchableSelect
+                    fetchPaginated={fetchNotificationsCallback}
+                    value={localNotification}
+                    onChange={(val) => {
+                      setLocalNotification(val);
+                      handleInputChange('notification', val);
+                    }}
+                    placeholder="Select notification template"
+                    idField="id"
+                    labelField="subject"
+                    pageSize={50}
+                    initialItem={initialNotificationItem as any}
+                    disabled={loading}
+                  />
+                  {errors.notification && (
+                    <p className="text-sm text-red-600">{errors.notification}</p>
+                  )}
+                </>
               )}
             </div>
           </div>

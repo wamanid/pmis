@@ -6,6 +6,7 @@ import { Input } from '../../../ui/input';
 import { Textarea } from '../../../ui/textarea';
 import { FileX, Save, X, Calendar as CalendarIcon, Upload, ExternalLink, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { format } from 'date-fns';
@@ -13,6 +14,8 @@ import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
 import StaffProfileSelect from '../../../common/StaffProfileSelect';
 import {
   DeathConfirmation,
+  createDeathConfirmation,
+  updateDeathConfirmation,
 } from '../../../../services/medical/deathDetails/deathConfirmationService';
 import { uploadFile } from '../../../../services/fileUploadService';
 import axiosInstance from '../../../../services/axiosInstance';
@@ -48,6 +51,7 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
 
   const [loading, setLoading] = useState(false);
   const [deathDateOpen, setDeathDateOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Local state for pending file uploads (stores File objects before upload)
   const [pendingFiles, setPendingFiles] = useState<{
@@ -235,30 +239,34 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
     if (!formData.officer_in_charge) {
-      toast.error('Please select an officer in charge');
-      return;
+      newErrors.officer_in_charge = 'Officer in Charge is required';
     }
     if (!formData.medial_officer) {
-      toast.error('Please select a medical officer');
-      return;
+      newErrors.medial_officer = 'Medical Officer is required';
     }
     if (!formData.date_of_death) {
-      toast.error('Please select date of death');
-      return;
+      newErrors.date_of_death = 'Date of Death is required';
     }
     if (!formData.place_of_death) {
-      toast.error('Please enter place of death');
-      return;
+      newErrors.place_of_death = 'Place of Death is required';
     }
     if (!formData.cause_of_death) {
-      toast.error('Please enter cause of death');
+      newErrors.cause_of_death = 'Cause of Death is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -266,8 +274,16 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
       // Check if we have any pending files to upload
       const hasPendingFiles = Object.values(pendingFiles).some(file => file !== null);
 
-      if (hasPendingFiles || mode === 'create') {
-        // Send as multipart/form-data with files + all form fields in ONE request
+      if (mode === 'edit' && !hasPendingFiles) {
+        // Edit mode without new files - use service method with JSON
+        if (!confirmation?.id) {
+          toast.error('Invalid record ID');
+          return;
+        }
+        await updateDeathConfirmation(confirmation.id, formData);
+        toast.success('Death confirmation updated successfully');
+      } else {
+        // Create mode OR edit mode with new files - use multipart/form-data
         const formDataToSend = new FormData();
 
         // Add all text fields
@@ -303,7 +319,7 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
           : '/medical-management/death-confirmations/';
 
         const response = await axiosInstance({
-          method: mode === 'edit' ? 'put' : 'post',
+          method: mode === 'edit' ? 'patch' : 'post',
           url: endpoint,
           data: formDataToSend,
           headers: {
@@ -312,38 +328,38 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
         });
 
         toast.success(mode === 'create' ? 'Death confirmation created successfully' : 'Death confirmation updated successfully');
-
-        if (mode === 'create') {
-          // Reset form
-          setFormData({
-            pathologist_attachment: '',
-            other_attachment: '',
-            medical_form: '',
-            death_certificate: '',
-            presumed_cause_of_death: '',
-            actual_cause_of_death: '',
-            cause_of_death: '',
-            place_of_death: '',
-            date_of_death: '',
-            notes: '',
-            prisoner: '',
-            officer_in_charge: '',
-            medial_officer: '',
-          });
-          setLocalPrisonerId(null);
-          setLocalOfficerInChargeId(null);
-          setLocalMedicalOfficerId(null);
-          setPendingFiles({
-            death_certificate: null,
-            medical_form: null,
-            pathologist_attachment: null,
-            other_attachment: null,
-          });
-        }
-
-        // Signal parent that submission is complete
-        onComplete();
       }
+
+      if (mode === 'create') {
+        // Reset form
+        setFormData({
+          pathologist_attachment: '',
+          other_attachment: '',
+          medical_form: '',
+          death_certificate: '',
+          presumed_cause_of_death: '',
+          actual_cause_of_death: '',
+          cause_of_death: '',
+          place_of_death: '',
+          date_of_death: '',
+          notes: '',
+          prisoner: '',
+          officer_in_charge: '',
+          medial_officer: '',
+        });
+        setLocalPrisonerId(null);
+        setLocalOfficerInChargeId(null);
+        setLocalMedicalOfficerId(null);
+        setPendingFiles({
+          death_certificate: null,
+          medical_form: null,
+          pathologist_attachment: null,
+          other_attachment: null,
+        });
+      }
+
+      // Signal parent that submission is complete
+      onComplete();
     } catch (error: any) {
       console.error('Error submitting form:', error);
       toast.error(error.response?.data?.message || 'Failed to save death confirmation');
@@ -377,18 +393,23 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
               </Label>
               {isReadOnly ? (
                 <Input
-                  value={`${confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
+                  value={`${confirmation?.prisoner_number_value || confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
                   disabled
                   className="bg-gray-50"
                 />
               ) : mode === 'edit' ? (
                 <Input
-                  value={`${confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
+                  value={`${confirmation?.prisoner_number_value || confirmation?.prisoner_number || ''} - ${confirmation?.prisoner_name || ''}`}
                   disabled
                   className="bg-muted"
                 />
               ) : (
-                prisonerSearchComponent
+                <>
+                  {prisonerSearchComponent}
+                  {errors.prisoner && (
+                    <p className="text-sm text-red-600">{errors.prisoner}</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -442,6 +463,9 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
                     </PopoverContent>
                   </Popover>
                 )}
+                {errors.date_of_death && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.date_of_death}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -456,6 +480,9 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
                   disabled={isReadOnly || loading}
                   className={isReadOnly ? 'bg-gray-50' : ''}
                 />
+                {errors.place_of_death && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.place_of_death}</p>
+                )}
               </div>
             </div>
 
@@ -472,6 +499,9 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
                 disabled={isReadOnly || loading}
                 className={isReadOnly ? 'bg-gray-50' : ''}
               />
+              {errors.cause_of_death && !isReadOnly && (
+                <p className="text-sm text-red-600">{errors.cause_of_death}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -518,7 +548,12 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
                     className="bg-gray-50"
                   />
                 ) : (
-                  officerInChargeSelectComponent
+                  <>
+                    {officerInChargeSelectComponent}
+                    {errors.officer_in_charge && (
+                      <p className="text-sm text-red-600">{errors.officer_in_charge}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -533,7 +568,12 @@ const DeathConfirmationForm: React.FC<DeathConfirmationFormProps> = ({
                     className="bg-gray-50"
                   />
                 ) : (
-                  medicalOfficerSelectComponent
+                  <>
+                    {medicalOfficerSelectComponent}
+                    {errors.medial_officer && (
+                      <p className="text-sm text-red-600">{errors.medial_officer}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
