@@ -3,12 +3,29 @@ import {toast} from "sonner";
 import {PrisonerItem} from "../../stationServices/visitorsServices/VisitorsService";
 import { getPrisoners } from "../../stationServices/visitorsServices/VisitorsService"
 import {
-    BmiClassification, BmiRecord, CaseBook, Diagnosis, ExaminationResult,
+    BmiClassification,
+    BmiRecord,
+    CaseBook,
+    Diagnosis,
+    ExaminationResult,
     getBloodGroups,
-    getBmiClassifications, getBmiRecord,
-    getBmiRecords, getCaseBooks, getCheckupTypes, getDiagnosis, getDiseases, getExaminationResults, getExams,
-    getMedicalRecords, getPresentationTypes, getRegiments, getSchedules,
-    MedicalRecord, Schedule
+    getBmiClassifications,
+    getBmiRecord,
+    getBmiRecords,
+    getCaseBooks,
+    getCheckupTypes,
+    getDiagnosis,
+    getDiseases,
+    getExaminationResults,
+    getExams,
+    getLabTests,
+    getMedicalRecords, getMedicalTests,
+    getPresentationTypes,
+    getRegiments,
+    getSchedules, getTestResults,
+    LabTest,
+    MedicalRecord,
+    Schedule
 } from "./medical";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -116,4 +133,22 @@ export async function getRegimentList(setData: React.Dispatch<React.SetStateActi
 export async function getDiseasesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
     const response = await getDiseases()
     populateList(response, "There are no diseases records", setData)
+}
+
+// Get lab tests
+export async function getLabTestsList(setData: React.Dispatch<React.SetStateAction<LabTest[]>>) {
+    const response = await getLabTests()
+    populateList(response, "There are no lab tests", setData)
+}
+
+// Get test results
+export async function getTestResultsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getTestResults()
+    return populateList(response, "There are no test results", setData)
+}
+
+// Get medical tests
+export async function getMedicalTestsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getMedicalTests()
+    populateList(response, "There are no medical tests", setData)
 }

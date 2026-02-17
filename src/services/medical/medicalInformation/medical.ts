@@ -427,3 +427,63 @@ export const updateDiagnosis = async (diagnosis: DiagnosisItem, id: string) : Pr
 export const deleteDiagnosis = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/diagnoses/${id}/`);
 };
+
+// Lab tests
+export interface LabTest {
+  id: string;
+  prisoner_name: string;
+  test_name: string;
+  result_name: string;
+  result_document: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  is_active: boolean;
+  notes: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  medical_case_book: string;
+  medical_test: string;
+  result: string;
+}
+
+export type LabTestsResponse<T> = Paginated<T> | ErrorResponse
+export type TestResponse = LabTest | ErrorResponse
+export type TestResultsResponse<T> = Paginated<T> | ErrorResponse
+export type MedicalTestsResponse<T> = Paginated<T> | ErrorResponse
+
+export const getTestResults = async (): Promise<TestResultsResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/test-results/'
+  )
+  return response.data
+}
+
+export const getMedicalTests = async (): Promise<MedicalTestsResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/medical-management/medical-tests/'
+  )
+  return response.data
+}
+
+export const getLabTests = async (): Promise<LabTestsResponse<LabTest>> => {
+  const response = await axiosInstance.get<Paginated<LabTest>>(
+    '/medical-management/lab-tests/'
+  )
+  return response.data
+}
+
+export const addLabTest = async (formData: FormData) : Promise<TestResponse> => {
+  const response = await axiosInstance.post<TestResponse>('/medical-management/lab-tests/', formData);
+  return response.data;
+}
+
+export const updateLabTest = async (formData: FormData, id: string) : Promise<TestResponse> => {
+  const response = await axiosInstance.put<TestResponse>(`/medical-management/lab-tests/${id}/`, formData);
+  return response.data;
+}
+
+export const deleteLabTest = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/lab-tests/${id}/`);
+};
