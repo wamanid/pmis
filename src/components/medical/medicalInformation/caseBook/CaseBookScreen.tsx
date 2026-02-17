@@ -47,7 +47,8 @@ export interface ChildProps {
 }
 
 const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, setLoading, caseBooks, checkupTypes,
-                                                setCaseBooks, setCheckupTypes, presentations, setPresentations, setBloodGroups, bloodGroups }) => {
+                                                setCaseBooks, setCheckupTypes, presentations, setPresentations,
+                                                setBloodGroups, bloodGroups }) => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedCaseBook, setSelectedCaseBook] = useState<any>(null);
@@ -257,7 +258,7 @@ const CaseBookScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading
               <div className="text-center">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
                   <p className="text-muted-foreground text-sm">
-                    Fetching patient BMI records
+                    Fetching additional information
                   </p>
               </div>
             </div>

@@ -23,6 +23,7 @@ import {
 } from '../../../ui/alert-dialog';
 import { Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, MoreVertical, CheckCircle, XCircle } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
 interface Diagnosis {
   id: string;
@@ -42,11 +43,13 @@ interface DiagnosisListProps {
   onEdit: (diagnosis: Diagnosis) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  diagnosis: Diagnosis[];
+  diseases: Unit[];
 }
 
-const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete, refreshTrigger }) => {
-  const [diagnoses, setDiagnoses] = useState<Diagnosis[]>([]);
-  const [filteredDiagnoses, setFilteredDiagnoses] = useState<Diagnosis[]>([]);
+const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete, refreshTrigger, diagnosis, diseases }) => {
+  // const [diagnosis, setDiagnosis] = useState<Diagnosis[]>([]);
+  const [filteredDiagnosis, setFilteredDiagnosis] = useState<Diagnosis[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [diseaseFilter, setDiseaseFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -56,87 +59,87 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
-  const mockDiagnoses: Diagnosis[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      disease_name: 'Tuberculosis',
-      regiment_name: 'Antibiotic Course',
-      differential: false,
-      unfit_for_labor: true,
-      remarks: 'Requires isolation and continuous monitoring',
-      medical_case_book: '1',
-      disease: '1',
-      regiment: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      disease_name: 'Malaria',
-      regiment_name: 'Antiviral Medication',
-      differential: true,
-      unfit_for_labor: false,
-      remarks: 'Pending blood test confirmation',
-      medical_case_book: '2',
-      disease: '2',
-      regiment: '2',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      disease_name: 'Pneumonia',
-      regiment_name: 'Antibiotic Course',
-      differential: false,
-      unfit_for_labor: true,
-      remarks: 'Severe case, needs hospital care',
-      medical_case_book: '3',
-      disease: '3',
-      regiment: '1',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Emily Davis',
-      disease_name: 'Hepatitis B',
-      regiment_name: 'Observation',
-      differential: false,
-      unfit_for_labor: false,
-      remarks: 'Chronic carrier, stable condition',
-      medical_case_book: '4',
-      disease: '4',
-      regiment: '4',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Robert Lee',
-      disease_name: 'COVID-19',
-      regiment_name: 'Isolation Protocol',
-      differential: false,
-      unfit_for_labor: true,
-      remarks: 'Quarantine in medical wing',
-      medical_case_book: '5',
-      disease: '5',
-      regiment: '3',
-    },
-  ];
+  // const mockDiagnosis: Diagnosis[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     disease_name: 'Tuberculosis',
+  //     regiment_name: 'Antibiotic Course',
+  //     differential: false,
+  //     unfit_for_labor: true,
+  //     remarks: 'Requires isolation and continuous monitoring',
+  //     medical_case_book: '1',
+  //     disease: '1',
+  //     regiment: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     disease_name: 'Malaria',
+  //     regiment_name: 'Antiviral Medication',
+  //     differential: true,
+  //     unfit_for_labor: false,
+  //     remarks: 'Pending blood test confirmation',
+  //     medical_case_book: '2',
+  //     disease: '2',
+  //     regiment: '2',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     disease_name: 'Pneumonia',
+  //     regiment_name: 'Antibiotic Course',
+  //     differential: false,
+  //     unfit_for_labor: true,
+  //     remarks: 'Severe case, needs hospital care',
+  //     medical_case_book: '3',
+  //     disease: '3',
+  //     regiment: '1',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Emily Davis',
+  //     disease_name: 'Hepatitis B',
+  //     regiment_name: 'Observation',
+  //     differential: false,
+  //     unfit_for_labor: false,
+  //     remarks: 'Chronic carrier, stable condition',
+  //     medical_case_book: '4',
+  //     disease: '4',
+  //     regiment: '4',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Robert Lee',
+  //     disease_name: 'COVID-19',
+  //     regiment_name: 'Isolation Protocol',
+  //     differential: false,
+  //     unfit_for_labor: true,
+  //     remarks: 'Quarantine in medical wing',
+  //     medical_case_book: '5',
+  //     disease: '5',
+  //     regiment: '3',
+  //   },
+  // ];
+
+  // useEffect(() => {
+  //   loadDiagnosis();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
-    loadDiagnoses();
-  }, [refreshTrigger]);
+    filterDiagnosis();
+  }, [diagnosis, searchTerm, diseaseFilter, statusFilter]);
 
-  useEffect(() => {
-    filterDiagnoses();
-  }, [diagnoses, searchTerm, diseaseFilter, statusFilter]);
+  // const loadDiagnosis = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setDiagnosis(mockDiagnosis);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
-  const loadDiagnoses = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setDiagnoses(mockDiagnoses);
-      setLoading(false);
-    }, 500);
-  };
-
-  const filterDiagnoses = () => {
-    let filtered = [...diagnoses];
+  const filterDiagnosis = () => {
+    let filtered = [...diagnosis];
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -158,7 +161,7 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
       filtered = filtered.filter((diagnosis) => diagnosis.differential);
     }
 
-    setFilteredDiagnoses(filtered);
+    setFilteredDiagnosis(filtered);
     setCurrentPage(1);
   };
 
@@ -168,19 +171,19 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
   };
 
   const handleConfirmDelete = () => {
-    if (recordToDelete) {
-      onDelete(recordToDelete);
-      setDiagnoses((prev) => prev.filter((diagnosis) => diagnosis.id !== recordToDelete));
-      toast.success('Diagnosis deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
-    }
+    // if (recordToDelete) {
+    onDelete(recordToDelete);
+    //   setDiagnosis((prev) => prev.filter((diagnosis) => diagnosis.id !== recordToDelete));
+    //   toast.success('Diagnosis deleted successfully');
+    //   setDeleteDialogOpen(false);
+    //   setRecordToDelete(null);
+    // }
   };
 
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
-  const currentItems = filteredDiagnoses.slice(indexOfFirstItem, indexOfLastItem);
-  const totalPages = Math.ceil(filteredDiagnoses.length / itemsPerPage);
+  const currentItems = filteredDiagnosis.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredDiagnosis.length / itemsPerPage);
 
   return (
     <div className="w-full space-y-4">
@@ -203,11 +206,11 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Diseases</SelectItem>
-                <SelectItem value="Tuberculosis">Tuberculosis</SelectItem>
-                <SelectItem value="Malaria">Malaria</SelectItem>
-                <SelectItem value="Pneumonia">Pneumonia</SelectItem>
-                <SelectItem value="Hepatitis B">Hepatitis B</SelectItem>
-                <SelectItem value="COVID-19">COVID-19</SelectItem>
+                {
+                  diseases.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
 
@@ -227,8 +230,8 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
 
       <div className="flex items-center justify-between text-sm text-gray-600">
         <div>
-          Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredDiagnoses.length)} of{' '}
-          {filteredDiagnoses.length} diagnoses
+          Showing {indexOfFirstItem + 1} to {Math.min(indexOfLastItem, filteredDiagnosis.length)} of{' '}
+          {filteredDiagnosis.length} diagnosis
         </div>
       </div>
 
@@ -251,13 +254,13 @@ const DiagnosisList: React.FC<DiagnosisListProps> = ({ onView, onEdit, onDelete,
                 {loading ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      Loading diagnoses...
+                      Loading diagnosis...
                     </TableCell>
                   </TableRow>
                 ) : currentItems.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No diagnoses found
+                      No diagnosis found
                     </TableCell>
                   </TableRow>
                 ) : (

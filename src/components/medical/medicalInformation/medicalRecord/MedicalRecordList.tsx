@@ -249,7 +249,7 @@ const MedicalRecordList: React.FC<MedicalRecordListProps> = ({
                   currentItems.map((record) => (
                     <TableRow key={record.id} className="hover:bg-gray-50">
                       <TableCell>{record.prisoner_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{record.prisoner_number}</TableCell>
+                      <TableCell className="font-mono text-sm">{record.prisoner_number_value}</TableCell>
                       <TableCell>{getBloodGroupBadge(record.blood_group_name)}</TableCell>
                       <TableCell className="text-right">
                         <DropdownMenu>
