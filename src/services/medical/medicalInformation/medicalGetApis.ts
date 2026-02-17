@@ -3,11 +3,12 @@ import {toast} from "sonner";
 import {PrisonerItem} from "../../stationServices/visitorsServices/VisitorsService";
 import { getPrisoners } from "../../stationServices/visitorsServices/VisitorsService"
 import {
+    Ailment,
     BmiClassification,
     BmiRecord,
     CaseBook,
     Diagnosis,
-    ExaminationResult,
+    ExaminationResult, getAilments,
     getBloodGroups,
     getBmiClassifications,
     getBmiRecord,
@@ -42,7 +43,7 @@ function populateList(response: any, msg: string, setData: any): boolean {
 
     if ("results" in response) {
       const data = response.results
-        console.log(data)
+        // console.log(data)
       if (!data.length) {
         toast.error(msg)
         return false
@@ -53,9 +54,9 @@ function populateList(response: any, msg: string, setData: any): boolean {
 }
 
 // Get medical records
-export async function getMedicalRecordsList(setData: React.Dispatch<React.SetStateAction<MedicalRecord[]>>) {
+export async function getMedicalRecordsList(setData: React.Dispatch<React.SetStateAction<MedicalRecord[]>>): Promise<boolean> {
     const response = await getMedicalRecords()
-    populateList(response, "There are no medical records", setData)
+    return populateList(response, "There are no medical records", setData)
 }
 
 // Get blood groups
@@ -151,4 +152,10 @@ export async function getTestResultsList(setData: React.Dispatch<React.SetStateA
 export async function getMedicalTestsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
     const response = await getMedicalTests()
     populateList(response, "There are no medical tests", setData)
+}
+
+// Get ailments
+export async function getAilmentsList(setData: React.Dispatch<React.SetStateAction<Ailment[]>>) {
+    const response = await getAilments()
+    populateList(response, "There are no ailments", setData)
 }

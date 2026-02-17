@@ -13,6 +13,7 @@ import AilmentScreen from './ailments/AilmentScreen';
 import DiagnosisScreen from './diagnosis/DiagnosisScreen';
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {
+  Ailment,
   BmiClassification,
   BmiRecord,
   CaseBook, Diagnosis, ExaminationResult, LabTest,
@@ -63,6 +64,8 @@ export default function MedicalDetails() {
   const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [medicalTests, setMedicalTests] = useState<Unit[]>([])
   const [testResults, setTestResults] = useState<Unit[]>([])
+  // Ailments
+  const [ailments, setAilments] = useState<Ailment[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -314,7 +317,18 @@ export default function MedicalDetails() {
 
           {activeTab === 'ailment' && (
             <div>
-              <AilmentScreen />
+              <AilmentScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  regiments={regiments}
+                  setRegiments={setRegiments}
+                  diseases={diseases}
+                  setDiseases={setDiseases}
+                  medicalRecords={medicalRecords}
+                  setMedicalRecords={setMedicalRecords}
+                  ailments={ailments}
+                  setAilments={setAilments}
+              />
             </div>
           )}
 

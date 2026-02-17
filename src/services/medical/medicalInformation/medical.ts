@@ -487,3 +487,47 @@ export const updateLabTest = async (formData: FormData, id: string) : Promise<Te
 export const deleteLabTest = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/medical-management/lab-tests/${id}/`);
 };
+
+// Ailment
+export interface Ailment {
+  id: string;
+  prisoner_name: string;
+  ailment_name: string;
+  regiment_name: string;
+  supporting_document: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  is_active: boolean;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  prisoner_medical_record: string;
+  ailment: string;
+  regiment: string;
+}
+
+export type AilmentsResponse<T> = Paginated<T> | ErrorResponse
+export type AilmentResponse = Ailment | ErrorResponse
+
+export const getAilments = async (): Promise<AilmentsResponse<Ailment>> => {
+  const response = await axiosInstance.get<Paginated<Ailment>>(
+    '/medical-management/ailments/'
+  )
+  return response.data
+}
+
+export const addAilment = async (formData: FormData) : Promise<AilmentResponse> => {
+  const response = await axiosInstance.post<AilmentResponse>('/medical-management/ailments/', formData);
+  return response.data;
+}
+
+export const updateAilment = async (formData: FormData, id: string) : Promise<AilmentResponse> => {
+  const response = await axiosInstance.put<AilmentResponse>(`/medical-management/ailments/${id}/`, formData);
+  return response.data;
+}
+
+export const deleteAilment = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/medical-management/ailments/${id}/`);
+};
