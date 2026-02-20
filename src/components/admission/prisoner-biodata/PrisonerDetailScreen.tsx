@@ -22,7 +22,7 @@ import {
 import { toast } from "sonner";
 import PrisonerBioDataView from "./PrisonerBioDataView";
 import PrisonerBioDataForm from "./PrisonerBioDataForm";
-import { getPrisonerById } from "../../../services/admission/prisonerService";
+import { getPrisonerById, deletePrisoner } from "../../../services/admission/prisonerService";
 import { getPrisonerBiodataByPrisonerId, updatePrisonerBiodata, deletePrisonerBiodata } from "../../../services/admission/prisonerBiodataService";
 import type { Prisoner, PrisonerBiodata } from "../../../models/admission";
 
@@ -82,15 +82,20 @@ const PrisonerDetailScreen: React.FC = () => {
   };
 
   const confirmDelete = async () => {
-    if (!bioData?.id) return;
+    if (!id) return;
     
     try {
-      await deletePrisonerBiodata(bioData.id);
-      toast.success("Prisoner biodata deleted successfully");
+      // Delete both biodata and prisoner
+      if (bioData?.id) {
+        await deletePrisonerBiodata(bioData.id);
+      }
+      await deletePrisoner(id);
+      
+      toast.success("Prisoner deleted successfully");
       navigate("/admissions-management/prisoners");
     } catch (error) {
-      console.error("Error deleting biodata:", error);
-      toast.error("Failed to delete prisoner biodata");
+      console.error("Error deleting prisoner:", error);
+      toast.error("Failed to delete prisoner");
     } finally {
       setIsDeleteDialogOpen(false);
     }
@@ -219,7 +224,7 @@ const PrisonerDetailScreen: React.FC = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete the biodata for{" "}
+              This will permanently delete the prisoner record and all associated biodata for{" "}
               {prisoner.full_name}. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
