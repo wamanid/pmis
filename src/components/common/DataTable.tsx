@@ -43,7 +43,7 @@ const defaultConfig: DataTableConfig = {
   summary: true,
 };
 
-export function DataTable({ url, title, columns, config }: DataTableProps) {
+export function DataTable({ url, title, columns, config, searchPlaceholder }: DataTableProps) {
   const mergedConfig = { ...defaultConfig, ...config };
   const { region, district, station } = useFilters();
   
@@ -51,52 +51,118 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(mergedConfig.lengthMenu?.[0] || 10);
   const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>(null);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [totalCount, setTotalCount] = useState(0);
+  const [useClientPagination, setUseClientPagination] = useState(false);
+  const prevGroupingRef = React.useRef(mergedConfig.grouping);
+
+  // Reset to page 1 when grouping mode changes or when switching views
+  useEffect(() => {
+    const groupingChanged = prevGroupingRef.current !== mergedConfig.grouping;
+    if (groupingChanged) {
+      console.log('Grouping mode changed, resetting to page 1');
+      setCurrentPage(1);
+      prevGroupingRef.current = mergedConfig.grouping;
+    }
+  }, [mergedConfig.grouping]);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchTerm);
+      setCurrentPage(1); // Reset to page 1 when searching
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   // Fetch data from URL
-  const fetchData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const response = await axiosInstance.get(url);
-      // Handle different response formats:
-      // 1. Direct array: [...]
-      // 2. Paginated with results: { results: [...], count: N }
-      // 3. Object with data: { data: [...] }
-      const responseData = response.data;
-      if (Array.isArray(responseData)) {
-        setData(responseData);
-      } else if (responseData.results && Array.isArray(responseData.results)) {
-        setData(responseData.results);
-      } else if (responseData.data && Array.isArray(responseData.data)) {
-        setData(responseData.data);
-      } else {
-        setData([]);
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to fetch data');
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    // Skip fetch if using client-side pagination and we already have all data
+    if (useClientPagination && data.length > 0 && currentPage > 1) {
+      console.log('Skipping fetch - using client-side pagination with existing data');
+      return;
     }
-  }, [url]);
+    
+    const fetchData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const params: any = {};
+        
+        // When grouping is enabled, fetch all records for proper grouping
+        if (mergedConfig.grouping) {
+          params.page_size = -1; // Fetch all records
+        } else {
+          params.page = currentPage;
+          params.page_size = pageSize;
+        }
+        
+        // Add search parameter if search term exists
+        if (debouncedSearch) {
+          params.search = debouncedSearch;
+        }
+        
+        console.log('DataTable fetching with params:', params);
+        console.log('Current page:', currentPage);
+        console.log('Grouping enabled:', !!mergedConfig.grouping);
+        
+        const response = await axiosInstance.get(url, { params });
+        const responseData = response.data;
+        
+        console.log('DataTable response:', responseData);
+        
+        if (Array.isArray(responseData)) {
+          setData(responseData);
+          setTotalCount(responseData.length);
+        } else if (responseData.results && Array.isArray(responseData.results)) {
+          const count = responseData.count || responseData.results.length;
+          const resultsLength = responseData.results.length;
+          
+          // Check if backend returned all records despite page_size parameter
+          if (!mergedConfig.grouping && resultsLength === count && count > pageSize && currentPage === 1) {
+            console.warn('Backend returned all records despite page_size param. Switching to client-side pagination.');
+            setUseClientPagination(true);
+          }
+          
+          setData(responseData.results);
+          setTotalCount(count);
+          console.log('Set totalCount to:', count, 'Results length:', resultsLength, 'Use client pagination:', useClientPagination);
+        } else if (responseData.data && Array.isArray(responseData.data)) {
+          setData(responseData.data);
+          setTotalCount(responseData.data.length);
+        } else {
+          setData([]);
+          setTotalCount(0);
+        }
+      } catch (err: any) {
+        console.error('DataTable fetch error:', err);
+        
+        // If we get a 404 "Invalid page" error, reset to page 1 and retry
+        if (err.response?.status === 404 && err.response?.data?.detail?.includes('Invalid page')) {
+          console.log('Invalid page detected, resetting to page 1');
+          if (currentPage !== 1) {
+            setCurrentPage(1);
+            return; // Don't set error, let it retry with page 1
+          }
+        }
+        
+        setError(err.message || 'Failed to fetch data');
+        setData([]);
+        setTotalCount(0);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Use filter refresh hook to reload data when filters change (including global filters)
-  useFilterRefresh(fetchData, [url, region, district, station]);
+    fetchData();
+  }, [url, currentPage, pageSize, debouncedSearch, mergedConfig.grouping, region, district, station]);
 
-  // Filter data based on search term
-  const filteredData = useMemo(() => {
-    if (!mergedConfig.search || !searchTerm) return data;
-
-    return data.filter((row) =>
-      columns.some((column) => {
-        const value = row[column.key];
-        return value?.toString().toLowerCase().includes(searchTerm.toLowerCase());
-      })
-    );
-  }, [data, searchTerm, columns, mergedConfig.search]);
+  // Use server-side search - data is already filtered by backend
+  const filteredData = data;
 
   // Sort data
   const sortedData = useMemo(() => {
@@ -115,31 +181,67 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
     return sorted;
   }, [filteredData, sortConfig]);
 
-  // Paginate data
-  const paginatedData = useMemo(() => {
-    if (!mergedConfig.pagination || pageSize === -1) return sortedData;
-
-    const startIndex = (currentPage - 1) * pageSize;
-    return sortedData.slice(startIndex, startIndex + pageSize);
-  }, [sortedData, currentPage, pageSize, mergedConfig.pagination]);
-
-  // Group data if grouping is enabled
+  // Group data FIRST (before pagination) when grouping is enabled
   const groupedData = useMemo(() => {
     if (!mergedConfig.grouping) return null;
 
     const groupKey = mergedConfig.grouping.groupBy;
     const groups = new Map<string, any[]>();
 
-    paginatedData.forEach(row => {
-      const groupValue = String(row[groupKey] || 'Unknown');
+    // Group ALL sorted data (before pagination)
+    sortedData.forEach(row => {
+      const rawValue = row[groupKey] || 'Unknown';
+      const groupValue = String(rawValue).trim();
       if (!groups.has(groupValue)) {
         groups.set(groupValue, []);
       }
       groups.get(groupValue)!.push(row);
     });
 
+    console.log(`Grouped ${sortedData.length} records into ${groups.size} groups`);
     return groups;
-  }, [paginatedData, mergedConfig.grouping]);
+  }, [sortedData, mergedConfig.grouping]);
+
+  // Pagination AFTER grouping
+  const paginatedData = useMemo(() => {
+    if (!mergedConfig.grouping) {
+      // Flat view: use client-side pagination if backend returned all records
+      const needsClientPagination = useClientPagination;
+      
+      if (!needsClientPagination) {
+        // Server-side pagination - data is already paginated by backend
+        return sortedData;
+      } else {
+        // Client-side pagination
+        if (!mergedConfig.pagination || pageSize === -1) return sortedData;
+        const startIndex = (currentPage - 1) * pageSize;
+        const endIndex = startIndex + pageSize;
+        console.log(`Flat view client-side pagination: slicing from ${startIndex} to ${endIndex} of ${sortedData.length} records`);
+        return sortedData.slice(startIndex, endIndex);
+      }
+    } else {
+      // Grouped view: paginate by number of groups (10 groups per page)
+      if (!mergedConfig.pagination || pageSize === -1 || !groupedData) return sortedData;
+      
+      // Get array of groups
+      const groupsArray = Array.from(groupedData.entries());
+      
+      // Paginate groups: show pageSize groups per page
+      const startGroupIndex = (currentPage - 1) * pageSize;
+      const endGroupIndex = startGroupIndex + pageSize;
+      const paginatedGroups = groupsArray.slice(startGroupIndex, endGroupIndex);
+      
+      // Flatten groups to rows
+      const rows: any[] = [];
+      paginatedGroups.forEach(([groupValue, groupRows]) => {
+        rows.push(...groupRows);
+      });
+      
+      console.log(`Page ${currentPage}: showing ${paginatedGroups.length} groups (${rows.length} rows) - groups ${startGroupIndex} to ${endGroupIndex-1}`);
+      
+      return rows;
+    }
+  }, [sortedData, groupedData, currentPage, pageSize, mergedConfig.grouping, mergedConfig.pagination, useClientPagination]);
 
   // Initialize expanded groups when data changes or config changes
   useEffect(() => {
@@ -177,9 +279,12 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
     setExpandedGroups(new Set());
   }, []);
 
-  const totalPages = pageSize === -1 ? 1 : Math.ceil(sortedData.length / pageSize);
-  const startRecord = sortedData.length === 0 ? 0 : (currentPage - 1) * (pageSize === -1 ? sortedData.length : pageSize) + 1;
-  const endRecord = pageSize === -1 ? sortedData.length : Math.min(currentPage * pageSize, sortedData.length);
+  // Calculate pagination info
+  const actualTotal = mergedConfig.grouping ? (groupedData?.size || 0) : totalCount;
+  const totalPages = pageSize === -1 ? 1 : Math.ceil(actualTotal / pageSize);
+  const displayTotal = mergedConfig.grouping ? sortedData.length : totalCount;
+  const startRecord = displayTotal === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const endRecord = mergedConfig.grouping ? Math.min(startRecord + paginatedData.length - 1, displayTotal) : Math.min(currentPage * pageSize, totalCount);
 
   // Handle sorting
   const handleSort = (key: string) => {
@@ -467,8 +572,23 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
                   </td>
                 </tr>
               ) : mergedConfig.grouping && groupedData ? (
-                // Render grouped data
-                Array.from(groupedData.entries()).map(([groupValue, items]) => {
+                // Render grouped data - rebuild groups from paginatedData
+                (() => {
+                  // Rebuild groups from paginated data only
+                  const displayGroups = new Map<string, any[]>();
+                  const groupKey = mergedConfig.grouping!.groupBy;
+                  
+                  paginatedData.forEach(row => {
+                    const rawValue = row[groupKey] || 'Unknown';
+                    const groupValue = String(rawValue).trim();
+                    if (!displayGroups.has(groupValue)) {
+                      displayGroups.set(groupValue, []);
+                    }
+                    displayGroups.get(groupValue)!.push(row);
+                  });
+                  
+                  return Array.from(displayGroups.entries());
+                })().map(([groupValue, items]) => {
                   const isExpanded = expandedGroups.has(groupValue);
                   return (
                     <React.Fragment key={groupValue}>
@@ -543,10 +663,10 @@ export function DataTable({ url, title, columns, config }: DataTableProps) {
         {/* Footer with Summary and Pagination */}
         <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mt-4">
           {/* Summary */}
-          {mergedConfig.summary && sortedData.length > 0 && (
+          {mergedConfig.summary && displayTotal > 0 && (
             <div className="text-sm text-muted-foreground">
-              Showing {startRecord} to {endRecord} of {sortedData.length} records
-              {data.length !== sortedData.length && ` (filtered from ${data.length} total records)`}
+              Showing {startRecord} to {endRecord} of {displayTotal} records
+              {mergedConfig.grouping && ` (${actualTotal} ${actualTotal === 1 ? 'group' : 'groups'})`}
             </div>
           )}
 

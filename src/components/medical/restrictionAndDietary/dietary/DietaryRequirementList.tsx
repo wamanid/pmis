@@ -252,17 +252,16 @@ const DietaryRequirementList: React.FC = () => {
         summary: true,
         rowSpacing: 'normal',
         grouping: {
-          groupBy: 'prisoner_name',
+          groupBy: 'prisoner_number_value',
           defaultExpanded: false,
           renderGroupHeader: (groupValue, items: any[]) => {
             // Calculate summary stats
             const activeCount = items.filter((item: any) => isActive(item)).length;
             const inactiveCount = items.length - activeCount;
             
-            // Get prisoner info (groupValue is prisoner_name)
-            const prisonerName = groupValue || 'Unknown Prisoner';
-            // TODO: Add prisoner_number when API is updated
-            // const prisonerNumber = items[0]?.prisoner_number || 'N/A';
+            // Get prisoner info
+            const prisonerNumberValue = groupValue || items[0]?.prisoner_number_value || items[0]?.prisoner_number || 'N/A';
+            const prisonerName = items[0]?.prisoner_name || 'Unknown Prisoner';
             
             // Get date range
             const startDates = items
@@ -284,8 +283,7 @@ const DietaryRequirementList: React.FC = () => {
                   <Users className="h-5 w-5" style={{ color: '#650000' }} />
                   <div>
                     <div className="font-semibold text-base">
-                      {prisonerName}
-                      {/* TODO: Add prisoner number when API updated: {prisonerNumber} | {prisonerName} */}
+                      {prisonerNumberValue} | {prisonerName}
                     </div>
                     <div className="text-xs text-muted-foreground">
                       {items.length} dietary {items.length === 1 ? 'requirement' : 'requirements'}

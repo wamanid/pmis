@@ -192,7 +192,7 @@ const PrisonerRestrictionList: React.FC = () => {
         summary: true,
         rowSpacing: 'normal',
         grouping: {
-          groupBy: 'prisoner_number',
+          groupBy: 'prisoner_number_value',
           defaultExpanded: false,
           renderGroupHeader: (groupValue, items) => {
             // Calculate summary stats
@@ -201,7 +201,7 @@ const PrisonerRestrictionList: React.FC = () => {
             
             // Get prisoner info from first item
             const prisonerName = items[0]?.prisoner_name || 'Unknown';
-            const prisonerNumber = groupValue;
+            const prisonerNumberValue = groupValue || items[0]?.prisoner_number_value || items[0]?.prisoner_number || 'N/A';
             
             // Get date range
             const startDates = items
@@ -223,7 +223,7 @@ const PrisonerRestrictionList: React.FC = () => {
                   <Users className="h-5 w-5" style={{ color: '#650000' }} />
                   <div>
                     <div className="font-semibold text-base">
-                      {prisonerNumber} | {prisonerName}
+                      {prisonerNumberValue} | {prisonerName}
                     </div>
                     {earliestStart && (
                       <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">

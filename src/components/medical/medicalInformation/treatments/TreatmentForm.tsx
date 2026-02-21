@@ -7,7 +7,8 @@ import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Switch } from '../../../ui/switch';
 import { Pill, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 
 interface Treatment {
   id?: string;
@@ -42,6 +43,7 @@ const TreatmentForm: React.FC<TreatmentFormProps> = ({ treatment, onSubmit, onCa
   const [caseBooks, setCaseBooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -70,18 +72,25 @@ const TreatmentForm: React.FC<TreatmentFormProps> = ({ treatment, onSubmit, onCa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.medical_case_book) {
-      toast.error('Please select a medical case book');
-      return;
+      newErrors.medical_case_book = 'Medical Case Book is required';
     }
     if (!formData.medication) {
-      toast.error('Please enter medication details');
-      return;
+      newErrors.medication = 'Medication is required';
     }
     if (formData.quantifiable && !formData.quantity) {
-      toast.error('Please enter quantity for quantifiable medication');
+      newErrors.quantity = 'Quantity is required for quantifiable medication';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 

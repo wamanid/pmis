@@ -7,7 +7,8 @@ import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Checkbox } from '../../../ui/checkbox';
 import { FileText, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import {handleCatchError, handleResponseError} from "../../../../services/stationServices/utils";
 import {
   getBloodGroupList, getBmi,
@@ -89,6 +90,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
   // const [bloodGroups, setBloodGroups] = useState<any[]>([]);
   // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();

@@ -5,7 +5,8 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { ClipboardCheck, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import {CaseBook, Result} from "../../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {getCasebookList} from "../../../../services/medical/medicalInformation/medicalGetApis";
@@ -48,6 +49,7 @@ const ExamResultForm: React.FC<ExamResultFormProps> = ({ examResult, onSubmit, o
   // const [medicalExams, setMedicalExams] = useState<any[]>([]);
   // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -104,19 +106,25 @@ const ExamResultForm: React.FC<ExamResultFormProps> = ({ examResult, onSubmit, o
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.medical_case_book) {
-      toast.error('Please select a case book');
-      return;
+      newErrors.medical_case_book = 'Case Book is required';
     }
     if (!formData.medical_exam) {
-      toast.error('Please select a medical exam');
+      newErrors.medical_exam = 'Medical Exam is required';
+    }
+    if (!formData.notes) {
+      newErrors.notes = 'Notes is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
-    if (!formData.notes) {
-      toast.error('Please include the notes');
-      return;
-    }
+    setErrors({});
 
     setLoader(true);
     onSubmit(formData);

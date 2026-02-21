@@ -100,15 +100,6 @@ const ReleaseRecommendationList: React.FC<ReleaseRecommendationListProps> = ({ s
           ),
       },
       {
-        key: 'approval_status',
-        label: 'Status',
-        render: (value: string) => (
-          <Badge className="bg-yellow-100 text-yellow-800">
-            {value || 'Pending'}
-          </Badge>
-        ),
-      },
-      {
         key: 'actions',
         label: 'Actions',
         render: (_value: any, row: ReleaseRecommendation) => (

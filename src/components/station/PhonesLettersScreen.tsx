@@ -767,19 +767,20 @@ export default function PhonesLettersScreen() {
       setCallDialogOpen(false);
       loadCalls(page, pageSize);
     } catch (err) {
-      // console.error(err);
-      toast.error("Failed to save call");
+      console.error('onSubmitCall error:', err);
+      toast.error("Failed to save call record");
     }
   };
 
   const onSubmitLetter = async (data: any) => {
     try {
+      console.log('onSubmitLetter called with data:', data);
+      console.log('editingLetter:', editingLetter);
+      console.log('editingLetter.id:', editingLetter?.id);
 
-      // normalize call_date to ISO if present
-      if (data?.call_date) {
-        const iso = localToISOString(data.call_date);
-        if (iso) data.call_date = iso;
-      }
+      // Normalize data before submission
+      const normalizedData = normalizeLetterForSubmit(data);
+      console.log('Normalized data:', normalizedData);
 
       const file = data?.letter_document instanceof File ? data.letter_document as File : null;
   
@@ -796,7 +797,7 @@ export default function PhonesLettersScreen() {
         const sendRes = await sendFile(file, {
           // endpoints: { audio: API_ENDPOINTS.createCall, doc: API_ENDPOINTS.createLetter },
           endpoints: { doc: API_ENDPOINTS.createLetter },
-          meta: { ...data },
+          meta: { ...normalizedData },
         });
   
         if (!sendRes.ok) {
@@ -811,31 +812,37 @@ export default function PhonesLettersScreen() {
         } else {
           // Otherwise extract file ref and include in JSON create call.
           const fileRef = extractFileRefFromSendResult(sendRes);
-          if (fileRef) data.letter_document = fileRef;
-          else data.letter_document = sendRes.data ?? null;
+          if (fileRef) normalizedData.letter_document = fileRef;
+          else normalizedData.letter_document = sendRes.data ?? null;
   
           if (editingLetter?.id) {
-            await LetterService.updateLetter(editingLetter.id, data);
+            console.log('Updating letter with ID:', editingLetter.id);
+            await LetterService.updateLetter(editingLetter.id, normalizedData);
             toast.success("Letter updated");
           } else {
-            await LetterService.createLetter(data);
+            console.log('Creating new letter');
+            await LetterService.createLetter(normalizedData);
             toast.success("Letter created");
           }
         }
       } else {
         // No new file uploaded
-        // Create clean payload
-        const payload = { ...data };
+        // Create clean payload with normalized data
+        const payload = normalizeLetterForSubmit(data);
         
-        // When editing: don't send file field at all if not changing it (let backend keep existing value)
-        // When creating: remove the field if no file
+        // When editing: don't send file field at all if not changing it
         delete payload.letter_document;
+        
+        console.log('Submitting payload:', payload);
+        console.log('Is editing:', !!editingLetter?.id);
         
         // Send JSON via existing service
         if (editingLetter?.id) {
+          console.log('Updating letter with ID:', editingLetter.id);
           await LetterService.updateLetter(editingLetter.id, payload);
           toast.success("Letter updated");
         } else {
+          console.log('Creating new letter');
           await LetterService.createLetter(payload);
           toast.success("Letter created");
         }
@@ -1303,12 +1310,17 @@ export default function PhonesLettersScreen() {
                       value={field.value ?? null}
                       onChange={(v) => field.onChange(v ?? null)}
                       onSelectItem={(p:any) => {
-                        field.onChange(p?.id ?? p ?? null);
+                        console.log('Prisoner selected:', p);
+                        const prisonerId = p?.id ?? p ?? null;
+                        console.log('Setting prisoner field to:', prisonerId);
+                        field.onChange(prisonerId);
                         setSelectedPrisoner(p); // Store full prisoner object
-                        // Clear sender/recipient fields when prisoner changes
+                        // Reset letter type and clear sender/recipient fields when prisoner changes
+                        letterForm.setValue("letter_type", null);
                         letterForm.setValue("sender_name", "");
                         letterForm.setValue("recipient_name", "");
                         setPrisoners(prev => prev.some(x => String(x.id) === String(p?.id)) ? prev : [p, ...prev]);
+                        console.log('Prisoner field value after change:', letterForm.getValues('prisoner'));
                       }}
                       fetchPaginated={fetchPrisonersPaginated}
                       placeholder="Select prisoner"
@@ -1333,19 +1345,28 @@ export default function PhonesLettersScreen() {
                   name="letter_type"
                   control={letterForm.control}
                   rules={requiredValidation("Letter type")}
-                  render={({ field }) => (
+                  render={({ field }) => {
+                    console.log('Letter Type render - selectedPrisoner:', selectedPrisoner);
+                    console.log('Letter Type render - disabled:', !selectedPrisoner);
+                    return (
                     <SearchableSelect
-                      value={field.value}
+                      value={field.value ?? null}
                       onChange={(id) => field.onChange(id)}
                       fetchPaginated={fetchLetterTypesPaginated}
-                      placeholder={watchedPrisoner ? "Select letter type" : "Select prisoner first"}
+                      placeholder={selectedPrisoner ? "Select letter type" : "Select prisoner first"}
                       idField="id"
                       labelField="name"
                       pageSize={50}
                       minQueryLength={0}
-                      disabled={!watchedPrisoner}
+                      disabled={!selectedPrisoner}
+                      initialItem={editingLetter && editingLetter.letter_type ? {
+                        id: editingLetter.letter_type,
+                        name: editingLetter.letter_type_name || 'Letter Type'
+                      } : undefined}
+                      key={`letter-type-${selectedPrisoner?.id || 'no-prisoner'}`}
                     />
-                  )}
+                  );}
+                  }
                 />
                 {letterForm.formState.errors.letter_type && (
                   <p className="text-red-500 text-sm mt-1">{(letterForm.formState.errors.letter_type as any).message}</p>

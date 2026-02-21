@@ -293,11 +293,10 @@ export function StaffDeploymentScreen() {
       setRegionSummary(getRegionSummary(updatedDeployments));
       return updatedDeployments
     })
-    // refresh table (server authoritative) so paging/total are correct
-    // loadTable is defined later but stable via useCallback; queue microtask to avoid race
-    setTimeout(() => {
-      try { loadTable(1, pageSize, sortField, sortDir, debouncedSearch); } catch { /* ignore */ }
-    }, 0);
+    // Refresh summary data for cards
+    fetchData();
+    // Force DataTable remount to trigger refetch
+    setFiltersReloadKey(k => k + 1);
   }
 
   const resetForm = () => {
@@ -775,11 +774,31 @@ export function StaffDeploymentScreen() {
 
       {/* Tabs for different views */}
       <Tabs defaultValue="staff-list" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="staff-list">Staff List</TabsTrigger>
-          <TabsTrigger value="by-station">By Station</TabsTrigger>
-          <TabsTrigger value="by-district">By District</TabsTrigger>
-          <TabsTrigger value="by-region">By Region</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-4 h-12 bg-muted/50">
+          <TabsTrigger
+            value="staff-list"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            Staff List
+          </TabsTrigger>
+          <TabsTrigger
+            value="by-station"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            By Station
+          </TabsTrigger>
+          <TabsTrigger
+            value="by-district"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            By District
+          </TabsTrigger>
+          <TabsTrigger
+            value="by-region"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            By Region
+          </TabsTrigger>
         </TabsList>
 
         {/* Staff List Tab */}

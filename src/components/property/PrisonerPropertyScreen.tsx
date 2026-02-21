@@ -1061,9 +1061,10 @@ export default function PrisonerPropertyScreen() {
                 <DataTable
                   key={dataTableRefreshKey}
                   url="/property-management/properties/"
-              title="Property Records"
-              columns={columns}
-              config={{
+                  title="Property Records"
+                  columns={columns}
+                  searchPlaceholder="Search by prisoner name, number, property type, item, or bag number..."
+                  config={{
                 search: true,
                 export: {
                   pdf: true,

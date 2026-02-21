@@ -5,6 +5,7 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { ArrowLeftRight, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
 import SearchableSelect from '../../../common/SearchableSelect';
 import {
@@ -92,6 +93,7 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
   });
 
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Track if initial data has been loaded to prevent re-syncing on every change
   const initialDataLoadedRef = React.useRef<string | boolean>(false);
@@ -370,26 +372,31 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
     if (!formData.reason_for_recommendation) {
-      toast.error('Please select a reason for recommendation');
-      return;
+      newErrors.reason_for_recommendation = 'Reason for Recommendation is required';
     }
     if (!formData.recommended_station) {
-      toast.error('Please select a recommended station');
-      return;
+      newErrors.recommended_station = 'Recommended Station is required';
     }
     if (!formData.refferal_hospital) {
-      toast.error('Please select a referral hospital');
-      return;
+      newErrors.refferal_hospital = 'Referral Hospital is required';
     }
     if (!formData.referral_category) {
-      toast.error('Please select a referral category');
+      newErrors.referral_category = 'Referral Category is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -475,14 +482,19 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
                   )}
                 </div>
               ) : (
-                <CustomPrisonerSearch
-                  value={localPrisonerValue}
-                  onChange={handlePrisonerSelect}
-                  onSelectItem={handlePrisonerItemSelect}
-                  disabled={loading}
-                  idField="id"
-                  labelField="full_name"
-                />
+                <>
+                  <CustomPrisonerSearch
+                    value={localPrisonerValue}
+                    onChange={handlePrisonerSelect}
+                    onSelectItem={handlePrisonerItemSelect}
+                    disabled={loading}
+                    idField="id"
+                    labelField="full_name"
+                  />
+                  {errors.prisoner && (
+                    <p className="text-sm text-red-600">{errors.prisoner}</p>
+                  )}
+                </>
               )}
             </div>
           </div>
@@ -501,18 +513,23 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
                     {selectedReason?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<TransferRecommendationReason>
-                    key={`reason-${initialData?.id}-${mode}`}
-                    value={localReasonValue}
-                    onChange={handleReasonSelect}
-                    fetchPaginated={fetchReasonsCallback}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleReasonItemSelect}
-                    initialItem={initialReasonItem ?? undefined}
-                    placeholder="Select reason"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<TransferRecommendationReason>
+                      key={`reason-${initialData?.id}-${mode}`}
+                      value={localReasonValue}
+                      onChange={handleReasonSelect}
+                      fetchPaginated={fetchReasonsCallback}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleReasonItemSelect}
+                      initialItem={initialReasonItem ?? undefined}
+                      placeholder="Select reason"
+                      disabled={loading}
+                    />
+                    {errors.reason_for_recommendation && (
+                      <p className="text-sm text-red-600">{errors.reason_for_recommendation}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -525,18 +542,23 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
                     {selectedCategory?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<ReferralCategory>
-                    key={`category-${initialData?.id}-${mode}`}
-                    value={localCategoryValue}
-                    onChange={handleCategorySelect}
-                    fetchPaginated={fetchCategoriesCallback}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleCategoryItemSelect}
-                    initialItem={initialCategoryItem ?? undefined}
-                    placeholder="Select category"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<ReferralCategory>
+                      key={`category-${initialData?.id}-${mode}`}
+                      value={localCategoryValue}
+                      onChange={handleCategorySelect}
+                      fetchPaginated={fetchCategoriesCallback}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleCategoryItemSelect}
+                      initialItem={initialCategoryItem ?? undefined}
+                      placeholder="Select category"
+                      disabled={loading}
+                    />
+                    {errors.referral_category && (
+                      <p className="text-sm text-red-600">{errors.referral_category}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -551,18 +573,23 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
                     {selectedStation?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<Station>
-                    key={`station-${initialData?.id}-${mode}`}
-                    value={localStationValue}
-                    onChange={handleStationSelect}
-                    fetchPaginated={fetchStationsCallback}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleStationItemSelect}
-                    initialItem={initialStationItem ?? undefined}
-                    placeholder="Select station"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<Station>
+                      key={`station-${initialData?.id}-${mode}`}
+                      value={localStationValue}
+                      onChange={handleStationSelect}
+                      fetchPaginated={fetchStationsCallback}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleStationItemSelect}
+                      initialItem={initialStationItem ?? undefined}
+                      placeholder="Select station"
+                      disabled={loading}
+                    />
+                    {errors.recommended_station && (
+                      <p className="text-sm text-red-600">{errors.recommended_station}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -575,18 +602,23 @@ const TransferRecommendationForm: React.FC<TransferRecommendationFormProps> = ({
                     {selectedHospital?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<Hospital>
-                    key={`hospital-${initialData?.id}-${mode}`}
-                    value={localHospitalValue}
-                    onChange={handleHospitalSelect}
-                    fetchPaginated={fetchHospitalsCallback}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleHospitalItemSelect}
-                    initialItem={initialHospitalItem ?? undefined}
-                    placeholder="Select hospital"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<Hospital>
+                      key={`hospital-${initialData?.id}-${mode}`}
+                      value={localHospitalValue}
+                      onChange={handleHospitalSelect}
+                      fetchPaginated={fetchHospitalsCallback}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleHospitalItemSelect}
+                      initialItem={initialHospitalItem ?? undefined}
+                      placeholder="Select hospital"
+                      disabled={loading}
+                    />
+                    {errors.refferal_hospital && (
+                      <p className="text-sm text-red-600">{errors.refferal_hospital}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

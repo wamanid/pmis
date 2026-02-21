@@ -6,7 +6,8 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Stethoscope, Save, X, Upload } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 
 interface Ailment {
   id?: string;
@@ -41,6 +42,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
   const [regiments, setRegiments] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -92,18 +94,25 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner_medical_record) {
-      toast.error('Please select a medical record');
-      return;
+      newErrors.prisoner_medical_record = 'Medical Record is required';
     }
     if (!formData.ailment) {
-      toast.error('Please select an ailment');
-      return;
+      newErrors.ailment = 'Ailment is required';
     }
     if (!formData.regiment) {
-      toast.error('Please select a treatment regiment');
+      newErrors.regiment = 'Treatment Regiment is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -176,6 +185,9 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.prisoner_medical_record && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.prisoner_medical_record}</p>
+                )}
               </div>
             </div>
           </div>
@@ -205,6 +217,9 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.ailment && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.ailment}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -227,6 +242,9 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.regiment && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.regiment}</p>
+                )}
               </div>
             </div>
           </div>

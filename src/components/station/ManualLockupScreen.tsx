@@ -35,6 +35,7 @@ import {
   addLockUpRecord,
   getLockType, getManualLockup, getPrisonerCategories, getSexes,
   getStation, ManualLockUpItem, MANUAL_LOCKUP_API_ENDPOINTS,
+  fetchManualLockupById,
 } from '../../services/stationServices/manualLockupIntegration';
 import axiosInstance from "../../services/axiosInstance";
 import { Edit, Trash } from 'lucide-react';
@@ -389,10 +390,16 @@ export function ManualLockupScreen() {
     watch: eWatch,
   } = editForm;
 
-  const handleEdit = (r: ManualLockUpItem) => {
-    // open edit modal and defer hydration until stations (lookups) are available
-    setPendingEditTarget(r);
-    setEditModalOpen(true);
+  const handleEdit = async (r: ManualLockUpItem) => {
+    // Fetch full record by ID to get complete data
+    try {
+      const fullRecord = await fetchManualLockupById(r.id);
+      setPendingEditTarget(fullRecord);
+      setEditModalOpen(true);
+    } catch (error: any) {
+      console.error('Failed to fetch manual lockup details:', error);
+      toast.error('Failed to load record details');
+    }
   };
 
   // when we have a pending edit target, wait for lookups to load then hydrate the edit form
@@ -407,7 +414,7 @@ export function ManualLockupScreen() {
       is_active: !!r.is_active,
       date: r.date,
       lockup_time: r.lockup_time,
-      location: r.location,
+      location: r.location || '', // Ensure location is set properly
       count: r.count,
       station: r.station, // keep UUID here
       type: r.type,
@@ -415,8 +422,13 @@ export function ManualLockupScreen() {
       sex: r.sex,
     });
 
+    // Force setValue to ensure location dropdown updates
+    if (r.location) {
+      eSetValue('location', r.location);
+    }
+
     setPendingEditTarget(null);
-  }, [pendingEditTarget, stationDataLoading, stations, eReset]);
+  }, [pendingEditTarget, stationDataLoading, stations, eReset, eSetValue]);
 
   const handleDeleteClick = (r: ManualLockUpItem) => {
     setDeleteTarget(r);
@@ -546,10 +558,25 @@ export function ManualLockupScreen() {
 
       {/* Tabs for switching between forms */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v)} className="w-full">
-        <TabsList className="grid w-full max-w-[600px] grid-cols-3">
-          <TabsTrigger value="table-form">Table Form</TabsTrigger>
-          <TabsTrigger value="table-view">Table View</TabsTrigger>
-          <TabsTrigger value="records">Records List</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-3 h-12 bg-muted/50">
+          <TabsTrigger
+            value="table-form"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            Table Form
+          </TabsTrigger>
+          <TabsTrigger
+            value="table-view"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            Table View
+          </TabsTrigger>
+          <TabsTrigger
+            value="records"
+            className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"
+          >
+            Records List
+          </TabsTrigger>
         </TabsList>
 
         {/* Table Form Tab */}
@@ -1017,6 +1044,20 @@ export function ManualLockupScreen() {
                         toast.success('Manual lockup record updated');
                         setFiltersReloadKey(k => k + 1);
                         fetchLockupsForSummary();
+                        // Close modal and reset form
+                        setEditModalOpen(false);
+                        eReset({
+                          id: null,
+                          is_active: true,
+                          date: new Date().toISOString().split("T")[0],
+                          lockup_time: "",
+                          location: "",
+                          count: "",
+                          station: null,
+                          type: null,
+                          prisoner_category: null,
+                          sex: null,
+                        });
                       } catch (err: any) {
                         console.error('update error', err);
                         toast.error('Failed to update record');
@@ -1056,9 +1097,11 @@ export function ManualLockupScreen() {
                             <Select value={String(eWatch("location") ?? "")} onValueChange={(v) => eSetValue("location", v)}>
                               <SelectTrigger id="e_location"><SelectValue placeholder="Select location" /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="court">Court</SelectItem>
-                                <SelectItem value="labour">Labour</SelectItem>
-                                <SelectItem value="station">Station</SelectItem>
+                                {locations.map((loc) => (
+                                  <SelectItem key={loc.id} value={loc.id}>
+                                    {loc.name}
+                                  </SelectItem>
+                                ))}
                               </SelectContent>
                             </Select>
                             <input type="hidden" {...eRegister("location", { required: true })} />

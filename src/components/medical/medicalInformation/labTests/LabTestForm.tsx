@@ -6,7 +6,8 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { FlaskConical, Save, X, Upload } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 
 interface LabTest {
   id?: string;
@@ -41,6 +42,7 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
   const [testResults, setTestResults] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -93,18 +95,25 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.medical_case_book) {
-      toast.error('Please select a case book');
-      return;
+      newErrors.medical_case_book = 'Case Book is required';
     }
     if (!formData.medical_test) {
-      toast.error('Please select a medical test');
-      return;
+      newErrors.medical_test = 'Medical Test is required';
     }
     if (!formData.result) {
-      toast.error('Please select test result');
+      newErrors.result = 'Test Result is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -177,6 +186,9 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.medical_case_book && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.medical_case_book}</p>
+                )}
               </div>
             </div>
           </div>
@@ -206,6 +218,9 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.medical_test && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.medical_test}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -228,6 +243,9 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                     ))}
                   </SelectContent>
                 </Select>
+                {errors.result && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.result}</p>
+                )}
               </div>
             </div>
           </div>

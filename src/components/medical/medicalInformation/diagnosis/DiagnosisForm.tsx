@@ -6,7 +6,8 @@ import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Switch } from '../../../ui/switch';
 import { ClipboardList, Save, X } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {CaseBook, DiagnosisItem} from "../../../../services/medical/medicalInformation/medical";
 import {getCasebookList, getRegimentList} from "../../../../services/medical/medicalInformation/medicalGetApis";
@@ -52,11 +53,8 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
     deleted_by: null,
   });
 
-  // const [caseBooks, setCaseBooks] = useState<any[]>([]);
-  // const [diseases, setDiseases] = useState<any[]>([]);
-  // const [regimentss, setRegimentss] = useState<any[]>([]);
-  // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -92,28 +90,6 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
     catch (error) {
       handleCatchError(error)
     }
-    // setCaseBooks([
-    //   { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },
-    //   { id: '2', prisoner_name: 'Jane Smith', case_number: 'CB-2024-002' },
-    //   { id: '3', prisoner_name: 'Michael Johnson', case_number: 'CB-2024-003' },
-    // ]);
-    //
-    // setDiseases([
-    //   { id: '1', name: 'Tuberculosis', category: 'Infectious' },
-    //   { id: '2', name: 'Malaria', category: 'Infectious' },
-    //   { id: '3', name: 'Pneumonia', category: 'Respiratory' },
-    //   { id: '4', name: 'Hepatitis B', category: 'Infectious' },
-    //   { id: '5', name: 'COVID-19', category: 'Infectious' },
-    // ]);
-    //
-    // setRegimentss([
-    //   { id: '1', name: 'Antibiotic Course', description: '14 days treatment' },
-    //   { id: '2', name: 'Antiviral Medication', description: '21 days treatment' },
-    //   { id: '3', name: 'Isolation Protocol', description: 'Quarantine required' },
-    //   { id: '4', name: 'Observation', description: 'Monitor symptoms' },
-    // ]);
-    //
-    // setDataLoaded(true);
   };
 
   const handleInputChange = (field: keyof Diagnosis, value: any) => {
@@ -123,27 +99,31 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.medical_case_book) {
-      toast.error('Please select a case book');
-      return;
+      newErrors.medical_case_book = 'Case Book is required';
     }
     if (!formData.disease) {
-      toast.error('Please select a disease');
-      return;
+      newErrors.disease = 'Disease is required';
     }
     if (!formData.regiment) {
-      toast.error('Please select a treatment regiment');
-      return;
+      newErrors.regiment = 'Treatment Regiment is required';
     }
     if (!formData.remarks) {
-      toast.error('Please enter remarks');
+      newErrors.remarks = 'Remarks is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoader(true);
     onSubmit(formData);
-
-    // setTimeout(() => {
     //   const selectedCaseBook = caseBooks.find((cb) => cb.id === formData.medical_case_book);
     //   const selectedDisease = diseases.find((d) => d.id === formData.disease);
     //   const selectedRegiments = regimentss.find((r) => r.id === formData.regiments);

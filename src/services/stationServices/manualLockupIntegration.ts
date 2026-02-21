@@ -158,8 +158,13 @@ export const addLockUpRecord = async (lockup: AddLockUp): Promise<ManualLockupRe
   return response.data;
 };
 
-export const getManualLockup = async () : Promise<ManualLockupResponse> => {
-  const response = await axiosInstance.get<ManualLockupResponse>(MANUAL_LOCKUP_API_ENDPOINTS.MANUAL_LOCKUPS);
+export const getManualLockup = async (params?: any, signal?: AbortSignal) : Promise<ManualLockupResponse> => {
+  const response = await axiosInstance.get<ManualLockupResponse>(MANUAL_LOCKUP_API_ENDPOINTS.MANUAL_LOCKUPS, { params, signal });
+  return response.data;
+}
+
+export const fetchManualLockupById = async (id: string): Promise<ManualLockUpItem> => {
+  const response = await axiosInstance.get<ManualLockUpItem>(`${MANUAL_LOCKUP_API_ENDPOINTS.MANUAL_LOCKUPS}${id}/`);
   return response.data;
 }
 
