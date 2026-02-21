@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+﻿import React, {useState, useEffect, SetStateAction} from 'react';
 import { Card, CardContent } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
@@ -23,6 +23,7 @@ import {
 } from '../../../ui/alert-dialog';
 import { Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, MoreVertical, FileText } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
 interface LabTest {
   id: string;
@@ -41,10 +42,13 @@ interface LabTestListProps {
   onEdit: (labTest: LabTest) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  labTests: LabTest[];
+  medicalTests: Unit[];
+  testResults: Unit[];
 }
 
-const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, refreshTrigger }) => {
-  const [labTests, setLabTests] = useState<LabTest[]>([]);
+const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, refreshTrigger, labTests, medicalTests, testResults }) => {
+  // const [labTests, setLabTests] = useState<LabTest[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<LabTest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [testFilter, setTestFilter] = useState('all');
@@ -55,57 +59,57 @@ const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, ref
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
-  const mockLabTests: LabTest[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      test_name: 'Complete Blood Count',
-      result_name: 'Normal',
-      notes: 'All parameters within normal range',
-      result_document: 'cbc_results_001.pdf',
-      medical_case_book: '1',
-      medical_test: '1',
-      result: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      test_name: 'Liver Function Test',
-      result_name: 'Abnormal',
-      notes: 'Elevated ALT levels, requires follow-up',
-      result_document: 'lft_results_002.pdf',
-      medical_case_book: '2',
-      medical_test: '2',
-      result: '2',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      test_name: 'HIV Test',
-      result_name: 'Negative',
-      notes: 'Test negative for HIV antibodies',
-      result_document: 'hiv_results_003.pdf',
-      medical_case_book: '3',
-      medical_test: '4',
-      result: '4',
-    },
-  ];
+  // const mockLabTests: LabTest[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     test_name: 'Complete Blood Count',
+  //     result_name: 'Normal',
+  //     notes: 'All parameters within normal range',
+  //     result_document: 'cbc_results_001.pdf',
+  //     medical_case_book: '1',
+  //     medical_test: '1',
+  //     result: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     test_name: 'Liver Function Test',
+  //     result_name: 'Abnormal',
+  //     notes: 'Elevated ALT levels, requires follow-up',
+  //     result_document: 'lft_results_002.pdf',
+  //     medical_case_book: '2',
+  //     medical_test: '2',
+  //     result: '2',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     test_name: 'HIV Test',
+  //     result_name: 'Negative',
+  //     notes: 'Test negative for HIV antibodies',
+  //     result_document: 'hiv_results_003.pdf',
+  //     medical_case_book: '3',
+  //     medical_test: '4',
+  //     result: '4',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadLabTests();
-  }, [refreshTrigger]);
+  // useEffect(() => {
+  //   loadLabTests();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
     filterRecords();
   }, [labTests, searchTerm, testFilter, resultFilter]);
 
-  const loadLabTests = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setLabTests(mockLabTests);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadLabTests = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setLabTests(mockLabTests);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterRecords = () => {
     let filtered = [...labTests];
@@ -148,13 +152,13 @@ const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, ref
   };
 
   const handleConfirmDelete = () => {
-    if (recordToDelete) {
+    // if (recordToDelete) {
       onDelete(recordToDelete);
-      setLabTests((prev) => prev.filter((record) => record.id !== recordToDelete));
-      toast.success('Lab test deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
-    }
+    //   setLabTests((prev) => prev.filter((record) => record.id !== recordToDelete));
+    //   toast.success('Lab test deleted successfully');
+    //   setDeleteDialogOpen(false);
+    //   setRecordToDelete(null);
+    // }
   };
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -183,11 +187,11 @@ const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, ref
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Tests</SelectItem>
-                <SelectItem value="Complete Blood Count">Complete Blood Count</SelectItem>
-                <SelectItem value="Liver Function Test">Liver Function Test</SelectItem>
-                <SelectItem value="Kidney Function Test">Kidney Function Test</SelectItem>
-                <SelectItem value="HIV Test">HIV Test</SelectItem>
-                <SelectItem value="Tuberculosis Test">Tuberculosis Test</SelectItem>
+                {
+                  medicalTests.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
 
@@ -197,11 +201,11 @@ const LabTestList: React.FC<LabTestListProps> = ({ onView, onEdit, onDelete, ref
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Results</SelectItem>
-                <SelectItem value="Normal">Normal</SelectItem>
-                <SelectItem value="Abnormal">Abnormal</SelectItem>
-                <SelectItem value="Positive">Positive</SelectItem>
-                <SelectItem value="Negative">Negative</SelectItem>
-                <SelectItem value="Pending">Pending</SelectItem>
+                {
+                  testResults.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>

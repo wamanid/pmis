@@ -56,9 +56,6 @@ const ExamResultScreen: React.FC<ChildProps> = ({ caseBooks, setCaseBooks, loadi
 
   async function fetchData() {
     try {
-      if (!caseBooks.length) {
-        await getCasebookList(setCaseBooks)
-      }
       await getExamsList(setExams)
       await getExaminationResultsList(setExaminationResults)
     } catch (error) {
@@ -110,7 +107,7 @@ const ExamResultScreen: React.FC<ChildProps> = ({ caseBooks, setCaseBooks, loadi
   };
 
   const handleSubmit = async (data: Result) => {
-     try {
+    try {
       let response
       if (selectedRecord) {
         response = await updateResult(data, selectedRecord.id)

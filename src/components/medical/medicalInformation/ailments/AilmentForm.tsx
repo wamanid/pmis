@@ -7,40 +7,56 @@ import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Stethoscope, Save, X, Upload } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {CaseBook, MedicalRecord} from "../../../../services/medical/medicalInformation/medical";
+import {
+  getCasebookList,
+  getMedicalRecordsList,
+  getRegimentList
+} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {handleCatchError} from "../../../../services/stationServices/utils";
 
-interface Ailment {
+export interface AilmentForm {
   id?: string;
   prisoner_name?: string;
   ailment_name?: string;
   regiment_name?: string;
   remarks: string;
   supporting_document: string;
+  document: File | null
   prisoner_medical_record: string;
   ailment: string;
   regiment: string;
 }
 
 interface AilmentFormProps {
-  ailment?: Ailment | null;
-  onSubmit: (ailment: Ailment) => void;
+  ailment?: AilmentForm | null;
+  onSubmit: (ailment: AilmentForm) => void;
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
+  regiments: Unit[];
+  diseases: Unit[];
+  medicalRecords: MedicalRecord[]
+  setMedicalRecords: React.Dispatch<React.SetStateAction<MedicalRecord[]>>
+  loader: Boolean
+  setLoader: React.Dispatch<React.SetStateAction<Boolean>>;
 }
 
-const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, mode }) => {
-  const [formData, setFormData] = useState<Ailment>({
+const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, mode, loader, setLoader, setMedicalRecords, medicalRecords, regiments, diseases }) => {
+  const [formData, setFormData] = useState<AilmentForm>({
     remarks: '',
     supporting_document: '',
     prisoner_medical_record: '',
+    document: null,
     ailment: '',
     regiment: '',
   });
 
-  const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
-  const [ailments, setAilments] = useState<any[]>([]);
-  const [regiments, setRegiments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  // const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
+  // const [ailments, setAilments] = useState<any[]>([]);
+  // const [regiments, setRegiments] = useState<any[]>([]);
+  // const [loader, setLoader] = useState(false);
+  const [dataLoaded, setDataLoaded] = useState(true);
 
   useEffect(() => {
     loadDropdownData();
@@ -52,39 +68,58 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
     }
   }, [ailment, dataLoaded]);
 
-  const loadDropdownData = () => {
-    setMedicalRecords([
-      { id: '1', prisoner_name: 'John Doe', prisoner_number: 'PR-2024-001' },
-      { id: '2', prisoner_name: 'Jane Smith', prisoner_number: 'PR-2024-002' },
-      { id: '3', prisoner_name: 'Michael Johnson', prisoner_number: 'PR-2024-003' },
-    ]);
+  const loadDropdownData = async () => {
+     try {
+      let medicalRecordOk = true
 
-    setAilments([
-      { id: '1', name: 'Hypertension', description: 'High blood pressure' },
-      { id: '2', name: 'Diabetes Type 2', description: 'Blood sugar disorder' },
-      { id: '3', name: 'Asthma', description: 'Respiratory condition' },
-      { id: '4', name: 'Arthritis', description: 'Joint inflammation' },
-      { id: '5', name: 'Migraine', description: 'Severe headaches' },
-    ]);
+      if (!medicalRecords.length) {
+        medicalRecordOk = await getMedicalRecordsList(setMedicalRecords)
+      }
 
-    setRegiments([
-      { id: '1', name: 'Daily Medication', description: 'Take medication once daily' },
-      { id: '2', name: 'Twice Daily', description: 'Take medication twice daily' },
-      { id: '3', name: 'As Needed', description: 'Take when symptoms appear' },
-      { id: '4', name: 'Weekly Treatment', description: 'Treatment once per week' },
-    ]);
+      if (medicalRecordOk) {
+        setDataLoaded(false)
+      }
+      else {
+        toast.error("Please make sure you have medical records")
+        onCancel()
+      }
 
-    setDataLoaded(true);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    // setMedicalRecords([
+    //   { id: '1', prisoner_name: 'John Doe', prisoner_number: 'PR-2024-001' },
+    //   { id: '2', prisoner_name: 'Jane Smith', prisoner_number: 'PR-2024-002' },
+    //   { id: '3', prisoner_name: 'Michael Johnson', prisoner_number: 'PR-2024-003' },
+    // ]);
+    //
+    // setAilments([
+    //   { id: '1', name: 'Hypertension', description: 'High blood pressure' },
+    //   { id: '2', name: 'Diabetes Type 2', description: 'Blood sugar disorder' },
+    //   { id: '3', name: 'Asthma', description: 'Respiratory condition' },
+    //   { id: '4', name: 'Arthritis', description: 'Joint inflammation' },
+    //   { id: '5', name: 'Migraine', description: 'Severe headaches' },
+    // ]);
+    //
+    // setRegiments([
+    //   { id: '1', name: 'Daily Medication', description: 'Take medication once daily' },
+    //   { id: '2', name: 'Twice Daily', description: 'Take medication twice daily' },
+    //   { id: '3', name: 'As Needed', description: 'Take when symptoms appear' },
+    //   { id: '4', name: 'Weekly Treatment', description: 'Treatment once per week' },
+    // ]);
+    //
+    // setDataLoaded(true);
   };
 
-  const handleInputChange = (field: keyof Ailment, value: any) => {
+  const handleInputChange = (field: keyof AilmentForm, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, supporting_document: file.name }));
+      setFormData((prev) => ({ ...prev, supporting_document: file.name, document: file }));
       toast.success('Document uploaded successfully');
     }
   };
@@ -104,37 +139,43 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
       toast.error('Please select a treatment regiment');
       return;
     }
+     if (!formData.remarks) {
+      toast.error('Please provide remarks');
+      return;
+    }
 
-    setLoading(true);
+    setLoader(true);
+    onSubmit(formData);
 
-    setTimeout(() => {
-      const selectedRecord = medicalRecords.find((r) => r.id === formData.prisoner_medical_record);
-      const selectedAilment = ailments.find((a) => a.id === formData.ailment);
-      const selectedRegiment = regiments.find((r) => r.id === formData.regiment);
-
-      const submitData: Ailment = {
-        ...formData,
-        prisoner_name: selectedRecord?.prisoner_name || '',
-        ailment_name: selectedAilment?.name || '',
-        regiment_name: selectedRegiment?.name || '',
-      };
-
-      onSubmit(submitData);
-      setLoading(false);
-
-      if (mode === 'create') {
-        toast.success('Ailment record created successfully');
-        setFormData({
-          remarks: '',
-          supporting_document: '',
-          prisoner_medical_record: '',
-          ailment: '',
-          regiment: '',
-        });
-      } else {
-        toast.success('Ailment record updated successfully');
-      }
-    }, 500);
+    // setTimeout(() => {
+    //   const selectedRecord = medicalRecords.find((r) => r.id === formData.prisoner_medical_record);
+    //   const selectedAilment = ailments.find((a) => a.id === formData.ailment);
+    //   const selectedRegiment = regiments.find((r) => r.id === formData.regiment);
+    //
+    //   const submitData: Ailment = {
+    //     ...formData,
+    //     prisoner_name: selectedRecord?.prisoner_name || '',
+    //     ailment_name: selectedAilment?.name || '',
+    //     regiment_name: selectedRegiment?.name || '',
+    //   };
+    //
+    //   onSubmit(submitData);
+    //   setLoader(false);
+    //
+    //   if (mode === 'create') {
+    //     toast.success('Ailment record created successfully');
+    //     setFormData({
+    //       remarks: '',
+    //       supporting_document: '',
+    //       document: null,
+    //       prisoner_medical_record: '',
+    //       ailment: '',
+    //       regiment: '',
+    //     });
+    //   } else {
+    //     toast.success('Ailment record updated successfully');
+    //   }
+    // }, 500);
   };
 
   const isReadOnly = mode === 'view';
@@ -171,7 +212,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                   <SelectContent>
                     {medicalRecords.map((record) => (
                       <SelectItem key={record.id} value={record.id}>
-                        {record.prisoner_number} - {record.prisoner_name}
+                        {record.prisoner_number_value} - {record.prisoner_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -198,7 +239,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                     <SelectValue placeholder="Select ailment" />
                   </SelectTrigger>
                   <SelectContent>
-                    {ailments.map((ailment) => (
+                    {diseases.map((ailment) => (
                       <SelectItem key={ailment.id} value={ailment.id}>
                         {ailment.name}
                       </SelectItem>
@@ -237,7 +278,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
             </h3>
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="remarks">Remarks</Label>
+                <Label htmlFor="remarks">Remarks <span className="text-red-500">*</span></Label>
                 <Textarea
                   id="remarks"
                   value={formData.remarks}
@@ -279,7 +320,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
 
           {!isReadOnly && (
             <div className="flex items-center justify-end gap-3 pt-4 border-t">
-              <Button type="button" variant="outline" onClick={onCancel} disabled={loading}>
+              <Button type="button" variant="outline" onClick={onCancel} disabled={loader}>
                 <X className="h-4 w-4 mr-2" />
                 Cancel
               </Button>
@@ -287,10 +328,10 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                 type="submit"
                 style={{ backgroundColor: '#650000' }}
                 className="text-white hover:opacity-90"
-                disabled={loading}
+                disabled={loader}
               >
                 <Save className="h-4 w-4 mr-2" />
-                {loading ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
+                {loader ? 'Saving...' : mode === 'create' ? 'Create Record' : 'Update Record'}
               </Button>
             </div>
           )}
