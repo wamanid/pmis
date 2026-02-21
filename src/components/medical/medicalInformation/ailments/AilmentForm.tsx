@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
@@ -6,7 +7,8 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Stethoscope, Save, X, Upload } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {CaseBook, MedicalRecord} from "../../../../services/medical/medicalInformation/medical";
 import {
@@ -43,19 +45,17 @@ interface AilmentFormProps {
 }
 
 const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, mode, loader, setLoader, setMedicalRecords, medicalRecords, regiments, diseases }) => {
-  const [formData, setFormData] = useState<AilmentForm>({
-    remarks: '',
-    supporting_document: '',
-    prisoner_medical_record: '',
-    document: null,
-    ailment: '',
-    regiment: '',
+  const { control, handleSubmit: handleRHFSumbit, setValue, watch, formState: { errors } } = useForm<AilmentForm>({
+    defaultValues: {
+      remarks: '',
+      supporting_document: '',
+      prisoner_medical_record: '',
+      document: null,
+      ailment: '',
+      regiment: '',
+    }
   });
 
-  // const [medicalRecords, setMedicalRecords] = useState<any[]>([]);
-  // const [ailments, setAilments] = useState<any[]>([]);
-  // const [regiments, setRegiments] = useState<any[]>([]);
-  // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
 
   useEffect(() => {
@@ -64,9 +64,11 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
 
   useEffect(() => {
     if (ailment && dataLoaded) {
-      setFormData(ailment);
+      Object.keys(ailment).forEach(key => {
+        setValue(key as keyof AilmentForm, ailment[key as keyof AilmentForm]);
+      });
     }
-  }, [ailment, dataLoaded]);
+  }, [ailment, dataLoaded, setValue]);
 
   const loadDropdownData = async () => {
      try {
@@ -88,99 +90,24 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
     catch (error) {
       handleCatchError(error)
     }
-    // setMedicalRecords([
-    //   { id: '1', prisoner_name: 'John Doe', prisoner_number: 'PR-2024-001' },
-    //   { id: '2', prisoner_name: 'Jane Smith', prisoner_number: 'PR-2024-002' },
-    //   { id: '3', prisoner_name: 'Michael Johnson', prisoner_number: 'PR-2024-003' },
-    // ]);
-    //
-    // setAilments([
-    //   { id: '1', name: 'Hypertension', description: 'High blood pressure' },
-    //   { id: '2', name: 'Diabetes Type 2', description: 'Blood sugar disorder' },
-    //   { id: '3', name: 'Asthma', description: 'Respiratory condition' },
-    //   { id: '4', name: 'Arthritis', description: 'Joint inflammation' },
-    //   { id: '5', name: 'Migraine', description: 'Severe headaches' },
-    // ]);
-    //
-    // setRegiments([
-    //   { id: '1', name: 'Daily Medication', description: 'Take medication once daily' },
-    //   { id: '2', name: 'Twice Daily', description: 'Take medication twice daily' },
-    //   { id: '3', name: 'As Needed', description: 'Take when symptoms appear' },
-    //   { id: '4', name: 'Weekly Treatment', description: 'Treatment once per week' },
-    // ]);
-    //
-    // setDataLoaded(true);
-  };
-
-  const handleInputChange = (field: keyof AilmentForm, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, supporting_document: file.name, document: file }));
+      setValue('supporting_document', file.name);
+      setValue('document', file);
       toast.success('Document uploaded successfully');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate required fields
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.prisoner_medical_record) {
-      newErrors.prisoner_medical_record = 'Medical Record is required';
-    }
-    if (!formData.ailment) {
-      newErrors.ailment = 'Ailment is required';
-    }
-    if (!formData.regiment) {
-      newErrors.regiment = 'Treatment Regiment is required';
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-     if (!formData.remarks) {
+  const onFormSubmit = (data: AilmentForm) => {
+    if (!data.remarks) {
       toast.error('Please provide remarks');
       return;
     }
-
     setLoader(true);
-    onSubmit(formData);
-
-    // setTimeout(() => {
-    //   const selectedRecord = medicalRecords.find((r) => r.id === formData.prisoner_medical_record);
-    //   const selectedAilment = ailments.find((a) => a.id === formData.ailment);
-    //   const selectedRegiment = regiments.find((r) => r.id === formData.regiment);
-    //
-    //   const submitData: Ailment = {
-    //     ...formData,
-    //     prisoner_name: selectedRecord?.prisoner_name || '',
-    //     ailment_name: selectedAilment?.name || '',
-    //     regiment_name: selectedRegiment?.name || '',
-    //   };
-    //
-    //   onSubmit(submitData);
-    //   setLoader(false);
-    //
-    //   if (mode === 'create') {
-    //     toast.success('Ailment record created successfully');
-    //     setFormData({
-    //       remarks: '',
-    //       supporting_document: '',
-    //       document: null,
-    //       prisoner_medical_record: '',
-    //       ailment: '',
-    //       regiment: '',
-    //     });
-    //   } else {
-    //     toast.success('Ailment record updated successfully');
-    //   }
-    // }, 500);
+    onSubmit(data);
   };
 
   const isReadOnly = mode === 'view';
@@ -196,7 +123,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleRHFSumbit(onFormSubmit)} className="space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Prisoner Medical Record
@@ -206,24 +133,31 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                 <Label htmlFor="prisoner_medical_record">
                   Medical Record <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.prisoner_medical_record}
-                  onValueChange={(value) => handleInputChange('prisoner_medical_record', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="prisoner_medical_record">
-                    <SelectValue placeholder="Select medical record" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {medicalRecords.map((record) => (
-                      <SelectItem key={record.id} value={record.id}>
-                        {record.prisoner_number_value} - {record.prisoner_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="prisoner_medical_record"
+                  control={control}
+                  rules={requiredValidation("Medical Record")}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger id="prisoner_medical_record">
+                        <SelectValue placeholder="Select medical record" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {medicalRecords.map((record) => (
+                          <SelectItem key={record.id} value={record.id}>
+                            {record.prisoner_number_value} - {record.prisoner_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.prisoner_medical_record && !isReadOnly && (
-                  <p className="text-sm text-red-600">{errors.prisoner_medical_record}</p>
+                  <p className="text-sm text-red-600">{errors.prisoner_medical_record.message}</p>
                 )}
               </div>
             </div>
@@ -238,24 +172,31 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                 <Label htmlFor="ailment">
                   Ailment/Disease <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.ailment}
-                  onValueChange={(value) => handleInputChange('ailment', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="ailment">
-                    <SelectValue placeholder="Select ailment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {diseases.map((ailment) => (
-                      <SelectItem key={ailment.id} value={ailment.id}>
-                        {ailment.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="ailment"
+                  control={control}
+                  rules={requiredValidation("Ailment")}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger id="ailment">
+                        <SelectValue placeholder="Select ailment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {diseases.map((ailment) => (
+                          <SelectItem key={ailment.id} value={ailment.id}>
+                            {ailment.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.ailment && !isReadOnly && (
-                  <p className="text-sm text-red-600">{errors.ailment}</p>
+                  <p className="text-sm text-red-600">{errors.ailment.message}</p>
                 )}
               </div>
 
@@ -263,24 +204,31 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                 <Label htmlFor="regiment">
                   Treatment Regiment <span className="text-red-500">*</span>
                 </Label>
-                <Select
-                  value={formData.regiment}
-                  onValueChange={(value) => handleInputChange('regiment', value)}
-                  disabled={isReadOnly}
-                >
-                  <SelectTrigger id="regiment">
-                    <SelectValue placeholder="Select regiment" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {regiments.map((regiment) => (
-                      <SelectItem key={regiment.id} value={regiment.id}>
-                        {regiment.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Controller
+                  name="regiment"
+                  control={control}
+                  rules={requiredValidation("Treatment Regiment")}
+                  render={({ field }) => (
+                    <Select
+                      value={field.value}
+                      onValueChange={field.onChange}
+                      disabled={isReadOnly}
+                    >
+                      <SelectTrigger id="regiment">
+                        <SelectValue placeholder="Select regiment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {regiments.map((regiment) => (
+                          <SelectItem key={regiment.id} value={regiment.id}>
+                            {regiment.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                />
                 {errors.regiment && !isReadOnly && (
-                  <p className="text-sm text-red-600">{errors.regiment}</p>
+                  <p className="text-sm text-red-600">{errors.regiment.message}</p>
                 )}
               </div>
             </div>
@@ -293,14 +241,24 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
             <div className="grid grid-cols-1 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="remarks">Remarks <span className="text-red-500">*</span></Label>
-                <Textarea
-                  id="remarks"
-                  value={formData.remarks}
-                  onChange={(e) => handleInputChange('remarks', e.target.value)}
-                  placeholder="Enter any additional remarks..."
-                  rows={4}
-                  disabled={isReadOnly}
+                <Controller
+                  name="remarks"
+                  control={control}
+                  rules={requiredValidation("Remarks")}
+                  render={({ field }) => (
+                    <Textarea
+                      id="remarks"
+                      value={field.value}
+                      onChange={field.onChange}
+                      placeholder="Enter any additional remarks..."
+                      rows={4}
+                      disabled={isReadOnly}
+                    />
+                  )}
                 />
+                {errors.remarks && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.remarks.message}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -308,7 +266,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                 {isReadOnly ? (
                   <Input
                     id="supporting_document"
-                    value={formData.supporting_document}
+                    value={watch('supporting_document')}
                     disabled
                     placeholder="No document uploaded"
                   />
@@ -323,9 +281,9 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
                     <Upload className="h-4 w-4 text-gray-400" />
                   </div>
                 )}
-                {formData.supporting_document && (
+                {watch('supporting_document') && (
                   <p className="text-sm text-gray-600">
-                    Current file: {formData.supporting_document}
+                    Current file: {watch('supporting_document')}
                   </p>
                 )}
               </div>

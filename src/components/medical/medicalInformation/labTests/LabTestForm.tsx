@@ -1,4 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
+import { useForm, Controller } from 'react-hook-form';
 import { Card, CardContent, CardHeader, CardTitle } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Input } from '../../../ui/input';
@@ -6,7 +7,8 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { FlaskConical, Save, X, Upload } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import {CaseBook} from "../../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 import {getCasebookList} from "../../../../services/medical/medicalInformation/medicalGetApis";
@@ -41,19 +43,17 @@ interface LabTestFormProps {
 
 const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, mode, setNewDialogLoader, setLoader,
                                                    setCaseBooks, caseBooks, testResults, medicalTests, loader }) => {
-  const [formData, setFormData] = useState<Test>({
-    notes: '',
-    result_document: '',
-    document: null,
-    medical_case_book: '',
-    medical_test: '',
-    result: '',
+  const { control, handleSubmit: handleRHFSumbit, setValue, watch, formState: { errors } } = useForm<Test>({
+    defaultValues: {
+      notes: '',
+      result_document: '',
+      document: null,
+      medical_case_book: '',
+      medical_test: '',
+      result: '',
+    }
   });
 
-  // const [caseBooks, setCaseBooks] = useState<any[]>([]);
-  // const [medicalTests, setMedicalTests] = useState<any[]>([]);
-  // const [testResults, setTestResults] = useState<any[]>([]);
-  // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
 
   useEffect(() => {
@@ -62,9 +62,11 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
 
   useEffect(() => {
     if (labTest && dataLoaded) {
-      setFormData(labTest);
+      Object.keys(labTest).forEach(key => {
+        setValue(key as keyof Test, labTest[key as keyof Test]);
+      });
     }
-  }, [labTest, dataLoaded]);
+  }, [labTest, dataLoaded, setValue]);
 
   const loadDropdownData = async () => {
     try {
@@ -86,99 +88,24 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
     catch (error) {
       handleCatchError(error)
     }
-    // setCaseBooks([
-    //   { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },
-    //   { id: '2', prisoner_name: 'Jane Smith', case_number: 'CB-2024-002' },
-    //   { id: '3', prisoner_name: 'Michael Johnson', case_number: 'CB-2024-003' },
-    // ]);
-    //
-    // setMedicalTests([
-    //   { id: '1', name: 'Complete Blood Count', category: 'Hematology' },
-    //   { id: '2', name: 'Liver Function Test', category: 'Biochemistry' },
-    //   { id: '3', name: 'Kidney Function Test', category: 'Biochemistry' },
-    //   { id: '4', name: 'HIV Test', category: 'Serology' },
-    //   { id: '5', name: 'Tuberculosis Test', category: 'Microbiology' },
-    // ]);
-    //
-    // setTestResults([
-    //   { id: '1', name: 'Normal', description: 'Within normal range' },
-    //   { id: '2', name: 'Abnormal', description: 'Outside normal range' },
-    //   { id: '3', name: 'Positive', description: 'Test positive' },
-    //   { id: '4', name: 'Negative', description: 'Test negative' },
-    //   { id: '5', name: 'Pending', description: 'Results pending' },
-    // ]);
-    //
-    // setDataLoaded(true);
-  };
-
-  const handleInputChange = (field: keyof LabTest, value: any) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setFormData((prev) => ({ ...prev, result_document: file.name, document: file }));
+      setValue('result_document', file.name);
+      setValue('document', file);
       toast.success('Document uploaded successfully');
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-
-    // Validate required fields
-    const newErrors: Record<string, string> = {};
-    
-    if (!formData.medical_case_book) {
-      newErrors.medical_case_book = 'Case Book is required';
-    }
-    if (!formData.medical_test) {
-      newErrors.medical_test = 'Medical Test is required';
-    }
-    if (!formData.result) {
-      newErrors.result = 'Test Result is required';
-    }
-
-    if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors);
-      return;
-    }
-    if (!formData.notes) {
+  const onFormSubmit = (data: Test) => {
+    if (!data.notes) {
       toast.error('Please provide the notes');
       return;
     }
-
     setLoader(true);
-    onSubmit(formData)
-
-    // setTimeout(() => {
-    //   const selectedCaseBook = caseBooks.find((cb) => cb.id === formData.medical_case_book);
-    //   const selectedTest = medicalTests.find((t) => t.id === formData.medical_test);
-    //   const selectedResult = testResults.find((r) => r.id === formData.result);
-    //
-    //   const submitData: LabTest = {
-    //     ...formData,
-    //     prisoner_name: selectedCaseBook?.prisoner_name || '',
-    //     test_name: selectedTest?.name || '',
-    //     result_name: selectedResult?.name || '',
-    //   };
-    //
-    //   onSubmit(submitData);
-    //   setLoader(false);
-    //
-    //   if (mode === 'create') {
-    //     toast.success('Lab test created successfully');
-    //     setFormData({
-    //       notes: '',
-    //       result_document: '',
-    //       medical_case_book: '',
-    //       medical_test: '',
-    //       result: '',
-    //     });
-    //   } else {
-    //     toast.success('Lab test updated successfully');
-    //   }
-    // }, 500);
+    onSubmit(data)
   };
 
   const isReadOnly = mode === 'view';
@@ -205,7 +132,7 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                 </div>
               </div>
           ) : (
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form onSubmit={handleRHFSumbit(onFormSubmit)} className="space-y-6">
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
                     Case Book Information
@@ -215,22 +142,32 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                       <Label htmlFor="medical_case_book">
                         Medical Case Book <span className="text-red-500">*</span>
                       </Label>
-                      <Select
-                        value={formData.medical_case_book}
-                        onValueChange={(value) => handleInputChange('medical_case_book', value)}
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger id="medical_case_book">
-                          <SelectValue placeholder="Select case book" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {caseBooks.map((cb) => (
-                            <SelectItem key={cb.id} value={cb.id}>
-                              {cb.check_type_name} - {cb.prisoner_name} - Doctor: {cb.doctors_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Controller
+                        name="medical_case_book"
+                        control={control}
+                        rules={requiredValidation("Case Book")}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger id="medical_case_book">
+                              <SelectValue placeholder="Select case book" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {caseBooks.map((cb) => (
+                                <SelectItem key={cb.id} value={cb.id}>
+                                  {cb.check_type_name} - {cb.prisoner_name} - Doctor: {cb.doctors_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.medical_case_book && !isReadOnly && (
+                        <p className="text-sm text-red-600">{errors.medical_case_book.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -244,45 +181,65 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                       <Label htmlFor="medical_test">
                         Medical Test <span className="text-red-500">*</span>
                       </Label>
-                      <Select
-                        value={formData.medical_test}
-                        onValueChange={(value) => handleInputChange('medical_test', value)}
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger id="medical_test">
-                          <SelectValue placeholder="Select test" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {medicalTests.map((test) => (
-                            <SelectItem key={test.id} value={test.id}>
-                              {/*{test.name} ({test.category})*/}
-                              {test.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Controller
+                        name="medical_test"
+                        control={control}
+                        rules={requiredValidation("Medical Test")}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger id="medical_test">
+                              <SelectValue placeholder="Select test" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {medicalTests.map((test) => (
+                                <SelectItem key={test.id} value={test.id}>
+                                  {/*{test.name} ({test.category})*/}
+                                  {test.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.medical_test && !isReadOnly && (
+                        <p className="text-sm text-red-600">{errors.medical_test.message}</p>
+                      )}
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="result">
                         Test Result <span className="text-red-500">*</span>
                       </Label>
-                      <Select
-                        value={formData.result}
-                        onValueChange={(value) => handleInputChange('result', value)}
-                        disabled={isReadOnly}
-                      >
-                        <SelectTrigger id="result">
-                          <SelectValue placeholder="Select result" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {testResults.map((result) => (
-                            <SelectItem key={result.id} value={result.id}>
-                              {result.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                      <Controller
+                        name="result"
+                        control={control}
+                        rules={requiredValidation("Test Result")}
+                        render={({ field }) => (
+                          <Select
+                            value={field.value}
+                            onValueChange={field.onChange}
+                            disabled={isReadOnly}
+                          >
+                            <SelectTrigger id="result">
+                              <SelectValue placeholder="Select result" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {testResults.map((result) => (
+                                <SelectItem key={result.id} value={result.id}>
+                                  {result.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        )}
+                      />
+                      {errors.result && !isReadOnly && (
+                        <p className="text-sm text-red-600">{errors.result.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -295,7 +252,7 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                     <div className="space-y-2">
                       <Label htmlFor="result_document">Result Document</Label>
                       {isReadOnly ? (
-                        <Input value={formData.result_document} disabled placeholder="No document uploaded" />
+                        <Input value={watch('result_document')} disabled placeholder="No document uploaded" />
                       ) : (
                         <div className="flex items-center gap-2">
                           <Input
@@ -307,21 +264,31 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
                           <Upload className="h-4 w-4 text-gray-400" />
                         </div>
                       )}
-                      {formData.result_document && (
-                        <p className="text-sm text-gray-600">Current file: {formData.result_document}</p>
+                      {watch('result_document') && (
+                        <p className="text-sm text-gray-600">Current file: {watch('result_document')}</p>
                       )}
                     </div>
 
                     <div className="space-y-2">
                       <Label htmlFor="notes">Notes <span className="text-red-500">*</span></Label>
-                      <Textarea
-                        id="notes"
-                        value={formData.notes}
-                        onChange={(e) => handleInputChange('notes', e.target.value)}
-                        placeholder="Enter test notes and observations..."
-                        rows={4}
-                        disabled={isReadOnly}
+                      <Controller
+                        name="notes"
+                        control={control}
+                        rules={requiredValidation("Notes")}
+                        render={({ field }) => (
+                          <Textarea
+                            id="notes"
+                            value={field.value}
+                            onChange={field.onChange}
+                            placeholder="Enter test notes and observations..."
+                            rows={4}
+                            disabled={isReadOnly}
+                          />
+                        )}
                       />
+                      {errors.notes && !isReadOnly && (
+                        <p className="text-sm text-red-600">{errors.notes.message}</p>
+                      )}
                     </div>
                   </div>
                 </div>
