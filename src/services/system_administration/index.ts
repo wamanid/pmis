@@ -62,3 +62,21 @@ export {
   patchIdType,
   deleteIdType
 } from './idTypeService';
+
+// Armed Force Service
+export {
+  fetchArmedForces,
+  getArmedForceById,
+  createArmedForce,
+  updateArmedForce,
+  deleteArmedForce
+} from './armedForceService';
+
+// Armed Force Status Service
+export {
+  fetchArmedForceStatuses,
+  getArmedForceStatusById,
+  createArmedForceStatus,
+  updateArmedForceStatus,
+  deleteArmedForceStatus
+} from './armedForceStatusService';
