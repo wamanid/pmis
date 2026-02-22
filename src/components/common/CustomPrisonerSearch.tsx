@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 import SearchableSelect from "./SearchableSelect";
 import { fetchPrisoners } from "../../services/customPrisonersService";
 import { useFilters } from "../../contexts/FilterContext";
@@ -32,8 +32,19 @@ export default function CustomPrisonerSearch({
 }: Props) {
   const { station: globalStation, district: globalDistrict, region: globalRegion } = useFilters();
 
+  // Use refs to capture current filter values without recreating callback
+  // This prevents API spam on every form keystroke
+  const filtersRef = useRef({ globalStation, globalDistrict, globalRegion, initialItems, pageSize });
+  
+  useEffect(() => {
+    filtersRef.current = { globalStation, globalDistrict, globalRegion, initialItems, pageSize };
+  }, [globalStation, globalDistrict, globalRegion, initialItems, pageSize]);
+
   // Paginated server fetch (14M+ ready). Uses SearchableSelect server mode.
+  // CRITICAL: Empty dependency array = stable reference = no re-fetches on form changes
   const fetchPrisonersPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    const { initialItems, pageSize, globalStation, globalDistrict, globalRegion } = filtersRef.current;
+    
     // Seed with initialItems on first empty search if provided
     if (!opts?.search && (opts?.page ?? 1) === 1 && (initialItems?.length ?? 0) > 0) {
       return { items: initialItems, count: initialItems.length, next: null };
@@ -55,7 +66,7 @@ export default function CustomPrisonerSearch({
       count: data?.count ?? items.length ?? 0,
       next: data?.next ?? null,
     };
-  }, [initialItems, pageSize, globalStation, globalDistrict, globalRegion]);
+  }, []); // Empty deps - function never recreates, always reads latest values from ref
 
   const renderItem = useCallback((p: Item) => {
     const id = String(p[idField]);

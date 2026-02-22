@@ -12,6 +12,7 @@ export interface DeathConfirmation {
   id?: string;
   prisoner_name?: string;
   prisoner_number?: string;
+  prisoner_number_value?: string;
   officer_in_charge_name?: string;
   medical_officer_name?: string;
   pathologist_attachment: string;
@@ -24,9 +25,9 @@ export interface DeathConfirmation {
   place_of_death: string;
   date_of_death: string;
   notes: string;
-  prisoner: string;
-  officer_in_charge: string;
-  medial_officer: string; // Note: API has typo "medial"
+  prisoner: string | null;
+  officer_in_charge: string | null;
+  medial_officer: string | null; // Note: API has typo "medial"
   created_datetime?: string;
   is_active?: boolean;
   updated_datetime?: string;

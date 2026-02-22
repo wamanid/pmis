@@ -19,6 +19,7 @@ export interface TransferRecommendation {
   id?: string;
   prisoner_name?: string;
   prisoner_number?: string;
+  prisoner_number_value?: string;
   reason_name?: string;
   station_name?: string;
   hospital_name?: string;

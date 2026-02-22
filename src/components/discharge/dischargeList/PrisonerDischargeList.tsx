@@ -334,8 +334,8 @@ export const PrisonerDischargeList: React.FC<ChildProps> = ({ loading, setLoadin
 
       setDischargeRecords([newDischarge, ...dischargeRecords]);
       toast.success('Discharge record created successfully');
-      // setIsFormOpen(false);
-      // setSelectedRecord(null);
+      setIsFormOpen(false);
+      setSelectedRecord(null);
     }
     catch (error){
       handleCatchError(error)

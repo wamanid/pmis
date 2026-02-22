@@ -5,6 +5,7 @@ import { Label } from '../../../ui/label';
 import { Textarea } from '../../../ui/textarea';
 import { Bed, Save, X } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
 import SearchableSelect from '../../../common/SearchableSelect';
 import {
@@ -35,6 +36,14 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   const [selectedPrisoner, setSelectedPrisoner] = useState<any>(null);
   const [selectedWard, setSelectedWard] = useState<Ward | null>(null);
   
+  // Initialize prisoner value immediately - CRITICAL for edit mode
+  const [localPrisonerValue, setLocalPrisonerValue] = useState<string | null>(() => {
+    if (initialData && mode !== 'create' && initialData.prisoner) {
+      return initialData.prisoner;
+    }
+    return null;
+  });
+  
   // Initialize ward value immediately - CRITICAL for edit mode
   const isWardInitialized = React.useRef(false);
   const [localWardValue, setLocalWardValue] = useState<string | null>(() => {
@@ -46,6 +55,10 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   });
   
   const [loading, setLoading] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  // Track if initial data has been loaded to prevent re-syncing on every change
+  const initialDataLoadedRef = React.useRef<string | boolean>(false);
 
   // Derive initialItem for ward dropdown - CRITICAL for edit mode
   const initialWardItem = React.useMemo(() => {
@@ -70,23 +83,25 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   }, [initialData, mode]);
 
   // Initialize form data on edit/view mode
+  // CRITICAL: Only sync FROM initialData, never reset user selections
   useEffect(() => {
     if (initialData && mode !== 'create') {
+      // Prevent re-syncing if we already loaded this record
+      const dataId = initialData.id || JSON.stringify(initialData);
+      if (initialDataLoadedRef.current === dataId) {
+        return; // Already loaded, skip
+      }
+      initialDataLoadedRef.current = dataId;
+
       setFormData({
         prisoner: initialData.prisoner,
         recommended_ward: initialData.recommended_ward,
         recommendation_notes: initialData.recommendation_notes || '',
       });
 
-      // Set local ward value only if not already initialized OR if value changed
-      const newWardId = initialData.recommended_ward || null;
-      if (newWardId && (!isWardInitialized.current || localWardValue !== newWardId)) {
-        setLocalWardValue(newWardId);
-        isWardInitialized.current = true;
-      }
-
-      // For edit/view mode, set initial values for display
+      // Set local prisoner value
       if (initialData.prisoner) {
+        setLocalPrisonerValue(initialData.prisoner);
         setSelectedPrisoner({
           id: initialData.prisoner,
           full_name: initialData.prisoner_name,
@@ -94,15 +109,33 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
         });
       }
 
-      if (initialData.recommended_ward && initialWardItem) {
-        setSelectedWard(initialWardItem);
+      // Set local ward value
+      if (initialData.recommended_ward) {
+        setLocalWardValue(initialData.recommended_ward);
+        isWardInitialized.current = true;
+        
+        if (initialWardItem) {
+          setSelectedWard(initialWardItem);
+        }
       }
     } else if (mode === 'create') {
-      // Reset on create mode
-      setLocalWardValue(null);
-      isWardInitialized.current = false;
+      // Only reset if switching TO create mode (not already in create mode)
+      if (initialDataLoadedRef.current !== false) {
+        initialDataLoadedRef.current = false;
+        setFormData({
+          prisoner: '',
+          recommended_ward: '',
+          recommendation_notes: '',
+        });
+        setLocalPrisonerValue(null);
+        setLocalWardValue(null);
+        setSelectedPrisoner(null);
+        setSelectedWard(null);
+        isWardInitialized.current = false;
+      }
     }
-  }, [initialData, mode, initialWardItem, localWardValue]);
+  }, [initialData, mode, initialWardItem]);
+  // CRITICAL: Do NOT include localPrisonerValue or localWardValue in dependencies!
 
   // Fetch wards callback for SearchableSelect
   const fetchWardsPaginated = useCallback(
@@ -113,7 +146,15 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
         const search = opts.search || '';
         const response = await fetchWards(page, pageSize, search, signal);
         return response;
-      } catch (error) {
+      } catch (error: any) {
+        // Silence cancellation errors
+        if (
+          error.name === 'CanceledError' ||
+          error.code === 'ERR_CANCELED' ||
+          error.name === 'AbortError'
+        ) {
+          return { items: [], count: 0, next: null };
+        }
         console.error('Failed to fetch wards:', error);
         return { items: [], count: 0, next: null };
       }
@@ -121,22 +162,23 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
     []
   );
 
-  const handlePrisonerSelect = (val: string | null) => {
+  const handlePrisonerSelect = useCallback((val: string | null) => {
+    setLocalPrisonerValue(val);
     setFormData((prev) => ({ ...prev, prisoner: val || '' }));
-  };
+  }, []);
 
-  const handlePrisonerItemSelect = (prisoner: any) => {
+  const handlePrisonerItemSelect = useCallback((prisoner: any) => {
     setSelectedPrisoner(prisoner);
-  };
+  }, []);
 
-  const handleWardSelect = (val: string | null) => {
+  const handleWardSelect = useCallback((val: string | null) => {
     setLocalWardValue(val);
     setFormData((prev) => ({ ...prev, recommended_ward: val || '' }));
-  };
+  }, []);
 
-  const handleWardItemSelect = (ward: Ward | null) => {
+  const handleWardItemSelect = useCallback((ward: Ward | null) => {
     setSelectedWard(ward);
-  };
+  }, []);
 
   const handleInputChange = (field: keyof WardRecommendation, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -145,14 +187,22 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
     if (!formData.recommended_ward) {
-      toast.error('Please select a recommended ward');
+      newErrors.recommended_ward = 'Recommended Ward is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -162,6 +212,7 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
         prisoner: formData.prisoner!,
         prisoner_name: selectedPrisoner?.full_name || initialData?.prisoner_name || '',
         prisoner_number: selectedPrisoner?.prisoner_number || initialData?.prisoner_number || '',
+        prisoner_number_value: selectedPrisoner?.prisoner_number_value || initialData?.prisoner_number_value || '',
         recommended_ward: formData.recommended_ward!,
         ward_name: selectedWard?.name || initialData?.ward_name || '',
         recommendation_notes: formData.recommendation_notes || '',
@@ -220,21 +271,26 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
                   <div className="p-2 bg-gray-50 rounded border text-sm">
                     {selectedPrisoner ? (
                       <>
-                        {selectedPrisoner.prisoner_number} - {selectedPrisoner.full_name}
+                        {selectedPrisoner.prisoner_number_value || selectedPrisoner.prisoner_number} - {selectedPrisoner.full_name}
                       </>
                     ) : (
                       'N/A'
                     )}
                   </div>
                 ) : (
-                  <CustomPrisonerSearch
-                    value={formData.prisoner || null}
-                    onChange={handlePrisonerSelect}
-                    onSelectItem={handlePrisonerItemSelect}
-                    disabled={loading}
-                    idField="id"
-                    labelField="full_name"
-                  />
+                  <>
+                    <CustomPrisonerSearch
+                      value={localPrisonerValue}
+                      onChange={handlePrisonerSelect}
+                      onSelectItem={handlePrisonerItemSelect}
+                      disabled={loading}
+                      idField="id"
+                      labelField="full_name"
+                    />
+                    {errors.prisoner && (
+                      <p className="text-sm text-red-600">{errors.prisoner}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -248,18 +304,23 @@ const WardRecommendationForm: React.FC<WardRecommendationFormProps> = ({
                     {selectedWard?.name || 'N/A'}
                   </div>
                 ) : (
-                  <SearchableSelect<Ward>
-                    key={`ward-${initialData?.id}-${mode}`}
-                    value={localWardValue}
-                    onChange={handleWardSelect}
-                    fetchPaginated={fetchWardsPaginated}
-                    labelField="name"
-                    idField="id"
-                    onSelectItem={handleWardItemSelect}
-                    initialItem={initialWardItem ?? undefined}
-                    placeholder="Select ward"
-                    disabled={loading}
-                  />
+                  <>
+                    <SearchableSelect<Ward>
+                      key={`ward-${initialData?.id}-${mode}`}
+                      value={localWardValue}
+                      onChange={handleWardSelect}
+                      fetchPaginated={fetchWardsPaginated}
+                      labelField="name"
+                      idField="id"
+                      onSelectItem={handleWardItemSelect}
+                      initialItem={initialWardItem ?? undefined}
+                      placeholder="Select ward"
+                      disabled={loading}
+                    />
+                    {errors.recommended_ward && (
+                      <p className="text-sm text-red-600">{errors.recommended_ward}</p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

@@ -267,9 +267,13 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       console.debug('loadTransactions request', baseParams(opts));
       const data = await txSvc.listTransactions(baseParams(opts));
       console.debug('loadTransactions response', data);
-      if (id !== reqId.current) return;
+      if (id !== reqId.current) {
+        console.warn('loadTransactions: stale request, ignoring response');
+        return;
+      }
       setTransactions(data.results ?? []);
       setTransactionsTotal(data.count ?? 0);
+      console.log('Transactions loaded:', data.results?.length, 'Total:', data.count);
     } catch (err:any) {
       console.debug('loadTransactions error', err);
       console.error('loadTransactions error', err);
@@ -290,17 +294,33 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     return () => { if (searchTimer.current) window.clearTimeout(searchTimer.current); };
   }, [searchTerm, transactionSearchTerm, activeTab, loadAccounts, loadTransactions]);
 
-  // reload when filters/paging change
-  useEffect(() => { loadAccounts(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadAccounts]);
-  useEffect(() => { loadTransactions(); }, [page, pageSize, globalStation, globalDistrict, globalRegion, loadTransactions]);
+  // Track if initial load is complete
+  const initialLoadComplete = React.useRef(false);
 
   // initial lookups and data load
   useEffect(() => { 
-    loadLookups();
-    // Load both accounts and transactions on mount since Accounts tab displays transaction statistics
-    loadAccounts();
-    loadTransactions();
-  }, [loadLookups, loadAccounts, loadTransactions]);
+    const initialLoad = async () => {
+      await loadLookups();
+      // Load both accounts and transactions on mount
+      await Promise.all([loadAccounts(), loadTransactions()]);
+      initialLoadComplete.current = true;
+      console.log('Initial load complete');
+    };
+    initialLoad();
+  }, []);
+
+  // reload when filters/paging change (only after initial load)
+  useEffect(() => {
+    if (initialLoadComplete.current) {
+      loadAccounts();
+    }
+  }, [page, pageSize, globalStation, globalDistrict, globalRegion]);
+  
+  useEffect(() => {
+    if (initialLoadComplete.current) {
+      loadTransactions();
+    }
+  }, [page, pageSize, globalStation, globalDistrict, globalRegion]);
 
   // register filter refresh to reload lists when global filters change via header UI
   useFilterRefresh(() => {
@@ -345,7 +365,26 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       setAccountFormErrors(errs);
       return;
     }
+    
+    // Check for duplicate account type for the same prisoner
+    const existingAccount = accounts.find(
+      acc => acc.prisoner === data.prisoner && acc.account_type === data.account_type
+    );
+    if (existingAccount) {
+      const accountTypeName = accountTypes.find(at => at.id === data.account_type)?.name || 'this type';
+      toast.error(`Prisoner already has an account of type "${accountTypeName}"`);
+      setAccountFormErrors({ account_type: `Account type already exists for this prisoner` });
+      return;
+    }
+    
     try {
+      console.log('Creating account with data:', {
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      
       await accountsSvc.createAccount({
         prisoner: data.prisoner,
         account_type: data.account_type,
@@ -410,7 +449,28 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       setAccountFormErrors(errs);
       return;
     }
+    
+    // Check for duplicate account type for the same prisoner (excluding current account)
+    const existingAccount = accounts.find(
+      acc => acc.prisoner === data.prisoner && 
+             acc.account_type === data.account_type && 
+             acc.id !== selectedAccount.id
+    );
+    if (existingAccount) {
+      const accountTypeName = accountTypes.find(at => at.id === data.account_type)?.name || 'this type';
+      toast.error(`Prisoner already has another account of type "${accountTypeName}"`);
+      setAccountFormErrors({ account_type: `Account type already exists for this prisoner` });
+      return;
+    }
+    
     try {
+      console.log('Updating account with data:', {
+        prisoner: data.prisoner,
+        account_type: data.account_type,
+        currency: data.currency,
+        balance: data.balance ?? '0',
+      });
+      
       const res = await accountsSvc.updateAccount(selectedAccount.id, {
         prisoner: data.prisoner,
         account_type: data.account_type,
@@ -906,18 +966,21 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       currency: accountFormData.currency ?? '',
       balance: accountFormData.balance ?? '0',
     });
-    // Sync prisoner, account_type and balance from parent when accountFormData changes (used when opening edit/view).
-    // Do not overwrite currency here (currency mapping effect handles id lookup).
+    // Sync all fields from parent when accountFormData changes (used when opening edit/view).
     useEffect(() => {
-      setLocal(prev => ({
-        prisoner: accountFormData.prisoner ?? prev.prisoner,
-        account_type: accountFormData.account_type ?? prev.account_type,
-        currency: prev.currency,
-        balance: accountFormData.balance ?? prev.balance,
-      }));
-    // only run when parent-provided values change
+      console.log('AccountForm syncing from parent accountFormData:', accountFormData);
+      setLocal(prev => {
+        const newLocal = {
+          prisoner: accountFormData.prisoner ?? prev.prisoner,
+          account_type: accountFormData.account_type ?? prev.account_type,
+          currency: accountFormData.currency ?? prev.currency,
+          balance: accountFormData.balance ?? prev.balance,
+        };
+        console.log('AccountForm local state updated to:', newLocal);
+        return newLocal;
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [accountFormData.prisoner, accountFormData.account_type, accountFormData.balance]);
+    }, [accountFormData.prisoner, accountFormData.account_type, accountFormData.currency, accountFormData.balance]);
 
     // Compute the Select value deterministically:
     // prefer local.currency (user edits). If empty, map accountFormData.currency (which may be code or id)
@@ -951,6 +1014,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
       const e: Record<string,string> = {};
       if (!String(local.prisoner || '').trim()) e.prisoner = 'Prisoner is required';
       if (!String(local.account_type || '').trim()) e.account_type = 'Account type is required';
+      if (!String(local.currency || '').trim()) e.currency = 'Currency is required';
       // balance must be numeric (allow negative and decimals). empty -> treat as 0
       if (!String(local.balance || '').trim() || !/^-?\d+(\.\d+)?$/.test(String(local.balance).trim())) e.balance = 'Balance must be a number';
       setErrors(e);
@@ -960,12 +1024,19 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
     const submit = (ev?: React.FormEvent) => {
       ev?.preventDefault();
       if (!validateLocal()) return;
-      onSubmit({
+      
+      const submitData = {
         prisoner: String(local.prisoner),
         account_type: String(local.account_type),
         currency: String(local.currency),
         balance: String(local.balance || '0'),
-      });
+      };
+      
+      console.log('AccountForm submitting data:', submitData);
+      console.log('Local state:', local);
+      console.log('Selected currency ID:', selectedCurrencyId);
+      
+      onSubmit(submitData);
     };
 
     return (
@@ -1004,7 +1075,10 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
           {/* Currency (searchable select) */}
           <div className="space-y-2">
             <Label htmlFor="currency">Currency <span className="text-red-500">*</span></Label>
-            <Select value={selectedCurrencyId} onValueChange={(v)=> setLocal(prev => ({ ...prev, currency: v }))} required>
+            <Select value={selectedCurrencyId} onValueChange={(v)=> {
+              console.log('Currency dropdown changed to:', v);
+              setLocal(prev => ({ ...prev, currency: v }));
+            }} required>
               <SelectTrigger><SelectValue placeholder="Select currency..." /></SelectTrigger>
               <SelectContent>
                 <div className="px-2 py-2">
@@ -1404,6 +1478,7 @@ const PrisonerPropertyAccountScreen: React.FC = () => {
                 url="/property-management/prisoner-accounts/"
                 title="Accounts"
                 columns={accountColumns}
+                searchPlaceholder="Search by prisoner name, number, account type, or currency..."
                 config={{
                   ...(accountsViewMode === 'grouped' ? {
                     grouping: {

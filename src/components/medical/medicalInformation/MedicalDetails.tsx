@@ -13,9 +13,10 @@ import AilmentScreen from './ailments/AilmentScreen';
 import DiagnosisScreen from './diagnosis/DiagnosisScreen';
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {
+  Ailment,
   BmiClassification,
   BmiRecord,
-  CaseBook,
+  CaseBook, Diagnosis, ExaminationResult, LabTest,
   MedicalRecord, Schedule
 } from "../../../services/medical/medicalInformation/medical";
 import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
@@ -25,6 +26,11 @@ export interface Loading {
   bmi: boolean,
   case: boolean,
   schedule: boolean,
+  exam: boolean,
+  diagnosis: boolean,
+  lab: boolean,
+  treatment: boolean,
+  ailments: boolean
 }
 
 export default function MedicalDetails() {
@@ -34,7 +40,7 @@ export default function MedicalDetails() {
   // API Integration
   const [prisoners, setPrisoners] = useState<PrisonerItem[]>([])
   const [loading, setLoading] = useState<Loading>({
-    record: true, bmi: true, case: true, schedule: true })
+    record: true, bmi: true, case: true, schedule: true, exam: true, diagnosis: true, ailments: true, lab: true, treatment: true })
   // BIM
   const [bmiRecords, setBmiRecords] = useState<BmiRecord[]>([]);
   const [classifications, setClassifications] = useState<BmiClassification[]>([])
@@ -47,6 +53,19 @@ export default function MedicalDetails() {
   const [presentations, setPresentations] = useState<Unit[]>([])
   // Schedules
   const [schedules, setSchedules] = useState<Schedule[]>([])
+  // Examination Results
+  const [exams, setExams] = useState<Unit[]>([])
+  const [examinationResults, setExaminationResults] = useState<ExaminationResult[]>([])
+  // Diagnosis
+  const [diagnosis, setDiagnosis] = useState<Diagnosis[]>([])
+  const [regiments, setRegiments] = useState<Unit[]>([])
+  const [diseases, setDiseases] = useState<Unit[]>([])
+  // lab tests
+  const [labTests, setLabTests] = useState<LabTest[]>([]);
+  const [medicalTests, setMedicalTests] = useState<Unit[]>([])
+  const [testResults, setTestResults] = useState<Unit[]>([])
+  // Ailments
+  const [ailments, setAilments] = useState<Ailment[]>([])
 
   const handlePrisonerChange = (prisonerId: string) => {
     setSelectedPrisonerId(prisonerId);
@@ -260,7 +279,18 @@ export default function MedicalDetails() {
 
           {activeTab === 'labtest' && (
             <div>
-              <LabTestScreen />
+              <LabTestScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  caseBooks={caseBooks}
+                  setCaseBooks={setCaseBooks}
+                  labTests={labTests}
+                  setLabTests={setLabTests}
+                  medicalTests={medicalTests}
+                  setMedicalTests={setMedicalTests}
+                  testResults={testResults}
+                  setTestResults={setTestResults}
+              />
             </div>
           )}
 
@@ -272,19 +302,50 @@ export default function MedicalDetails() {
 
           {activeTab === 'examresult' && (
             <div>
-              <ExamResultScreen />
+              <ExamResultScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  caseBooks={caseBooks}
+                  setCaseBooks={setCaseBooks}
+                  setExaminationResults={setExaminationResults}
+                  examinationResults={examinationResults}
+                  setExams={setExams}
+                  exams={exams}
+              />
             </div>
           )}
 
           {activeTab === 'ailment' && (
             <div>
-              <AilmentScreen />
+              <AilmentScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  regiments={regiments}
+                  setRegiments={setRegiments}
+                  diseases={diseases}
+                  setDiseases={setDiseases}
+                  medicalRecords={medicalRecords}
+                  setMedicalRecords={setMedicalRecords}
+                  ailments={ailments}
+                  setAilments={setAilments}
+              />
             </div>
           )}
 
           {activeTab === 'diagnosis' && (
             <div>
-              <DiagnosisScreen />
+              <DiagnosisScreen
+                  loading={loading}
+                  setLoading={setLoading}
+                  caseBooks={caseBooks}
+                  setCaseBooks={setCaseBooks}
+                  diagnosis={diagnosis}
+                  setDiagnosis={setDiagnosis}
+                  regiments={regiments}
+                  setRegiments={setRegiments}
+                  diseases={diseases}
+                  setDiseases={setDiseases}
+              />
             </div>
           )}
         </CardContent>

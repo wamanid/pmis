@@ -16,6 +16,7 @@ export interface WardRecommendation {
   id?: string;
   prisoner_name?: string;
   prisoner_number?: string;
+  prisoner_number_value?: string;
   ward_name?: string;
   recommendation_notes: string;
   prisoner: string;

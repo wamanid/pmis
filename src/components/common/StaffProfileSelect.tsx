@@ -1,4 +1,4 @@
-import React, { useCallback } from "react";
+import React, { useCallback, useRef, useEffect } from "react";
 import SearchableSelect from "./SearchableSelect";
 import * as StaffEntryService from "../../services/stationServices/staffEntryService";
 
@@ -38,11 +38,21 @@ export default function StaffProfileSelect({
     }
   }, [initialItem, value]);
 
+  // Use ref to capture current initialItems without recreating callback
+  const initialItemsRef = useRef(initialItems);
+  
+  useEffect(() => {
+    initialItemsRef.current = initialItems;
+  }, [initialItems]);
+
   // Paginated server fetch (14M+ ready). Uses SearchableSelect server mode.
+  // CRITICAL: Empty dependency array = stable reference = no re-fetches on form changes
   const fetchStaffPaginated = useCallback(async (opts: any, signal?: AbortSignal) => {
+    const currentInitialItems = initialItemsRef.current;
+    
     // If parent passed initialItems, return them for the first empty search to avoid extra round-trip
-    if (!opts?.search && (opts?.page ?? 1) === 1 && (initialItems?.length ?? 0) > 0) {
-      return { items: initialItems, count: initialItems.length, next: null };
+    if (!opts?.search && (opts?.page ?? 1) === 1 && (currentInitialItems?.length ?? 0) > 0) {
+      return { items: currentInitialItems, count: currentInitialItems.length, next: null };
     }
 
     const res = await StaffEntryService.fetchStaffProfiles({
@@ -58,7 +68,7 @@ export default function StaffProfileSelect({
       count: data?.count ?? items.length ?? 0,
       next: data?.next ?? null,
     };
-  }, [initialItems]);
+  }, []); // Empty deps - function never recreates
 
   const renderItem = useCallback((it: StaffProfile) => {
     const name = (it.first_name || it.last_name)

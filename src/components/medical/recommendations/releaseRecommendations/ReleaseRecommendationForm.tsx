@@ -9,6 +9,7 @@ import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { FileCheck, Save, X, CalendarIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import { format } from 'date-fns';
 import CustomPrisonerSearch from '../../../common/CustomPrisonerSearch';
 import { ReleaseRecommendation } from '../../../../services/medical/recommendations/releaseRecommendationService';
@@ -47,10 +48,6 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
     hospital_support: false,
     hospital_support_reason: '',
     recommendation_date: '',
-    approval_status: '',
-    approved_by: '',
-    approval_date: '',
-    approval_notes: '',
     recommendation_notes: '',
     prisoner: '',
   });
@@ -65,7 +62,7 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
   const [loading, setLoading] = useState(false);
   const [reportDateOpen, setReportDateOpen] = useState(false);
   const [recDateOpen, setRecDateOpen] = useState(false);
-  const [approvalDateOpen, setApprovalDateOpen] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (releaseRecommendation && (mode === 'edit' || mode === 'view')) {
@@ -97,10 +94,6 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
         hospital_support: false,
         hospital_support_reason: '',
         recommendation_date: '',
-        approval_status: '',
-        approved_by: '',
-        approval_date: '',
-        approval_notes: '',
         recommendation_notes: '',
         prisoner: '',
       });
@@ -115,14 +108,22 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.prisoner) {
-      toast.error('Please select a prisoner');
-      return;
+      newErrors.prisoner = 'Prisoner is required';
     }
     if (!formData.date_of_report) {
-      toast.error('Please select date of report');
+      newErrors.date_of_report = 'Date of Report is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoading(true);
 
@@ -161,21 +162,26 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 </Label>
                 {mode === 'edit' || mode === 'view' ? (
                   <Input
-                    value={`${releaseRecommendation?.prisoner_number || 'N/A'} - ${releaseRecommendation?.prisoner_name || 'N/A'}`}
+                    value={`${releaseRecommendation?.prisoner_number_value || releaseRecommendation?.prisoner_number || 'N/A'} - ${releaseRecommendation?.prisoner_name || 'N/A'}`}
                     disabled
                     readOnly
                     className="bg-muted"
                   />
                 ) : (
-                  <CustomPrisonerSearch
-                    value={localPrisonerId}
-                    onChange={(value) => {
-                      setLocalPrisonerId(value);
-                      handleInputChange('prisoner', value);
-                    }}
-                    placeholder="Search prisoner..."
-                    disabled={loading}
-                  />
+                  <>
+                    <CustomPrisonerSearch
+                      value={localPrisonerId}
+                      onChange={(value) => {
+                        setLocalPrisonerId(value);
+                        handleInputChange('prisoner', value);
+                      }}
+                      placeholder="Search prisoner..."
+                      disabled={loading}
+                    />
+                    {errors.prisoner && (
+                      <p className="text-sm text-red-600">{errors.prisoner}</p>
+                    )}
+                  </>
                 )}
               </div>
 
@@ -203,6 +209,9 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                     />
                   </PopoverContent>
                 </Popover>
+                {errors.date_of_report && !isReadOnly && (
+                  <p className="text-sm text-red-600">{errors.date_of_report}</p>
+                )}
               </div>
             </div>
           </div>
@@ -435,16 +444,6 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                   </PopoverContent>
                 </Popover>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="approval_status">Approval Status</Label>
-                <Input
-                  id="approval_status"
-                  value={formData.approval_status}
-                  onChange={(e) => handleInputChange('approval_status', e.target.value)}
-                  placeholder="Enter approval status"
-                  disabled={isReadOnly}
-                />
-              </div>
             </div>
             <div className="space-y-2">
               <Label htmlFor="recommendation_notes">Recommendation Notes</Label>
@@ -454,58 +453,6 @@ const ReleaseRecommendationForm: React.FC<ReleaseRecommendationFormProps> = ({
                 onChange={(e) => handleInputChange('recommendation_notes', e.target.value)}
                 placeholder="Enter recommendation notes..."
                 rows={4}
-                disabled={isReadOnly}
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
-              Approval Information
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="approved_by">Approved By</Label>
-                <Input
-                  id="approved_by"
-                  value={formData.approved_by}
-                  onChange={(e) => handleInputChange('approved_by', e.target.value)}
-                  placeholder="Enter approver name"
-                  disabled={isReadOnly}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="approval_date">Approval Date</Label>
-                <Popover open={approvalDateOpen} onOpenChange={setApprovalDateOpen}>
-                  <PopoverTrigger asChild>
-                    <Button variant="outline" className="w-full justify-start text-left" disabled={isReadOnly}>
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {formData.approval_date ? format(new Date(formData.approval_date), 'PPP') : 'Select date'}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0">
-                    <Calendar
-                      mode="single"
-                      selected={formData.approval_date ? new Date(formData.approval_date) : undefined}
-                      onSelect={(date: Date | undefined) => {
-                        if (date) {
-                          handleInputChange('approval_date', format(date, 'yyyy-MM-dd'));
-                          setApprovalDateOpen(false);
-                        }
-                      }}
-                    />
-                  </PopoverContent>
-                </Popover>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="approval_notes">Approval Notes</Label>
-              <Textarea
-                id="approval_notes"
-                value={formData.approval_notes}
-                onChange={(e) => handleInputChange('approval_notes', e.target.value)}
-                placeholder="Enter approval notes..."
-                rows={3}
                 disabled={isReadOnly}
               />
             </div>

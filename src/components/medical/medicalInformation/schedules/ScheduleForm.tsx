@@ -8,7 +8,8 @@ import { Switch } from '../../../ui/switch';
 import { Calendar } from '../../../ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
 import { CalendarClock, Save, X, CalendarIcon } from 'lucide-react';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { requiredValidation } from '../../../../utils/validation';
 import { format } from 'date-fns';
 import {CaseBook, NewSchedule} from "../../../../services/medical/medicalInformation/medical";
 import {
@@ -55,6 +56,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSubmit, onCance
   // const [loader, setLoader] = useState(false);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     loadDropdownData();
@@ -104,18 +106,25 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSubmit, onCance
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Validate required fields
+    const newErrors: Record<string, string> = {};
+    
     if (!formData.medical_case_book) {
-      toast.error('Please select a medical case book');
-      return;
+      newErrors.medical_case_book = 'Medical Case Book is required';
     }
     if (!formData.followup_date) {
-      toast.error('Please select follow-up date');
-      return;
+      newErrors.followup_date = 'Follow-up Date is required';
     }
     if (!formData.notes) {
-      toast.error('Please provide some notes');
+      newErrors.notes = 'Notes is required';
+    }
+
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
+
+    setErrors({});
 
     setLoader(true);
     onSubmit(formData);

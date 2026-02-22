@@ -11,6 +11,7 @@ export interface ReleaseRecommendation {
   id?: string;
   prisoner_name?: string;
   prisoner_number?: string;
+  prisoner_number_value?: string;
   created_datetime?: string;
   is_active?: boolean;
   updated_datetime?: string;

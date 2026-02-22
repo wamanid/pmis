@@ -3,10 +3,9 @@ import { Card, CardContent } from '../../ui/card';
 import { FileX } from 'lucide-react';
 import DeathConfirmationList from './deathConfirmation/DeathConfirmationList';
 import DeathNotificationList from './deathNotification/DeathNotificationList';
-import DeathRecipientList from './deathRecipient/DeathRecipientList';
 
 export default function DeathDetails() {
-  const [activeTab, setActiveTab] = useState<'confirmation' | 'notification' | 'recipient'>('confirmation');
+  const [activeTab, setActiveTab] = useState<'confirmation' | 'notification'>('confirmation');
 
   return (
     <div className="space-y-6">
@@ -47,19 +46,6 @@ export default function DeathDetails() {
             >
               Death Notification
             </button>
-            <button
-              onClick={() => setActiveTab('recipient')}
-              className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
-                activeTab === 'recipient'
-                  ? 'text-white'
-                  : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
-              }`}
-              style={{
-                backgroundColor: activeTab === 'recipient' ? '#650000' : undefined,
-              }}
-            >
-              Death Recipient
-            </button>
           </div>
 
           {/* Tab Content */}
@@ -72,12 +58,6 @@ export default function DeathDetails() {
           {activeTab === 'notification' && (
             <div>
               <DeathNotificationList />
-            </div>
-          )}
-
-          {activeTab === 'recipient' && (
-            <div>
-              <DeathRecipientList />
             </div>
           )}
         </CardContent>

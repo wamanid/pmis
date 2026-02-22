@@ -2,14 +2,117 @@
 
 ---
 **Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
-**Created**: February 6, 2026 | **Last Updated**: February 8, 2026
+**Created**: February 6, 2026 | **Last Updated**: February 17, 2026
 ---
 
 All notable changes to this project should be documented in this file.
 
-## [Unreleased]
+## [Unreleased] - 2026-02-17 
 
 ### Added
+- **Medical Module Forms - Inline Validation & Prisoner Number Formatting (February 16-17, 2026)**:
+  - Refactored all 12 medical module forms to use inline validation messages instead of toast notifications
+  - **Inline Validation Pattern**: Required field errors now display as red text directly below the input field
+    - Replaced toast.error() calls with inline error state management
+    - Added `errors` state to all forms: `const [errors, setErrors] = useState<Record<string, string>>({});`
+    - Validation logic moved to handleSubmit with error object creation
+    - Error display pattern: `{errors.field_name && <p className="text-sm text-red-600">{errors.field_name}</p>}`
+  - **Prisoner Number Formatting**: Updated all forms to display `prisoner_number_value` (e.g., "P2022000043") instead of UUID
+    - Pattern: `{prisoner?.prisoner_number_value || prisoner?.prisoner_number}` with fallback
+    - Applied to read-only displays, edit mode displays, and SearchableSelect transformations
+  - **Forms Refactored** (12 total):
+    - **Death Details**: DeathConfirmationForm, DeathNotificationForm
+    - **Recommendations**: WardRecommendationForm, TransferRecommendationForm, ReleaseRecommendationForm
+    - **Medical Information**: AilmentForm, LabTestForm, TreatmentForm, DiagnosisForm, CaseBookForm, ExamResultForm, ScheduleForm
+  - **DeathConfirmationForm Fixes**:
+    - Fixed update button to use PATCH method instead of PUT
+    - Implemented smart submission: JSON for updates without files, multipart/form-data for updates with files
+    - Added `prisoner_number_value` field to DeathConfirmation interface
+  - **DeathConfirmationList Fixes**:
+    - Updated delete modal to show `prisoner_number_value` instead of UUID
+    - Pattern: `{recordToDelete.prisoner_number_value || recordToDelete.prisoner_number}`
+  - **Import Fixes**: Corrected `import { toast } from 'sonner@2.0.3';` to `import { toast } from 'sonner';` in 6 forms
+  - **Files Modified**: 13 component files, 1 service file
+  - **Documentation**: Created comprehensive refactoring guides in ma_ignore folder
+
+- **Station Management - Manual Lockup & Staff Deployments UI Improvements (February 17, 2026)**:
+  - **Manual Lockup Edit Modal - Location Dropdown Fix**:
+    - Added `fetchManualLockupById()` service function to fetch complete record details by ID
+    - Updated `handleEdit()` to call API endpoint `/station-management/api/manual-lockups/{id}/` before opening modal
+    - Fixed location dropdown to populate with existing data using `eSetValue('location', r.location)`
+    - Changed location dropdown from hardcoded values to dynamic API-driven locations
+    - Location dropdown now uses `/system-administration/locations/` API with UUID values
+  - **Tab Styling Standardization**:
+    - Converted Manual Lockup Management tabs to match Visitation screen style
+    - Converted Staff Deployments tabs to match Visitation screen style
+    - Applied consistent dark red (#650000) background for active tabs
+    - TabsList styling: `className="grid w-full grid-cols-N h-12 bg-muted/50"`
+    - TabsTrigger styling: `className="text-base data-[state=active]:bg-[#650000] data-[state=active]:text-white data-[state=active]:shadow-sm"`
+  - **Files Modified**: ManualLockupScreen.tsx, StaffDeploymentScreen.tsx, manualLockupIntegration.ts
+
+- **Architectural Review & Security Roadmap Documentation (February 16, 2026)**:
+  - Conducted comprehensive architectural review of PMIS codebase
+  - Identified 7 major strengths: Modern tech stack, modular architecture, enterprise components, strong API integration, MFA auth, comprehensive docs, recent refactoring
+  - Identified critical security vulnerabilities: Tokens in localStorage (XSS risk), no CSP, missing security headers, no rate limiting, weak password validation
+  - Documented NIST 800-53, OWASP Top 10, and ISO 27001 compliance gaps
+  - Created 18-week strategic improvement roadmap (5 phases)
+  - **Documentation Created** (moved to ma_ignore folder):
+    - ARCHITECTURAL_REVIEW_SUMMARY.md - Strengths, weaknesses, compliance gaps
+    - SECURITY_ROADMAP_PHASE1.md - Critical security hardening (Weeks 1-4)
+    - IMPROVEMENT_ROADMAP_PHASES2-5.md - Code quality, performance, UX (Weeks 5-18)
+    - IMPLEMENTATION_GUIDE.md - Developer onboarding and best practices
+    - MEDICAL_FORMS_REFACTOR_SUMMARY.md - Medical forms refactoring overview
+    - MEDICAL_FORMS_REFACTOR_IMPLEMENTATION_GUIDE.md - Step-by-step implementation guide
+    - MEDICAL_FORMS_REFACTOR_COMPLETE.md - Completion summary
+
+
+## [Unreleased] - 2026-02-07 - 2026-02-13
+
+- **Medical Death Notification Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
+  - Fully refactored Death Notification module with live backend API integration
+  - Removed Death Recipient tab from Death Details page (simplified to Confirmation & Notification only)
+  - **Service Layer**: Created services for death notifications and notification templates
+    - `deathNotificationService.ts`: Full CRUD operations with `DEATH_NOTIFICATION_API_ENDPOINTS`
+    - `notificationService.ts`: System administration notification templates with server-side pagination
+    - All services return paginated format: `{items: [], count: number, next: string | null}`
+    - Interfaces: `DeathNotificationItem` (prisoner_name, death_confirmation, notification), `NotificationTemplate` with optional fields
+  - **DeathNotificationList Server-Side Integration with DataTable**:
+    - Replaced 400+ lines of manual table with enterprise DataTable component
+    - Individual action buttons pattern: Eye (View), Pencil (Edit), Trash2 (Delete) - matching existing modules
+    - Server-side pagination with automatic search/filter/sort from DataTable
+    - tableKey auto-refresh pattern: increments after create/edit/delete operations
+    - Fetch by ID pattern: `handleView` and `handleEdit` call `fetchDeathNotificationById` for complete data
+    - Column definitions: Prisoner Name, Death Confirmation ID, Notification Template ID, Actions
+    - Loading states, error handling with user-friendly toast messages
+    - ConfirmDialog for delete confirmations with notification details display
+  - **DeathNotificationForm Server-Side Dropdowns**:
+    - **Death Confirmation dropdown**: Enhanced UX with comprehensive display labels
+      - Shows: Prisoner Number, Name, Date of Death, and Cause of Death
+      - Format: "ARPC0000000001/26 - Kathryn Robinson | Died: 2026-02-10 | Cause: ggf"
+      - Addresses disambiguation: Multiple death records per prisoner now clearly distinguishable
+      - SearchableSelect with `fetchDeathConfirmationsCallback` with data transformation layer
+      - Search placeholder: "Search by prisoner number, name, or cause of death..."
+    - Notification Template dropdown: SearchableSelect with `fetchNotificationsCallback` showing subjects
+    - All fetch callbacks wrapped in `useCallback` to prevent API spam on form state changes
+    - Edit mode dropdown fixes: Local state initialization with functions, initialItem derivation via find
+    - Defensive coding: All optional fields handled with optional chaining
+    - Validation: Required field checks for death_confirmation and notification
+    - Recipients section removed per requirements (notification simplified to template selection only)
+  - **DeathNotificationView Component**:
+    - Updated to use service types with optional field handling
+    - Displays notification ID, prisoner name, death confirmation ID, notification template ID
+    - All fields have N/A fallbacks for missing data
+    - Recipients section removed per requirements
+  - **Type System Consolidation**:
+    - Centralized all interfaces in service files
+    - Made all critical fields optional in `DeathNotificationItem` and `Recipient`
+    - Consistent imports across List, Form, and View components
+    - Eliminated type mismatches between components
+  - **Code Quality**: Removed 500+ lines of mock data, improved maintainability
+  - **Files Created**: `deathNotificationService.ts`, `notificationService.ts` (360 lines total)
+  - **Files Modified**: `DeathNotificationList.tsx` (net -250 lines), `DeathNotificationForm.tsx` (net -180 lines), `DeathNotificationView.tsx`, `DeathDetails.tsx` (removed recipient tab)
+  - **Documentation**: Created `DEATH_NOTIFICATION_REFACTOR_SUMMARY.md` with comprehensive implementation details
+
 - **Medical Death Confirmation Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
   - Fully refactored Death Confirmation module with live backend API integration
   - **Service Layer**: Created `deathConfirmationService.ts` with centralized API endpoints
@@ -725,6 +828,51 @@ All notable changes to this project should be documented in this file.
   - Child selections automatically clear when parent changes (e.g., changing Region clears District/County/etc.)
   - No key props needed - LocationSelect handles dynamic updates natively
   - File added: LocationSelect.tsx, File modified: NextOfKin.tsx
+
+- **Phones & Letters - Letter Type Dropdown Fix**:
+  - Fixed letter type dropdown not enabling when prisoner is selected
+  - **Root Cause**: React re-rendering issue - `letterForm.watch("prisoner")` doesn't trigger immediate re-renders in Controller render functions
+  - **Solution**: Changed disabled check from `!watchedPrisoner` to `!selectedPrisoner` and added `key` prop to force remount when prisoner changes
+  - **Bonus**: Letter type resets when prisoner changes to prevent data association errors
+  - File modified: PhonesLettersScreen.tsx (lines 1361, 1366)
+
+- **Medical Restrictions & Dietary Requirements - Prisoner Grouping Update**:
+  - Updated grouping to use `prisoner_number_value` instead of UUID for better readability
+  - **PrisonerRestrictionList**: Changed `groupBy: 'prisoner_number'` → `groupBy: 'prisoner_number_value'`
+  - **DietaryRequirementList**: Changed `groupBy: 'prisoner_name'` → `groupBy: 'prisoner_number_value'`
+  - **Group Headers**: Now display formatted prisoner number with name (e.g., "ARPC0000000001/26 | Kathryn Robinson")
+  - **Fallback Support**: Falls back to UUID if `prisoner_number_value` not available
+  - Files modified: PrisonerRestrictionList.tsx, DietaryRequirementList.tsx
+
+- **Release Recommendations - Approval Fields Removal**:
+  - Removed approval status and approval information sections from release recommendation forms
+  - **Form Changes**: Removed `approval_status`, `approved_by`, `approval_date`, `approval_notes` fields
+  - **UI Changes**: Removed entire "Approval Information" section and approval status field from "Recommendation Details"
+  - **List Changes**: Removed approval status column from DataTable
+  - **Result**: Cleaner, simpler release recommendation workflow
+  - Files modified: ReleaseRecommendationForm.tsx, ReleaseRecommendationList.tsx
+
+- **Discharge Management - Form Close & Reset Fix**:
+  - Fixed discharge form not closing and resetting after successful creation
+  - **Issue**: Lines 337-338 in PrisonerDischargeList.tsx were commented out
+  - **Fix**: Uncommented `setIsFormOpen(false)` and `setSelectedRecord(null)` after successful creation
+  - **Result**: Form now properly closes and resets after adding discharge records
+  - File modified: PrisonerDischargeList.tsx
+
+- **Staff Deployment - DataTable & Cards Refresh Fix**:
+  - Fixed DataTable and summary cards not refreshing after adding new deployment
+  - **Issue**: `addDeployment` function only updated local state but didn't trigger DataTable refetch
+  - **Solution**: Added `fetchData()` and `setFiltersReloadKey(k => k + 1)` to force DataTable remount
+  - **Result**: Summary cards and DataTable update immediately without page refresh
+  - File modified: StaffDeploymentScreen.tsx (lines 297-299)
+
+- **Property Management - Enhanced Search Functionality**:
+  - Added descriptive search placeholder to Property Records DataTable
+  - **Search Fields**: Prisoner name, prisoner number, property type, item, bag number
+  - **Implementation**: Added `searchPlaceholder="Search by prisoner name, number, property type, item, or bag number..."`
+  - **Backend Integration**: DataTable sends search parameter to `/api/property-management/properties/` endpoint
+  - **Result**: Users can now search by multiple fields, not just prisoner number
+  - File modified: PrisonerPropertyScreen.tsx (line 1066)
 
 ### Fixed
 - **Property Management - Accounts & Transactions Tables Enhancement (Senior UX Review)**:

@@ -137,7 +137,7 @@ const WardRecommendationList: React.FC<WardRecommendationListProps> = ({ selecte
         ),
       },
       {
-        key: 'prisoner_number',
+        key: 'prisoner_number_value',
         label: 'Prisoner Number',
         render: (value: any) => value || 'N/A',
       },
@@ -267,7 +267,7 @@ const WardRecommendationList: React.FC<WardRecommendationListProps> = ({ selecte
             <div className="bg-gray-50 p-3 rounded-md text-sm space-y-1">
               <p key="prisoner-info">
                 <span className="font-medium">Prisoner:</span>{' '}
-                {recordToDelete.prisoner_name} ({recordToDelete.prisoner_number})
+                {recordToDelete.prisoner_name} ({recordToDelete.prisoner_number_value || recordToDelete.prisoner_number})
               </p>
               <p key="ward-info">
                 <span className="font-medium">Recommended Ward:</span> {recordToDelete.ward_name || 'N/A'}

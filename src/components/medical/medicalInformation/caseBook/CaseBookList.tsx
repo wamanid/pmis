@@ -490,7 +490,7 @@ const CaseBookList: React.FC<CaseBookListProps> = ({
                   currentItems.map((caseBook) => (
                     <TableRow key={caseBook.id} className="hover:bg-gray-50">
                       <TableCell>{caseBook.prisoner_name}</TableCell>
-                      <TableCell className="font-mono text-sm">{caseBook.prisoner_number}</TableCell>
+                      <TableCell className="font-mono text-sm">{caseBook.prisoner_number_value}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{caseBook.check_type_name}</Badge>
                       </TableCell>

@@ -23,6 +23,8 @@ import {
 } from '../../../ui/alert-dialog';
 import { Search, Eye, Pencil, Trash2, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {ExaminationResult} from "../../../../services/medical/medicalInformation/medical";
 
 interface ExamResult {
   id: string;
@@ -38,11 +40,13 @@ interface ExamResultListProps {
   onEdit: (examResult: ExamResult) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  exams: Unit[];
+  examinationResults: ExaminationResult[]
 }
 
-const ExamResultList: React.FC<ExamResultListProps> = ({ onView, onEdit, onDelete, refreshTrigger }) => {
-  const [examResults, setExamResults] = useState<ExamResult[]>([]);
-  const [filteredResults, setFilteredResults] = useState<ExamResult[]>([]);
+const ExamResultList: React.FC<ExamResultListProps> = ({ onView, onEdit, onDelete, refreshTrigger, exams, examinationResults }) => {
+  // const [examResults, setExamResults] = useState<ExamResult[]>([]);
+  const [filteredResults, setFilteredResults] = useState<ExaminationResult[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [examFilter, setExamFilter] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
@@ -51,67 +55,67 @@ const ExamResultList: React.FC<ExamResultListProps> = ({ onView, onEdit, onDelet
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
-  const mockExamResults: ExamResult[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      exam_name: 'Blood Test',
-      notes: 'Hemoglobin: 14.5 g/dL, WBC: 7,200/µL, All parameters within normal range',
-      medical_case_book: '1',
-      medical_exam: '1',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      exam_name: 'X-Ray',
-      notes: 'Chest X-Ray shows mild pneumonia in left lower lobe. Recommend antibiotics.',
-      medical_case_book: '2',
-      medical_exam: '2',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      exam_name: 'ECG',
-      notes: 'Normal sinus rhythm, heart rate 72 bpm. No abnormalities detected.',
-      medical_case_book: '3',
-      medical_exam: '3',
-    },
-    {
-      id: '4',
-      prisoner_name: 'John Doe',
-      exam_name: 'Urinalysis',
-      notes: 'pH: 6.0, No protein, No glucose. Normal findings.',
-      medical_case_book: '1',
-      medical_exam: '4',
-    },
-    {
-      id: '5',
-      prisoner_name: 'Jane Smith',
-      exam_name: 'CT Scan',
-      notes: 'CT scan of chest reveals consolidation consistent with pneumonia diagnosis.',
-      medical_case_book: '2',
-      medical_exam: '5',
-    },
-  ];
+  // const mockExamResults: ExamResult[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     exam_name: 'Blood Test',
+  //     notes: 'Hemoglobin: 14.5 g/dL, WBC: 7,200/µL, All parameters within normal range',
+  //     medical_case_book: '1',
+  //     medical_exam: '1',
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     exam_name: 'X-Ray',
+  //     notes: 'Chest X-Ray shows mild pneumonia in left lower lobe. Recommend antibiotics.',
+  //     medical_case_book: '2',
+  //     medical_exam: '2',
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     exam_name: 'ECG',
+  //     notes: 'Normal sinus rhythm, heart rate 72 bpm. No abnormalities detected.',
+  //     medical_case_book: '3',
+  //     medical_exam: '3',
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'John Doe',
+  //     exam_name: 'Urinalysis',
+  //     notes: 'pH: 6.0, No protein, No glucose. Normal findings.',
+  //     medical_case_book: '1',
+  //     medical_exam: '4',
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Jane Smith',
+  //     exam_name: 'CT Scan',
+  //     notes: 'CT scan of chest reveals consolidation consistent with pneumonia diagnosis.',
+  //     medical_case_book: '2',
+  //     medical_exam: '5',
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadExamResults();
-  }, [refreshTrigger]);
+  // useEffect(() => {
+  //   loadExamResults();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
     filterResults();
-  }, [examResults, searchTerm, examFilter]);
+  }, [examinationResults, searchTerm, examFilter]);
 
-  const loadExamResults = () => {
-    setLoading(true);
-    setTimeout(() => {
-      setExamResults(mockExamResults);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadExamResults = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     setExamResults(mockExamResults);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterResults = () => {
-    let filtered = [...examResults];
+    let filtered = [...examinationResults];
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -137,13 +141,13 @@ const ExamResultList: React.FC<ExamResultListProps> = ({ onView, onEdit, onDelet
   };
 
   const handleConfirmDelete = () => {
-    if (recordToDelete) {
+    // if (recordToDelete) {
       onDelete(recordToDelete);
-      setExamResults((prev) => prev.filter((result) => result.id !== recordToDelete));
-      toast.success('Exam result deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
-    }
+    //   setExamResults((prev) => prev.filter((result) => result.id !== recordToDelete));
+    //   toast.success('Exam result deleted successfully');
+    //   setDeleteDialogOpen(false);
+    //   setRecordToDelete(null);
+    // }
   };
 
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -172,12 +176,11 @@ const ExamResultList: React.FC<ExamResultListProps> = ({ onView, onEdit, onDelet
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Exams</SelectItem>
-                <SelectItem value="Blood Test">Blood Test</SelectItem>
-                <SelectItem value="X-Ray">X-Ray</SelectItem>
-                <SelectItem value="ECG">ECG</SelectItem>
-                <SelectItem value="Urinalysis">Urinalysis</SelectItem>
-                <SelectItem value="CT Scan">CT Scan</SelectItem>
-                <SelectItem value="MRI">MRI</SelectItem>
+                {
+                  exams.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>
