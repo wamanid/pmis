@@ -16,6 +16,8 @@ import { StatusOfWomanSelect } from "../../common/StatusOfWomanSelect";
 import { ReligionSelect } from "../../common/ReligionSelect";
 import { TribeSelect } from "../../common/TribeSelect";
 import { IdTypeSelect } from "../../common/IdTypeSelect";
+import { ArmedForceSelect } from "../../common/ArmedForceSelect";
+import { ArmedForceStatusSelect } from "../../common/ArmedForceStatusSelect";
 import { AddressSelect } from "../../common/AddressSelect";
 import { BuildSelect } from "../../common/BuildSelect";
 import { FaceSelect } from "../../common/FaceSelect";
@@ -1540,6 +1542,7 @@ const {
                         value={watchDesiredDistrictOfRelease}
                         onValueChange={(value) => setValueAndClearError("desired_district_of_release", value)}
                         placeholder="Select district"
+                        ignoreRegion={true}
                       />
                       {errors.desired_district_of_release && (
                         <p className="text-red-500 text-sm mt-1">
@@ -1687,10 +1690,16 @@ const {
                               <Label htmlFor="armed_force">
                                 Armed Force *
                               </Label>
-                              <Input
-                                id="armed_force"
-                                {...registerArmedPersonnel("armed_force")}
-                                placeholder="Enter armed force"
+                              <Controller
+                                name="armed_force"
+                                control={controlArmedPersonnel}
+                                render={({ field }) => (
+                                  <ArmedForceSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    placeholder="Select armed force"
+                                  />
+                                )}
                               />
                             </div>
 
@@ -1698,10 +1707,27 @@ const {
                               <Label htmlFor="armed_forces_status">
                                 Armed Force Status *
                               </Label>
+                              <Controller
+                                name="armed_forces_status"
+                                control={controlArmedPersonnel}
+                                render={({ field }) => (
+                                  <ArmedForceStatusSelect
+                                    value={field.value}
+                                    onValueChange={field.onChange}
+                                    placeholder="Select armed force status"
+                                  />
+                                )}
+                              />
+                            </div>
+
+                            <div>
+                              <Label htmlFor="force_number">
+                                Force Number
+                              </Label>
                               <Input
-                                id="armed_forces_status"
-                                {...registerArmedPersonnel("armed_forces_status")}
-                                placeholder="Enter armed force status"
+                                id="force_number"
+                                {...registerArmedPersonnel("force_number")}
+                                placeholder="Enter force number"
                               />
                             </div>
 

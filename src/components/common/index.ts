@@ -7,6 +7,8 @@ export { StationSelect } from './StationSelect';
 export { LocationFilter } from './LocationFilter';
 export { RelationshipSelect } from './RelationshipSelect';
 export { IdTypeSelect } from './IdTypeSelect';
+export { ArmedForceSelect } from './ArmedForceSelect';
+export { ArmedForceStatusSelect } from './ArmedForceStatusSelect';
 export type { 
   DataTableColumn, 
   DataTableConfig, 
@@ -22,3 +24,5 @@ export type { StationSelectProps } from './StationSelect';
 export type { LocationFilterProps } from './LocationFilter';
 export type { RelationshipSelectProps } from './RelationshipSelect';
 export type { IdTypeSelectProps } from './IdTypeSelect';
+export type { ArmedForceSelectProps } from './ArmedForceSelect';
+export type { ArmedForceStatusSelectProps } from './ArmedForceStatusSelect';
