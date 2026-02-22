@@ -1540,6 +1540,7 @@ const {
                         value={watchDesiredDistrictOfRelease}
                         onValueChange={(value) => setValueAndClearError("desired_district_of_release", value)}
                         placeholder="Select district"
+                        ignoreRegion={true}
                       />
                       {errors.desired_district_of_release && (
                         <p className="text-red-500 text-sm mt-1">
