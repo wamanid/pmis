@@ -16,3 +16,11 @@ export const getWorkingpartyPrisoners = async (): Promise<WorkingPartyResponse[]
   const response = await axiosInstance.get<WorkingPartyResponse[]>('earning-scheme/api/working-party-prisoners/');
   return response.data;
 };
+
+
+
+
+export const getEarningRateForPrisoner = async (id:string): Promise<WorkingPartyResponse[]> => {
+  const response = await axiosInstance.get<WorkingPartyResponse[]>(`earning-scheme/api/prisoner-earning-rates/?prisoner=${id}`);
+  return response.data;
+};

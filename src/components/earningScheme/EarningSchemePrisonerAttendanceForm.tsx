@@ -14,7 +14,7 @@ import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Calendar, DollarSign, Users, Briefcase, Award } from 'lucide-react';
 import { PrisonerRecord } from '../../models/admission';
 import { getPrisoners } from '../../services/admission';
-import { getEarningRateTypes,getWorkingpartyPrisoners } from '../../services/gratuityService';
+import { getEarningRateForPrisoner, getEarningRateTypes,getWorkingpartyPrisoners } from '../../services/gratuityService';
 
 
 import { getprisoners, getworkingparty } from '../../services/gateService';
@@ -49,9 +49,9 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
 
 
   const [earningRates,setearningRates] = useState([
-    { id: 'er-001', grade: 'Grade A (1398)', amount: 1398 },
+  /*  { id: 'er-001', grade: 'Grade A (1398)', amount: 1398 },
     { id: 'er-002', grade: 'Grade B (699)', amount: 699 },
-    { id: 'er-003', grade: 'Grade C (280)', amount: 280 },
+    { id: 'er-003', grade: 'Grade C (280)', amount: 280 },*/
   ]);
 
   useEffect(() => {
@@ -60,8 +60,14 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
           
     }
       getWorkingpartyPrisoners().then((data) => {
-           // alert(JSON.stringify(data.results));
-             setPrisoners(data.results);
+       // alert(JSON.stringify(data));
+       //remove the duplicate prisoners from the data.results array based on the prisoner field
+        const uniquePrisoners = Array.from(new Set(data.results.map(p => p.prisoner)))
+          .map(prisoner => {
+            return data.results.find(p => p.prisoner === prisoner);
+          }
+          ) as PrisonerRecord[];
+          setPrisoners(uniquePrisoners);
           }).catch((error) => {
             alert(error);
           });
@@ -72,12 +78,13 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
             alert(error);
           });
 
-           getEarningRateTypes().then((data) => {
-           //  alert(JSON.stringify(data.results));
+
+       /*    getEarningRateTypes().then((data) => {
+           alert(JSON.stringify(data.results));
             setearningRates(data.results);
           }).catch((error) => {
             alert(error);
-          });
+          });*/
 
 
 
@@ -111,16 +118,36 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   };
 
   const handlePrisonerChange = (prisonerId: string) => {
-    const prisoner = prisoners.find(p => p.prisoner === prisonerId);
+    //b93828de-9440-45ca-89ea-08a391676261
+    const prisoner = prisoners.find(p => p.id === prisonerId);
+    //alert(JSON.stringify(prisonerId));
     if (prisoner) {
-      //alert();
-      
-
+    //alert(JSON.stringify(prisoner));
+      //get the earning rate for the selected prisoner and set it in the form data
+      //getEarningRateForPrisoner
+      getEarningRateForPrisoner(prisoner.prisoner).then((data) => {
+     //alert(JSON.stringify(data.results));
+     setearningRates(data.results);
+      }
+      ).catch((error) => {
+        alert(error);
+      }
+      );
       setFormData({...formData,earning_rate_grade: prisoner.earning_rate});
-       handleChange('earning_rate', prisoner.earning_rate);
+     // handleChange('earning_rate', prisoner.earning_rate);
       handleChange('prisoner_name', prisoner.prisoner_name);
-      handleChange('prisoner_id', prisoner.working_party_prisoner);
-      handleChange('working_party_prisoner', prisonerId);
+      handleChange('prisoner_id',prisonerId);
+      handleChange('working_party_prisoner', prisoner.id);
+       handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', 'None');
+
+    }
+    else{
+      handleChange('prisoner_name', '');
+      handleChange('prisoner_id','');
+      handleChange('working_party_prisoner', '');
+      handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', '');
     }
   };
 
@@ -131,8 +158,13 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   const handleEarningRateChange = (rateId: string) => {
     const rate = earningRates.find(r => r.id === rateId);
     if (rate) {
-      handleChange('earning_rate_grade', rate.grade);
+      handleChange('earning_rate_grade', rate.earning_rate_grade);
       handleChange('earning_rate', rateId);
+    }
+    else{
+      handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', 'None');
+
     }
   };
 
@@ -166,8 +198,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
         </Label>
         <Select
           value={formData.working_party_prisoner}
-          onValueChange={handlePrisonerChange}
-        >
+          onValueChange={handlePrisonerChange}>
           <SelectTrigger id="prisoner" className={errors.prisoner_name ? 'border-red-500' : ''}>
             <SelectValue placeholder="Select prisoner..." />
           </SelectTrigger>
@@ -175,10 +206,8 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
               <SelectItem key="None" value='None'>
                 Select Prisoner
               </SelectItem>
-
-
             {prisoners.map(prisoner => (
-              <SelectItem key={prisoner.prisoner} value={prisoner.prisoner}>
+              <SelectItem key={prisoner.id} value={prisoner.id}>
                 {prisoner.prisoner_name}
               </SelectItem>
             ))}
@@ -229,9 +258,13 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
             <SelectValue placeholder="Select earning grade..." />
           </SelectTrigger>
           <SelectContent>
+              <SelectItem key="None" value='None'>
+                Select Earning Grade
+              </SelectItem>
+
             {earningRates.map(rate => (
               <SelectItem key={rate.id} value={rate.id}>
-                {rate.grade} - UGX {rate.amount.toLocaleString()}
+                {rate.earning_rate_grade} - UGX {rate.earning_rate_amount.toLocaleString()}
               </SelectItem>
             ))}
           </SelectContent>

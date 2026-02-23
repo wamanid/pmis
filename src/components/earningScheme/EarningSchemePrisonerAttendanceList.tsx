@@ -59,25 +59,13 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
 
   // Mock data for attendance records
   const [mockAttendanceRecords,setMockAttendanceRecords]= useState<any[]>([
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      working_party_name: 'Workshop A',
-      earning_rate_grade: 'Grade A (1398)',
-      is_present: true,
-      attendance_datetime: '2025-11-29T08:00:00Z',
-      amount_earned: '1398.00',
-      remarks: 'Full day attendance',
-      working_party_prisoner: 'wp-001',
-      earning_rate: 'er-001',
-    },
+   
   ]);
-
 
   useEffect(() => {
            getEarningSchemes().then((data) => {
-           //  alert(JSON.stringify(data.results));
-            setMockAttendanceRecords(data.results);
+           //alert(JSON.stringify(data.results));
+            setAttendanceRecords(data.results);
           }).catch((error) => {
             alert(error);
           });
@@ -154,7 +142,7 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
         ...data,
       };
       alert(JSON.stringify(newRecord));
-      setAttendanceRecords([...attendanceRecords, newRecord]);
+     // setAttendanceRecords([...attendanceRecords, newRecord]);
       toast.success('Attendance record created successfully');
     }
     setIsFormOpen(false);
