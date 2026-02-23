@@ -8,6 +8,7 @@ import { propertyRoutes } from './property.routes'
 import { gateRoutes } from './gate.routes';
 import { stageRoutes } from './stage.routes';
 import { courtRoutes } from './court.routes';
+import { gratuityRoutes } from './gratuity.routes';
 
 /**
  * Application Routes Configuration
@@ -39,6 +40,7 @@ export const routes: RouteObject[] = [
 
   ...stageRoutes,
   ...courtRoutes,
+  ...gratuityRoutes,
   
   // Default/Fallback Route
   {
