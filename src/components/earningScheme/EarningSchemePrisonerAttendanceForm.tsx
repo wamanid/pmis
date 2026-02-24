@@ -21,13 +21,13 @@ import { getprisoners, getworkingparty } from '../../services/gateService';
 import { AttendanceFormData, EarningSchemePrisonerAttendanceFormProps } from '../../models/earningScheme/earning';
 import { WorkingParty } from '../../models/gate/Index';
 
-
-
-
 export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisonerAttendanceFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
+  editData,
+  prisoners,
+  workingParties
 }) => {
   const [formData, setFormData] = useState<AttendanceFormData>({
     prisoner_name: '',
@@ -43,9 +43,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hoursWorked, setHoursWorked] = useState<string>('8');
-  const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
-  const [workingParties,setworkingParties]= useState([
-  ]);
+
 
 
   const [earningRates,setearningRates] = useState([
@@ -54,30 +52,58 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     { id: 'er-003', grade: 'Grade C (280)', amount: 280 },*/
   ]);
 
+  const loadData = async() => {
+
+
+
+  }
+
   useEffect(() => {
+
     if (initialData) {
-      setFormData(initialData);
-          
+          setFormData(initialData);
     }
-      getWorkingpartyPrisoners().then((data) => {
-       // alert(JSON.stringify(data));
-       //remove the duplicate prisoners from the data.results array based on the prisoner field
-        const uniquePrisoners = Array.from(new Set(data.results.map(p => p.prisoner)))
-          .map(prisoner => {
-            return data.results.find(p => p.prisoner === prisoner);
-          }
-          ) as PrisonerRecord[];
-          setPrisoners(uniquePrisoners);
-          }).catch((error) => {
-            alert(error);
-          });
+  
 
-          getworkingparty().then((data) => {
-            setworkingParties(data.results);
-          }).catch((error) => {
-            alert(error);
-          });
+            
 
+          //its loaded all the time here
+          //but this needs to be loaded and passed as a prop to the form and not loaded in the form because its used in other places as well
+      if (editData) {
+     //   alert(`Edit data found: ${JSON.stringify(editData)}`);
+       const workingPartyPrisoner= prisoners.find(p => p.id === editData.working_party_prisoner);
+      if(workingPartyPrisoner)
+      {
+      let prisonerId = workingPartyPrisoner.prisoner;
+     getEarningRateForPrisoner(prisonerId).then((data) => {
+     setearningRates(data.results);
+      // setFormData({...formData,amount_earned: prisoner.amount_earned});
+  // alert(`Found working party prisoner: ${JSON.stringify(workingPartyPrisoner)}`);
+   setFormData(prev => ({...prev, prisoner_name: workingPartyPrisoner.prisoner_name,prisoner_id: prisonerId, 
+    working_party: editData.working_party_name,
+    working_party_prisoner: workingPartyPrisoner.id,
+     earning_rate_grade: workingPartyPrisoner.earning_rate_grade, earning_rate: workingPartyPrisoner.earning_rate}));
+   /* handleChange('prisoner_name', workingPartyPrisoner.prisoner_name);
+     handleChange('prisoner_id',prisonerId);
+     handleChange('working_party_prisoner', workingPartyPrisoner.id);
+      handleChange('earning_rate_grade', workingPartyPrisoner.earning_rate);
+     handleChange('earning_rate', workingPartyPrisoner.earning_rate);*/
+     // alert(`Found prisoner for editing: ${JSON.stringify(data.results)}`);
+    calculateEarnings(editData.is_present, "8", editData.earning_rate_grade);
+    
+      }
+      ).catch((error) => {
+        alert(error);
+      }
+      );
+    
+  
+    
+
+    }
+
+}
+     
 
        /*    getEarningRateTypes().then((data) => {
            alert(JSON.stringify(data.results));
@@ -87,6 +113,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
           });*/
 
 
+                
 
   }, [initialData]);
 
@@ -99,10 +126,13 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     const hoursNum = parseFloat(hours) || 0;
     if (hoursNum < 3) return '0.00'; // No earnings if worked less than 3 hours
     
-    const selectedRate = earningRates.find(r => r.grade === grade);
+    const selectedRate = earningRates.find(r => r.earning_rate_grade == grade);
+   // alert(`Calculating earnings with isPresent=${isPresent}, hours=${hours}, grade=${grade} selectedRate=${JSON.stringify(selectedRate)}`);
+    
     if (!selectedRate) return '0.00';
     
-    return selectedRate.amount;//.toFixed(2);
+    //remove commas from the amount and convert to number
+    return parseFloat(selectedRate.earning_rate_amount.replace(/,/g, '')).toFixed(2);
   };
 
   useEffect(() => {
@@ -118,6 +148,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   };
 
   const handlePrisonerChange = (prisonerId: string) => {
+
     //b93828de-9440-45ca-89ea-08a391676261
     const prisoner = prisoners.find(p => p.id === prisonerId);
     //alert(JSON.stringify(prisonerId));
@@ -126,7 +157,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
       //get the earning rate for the selected prisoner and set it in the form data
       //getEarningRateForPrisoner
       getEarningRateForPrisoner(prisoner.prisoner).then((data) => {
-     //alert(JSON.stringify(data.results));
+    //alert(JSON.stringify(data.results));
      setearningRates(data.results);
       }
       ).catch((error) => {

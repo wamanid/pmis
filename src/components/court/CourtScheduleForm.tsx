@@ -102,7 +102,6 @@ const mockCaseOutcomes =/* [
 
   useEffect(() => {
     if (editData) {
-
         getOffencesPersonal(editData).then((data) => {
         mockOffences=data.results;
         setOffs(data.results);

@@ -12,12 +12,26 @@ export const getEarningSchemes = async (): Promise<WorkingPartyResponse[]> => {
 };
 
 
+
+export const saveEarningSchemes = async (data:object): Promise<WorkingPartyResponse[]> => {
+  const response = await axiosInstance.post<WorkingPartyResponse[]>('earning-scheme/api/attendance/', data);
+  return response.data;
+};
+
+
+
+
 export const getWorkingpartyPrisoners = async (): Promise<WorkingPartyResponse[]> => {
   const response = await axiosInstance.get<WorkingPartyResponse[]>('earning-scheme/api/working-party-prisoners/');
   return response.data;
 };
 
 
+
+export const deleteEarningScheme = async (id:string): Promise<WorkingPartyResponse[]> => {
+  const response = await axiosInstance.delete<WorkingPartyResponse[]>('earning-scheme/api/attendance/'+id);
+  return response.data;
+};
 
 
 export const getEarningRateForPrisoner = async (id:string): Promise<WorkingPartyResponse[]> => {

@@ -27,4 +27,7 @@ export interface EarningSchemePrisonerAttendanceFormProps {
   initialData?: AttendanceFormData | null;
   onSubmit: (data: AttendanceFormData) => void;
   onCancel: () => void;
+  editData?: AttendanceRecord | null; 
+  prisoners: any[]; // You can replace 'any' with a more specific type if you have one
+  workingParties:any[]; // You can replace 'any' with a more specific type if you have one
 }
