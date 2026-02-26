@@ -7,7 +7,7 @@
 
 All notable changes to this project should be documented in this file.
 
-## [Unreleased] - 2026-02-17 
+## [Released] - 2026-02-17 
 
 ### Added
 - **Medical Module Forms - Inline Validation & Prisoner Number Formatting (February 16-17, 2026)**:
@@ -66,7 +66,7 @@ All notable changes to this project should be documented in this file.
     - MEDICAL_FORMS_REFACTOR_COMPLETE.md - Completion summary
 
 
-## [Unreleased] - 2026-02-07 - 2026-02-13
+## [Released] - 2026-02-07 - 2026-02-13
 
 - **Medical Death Notification Module - Backend Integration & Server-Side Pagination (14M+ Ready)**:
   - Fully refactored Death Notification module with live backend API integration
