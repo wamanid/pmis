@@ -257,7 +257,7 @@ export default function CourtDocumentList() {
                           <FileText className="h-4 w-4 text-red-600" />
 
                           <span className="text-sm">
-                            <a href='{document.document}' target="_blank" rel="noopener noreferrer">
+                            <a href={document.document} target="_blank" rel="noopener noreferrer">
                            download</a>
                           </span>
                         </div>

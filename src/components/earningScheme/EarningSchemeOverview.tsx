@@ -1229,4 +1229,8 @@ export const EarningSchemeOverview: React.FC<EarningSchemeOverviewProps> = ({ on
       </div>
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> ezama

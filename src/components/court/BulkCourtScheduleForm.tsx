@@ -172,7 +172,7 @@ const BulkCourtScheduleForm: React.FC = () => {
     useEffect(() => {
 
         getAttendacetypes().then((data) => {
-                alert(JSON.stringify(data.results));
+           //     alert(JSON.stringify(data.results));
              setAttendancetypes(data.results);
           }).catch((error) => {
             alert(error);
@@ -191,7 +191,7 @@ const BulkCourtScheduleForm: React.FC = () => {
 
          getStations().then((data) => {
         mockStations=data.results;
-        setStations(data.results);
+       // setStations(data.results);
       // alert(JSON.stringify(courts));
       }).catch((error) => {
         alert(error);

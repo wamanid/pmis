@@ -290,8 +290,8 @@ const mockAppeals2 = [
             }
             else{
       toast.success(editData ? 'Court attendance record updated successfully' : 'Court attendance record created successfully');
-    //  onSuccess();
-     // handleClose();
+     onSuccess();
+     handleClose();
             }
           } catch (error) {
             console.error('Upload error:', error);
@@ -299,20 +299,6 @@ const mockAppeals2 = [
           
           }
 
-            const dataTopost:CourtAttendanceRecord={
-              prisoner:formData.prisoner,
-              court_attendance_type:formData.court_attendance_type,
-              court:formData.court,
-              offence:formData.offence,
-              case_outcome:formData.case_outcome,
-              appeal:formData.appeal,
-              gate_pass:formData.gate_pass,
-              criminal_case_number:formData.criminal_case_number,
-              attendance_datetime:formData.attendance_datetime,
-              legal_proceedings:formData.legal_proceedings,
-              remarks:formData.remarks,
-              production_warrant:''
-            };
             //alert(JSON.stringify(dataTopost));
 /*
             submitCourtAttendance(dataTopost).then(() => {

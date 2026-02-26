@@ -33,7 +33,8 @@ import {
   Calendar,
   Filter,
   Download,
-  Eye
+  Eye,
+  EyeIcon
 } from 'lucide-react';
 import CourtAttendanceForm from './CourtAttendanceForm';
 import { PrisonerRecord } from '../../models/admission';
@@ -523,6 +524,18 @@ export default function CourtAttendanceList() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          {record.production_warrant && (
+                            <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setDeleteId(record.id)}
+                            title="View Warrant"
+                            style={{ color: '#650000' }}
+                          >
+                            <a href={record.production_warrant} target="_blank" rel="noopener noreferrer"></a>
+                            <EyeIcon className="h-4 w-4" />
+                          </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon"
