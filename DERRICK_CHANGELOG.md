@@ -2,10 +2,45 @@
 
 ---
 **Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
-**Created**: February 6, 2026 | **Last Updated**: February 17, 2026
+**Created**: February 6, 2026 | **Last Updated**: February 26, 2026
 ---
 
 All notable changes to this project should be documented in this file.
+
+## [Released] - 2026-02-26
+
+### Refactored
+- **Rehabilitation Module - Menu-Aligned Folder Structure Reorganization (February 26, 2026)**:
+  - Restructured rehabilitation module following medical module pattern for improved maintainability and scalability
+  - **Component Structure**: Created menu-aligned subfolders matching UI navigation
+    - `enrollments/` - Rehabilitation Enrollments menu item
+      - `EnrollmentsScreen.tsx` - Tab container component
+      - `enrollment/` - Enrollment management (3 files: Screen, Form, List)
+      - `sessions/` - Session tracking (3 files: Screen, Form, List)
+    - `afterCare/` - After Care menu item (3 files: Screen, Form, List)
+  - **Services Structure**: Created parallel services folder structure
+    - `services/rehabilitation/` with barrel exports (index.ts)
+    - `services/rehabilitation/enrollments/index.ts` - Ready for service implementations
+    - `services/rehabilitation/afterCare/index.ts` - Ready for service implementations
+  - **Routes Configuration**: Created `rehabilitation.routes.tsx` with 2 routes
+    - `/rehabilitation/enrollments` → EnrollmentsScreen
+    - `/rehabilitation/after-care` → AfterCareScreen
+    - Integrated into main routes index
+  - **Import Path Corrections**: Systematically fixed all import paths based on file depth
+    - Container files (1 level): `../../ui/component`
+    - Enrollment/Session files (2 levels): `../../../ui/component`
+    - After Care files (1 level): `../../ui/component`
+    - Used PowerShell bulk corrections for efficiency
+  - **Git History Preservation**: All 10 files moved using `git mv` to preserve history
+  - **Documentation**: Created comprehensive `REHABILITATION_MODULE_STRUCTURE.md`
+    - File mapping table showing old → new locations
+    - Import examples (before/after)
+    - Design principles and benefits
+    - Next steps and expansion guidance
+  - **Files Reorganized**: 10 component files
+  - **Folders Created**: 4 component subfolders, 2 service subfolders
+  - **Pattern Consistency**: Follows exact structure of medical module refactoring (commit 9d6c64a)
+  - **Commit**: 628890d
 
 ## [Released] - 2026-02-17 
 
