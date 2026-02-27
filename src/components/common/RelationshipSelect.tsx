@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Check, ChevronsUpDown, Loader2 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { Button } from '../ui/button';
@@ -15,60 +15,53 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchDistricts } from '../../services/systemAdministrationService';
-import type { District } from '../../models/system_administration';
+import { fetchRelationships } from '../../services/system_administration/relationshipService';
+import type { Relationship } from '../../models/system_administration';
 
-export interface DistrictSelectProps {
+export interface RelationshipSelectProps {
   value?: string;
-  onValueChange?: (value: string) => void;
-  regionId?: string;
+  onValueChange?: (value: string, relationship?: Relationship) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
-  ignoreRegion?: boolean;
 }
 
-export function DistrictSelect({
+export function RelationshipSelect({
   value,
   onValueChange,
-  regionId,
-  placeholder = 'Select district...',
+  placeholder = 'Select relationship...',
   disabled = false,
   className,
-  ignoreRegion = false,
-}: DistrictSelectProps) {
+}: RelationshipSelectProps) {
   const [open, setOpen] = useState(false);
-  const [districts, setDistricts] = useState<District[]>([]);
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch districts when component mounts, search query changes, or regionId changes
   useEffect(() => {
-    const loadDistricts = async () => {
+    const loadRelationships = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchDistricts({
+        const response = await fetchRelationships({
           search: searchQuery || undefined,
-          region: ignoreRegion ? undefined : (regionId || undefined),
-          is_active: true,
           ordering: 'name',
+          is_active: true,
         });
-        setDistricts(response.results);
+        setRelationships(response.results);
       } catch (err: any) {
-        console.error('Failed to load districts:', err);
-        setError(err.message || 'Failed to load districts');
+        console.error('Failed to load relationships:', err);
+        setError(err.message || 'Failed to load relationships');
       } finally {
         setLoading(false);
       }
     };
 
-    loadDistricts();
-  }, [searchQuery, regionId, ignoreRegion]);
+    loadRelationships();
+  }, [searchQuery]);
 
-  // Find selected district
-  const selectedDistrict = districts.find((district) => district.id === value);
+  const selectedRelationship = relationships.find((r) => r.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -78,20 +71,16 @@ export function DistrictSelect({
           role="combobox"
           aria-expanded={open}
           disabled={disabled}
-          className={cn(
-            'w-full justify-between',
-            !value && 'text-muted-foreground',
-            className
-          )}
+          className={cn('w-full justify-between', !value && 'text-muted-foreground', className)}
         >
-          {selectedDistrict ? selectedDistrict.name : placeholder}
+          {selectedRelationship ? selectedRelationship.name : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search districts..."
+            placeholder="Search relationships..."
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
@@ -101,38 +90,35 @@ export function DistrictSelect({
                 <Loader2 className="h-4 w-4 animate-spin" />
               </div>
             ) : error ? (
-              <div className="py-6 text-center text-sm text-red-600">
-                {error}
-              </div>
+              <div className="py-6 text-center text-sm text-red-600">{error}</div>
             ) : (
               <>
-                <CommandEmpty>No district found.</CommandEmpty>
+                <CommandEmpty>No relationship found.</CommandEmpty>
                 <CommandGroup>
-                  {districts.map((district) => (
+                  {relationships.map((relationship) => (
                     <CommandItem
-                      key={district.id}
-                      value={district.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      key={relationship.id}
+                      value={relationship.name}
+                      onSelect={() => {
+                        const newValue = relationship.id === value ? '' : relationship.id;
+                        onValueChange?.(
+                          newValue,
+                          newValue ? relationship : undefined
+                        );
                         setOpen(false);
                       }}
                     >
                       <Check
                         className={cn(
                           'mr-2 h-4 w-4',
-                          value === district.id ? 'opacity-100' : 'opacity-0'
+                          value === relationship.id ? 'opacity-100' : 'opacity-0'
                         )}
                       />
                       <div className="flex flex-col">
-                        <span>{district.name}</span>
-                        {district.description && (
+                        <span>{relationship.name}</span>
+                        {relationship.description && (
                           <span className="text-xs text-muted-foreground">
-                            {district.description}
-                          </span>
-                        )}
-                        {district.region_name && (
-                          <span className="text-xs text-muted-foreground">
-                            Region: {district.region_name}
+                            {relationship.description}
                           </span>
                         )}
                       </div>

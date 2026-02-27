@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Label } from '../ui/label';
 import { RegionSelect } from './RegionSelect';
 import { DistrictSelect } from './DistrictSelect';
@@ -51,40 +51,62 @@ export function AddressSelect({
   gridCols = 2,
   enableReverseCascade = true,
 }: AddressSelectProps) {
+  // Track previous values to detect actual changes
+  const prevRegionRef = useRef<string | undefined>(region);
+  const prevDistrictRef = useRef<string | undefined>(district);
+  const prevCountyRef = useRef<string | undefined>(county);
+  const prevSubCountyRef = useRef<string | undefined>(subCounty);
+  const prevParishRef = useRef<string | undefined>(parish);
+
   // Forward cascade: Reset dependent fields when parent changes
   useEffect(() => {
-    // When region changes, clear district and all dependent fields
-    if (district) {
-      onDistrictChange?.('');
+    // Only clear if region actually changed (not just on mount/re-render)
+    if (prevRegionRef.current !== region && prevRegionRef.current !== undefined) {
+      if (district) {
+        onDistrictChange?.('');
+      }
     }
+    prevRegionRef.current = region;
   }, [region]);
 
   useEffect(() => {
-    // When district changes, clear county and all dependent fields
-    if (county) {
-      onCountyChange?.('');
+    // Only clear if district actually changed
+    if (prevDistrictRef.current !== district && prevDistrictRef.current !== undefined) {
+      if (county) {
+        onCountyChange?.('');
+      }
     }
+    prevDistrictRef.current = district;
   }, [district]);
 
   useEffect(() => {
-    // When county changes, clear sub-county and all dependent fields
-    if (subCounty) {
-      onSubCountyChange?.('');
+    // Only clear if county actually changed
+    if (prevCountyRef.current !== county && prevCountyRef.current !== undefined) {
+      if (subCounty) {
+        onSubCountyChange?.('');
+      }
     }
+    prevCountyRef.current = county;
   }, [county]);
 
   useEffect(() => {
-    // When sub-county changes, clear parish and all dependent fields
-    if (parish) {
-      onParishChange?.('');
+    // Only clear if sub-county actually changed
+    if (prevSubCountyRef.current !== subCounty && prevSubCountyRef.current !== undefined) {
+      if (parish) {
+        onParishChange?.('');
+      }
     }
+    prevSubCountyRef.current = subCounty;
   }, [subCounty]);
 
   useEffect(() => {
-    // When parish changes, clear village
-    if (village) {
-      onVillageChange?.('');
+    // Only clear if parish actually changed
+    if (prevParishRef.current !== parish && prevParishRef.current !== undefined) {
+      if (village) {
+        onVillageChange?.('');
+      }
     }
+    prevParishRef.current = parish;
   }, [parish]);
 
   const gridClass = `grid grid-cols-1 md:grid-cols-${gridCols} gap-4`;

@@ -15,6 +15,7 @@ import { Card, CardContent } from '../ui/card';
 import { Search, Plus, Edit, Eye, FileText, ChevronLeft, ChevronRight } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
 import CourtDocumentForm from './CourtDocumentForm';
+import { getCourtattendance, getcourtdocuments } from '../../services/courtService';
 
 interface CourtDocumentRecord {
   id: string;
@@ -24,52 +25,9 @@ interface CourtDocumentRecord {
   court_attendance: string;
 }
 
-// Mock data for court documents
-const mockCourtDocuments: CourtDocumentRecord[] = [
-  {
-    id: '1',
-    court_attendance_details: 'Court Appearance - High Court Kampala - 2024-01-15',
-    description: 'Court summons for hearing on theft case',
-    document: 'summons_001.pdf',
-    court_attendance: '1'
-  },
-  {
-    id: '2',
-    court_attendance_details: 'Bail Hearing - Chief Magistrates Court - 2024-01-20',
-    description: 'Bail application documents',
-    document: 'bail_application_002.pdf',
-    court_attendance: '2'
-  },
-  {
-    id: '3',
-    court_attendance_details: 'Sentencing - Magistrates Court Nakawa - 2024-01-25',
-    description: 'Sentencing order and judgment',
-    document: 'sentencing_order_003.pdf',
-    court_attendance: '3'
-  },
-  {
-    id: '4',
-    court_attendance_details: 'Appeal Hearing - High Court Kampala - 2024-02-01',
-    description: 'Appeal notice and supporting documents',
-    document: 'appeal_notice_004.pdf',
-    court_attendance: '4'
-  },
-  {
-    id: '5',
-    court_attendance_details: 'Case Mention - Family Court Mengo - 2024-02-05',
-    description: 'Case mention report',
-    document: 'case_mention_005.pdf',
-    court_attendance: '5'
-  },
-];
 
-const mockCourtAttendanceRecords = [
-  { id: '1', details: 'Court Appearance - High Court Kampala - 2024-01-15' },
-  { id: '2', details: 'Bail Hearing - Chief Magistrates Court - 2024-01-20' },
-  { id: '3', details: 'Sentencing - Magistrates Court Nakawa - 2024-01-25' },
-  { id: '4', details: 'Appeal Hearing - High Court Kampala - 2024-02-01' },
-  { id: '5', details: 'Case Mention - Family Court Mengo - 2024-02-05' },
-];
+
+let mockCourtAttendanceRecords:any = [];
 
 export default function CourtDocumentList() {
   const [documents, setDocuments] = useState<CourtDocumentRecord[]>([]);
@@ -96,10 +54,24 @@ export default function CourtDocumentList() {
 
   const fetchDocuments = async () => {
     setLoading(true);
+
+
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setDocuments(mockCourtDocuments);
+     
+    //load attendance records
+      getCourtattendance().then((data) => {
+       // alert(JSON.stringify(data));
+          mockCourtAttendanceRecords = data.results;
+        }).catch((error) => {
+          alert(error);
+        });
+
+        getcourtdocuments().then((data) => {
+       // alert(JSON.stringify(data));
+          setDocuments(data.results);
+        }).catch((error) => {
+          alert(error);
+        });
     } catch (error) {
       toast.error('Failed to fetch court documents');
     } finally {
@@ -224,7 +196,7 @@ export default function CourtDocumentList() {
                   <SelectItem value="all">All Records</SelectItem>
                   {mockCourtAttendanceRecords.map((record) => (
                     <SelectItem key={record.id} value={record.id}>
-                      {record.details}
+                    {record.court_name}-{record.criminal_case_number}-{record.prisoner_name}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -283,7 +255,11 @@ export default function CourtDocumentList() {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4 text-red-600" />
-                          <span className="text-sm">{document.document}</span>
+
+                          <span className="text-sm">
+                            <a href={document.document} target="_blank" rel="noopener noreferrer">
+                           download</a>
+                          </span>
                         </div>
                       </TableCell>
                       <TableCell className="text-right">

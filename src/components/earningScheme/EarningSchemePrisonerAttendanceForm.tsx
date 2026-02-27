@@ -12,6 +12,7 @@ import {
 } from '../ui/select';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Calendar, DollarSign, Users, Briefcase, Award } from 'lucide-react';
+<<<<<<< HEAD
 
 interface AttendanceFormData {
   prisoner_name: string;
@@ -30,11 +31,27 @@ interface EarningSchemePrisonerAttendanceFormProps {
   onSubmit: (data: AttendanceFormData) => void;
   onCancel: () => void;
 }
+=======
+import { PrisonerRecord } from '../../models/admission';
+import { getPrisoners } from '../../services/admission';
+import { getEarningRateForPrisoner, getEarningRateTypes,getWorkingpartyPrisoners } from '../../services/gratuityService';
+
+
+import { getprisoners, getworkingparty } from '../../services/gateService';
+import { AttendanceFormData, EarningSchemePrisonerAttendanceFormProps } from '../../models/earningScheme/earning';
+import { WorkingParty } from '../../models/gate/Index';
+>>>>>>> ezama
 
 export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisonerAttendanceFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
+<<<<<<< HEAD
+=======
+  editData,
+  prisoners,
+  workingParties
+>>>>>>> ezama
 }) => {
   const [formData, setFormData] = useState<AttendanceFormData>({
     prisoner_name: '',
@@ -51,6 +68,7 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hoursWorked, setHoursWorked] = useState<string>('8');
 
+<<<<<<< HEAD
   useEffect(() => {
     if (initialData) {
       setFormData(initialData);
@@ -80,6 +98,82 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     { id: 'er-002', grade: 'Grade B (699)', amount: 699 },
     { id: 'er-003', grade: 'Grade C (280)', amount: 280 },
   ];
+=======
+
+
+  const [earningRates,setearningRates] = useState([
+  /*  { id: 'er-001', grade: 'Grade A (1398)', amount: 1398 },
+    { id: 'er-002', grade: 'Grade B (699)', amount: 699 },
+    { id: 'er-003', grade: 'Grade C (280)', amount: 280 },*/
+  ]);
+
+  const loadData = async() => {
+
+
+
+  }
+
+  useEffect(() => {
+
+    if (initialData) {
+          setFormData(initialData);
+    }
+  
+
+            
+
+          //its loaded all the time here
+          //but this needs to be loaded and passed as a prop to the form and not loaded in the form because its used in other places as well
+      if (editData) {
+     //   alert(`Edit data found: ${JSON.stringify(editData)}`);
+       const workingPartyPrisoner= prisoners.find(p => p.id === editData.working_party_prisoner);
+      if(workingPartyPrisoner)
+      {
+      let prisonerId = workingPartyPrisoner.prisoner;
+     getEarningRateForPrisoner(prisonerId).then((data) => {
+     setearningRates(data.results);
+      // setFormData({...formData,amount_earned: prisoner.amount_earned});
+  // alert(`Found working party prisoner: ${JSON.stringify(workingPartyPrisoner)}`);
+   setFormData(prev => ({...prev, prisoner_name: workingPartyPrisoner.prisoner_name,prisoner_id: prisonerId, 
+    working_party: editData.working_party_name,
+    working_party_prisoner: workingPartyPrisoner.id,
+     earning_rate_grade: workingPartyPrisoner.earning_rate_grade, earning_rate: workingPartyPrisoner.earning_rate}));
+   /* handleChange('prisoner_name', workingPartyPrisoner.prisoner_name);
+     handleChange('prisoner_id',prisonerId);
+     handleChange('working_party_prisoner', workingPartyPrisoner.id);
+      handleChange('earning_rate_grade', workingPartyPrisoner.earning_rate);
+     handleChange('earning_rate', workingPartyPrisoner.earning_rate);*/
+     // alert(`Found prisoner for editing: ${JSON.stringify(data.results)}`);
+    calculateEarnings(editData.is_present, "8", editData.earning_rate_grade);
+    
+      }
+      ).catch((error) => {
+        alert(error);
+      }
+      );
+    
+  
+    
+
+    }
+
+}
+     
+
+       /*    getEarningRateTypes().then((data) => {
+           alert(JSON.stringify(data.results));
+            setearningRates(data.results);
+          }).catch((error) => {
+            alert(error);
+          });*/
+
+
+                
+
+  }, [initialData]);
+
+
+>>>>>>> ezama
 
   // Calculate earnings based on attendance, hours worked, and grade
   const calculateEarnings = (isPresent: boolean, hours: string, grade: string) => {
@@ -88,10 +182,20 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     const hoursNum = parseFloat(hours) || 0;
     if (hoursNum < 3) return '0.00'; // No earnings if worked less than 3 hours
     
+<<<<<<< HEAD
     const selectedRate = earningRates.find(r => r.grade === grade);
     if (!selectedRate) return '0.00';
     
     return selectedRate.amount.toFixed(2);
+=======
+    const selectedRate = earningRates.find(r => r.earning_rate_grade == grade);
+   // alert(`Calculating earnings with isPresent=${isPresent}, hours=${hours}, grade=${grade} selectedRate=${JSON.stringify(selectedRate)}`);
+    
+    if (!selectedRate) return '0.00';
+    
+    //remove commas from the amount and convert to number
+    return parseFloat(selectedRate.earning_rate_amount.replace(/,/g, '')).toFixed(2);
+>>>>>>> ezama
   };
 
   useEffect(() => {
@@ -107,10 +211,44 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   };
 
   const handlePrisonerChange = (prisonerId: string) => {
+<<<<<<< HEAD
     const prisoner = prisoners.find(p => p.id === prisonerId);
     if (prisoner) {
       handleChange('prisoner_name', prisoner.name);
       handleChange('working_party_prisoner', prisonerId);
+=======
+
+    //b93828de-9440-45ca-89ea-08a391676261
+    const prisoner = prisoners.find(p => p.id === prisonerId);
+    //alert(JSON.stringify(prisonerId));
+    if (prisoner) {
+    //alert(JSON.stringify(prisoner));
+      //get the earning rate for the selected prisoner and set it in the form data
+      //getEarningRateForPrisoner
+      getEarningRateForPrisoner(prisoner.prisoner).then((data) => {
+    //alert(JSON.stringify(data.results));
+     setearningRates(data.results);
+      }
+      ).catch((error) => {
+        alert(error);
+      }
+      );
+      setFormData({...formData,earning_rate_grade: prisoner.earning_rate});
+     // handleChange('earning_rate', prisoner.earning_rate);
+      handleChange('prisoner_name', prisoner.prisoner_name);
+      handleChange('prisoner_id',prisonerId);
+      handleChange('working_party_prisoner', prisoner.id);
+       handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', 'None');
+
+    }
+    else{
+      handleChange('prisoner_name', '');
+      handleChange('prisoner_id','');
+      handleChange('working_party_prisoner', '');
+      handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', '');
+>>>>>>> ezama
     }
   };
 
@@ -121,9 +259,20 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   const handleEarningRateChange = (rateId: string) => {
     const rate = earningRates.find(r => r.id === rateId);
     if (rate) {
+<<<<<<< HEAD
       handleChange('earning_rate_grade', rate.grade);
       handleChange('earning_rate', rateId);
     }
+=======
+      handleChange('earning_rate_grade', rate.earning_rate_grade);
+      handleChange('earning_rate', rateId);
+    }
+    else{
+      handleChange('earning_rate_grade', '');
+      handleChange('earning_rate', 'None');
+
+    }
+>>>>>>> ezama
   };
 
   const validate = (): boolean => {
@@ -156,15 +305,28 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
         </Label>
         <Select
           value={formData.working_party_prisoner}
+<<<<<<< HEAD
           onValueChange={handlePrisonerChange}
         >
+=======
+          onValueChange={handlePrisonerChange}>
+>>>>>>> ezama
           <SelectTrigger id="prisoner" className={errors.prisoner_name ? 'border-red-500' : ''}>
             <SelectValue placeholder="Select prisoner..." />
           </SelectTrigger>
           <SelectContent>
+<<<<<<< HEAD
             {prisoners.map(prisoner => (
               <SelectItem key={prisoner.id} value={prisoner.id}>
                 {prisoner.name}
+=======
+              <SelectItem key="None" value='None'>
+                Select Prisoner
+              </SelectItem>
+            {prisoners.map(prisoner => (
+              <SelectItem key={prisoner.id} value={prisoner.id}>
+                {prisoner.prisoner_name}
+>>>>>>> ezama
               </SelectItem>
             ))}
           </SelectContent>
@@ -214,9 +376,19 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
             <SelectValue placeholder="Select earning grade..." />
           </SelectTrigger>
           <SelectContent>
+<<<<<<< HEAD
             {earningRates.map(rate => (
               <SelectItem key={rate.id} value={rate.id}>
                 {rate.grade} - UGX {rate.amount.toLocaleString()}
+=======
+              <SelectItem key="None" value='None'>
+                Select Earning Grade
+              </SelectItem>
+
+            {earningRates.map(rate => (
+              <SelectItem key={rate.id} value={rate.id}>
+                {rate.earning_rate_grade} - UGX {rate.earning_rate_amount.toLocaleString()}
+>>>>>>> ezama
               </SelectItem>
             ))}
           </SelectContent>
@@ -352,4 +524,8 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
       </div>
     </form>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> ezama

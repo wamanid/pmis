@@ -19,11 +19,10 @@ import {
   Users
 } from 'lucide-react';
 import { cn } from '../ui/utils';
-import { getPrisoners } from '../../services/admission/prisonerService';
+import { getPrisoners } from '../../services/admission';
 import { Prisoner, PrisonerFilters } from '../../models/admission';
-import { useFilterRefresh } from '../../hooks/useFilterRefresh';
 
-interface PrisonerSearchScreenProps {
+interface PrisonerSearchScreenMiniProps {
   value?: string; // Selected prisoner ID
   onChange?: (prisonerId: string, prisoner: Prisoner | null) => void;
   onPrisonerSelect?: (prisoner: Prisoner) => void;
@@ -34,7 +33,7 @@ interface PrisonerSearchScreenProps {
 }
 
 
-export default function PrisonerSearchScreen({ 
+export default function PrisonerSearchScreenMini({ 
   value,
   onChange,
   onPrisonerSelect,
@@ -42,16 +41,17 @@ export default function PrisonerSearchScreen({
   showTitle = true,
   label = 'Search Prisoner',
   required = false
-}: PrisonerSearchScreenProps) {
+}: PrisonerSearchScreenMiniProps) {
   const [selectedPrisonerId, setSelectedPrisonerId] = useState<string>(value || '');
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [openDropdown, setOpenDropdown] = useState(false);
   const [prisoners, setPrisoners] = useState<Prisoner[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  let canShow = false;
 
   // Load prisoner data from API with debounce
-  useFilterRefresh(() => {
+  useEffect(() => {
     const loadPrisoners = async () => {
       setIsLoading(true);
       try {
@@ -263,105 +263,7 @@ export default function PrisonerSearchScreen({
       {/* Prisoner Details Display */}
       {selectedPrisoner && (
         <Card>
-          <CardHeader style={{ borderBottom: '2px solid #650000' }}>
-            <CardTitle className="flex items-center gap-2 text-lg" style={{ color: '#650000' }}>
-              <User className="h-5 w-5" />
-              Prisoner Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="pt-6 text-sm">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {/* Prisoner Number */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Prisoner Number</span>
-                </div>
-                <p className="font-medium text-sm">{selectedPrisoner.prisoner_number_value}</p>
-              </div>
-
-              {/* Personal Number */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <CreditCard className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Personal Number</span>
-                </div>
-                <p className="font-medium text-sm">{selectedPrisoner.prisoner_personal_number_value}</p>
-              </div>
-
-              {/* Full Name */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <UserCircle className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Full Name</span>
-                </div>
-                <p className="font-medium text-sm">{selectedPrisoner.full_name}</p>
-              </div>
-
-              {/* First Name */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <UserCircle className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>First Name</span>
-                </div>
-                <p className="font-medium text-sm">{selectedPrisoner.first_name}</p>
-              </div>
-
-              {/* Last Name */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <UserCircle className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Last Name</span>
-                </div>
-                <p className="font-medium text-sm">{selectedPrisoner.last_name}</p>
-              </div>
-
-            
-              {/* Current Station */}
-              {selectedPrisoner.current_station_name && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <MapPin className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                    <span>Current Station</span>
-                  </div>
-                  <p className="font-medium text-sm">{selectedPrisoner.current_station_name}</p>
-                </div>
-              )}
-
-              {/* Status */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Users className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Status</span>
-                </div>
-                <Badge className={selectedPrisoner.is_active ? "bg-green-600 text-xs" : "bg-gray-600 text-xs"}>
-                  {selectedPrisoner.is_active ? 'Active' : 'Inactive'}
-                </Badge>
-              </div>
-
-              {/* Created Date */}
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 text-xs text-gray-600">
-                  <Calendar className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                  <span>Created Date</span>
-                </div>
-                <p className="font-medium text-sm">{formatDate(selectedPrisoner.created_datetime)}</p>
-              </div>
-
-              {/* Created By */}
-              {selectedPrisoner.created_by_details && (
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-600">
-                    <UserCircle className="h-3.5 w-3.5" style={{ color: '#650000' }} />
-                    <span>Created By</span>
-                  </div>
-                  <p className="font-medium text-sm">
-                    {selectedPrisoner.created_by_details.first_name} {selectedPrisoner.created_by_details.last_name}
-                  </p>
-                </div>
-              )}
-            </div>
-          </CardContent>
+          
         </Card>
       )}
     </div>

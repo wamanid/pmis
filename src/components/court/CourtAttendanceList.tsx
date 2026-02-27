@@ -33,9 +33,13 @@ import {
   Calendar,
   Filter,
   Download,
-  Eye
+  Eye,
+  EyeIcon
 } from 'lucide-react';
 import CourtAttendanceForm from './CourtAttendanceForm';
+import { PrisonerRecord } from '../../models/admission';
+import { deleteCourtAttendance, getAttendacetypes, getCourtDetails, getOffences, getOutcomes, getStations,getCourtattendance } from '../../services/courtService';
+import { getprisoners } from '../../services/gateService';
 
 interface CourtAttendanceRecord {
   id: string;
@@ -60,9 +64,30 @@ interface CourtAttendanceRecord {
   gate_pass: string;
 }
 
+interface CourtAttendanceRecord2 {
+  id: string;
+  prisoner_name: string;
+  attendance_type_name: string;
+  court_name: string;
+  offence_name: string;
+  case_outcome_name: string;
+  gate_pass: string;
+  remarks: string;
+  production_warrant: string;
+  criminal_case_number: string;
+  attendance_datetime: string;
+  legal_proceedings: string;
+  prisoner: string;
+  court_attendance_type: string;
+  court: string;
+  offence: string;
+  case_outcome: string;
+  appeal: string;
+}
+
 // Mock data
-const mockRecords: CourtAttendanceRecord[] = [
-  {
+let mockRecords2: CourtAttendanceRecord2[] = [
+  /*{
     id: '1',
     prisoner_name: 'John Doe Mukasa',
     attendance_type_name: 'Court Appearance',
@@ -83,95 +108,7 @@ const mockRecords: CourtAttendanceRecord[] = [
     case_outcome: '1',
     appeal: '1',
     gate_pass: '1'
-  },
-  {
-    id: '2',
-    prisoner_name: 'Sarah Jane Nakato',
-    attendance_type_name: 'Sentencing',
-    court_name: 'Chief Magistrates Court - Kampala',
-    offence_name: 'Fraud',
-    case_outcome_name: 'Convicted',
-    appeal_id: '',
-    gate_pass_number: 'GP-2024-002',
-    remarks: 'Sentenced to 5 years imprisonment',
-    production_warrant: 'warrant_002.jpg',
-    criminal_case_number: 'CCN-2024-002',
-    attendance_datetime: '2024-10-20T10:30:00',
-    legal_proceedings: 'Final sentencing delivered',
-    prisoner: 'pr2',
-    court_attendance_type: '3',
-    court: '2',
-    offence: '4',
-    case_outcome: '2',
-    appeal: '',
-    gate_pass: '2'
-  },
-  {
-    id: '3',
-    prisoner_name: 'Michael Peter Okello',
-    attendance_type_name: 'Bail Hearing',
-    court_name: 'Magistrates Court - Nakawa',
-    offence_name: 'Assault',
-    case_outcome_name: 'Bail Granted',
-    appeal_id: '',
-    gate_pass_number: 'GP-2024-003',
-    remarks: 'Bail granted with conditions',
-    production_warrant: 'warrant_003.jpg',
-    criminal_case_number: 'CCN-2024-003',
-    attendance_datetime: '2024-10-25T14:00:00',
-    legal_proceedings: 'Bail conditions set',
-    prisoner: 'pr3',
-    court_attendance_type: '2',
-    court: '3',
-    offence: '2',
-    case_outcome: '5',
-    appeal: '',
-    gate_pass: '3'
-  },
-  {
-    id: '4',
-    prisoner_name: 'David Emmanuel Musoke',
-    attendance_type_name: 'Appeal Hearing',
-    court_name: 'High Court - Kampala',
-    offence_name: 'Murder',
-    case_outcome_name: 'Remanded',
-    appeal_id: 'APP-2024-002',
-    gate_pass_number: 'GP-2024-004',
-    remarks: 'Appeal hearing in progress',
-    production_warrant: 'warrant_004.jpg',
-    criminal_case_number: 'CCN-2024-004',
-    attendance_datetime: '2024-10-28T11:00:00',
-    legal_proceedings: 'Appeal arguments presented',
-    prisoner: 'pr4',
-    court_attendance_type: '4',
-    court: '1',
-    offence: '3',
-    case_outcome: '6',
-    appeal: '2',
-    gate_pass: '1'
-  },
-  {
-    id: '5',
-    prisoner_name: 'Grace Mary Akello',
-    attendance_type_name: 'Case Mention',
-    court_name: 'Family Court - Mengo',
-    offence_name: 'Drug Trafficking',
-    case_outcome_name: 'Adjourned',
-    appeal_id: '',
-    gate_pass_number: 'GP-2024-005',
-    remarks: 'Awaiting witness testimony',
-    production_warrant: 'warrant_005.jpg',
-    criminal_case_number: 'CCN-2024-005',
-    attendance_datetime: '2024-11-01T08:30:00',
-    legal_proceedings: 'Case mentioned for next hearing',
-    prisoner: 'pr5',
-    court_attendance_type: '5',
-    court: '4',
-    offence: '5',
-    case_outcome: '1',
-    appeal: '',
-    gate_pass: '2'
-  }
+  },*/
 ];
 
 export default function CourtAttendanceList() {
@@ -182,6 +119,17 @@ export default function CourtAttendanceList() {
   const [editData, setEditData] = useState<CourtAttendanceRecord | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+
+  const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
+  const [uniqueCourts, setUniqueCourts] = useState<any[]>([]);
+  const [uniqueOffences, setUniqueOffences] = useState<any[]>([]);
+  const [stations, setStations] = useState<any[]>([]);
+  const [attendancetypes, setAttendancetypes] = useState<any[]>([]);
+  const [outcomes, setOutcomes] = useState<any[]>([]);
+  const [mockRecords, setCourtAttendanceRecord] = useState<CourtAttendanceRecord[]>([]);
+
+
+
 
   // Filter states
   const [searchTerm, setSearchTerm] = useState('');
@@ -207,14 +155,71 @@ export default function CourtAttendanceList() {
   const fetchRecords = async () => {
     setIsLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/court-attendance/attendance-records/?page=${currentPage}`);
-      // const data = await response.json();
-      // setRecords(data.results);
-      // setTotalRecords(data.count);
 
-      // Using mock data
-      await new Promise(resolve => setTimeout(resolve, 500));
+      //get the attendances
+
+    
+
+
+      getprisoners().then((data) => {
+     // alert(JSON.stringify(data.results));
+       setPrisoners(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+       getOutcomes().then((data) => {
+      //alert(JSON.stringify(data.results));
+       setOutcomes(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+       getAttendacetypes().then((data) => {
+       setAttendancetypes(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+   
+     getStations().then((data) => {
+       setStations(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+
+    getOffences().then((data) => {
+       setUniqueOffences(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+
+    //get courts
+    
+     getCourtDetails().then((data) => {
+    // alert(JSON.stringify(data.results));
+       setUniqueCourts(data.results);
+    }).catch((error) => {
+      alert(error);
+    });
+
+
+     getCourtattendance().then((data) => {
+      setRecords(data.results);
+       setCourtAttendanceRecord(data.results);
+      // alert(JSON.stringify(data.results));
+    }).catch((error) => {
+      alert(error);
+    });
+
+   
+
       setRecords(mockRecords);
       setTotalRecords(mockRecords.length);
     } catch (error) {
@@ -273,23 +278,23 @@ export default function CourtAttendanceList() {
   };
 
   const handleEdit = (record: CourtAttendanceRecord) => {
+   // alert(JSON.stringify(record))
     setEditData(record);
     setFormOpen(true);
   };
 
   const handleDelete = async (id: string) => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/court-attendance/attendance-records/${id}/`, {
-      //   method: 'DELETE'
-      // });
-      // if (!response.ok) throw new Error('Failed to delete record');
-
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
+      //delete here
+        deleteCourtAttendance(id).then((data) => {
       toast.success('Court attendance record deleted successfully');
       setDeleteId(null);
       fetchRecords();
+                }).catch((error) => {
+                  alert(error);
+                });
+      
+     
     } catch (error) {
       console.error('Error deleting court attendance record:', error);
       toast.error('Failed to delete court attendance record');
@@ -383,12 +388,12 @@ export default function CourtAttendanceList() {
                       <SelectValue placeholder="All Courts" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Courts</SelectItem>
-                      <SelectItem value="1">High Court - Kampala</SelectItem>
-                      <SelectItem value="2">Chief Magistrates Court</SelectItem>
-                      <SelectItem value="3">Magistrates Court - Nakawa</SelectItem>
-                      <SelectItem value="4">Family Court - Mengo</SelectItem>
-                      <SelectItem value="5">Commercial Court</SelectItem>
+                      <SelectItem value="All">All Courts</SelectItem>
+                      {uniqueCourts.map((prisoner) => (
+                      <SelectItem key={prisoner.name} value={prisoner.name}>
+                        {prisoner.name}
+                      </SelectItem>
+                    ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -400,12 +405,12 @@ export default function CourtAttendanceList() {
                       <SelectValue placeholder="All Types" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Types</SelectItem>
-                      <SelectItem value="1">Court Appearance</SelectItem>
-                      <SelectItem value="2">Bail Hearing</SelectItem>
-                      <SelectItem value="3">Sentencing</SelectItem>
-                      <SelectItem value="4">Appeal Hearing</SelectItem>
-                      <SelectItem value="5">Case Mention</SelectItem>
+                      <SelectItem value="All">All Types</SelectItem>
+                     {attendancetypes.map((prisoner) => (
+                      <SelectItem key={prisoner.name} value={prisoner.id}>
+                        {prisoner.name}
+                      </SelectItem>
+                    ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -417,13 +422,12 @@ export default function CourtAttendanceList() {
                       <SelectValue placeholder="All Outcomes" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All Outcomes</SelectItem>
-                      <SelectItem value="1">Adjourned</SelectItem>
-                      <SelectItem value="2">Convicted</SelectItem>
-                      <SelectItem value="3">Acquitted</SelectItem>
-                      <SelectItem value="4">Case Dismissed</SelectItem>
-                      <SelectItem value="5">Bail Granted</SelectItem>
-                      <SelectItem value="6">Remanded</SelectItem>
+                      <SelectItem value="All">All Outcomes</SelectItem>
+                       {outcomes.map((prisoner) => (
+                      <SelectItem key={prisoner.name} value={prisoner.id}>
+                        {prisoner.name}
+                      </SelectItem>
+                    ))}
                     </SelectContent>
                   </Select>
                 </div>
@@ -520,6 +524,18 @@ export default function CourtAttendanceList() {
                           >
                             <Edit className="h-4 w-4" />
                           </Button>
+                          {record.production_warrant && (
+                            <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => setDeleteId(record.id)}
+                            title="View Warrant"
+                            style={{ color: '#650000' }}
+                          >
+                            <a href={record.production_warrant} target="_blank" rel="noopener noreferrer"></a>
+                            <EyeIcon className="h-4 w-4" />
+                          </Button>
+                          )}
                           <Button
                             variant="outline"
                             size="icon"
@@ -549,6 +565,12 @@ export default function CourtAttendanceList() {
         }}
         onSuccess={fetchRecords}
         editData={editData}
+        prisoners={[]}
+        offenses={uniqueOffences}
+        courts={uniqueCourts}
+        stations={stations}
+        attendancetypes={attendancetypes}
+        coutcomes={outcomes}
       />
 
       {/* Delete Confirmation Dialog */}

@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useState } from 'react';
+=======
+import React, { useState, useEffect } from 'react';
+>>>>>>> ezama
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -41,6 +45,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EarningSchemePrisonerAttendanceForm } from './EarningSchemePrisonerAttendanceForm';
+<<<<<<< HEAD
 
 interface AttendanceRecord {
   id: string;
@@ -55,6 +60,13 @@ interface AttendanceRecord {
   earning_rate: string;
 }
 
+=======
+import { AttendanceRecord } from '../../models/earningScheme/earning';
+
+import {deleteEarningScheme, getEarningSchemes, getWorkingpartyPrisoners, saveEarningSchemes} from '../../services/gratuityService'
+import { PrisonerRecord } from '../../models/admission';
+import { getworkingparty } from '../../services/gateService';
+>>>>>>> ezama
 export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterWorkingParty, setFilterWorkingParty] = useState('all');
@@ -66,6 +78,7 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+<<<<<<< HEAD
   const recordsPerPage = 10;
 
   // Mock data for attendance records
@@ -134,6 +147,50 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
 
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
 
+=======
+  const [editData, setEditData] = useState<AttendanceRecord | null>(null);
+  const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
+    
+  const recordsPerPage = 10;
+  // Mock data for attendance records
+  const [mockAttendanceRecords,setMockAttendanceRecords]= useState<any[]>([
+  ]);
+    const [workingParties,setworkingParties]= useState([
+    ]);
+  useEffect(() => {
+  loadData();
+  }, []);
+   const loadData = () => {
+
+
+              getworkingparty().then((data) => {
+                setworkingParties(data.results);
+              }).catch((error) => {
+                alert(error);
+              });
+    
+
+
+        getWorkingpartyPrisoners().then((data) => {
+            const uniquePrisoners = Array.from(new Set(data.results.map(p => p.prisoner)))
+              .map(prisoner => {
+                return data.results.find(p => p.prisoner === prisoner);
+              }
+              ) as PrisonerRecord[];
+              setPrisoners(uniquePrisoners);
+            }).catch((error) => {
+
+            });
+             getEarningSchemes().then((data) => {
+            //alert(JSON.stringify(data.results));
+            setAttendanceRecords(data.results);
+          }).catch((error) => {
+            alert(error);
+          });
+          }
+  //userEffect here
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
+>>>>>>> ezama
   // Filter and search logic
   const filteredRecords = attendanceRecords.filter((record) => {
     const matchesSearch = 
@@ -163,8 +220,16 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   };
 
   const handleEdit = (record: AttendanceRecord) => {
+<<<<<<< HEAD
     setSelectedRecord(record);
     setIsFormOpen(true);
+=======
+    //alert(`Editing record for ${JSON.stringify(record)}`);
+    setSelectedRecord(record);
+    setIsFormOpen(true);
+    setEditData(record);
+   //working_party_prisoner
+>>>>>>> ezama
   };
 
   const handleView = (record: AttendanceRecord) => {
@@ -173,16 +238,36 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   };
 
   const handleDelete = (record: AttendanceRecord) => {
+<<<<<<< HEAD
+=======
+
+>>>>>>> ezama
     setSelectedRecord(record);
     setIsDeleteOpen(true);
   };
 
   const confirmDelete = () => {
     if (selectedRecord) {
+<<<<<<< HEAD
       setAttendanceRecords(attendanceRecords.filter(r => r.id !== selectedRecord.id));
       toast.success('Attendance record deleted successfully');
       setIsDeleteOpen(false);
       setSelectedRecord(null);
+=======
+     // setAttendanceRecords(attendanceRecords.filter(r => r.id !== selectedRecord.id));
+      
+        deleteEarningScheme(selectedRecord.id).then((data) => {
+     toast.success('Attendance record deleted successfully');
+      setIsDeleteOpen(false);
+      setSelectedRecord(null);
+
+      loadData();
+
+          }).catch((error) => {
+            alert(error);
+          });
+
+>>>>>>> ezama
     }
   };
 
@@ -196,6 +281,7 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
     } else {
       // Create new record
       const newRecord: AttendanceRecord = {
+<<<<<<< HEAD
         id: `${attendanceRecords.length + 1}`,
         ...data,
       };
@@ -204,6 +290,24 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
     }
     setIsFormOpen(false);
     setSelectedRecord(null);
+=======
+      //  id: `${attendanceRecords.length + 1}`,
+        ...data,
+      };
+    //alert(JSON.stringify(newRecord));
+     // setAttendanceRecords([...attendanceRecords, newRecord]);    
+    saveEarningSchemes(newRecord).then((data) => {
+    toast.success('Attendance record created successfully');
+    setIsFormOpen(false);
+    setSelectedRecord(null);
+      loadData();
+
+          }).catch((error) => {
+            alert(error);
+          });
+    }
+
+>>>>>>> ezama
   };
 
   const handleResetFilters = () => {
@@ -265,11 +369,19 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Parties</SelectItem>
+<<<<<<< HEAD
                   <SelectItem value="Workshop A">Workshop A</SelectItem>
                   <SelectItem value="Workshop B">Workshop B</SelectItem>
                   <SelectItem value="Kitchen">Kitchen</SelectItem>
                   <SelectItem value="Cleaning Squad">Cleaning Squad</SelectItem>
                   <SelectItem value="Shamba/Agriculture">Shamba/Agriculture</SelectItem>
+=======
+                  {workingParties.map((party) => (
+                    <SelectItem key={party.id} value={party.name}>
+                      {party.name}
+                    </SelectItem>
+                  ))}
+>>>>>>> ezama
                 </SelectContent>
               </Select>
             </div>
@@ -496,7 +608,15 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             onCancel={() => {
               setIsFormOpen(false);
               setSelectedRecord(null);
+<<<<<<< HEAD
             }}
+=======
+              setEditData(null);
+            }}
+            editData={editData}
+            prisoners={prisoners}
+            workingParties={workingParties}
+>>>>>>> ezama
           />
         </DialogContent>
       </Dialog>
@@ -585,4 +705,8 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
       </Dialog>
     </div>
   );
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> ezama

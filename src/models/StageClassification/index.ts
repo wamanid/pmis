@@ -20,6 +20,11 @@ export interface StageAssignmentPost {
   prisoner: String;
 }
 
+
+export interface  OffenceRequest {
+  prisoner: String;
+}
+
 export interface StageDemotionPost {
   prisoners?: String[];
   start_date: String;

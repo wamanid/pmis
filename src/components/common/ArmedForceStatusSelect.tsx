@@ -15,60 +15,53 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
-import { fetchDistricts } from '../../services/systemAdministrationService';
-import type { District } from '../../models/system_administration';
+import { fetchArmedForceStatuses } from '../../services/system_administration/armedForceStatusService';
+import type { ArmedForceStatus } from '../../models/system_administration/armedForceStatus';
 
-export interface DistrictSelectProps {
+export interface ArmedForceStatusSelectProps {
   value?: string;
-  onValueChange?: (value: string) => void;
-  regionId?: string;
+  onValueChange?: (value: string, armedForceStatus?: ArmedForceStatus) => void;
   placeholder?: string;
   disabled?: boolean;
   className?: string;
-  ignoreRegion?: boolean;
 }
 
-export function DistrictSelect({
+export function ArmedForceStatusSelect({
   value,
   onValueChange,
-  regionId,
-  placeholder = 'Select district...',
+  placeholder = 'Select armed force status...',
   disabled = false,
   className,
-  ignoreRegion = false,
-}: DistrictSelectProps) {
+}: ArmedForceStatusSelectProps) {
   const [open, setOpen] = useState(false);
-  const [districts, setDistricts] = useState<District[]>([]);
+  const [armedForceStatuses, setArmedForceStatuses] = useState<ArmedForceStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch districts when component mounts, search query changes, or regionId changes
   useEffect(() => {
-    const loadDistricts = async () => {
+    const loadArmedForceStatuses = async () => {
       try {
         setLoading(true);
         setError(null);
-        const response = await fetchDistricts({
+        const response = await fetchArmedForceStatuses({
           search: searchQuery || undefined,
-          region: ignoreRegion ? undefined : (regionId || undefined),
-          is_active: true,
           ordering: 'name',
+          is_active: true,
         });
-        setDistricts(response.results);
+        setArmedForceStatuses(response.results);
       } catch (err: any) {
-        console.error('Failed to load districts:', err);
-        setError(err.message || 'Failed to load districts');
+        console.error('Failed to load armed force statuses:', err);
+        setError(err.message || 'Failed to load armed force statuses');
       } finally {
         setLoading(false);
       }
     };
 
-    loadDistricts();
-  }, [searchQuery, regionId, ignoreRegion]);
+    loadArmedForceStatuses();
+  }, [searchQuery]);
 
-  // Find selected district
-  const selectedDistrict = districts.find((district) => district.id === value);
+  const selectedArmedForceStatus = armedForceStatuses.find((afs) => afs.id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -84,14 +77,14 @@ export function DistrictSelect({
             className
           )}
         >
-          {selectedDistrict ? selectedDistrict.name : placeholder}
+          {selectedArmedForceStatus ? selectedArmedForceStatus.name : placeholder}
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start">
         <Command shouldFilter={false}>
           <CommandInput
-            placeholder="Search districts..."
+            placeholder="Search armed force statuses..."
             value={searchQuery}
             onValueChange={setSearchQuery}
           />
@@ -106,33 +99,32 @@ export function DistrictSelect({
               </div>
             ) : (
               <>
-                <CommandEmpty>No district found.</CommandEmpty>
+                <CommandEmpty>No armed force status found.</CommandEmpty>
                 <CommandGroup>
-                  {districts.map((district) => (
+                  {armedForceStatuses.map((armedForceStatus) => (
                     <CommandItem
-                      key={district.id}
-                      value={district.id}
-                      onSelect={(currentValue: string) => {
-                        onValueChange?.(currentValue === value ? '' : currentValue);
+                      key={armedForceStatus.id}
+                      value={armedForceStatus.name}
+                      onSelect={() => {
+                        const newValue = armedForceStatus.id === value ? '' : armedForceStatus.id;
+                        onValueChange?.(
+                          newValue,
+                          newValue ? armedForceStatus : undefined
+                        );
                         setOpen(false);
                       }}
                     >
                       <Check
                         className={cn(
                           'mr-2 h-4 w-4',
-                          value === district.id ? 'opacity-100' : 'opacity-0'
+                          value === armedForceStatus.id ? 'opacity-100' : 'opacity-0'
                         )}
                       />
                       <div className="flex flex-col">
-                        <span>{district.name}</span>
-                        {district.description && (
+                        <span>{armedForceStatus.name}</span>
+                        {armedForceStatus.description && (
                           <span className="text-xs text-muted-foreground">
-                            {district.description}
-                          </span>
-                        )}
-                        {district.region_name && (
-                          <span className="text-xs text-muted-foreground">
-                            Region: {district.region_name}
+                            {armedForceStatus.description}
                           </span>
                         )}
                       </div>
