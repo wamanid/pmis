@@ -12,26 +12,6 @@ import {
 } from '../ui/select';
 import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
 import { Calendar, DollarSign, Users, Briefcase, Award } from 'lucide-react';
-<<<<<<< HEAD
-
-interface AttendanceFormData {
-  prisoner_name: string;
-  working_party_name: string;
-  earning_rate_grade: string;
-  is_present: boolean;
-  attendance_datetime: string;
-  amount_earned: string;
-  remarks: string;
-  working_party_prisoner: string;
-  earning_rate: string;
-}
-
-interface EarningSchemePrisonerAttendanceFormProps {
-  initialData?: AttendanceFormData | null;
-  onSubmit: (data: AttendanceFormData) => void;
-  onCancel: () => void;
-}
-=======
 import { PrisonerRecord } from '../../models/admission';
 import { getPrisoners } from '../../services/admission';
 import { getEarningRateForPrisoner, getEarningRateTypes,getWorkingpartyPrisoners } from '../../services/gratuityService';
@@ -40,18 +20,14 @@ import { getEarningRateForPrisoner, getEarningRateTypes,getWorkingpartyPrisoners
 import { getprisoners, getworkingparty } from '../../services/gateService';
 import { AttendanceFormData, EarningSchemePrisonerAttendanceFormProps } from '../../models/earningScheme/earning';
 import { WorkingParty } from '../../models/gate/Index';
->>>>>>> ezama
 
 export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisonerAttendanceFormProps> = ({
   initialData,
   onSubmit,
   onCancel,
-<<<<<<< HEAD
-=======
   editData,
   prisoners,
   workingParties
->>>>>>> ezama
 }) => {
   const [formData, setFormData] = useState<AttendanceFormData>({
     prisoner_name: '',
@@ -68,37 +44,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [hoursWorked, setHoursWorked] = useState<string>('8');
 
-<<<<<<< HEAD
-  useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    }
-  }, [initialData]);
-
-  // Mock data for dropdowns
-  const prisoners = [
-    { id: 'p-001', name: 'John Doe' },
-    { id: 'p-002', name: 'Jane Smith' },
-    { id: 'p-003', name: 'Michael Johnson' },
-    { id: 'p-004', name: 'Robert Brown' },
-    { id: 'p-005', name: 'David Wilson' },
-  ];
-
-  const workingParties = [
-    { id: 'wp-001', name: 'Workshop A' },
-    { id: 'wp-002', name: 'Kitchen' },
-    { id: 'wp-003', name: 'Cleaning Squad' },
-    { id: 'wp-004', name: 'Shamba/Agriculture' },
-    { id: 'wp-005', name: 'Livestock Care' },
-    { id: 'wp-006', name: 'Workshop B' },
-  ];
-
-  const earningRates = [
-    { id: 'er-001', grade: 'Grade A (1398)', amount: 1398 },
-    { id: 'er-002', grade: 'Grade B (699)', amount: 699 },
-    { id: 'er-003', grade: 'Grade C (280)', amount: 280 },
-  ];
-=======
 
 
   const [earningRates,setearningRates] = useState([
@@ -173,7 +118,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   }, [initialData]);
 
 
->>>>>>> ezama
 
   // Calculate earnings based on attendance, hours worked, and grade
   const calculateEarnings = (isPresent: boolean, hours: string, grade: string) => {
@@ -182,12 +126,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     const hoursNum = parseFloat(hours) || 0;
     if (hoursNum < 3) return '0.00'; // No earnings if worked less than 3 hours
     
-<<<<<<< HEAD
-    const selectedRate = earningRates.find(r => r.grade === grade);
-    if (!selectedRate) return '0.00';
-    
-    return selectedRate.amount.toFixed(2);
-=======
     const selectedRate = earningRates.find(r => r.earning_rate_grade == grade);
    // alert(`Calculating earnings with isPresent=${isPresent}, hours=${hours}, grade=${grade} selectedRate=${JSON.stringify(selectedRate)}`);
     
@@ -195,7 +133,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
     
     //remove commas from the amount and convert to number
     return parseFloat(selectedRate.earning_rate_amount.replace(/,/g, '')).toFixed(2);
->>>>>>> ezama
   };
 
   useEffect(() => {
@@ -211,12 +148,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   };
 
   const handlePrisonerChange = (prisonerId: string) => {
-<<<<<<< HEAD
-    const prisoner = prisoners.find(p => p.id === prisonerId);
-    if (prisoner) {
-      handleChange('prisoner_name', prisoner.name);
-      handleChange('working_party_prisoner', prisonerId);
-=======
 
     //b93828de-9440-45ca-89ea-08a391676261
     const prisoner = prisoners.find(p => p.id === prisonerId);
@@ -248,7 +179,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
       handleChange('working_party_prisoner', '');
       handleChange('earning_rate_grade', '');
       handleChange('earning_rate', '');
->>>>>>> ezama
     }
   };
 
@@ -259,11 +189,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
   const handleEarningRateChange = (rateId: string) => {
     const rate = earningRates.find(r => r.id === rateId);
     if (rate) {
-<<<<<<< HEAD
-      handleChange('earning_rate_grade', rate.grade);
-      handleChange('earning_rate', rateId);
-    }
-=======
       handleChange('earning_rate_grade', rate.earning_rate_grade);
       handleChange('earning_rate', rateId);
     }
@@ -272,7 +197,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
       handleChange('earning_rate', 'None');
 
     }
->>>>>>> ezama
   };
 
   const validate = (): boolean => {
@@ -305,28 +229,17 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
         </Label>
         <Select
           value={formData.working_party_prisoner}
-<<<<<<< HEAD
-          onValueChange={handlePrisonerChange}
-        >
-=======
           onValueChange={handlePrisonerChange}>
->>>>>>> ezama
           <SelectTrigger id="prisoner" className={errors.prisoner_name ? 'border-red-500' : ''}>
             <SelectValue placeholder="Select prisoner..." />
           </SelectTrigger>
           <SelectContent>
-<<<<<<< HEAD
-            {prisoners.map(prisoner => (
-              <SelectItem key={prisoner.id} value={prisoner.id}>
-                {prisoner.name}
-=======
               <SelectItem key="None" value='None'>
                 Select Prisoner
               </SelectItem>
             {prisoners.map(prisoner => (
               <SelectItem key={prisoner.id} value={prisoner.id}>
                 {prisoner.prisoner_name}
->>>>>>> ezama
               </SelectItem>
             ))}
           </SelectContent>
@@ -376,11 +289,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
             <SelectValue placeholder="Select earning grade..." />
           </SelectTrigger>
           <SelectContent>
-<<<<<<< HEAD
-            {earningRates.map(rate => (
-              <SelectItem key={rate.id} value={rate.id}>
-                {rate.grade} - UGX {rate.amount.toLocaleString()}
-=======
               <SelectItem key="None" value='None'>
                 Select Earning Grade
               </SelectItem>
@@ -388,7 +296,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
             {earningRates.map(rate => (
               <SelectItem key={rate.id} value={rate.id}>
                 {rate.earning_rate_grade} - UGX {rate.earning_rate_amount.toLocaleString()}
->>>>>>> ezama
               </SelectItem>
             ))}
           </SelectContent>
@@ -524,8 +431,4 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
       </div>
     </form>
   );
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> ezama
