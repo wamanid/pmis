@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
+﻿import React, { useState } from 'react';
+import { Button } from '../../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
 import { toast } from 'sonner@2.0.3';
 import { Plus, HeartHandshake } from 'lucide-react';
 import AfterCareForm from './AfterCareForm';

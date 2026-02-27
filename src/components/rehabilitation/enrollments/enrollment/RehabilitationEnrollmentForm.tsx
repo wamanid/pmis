@@ -1,16 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Calendar } from '../ui/calendar';
-import { Switch } from '../ui/switch';
-import { Card, CardContent } from '../ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog';
-import { Badge } from '../ui/badge';
+﻿import React, { useState, useEffect } from 'react';
+import { Button } from '../../../ui/button';
+import { Input } from '../../../ui/input';
+import { Label } from '../../../ui/label';
+import { Textarea } from '../../../ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../../ui/command';
+import { Calendar } from '../../../ui/calendar';
+import { Switch } from '../../../ui/switch';
+import { Card, CardContent } from '../../../ui/card';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../../ui/dialog';
+import { Badge } from '../../../ui/badge';
 import { toast } from 'sonner@2.0.3';
 import { 
   Search, 
@@ -23,7 +23,7 @@ import {
   User,
   BookOpen
 } from 'lucide-react';
-import { cn } from '../ui/utils';
+import { cn } from '../../../ui/utils';
 
 interface RehabilitationEnrollment {
   id?: string;

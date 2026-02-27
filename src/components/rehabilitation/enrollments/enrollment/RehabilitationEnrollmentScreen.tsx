@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
+﻿import React, { useState } from 'react';
+import { Card, CardContent } from '../../../ui/card';
+import { Button } from '../../../ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../ui/alert-dialog';
 import { toast } from 'sonner@2.0.3';
 import { Plus, BookOpen, Users, Award, TrendingUp } from 'lucide-react';
 import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
@@ -32,13 +32,45 @@ interface RehabilitationEnrollment {
   progress_status: string;
 }
 
-const EnrollmentsScreen: React.FC = () => {
+const RehabilitationEnrollmentScreen: React.FC = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedEnrollment, setSelectedEnrollment] = useState<RehabilitationEnrollment | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Stats data
+  const stats = [
+    {
+      title: 'Total Enrollments',
+      value: '45',
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50'
+    },
+    {
+      title: 'Active Programmes',
+      value: '28',
+      icon: BookOpen,
+      color: 'text-green-600',
+      bgColor: 'bg-green-50'
+    },
+    {
+      title: 'Certificates Awarded',
+      value: '12',
+      icon: Award,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-50'
+    },
+    {
+      title: 'Completion Rate',
+      value: '78%',
+      icon: TrendingUp,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-50'
+    }
+  ];
 
   const handleCreate = () => {
     setDialogMode('create');
@@ -93,7 +125,7 @@ const EnrollmentsScreen: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 style={{ color: '#650000' }}>Enrollments</h1>
+          <h1 style={{ color: '#650000' }}>Rehabilitation Enrollment Sessions</h1>
           <p className="text-gray-600">Manage prisoner enrollments in rehabilitation programmes</p>
         </div>
         <Button
@@ -104,6 +136,27 @@ const EnrollmentsScreen: React.FC = () => {
           <Plus className="h-4 w-4 mr-2" />
           New Enrollment
         </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        {stats.map((stat, index) => (
+          <Card key={index}>
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">{stat.title}</p>
+                  <p className="text-2xl" style={{ color: '#650000' }}>
+                    {stat.value}
+                  </p>
+                </div>
+                <div className={`${stat.bgColor} p-3 rounded-lg`}>
+                  <stat.icon className={`h-6 w-6 ${stat.color}`} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       {/* Enrollment List */}
@@ -163,4 +216,4 @@ const EnrollmentsScreen: React.FC = () => {
   );
 };
 
-export default EnrollmentsScreen;
+export default RehabilitationEnrollmentScreen;

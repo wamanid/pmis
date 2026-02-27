@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Card, CardContent } from '../ui/card';
-import { Badge } from '../ui/badge';
+﻿import React, { useState, useEffect } from 'react';
+import { Button } from '../../../ui/button';
+import { Input } from '../../../ui/input';
+import { Card, CardContent } from '../../../ui/card';
+import { Badge } from '../../../ui/badge';
 import { 
   Table, 
   TableBody, 
@@ -10,7 +10,7 @@ import {
   TableHead, 
   TableHeader, 
   TableRow 
-} from '../ui/table';
+} from '../../../ui/table';
 import { 
   Search, 
   Eye, 
@@ -30,7 +30,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../ui/alert-dialog';
+} from '../../../ui/alert-dialog';
 
 interface EnrollmentSession {
   id: string;

@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Label } from '../ui/label';
-import { Textarea } from '../ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
-import { Calendar } from '../ui/calendar';
+﻿import React, { useState, useEffect } from 'react';
+import { Button } from '../../../ui/button';
+import { Input } from '../../../ui/input';
+import { Label } from '../../../ui/label';
+import { Textarea } from '../../../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../../ui/command';
+import { Calendar } from '../../../ui/calendar';
 import { toast } from 'sonner@2.0.3';
 import { 
   Check, 
@@ -13,7 +13,7 @@ import {
   CalendarIcon,
   Clock
 } from 'lucide-react';
-import { cn } from '../ui/utils';
+import { cn } from '../../../ui/utils';
 
 interface EnrollmentSession {
   id?: string;
