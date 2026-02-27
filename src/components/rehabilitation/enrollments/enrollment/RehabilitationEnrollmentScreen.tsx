@@ -3,7 +3,7 @@ import { Card, CardContent } from '../../../ui/card';
 import { Button } from '../../../ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../ui/dialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../ui/alert-dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Plus, BookOpen, Users, Award, TrendingUp } from 'lucide-react';
 import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
 import RehabilitationEnrollmentList from './RehabilitationEnrollmentList';

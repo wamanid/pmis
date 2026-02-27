@@ -11,7 +11,7 @@ import { Switch } from '../../../ui/switch';
 import { Card, CardContent } from '../../../ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '../../../ui/dialog';
 import { Badge } from '../../../ui/badge';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { 
   Search, 
   Check, 

@@ -2,7 +2,7 @@
 import { Button } from '../../ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { Plus, HeartHandshake } from 'lucide-react';
 import AfterCareForm from './AfterCareForm';
 import AfterCareList from './AfterCareList';
