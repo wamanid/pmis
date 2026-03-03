@@ -16,11 +16,10 @@ import {
   Eye, 
   Edit, 
   Trash2, 
+  Calendar,
+  Clock,
   User,
-  Activity,
-  UserCircle,
-  FileText,
-  Image as ImageIcon
+  BookOpen
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -33,62 +32,136 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 
-interface AfterCare {
+interface EnrollmentSession {
   id: string;
   prisoner_name: string;
-  prisoner_number: string;
-  activity_name: string;
-  officer_name: string;
-  description: string;
-  photo?: string;
-  prisoner: string;
-  after_care_activity: string;
-  officer: number;
+  programme_name: string;
+  session_date: string;
+  session_duration: number;
+  remarks: string;
+  enrollment: string;
 }
 
-interface AfterCareListProps {
-  afterCares: AfterCare[];
-  onView: (afterCare: AfterCare) => void;
-  onEdit: (afterCare: AfterCare) => void;
+interface RehabilitationEnrollmentSessionListProps {
+  sessions?: EnrollmentSession[];
+  onView: (session: EnrollmentSession) => void;
+  onEdit: (session: EnrollmentSession) => void;
   onDelete: (id: string) => void;
+  enrollmentId?: string;
+  refreshTrigger?: number;
+  prisonerId?: string;
 }
 
-const AfterCareList: React.FC<AfterCareListProps> = ({
-  afterCares,
+// Mock sessions data
+const mockSessions: EnrollmentSession[] = [
+  {
+    id: '1',
+    prisoner_name: 'John Doe',
+    programme_name: 'Carpentry Skills',
+    session_date: '2025-11-01',
+    session_duration: 120,
+    remarks: 'Excellent progress in skills development.',
+    enrollment: '1',
+  },
+  {
+    id: '2',
+    prisoner_name: 'Jane Smith',
+    programme_name: 'Computer Literacy',
+    session_date: '2025-11-03',
+    session_duration: 90,
+    remarks: 'Good understanding of basic concepts.',
+    enrollment: '2',
+  },
+  {
+    id: '3',
+    prisoner_name: 'Michael Johnson',
+    programme_name: 'Agriculture Training',
+    session_date: '2025-11-05',
+    session_duration: 150,
+    remarks: 'Practical workshop session completed.',
+    enrollment: '3',
+  },
+];
+
+const RehabilitationEnrollmentSessionList: React.FC<RehabilitationEnrollmentSessionListProps> = ({
+  sessions: propSessions,
   onView,
   onEdit,
-  onDelete
+  onDelete,
+  enrollmentId,
+  refreshTrigger,
+  prisonerId,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredAfterCares, setFilteredAfterCares] = useState<AfterCare[]>(afterCares);
+  const [sessions, setSessions] = useState<EnrollmentSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<EnrollmentSession[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [afterCareToDelete, setAfterCareToDelete] = useState<string | null>(null);
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    const filtered = afterCares.filter(afterCare => {
+    if (propSessions) {
+      setSessions(propSessions);
+    } else {
+      loadSessions();
+    }
+  }, [propSessions, enrollmentId, refreshTrigger, prisonerId]);
+
+  const loadSessions = () => {
+    setLoading(true);
+    setTimeout(() => {
+      let data = mockSessions;
+      if (enrollmentId) {
+        data = data.filter((s) => s.enrollment === enrollmentId);
+      }
+      // Filter by prisonerId if provided (mock - in real API would filter by prisoner)
+      // For now just showing all sessions when no enrollmentId
+      setSessions(data);
+      setLoading(false);
+    }, 500);
+  };
+
+  useEffect(() => {
+    const filtered = sessions.filter(session => {
       const searchLower = searchTerm.toLowerCase();
       return (
-        afterCare.prisoner_name.toLowerCase().includes(searchLower) ||
-        afterCare.prisoner_number.toLowerCase().includes(searchLower) ||
-        afterCare.activity_name.toLowerCase().includes(searchLower) ||
-        afterCare.officer_name.toLowerCase().includes(searchLower) ||
-        afterCare.description.toLowerCase().includes(searchLower)
+        session.prisoner_name.toLowerCase().includes(searchLower) ||
+        session.programme_name.toLowerCase().includes(searchLower) ||
+        session.remarks.toLowerCase().includes(searchLower) ||
+        session.session_date.includes(searchLower)
       );
     });
-    setFilteredAfterCares(filtered);
-  }, [searchTerm, afterCares]);
+    setFilteredSessions(filtered);
+  }, [searchTerm, sessions]);
 
   const handleDeleteClick = (id: string) => {
-    setAfterCareToDelete(id);
+    setSessionToDelete(id);
     setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = () => {
-    if (afterCareToDelete) {
-      onDelete(afterCareToDelete);
+    if (sessionToDelete) {
+      onDelete(sessionToDelete);
       setDeleteDialogOpen(false);
-      setAfterCareToDelete(null);
+      setSessionToDelete(null);
     }
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric'
+    });
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) {
+      return `${minutes} min`;
+    }
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+    return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
   };
 
   return (
@@ -100,7 +173,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
               <Input
-                placeholder="Search by prisoner name, number, activity, officer, or description..."
+                placeholder="Search by prisoner name, programme, date, or remarks..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -113,7 +186,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
         </CardContent>
       </Card>
 
-      {/* After Care Table */}
+      {/* Sessions Table */}
       <Card>
         <CardContent className="pt-6">
           <div className="rounded-md border">
@@ -128,79 +201,67 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
                   </TableHead>
                   <TableHead className="text-white">
                     <div className="flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Prisoner Number
+                      <BookOpen className="h-4 w-4" />
+                      Programme
                     </div>
                   </TableHead>
                   <TableHead className="text-white">
                     <div className="flex items-center gap-2">
-                      <Activity className="h-4 w-4" />
-                      Activity
+                      <Calendar className="h-4 w-4" />
+                      Session Date
                     </div>
                   </TableHead>
                   <TableHead className="text-white">
                     <div className="flex items-center gap-2">
-                      <UserCircle className="h-4 w-4" />
-                      Responsible Officer
+                      <Clock className="h-4 w-4" />
+                      Duration
                     </div>
                   </TableHead>
-                  <TableHead className="text-white">Description</TableHead>
-                  <TableHead className="text-white">
-                    <div className="flex items-center gap-2">
-                      <ImageIcon className="h-4 w-4" />
-                      Photo
-                    </div>
-                  </TableHead>
+                  <TableHead className="text-white">Remarks</TableHead>
                   <TableHead className="text-white text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredAfterCares.length === 0 ? (
+                {filteredSessions.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="text-center py-8 text-gray-500">
-                      No after care records found
+                    <TableCell colSpan={6} className="text-center py-8 text-gray-500">
+                      No enrollment sessions found
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredAfterCares.map((afterCare) => (
-                    <TableRow key={afterCare.id} className="hover:bg-gray-50">
+                  filteredSessions.map((session) => (
+                    <TableRow key={session.id} className="hover:bg-gray-50">
                       <TableCell>
-                        <div>{afterCare.prisoner_name}</div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="bg-gray-50 text-gray-700 border-gray-200">
-                          {afterCare.prisoner_number}
-                        </Badge>
+                        <div>{session.prisoner_name}</div>
                       </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {afterCare.activity_name}
+                          {session.programme_name}
                         </Badge>
                       </TableCell>
                       <TableCell>
-                        <div className="text-sm">{afterCare.officer_name}</div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="max-w-[250px] truncate text-sm text-gray-600">
-                          {afterCare.description}
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-3 w-3 text-gray-500" />
+                          {formatDate(session.session_date)}
                         </div>
                       </TableCell>
                       <TableCell>
-                        {afterCare.photo ? (
-                          <div className="flex items-center gap-2 text-green-600">
-                            <ImageIcon className="h-4 w-4" />
-                            <span className="text-xs">Available</span>
-                          </div>
-                        ) : (
-                          <span className="text-xs text-gray-400">No photo</span>
-                        )}
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-3 w-3 text-gray-500" />
+                          {formatDuration(session.session_duration)}
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="max-w-[200px] truncate text-sm text-gray-600">
+                          {session.remarks || '-'}
+                        </div>
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onView(afterCare)}
+                            onClick={() => onView(session)}
                             className="h-8 w-8 p-0"
                           >
                             <Eye className="h-4 w-4" />
@@ -208,7 +269,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onEdit(afterCare)}
+                            onClick={() => onEdit(session)}
                             className="h-8 w-8 p-0"
                           >
                             <Edit className="h-4 w-4" />
@@ -216,7 +277,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleDeleteClick(afterCare.id)}
+                            onClick={() => handleDeleteClick(session.id)}
                             className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600"
                           >
                             <Trash2 className="h-4 w-4" />
@@ -231,10 +292,10 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
           </div>
 
           {/* Pagination Info */}
-          {filteredAfterCares.length > 0 && (
+          {filteredSessions.length > 0 && (
             <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
               <div>
-                Showing {filteredAfterCares.length} of {afterCares.length} record(s)
+                Showing {filteredSessions.length} of {sessions.length} session(s)
               </div>
             </div>
           )}
@@ -247,7 +308,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Deletion</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this after care record? This action cannot be undone.
+              Are you sure you want to delete this enrollment session? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -266,4 +327,4 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
   );
 };
 
-export default AfterCareList;
+export default RehabilitationEnrollmentSessionList;

@@ -1,8 +1,4 @@
-<<<<<<< HEAD
-import React, { useState } from 'react';
-=======
 import React, { useState, useEffect } from 'react';
->>>>>>> ezama
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -45,28 +41,11 @@ import {
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { EarningSchemePrisonerAttendanceForm } from './EarningSchemePrisonerAttendanceForm';
-<<<<<<< HEAD
-
-interface AttendanceRecord {
-  id: string;
-  prisoner_name: string;
-  working_party_name: string;
-  earning_rate_grade: string;
-  is_present: boolean;
-  attendance_datetime: string;
-  amount_earned: string;
-  remarks: string;
-  working_party_prisoner: string;
-  earning_rate: string;
-}
-
-=======
 import { AttendanceRecord } from '../../models/earningScheme/earning';
 
 import {deleteEarningScheme, getEarningSchemes, getWorkingpartyPrisoners, saveEarningSchemes} from '../../services/gratuityService'
 import { PrisonerRecord } from '../../models/admission';
 import { getworkingparty } from '../../services/gateService';
->>>>>>> ezama
 export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterWorkingParty, setFilterWorkingParty] = useState('all');
@@ -78,85 +57,16 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState<AttendanceRecord | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-<<<<<<< HEAD
-  const recordsPerPage = 10;
-
-  // Mock data for attendance records
-  const mockAttendanceRecords: AttendanceRecord[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      working_party_name: 'Workshop A',
-      earning_rate_grade: 'Grade A (1398)',
-      is_present: true,
-      attendance_datetime: '2025-11-29T08:00:00Z',
-      amount_earned: '1398.00',
-      remarks: 'Full day attendance',
-      working_party_prisoner: 'wp-001',
-      earning_rate: 'er-001',
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      working_party_name: 'Kitchen',
-      earning_rate_grade: 'Grade B (699)',
-      is_present: true,
-      attendance_datetime: '2025-11-29T08:00:00Z',
-      amount_earned: '699.00',
-      remarks: 'Weekend worker - Cook',
-      working_party_prisoner: 'wp-002',
-      earning_rate: 'er-002',
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      working_party_name: 'Cleaning Squad',
-      earning_rate_grade: 'Grade C (280)',
-      is_present: false,
-      attendance_datetime: '2025-11-29T08:00:00Z',
-      amount_earned: '0.00',
-      remarks: 'Absent - Sick',
-      working_party_prisoner: 'wp-003',
-      earning_rate: 'er-003',
-    },
-    {
-      id: '4',
-      prisoner_name: 'Robert Brown',
-      working_party_name: 'Shamba/Agriculture',
-      earning_rate_grade: 'Grade A (1398)',
-      is_present: true,
-      attendance_datetime: '2025-11-29T08:00:00Z',
-      amount_earned: '1398.00',
-      remarks: 'Present - 8 hours worked',
-      working_party_prisoner: 'wp-004',
-      earning_rate: 'er-001',
-    },
-    {
-      id: '5',
-      prisoner_name: 'David Wilson',
-      working_party_name: 'Workshop B',
-      earning_rate_grade: 'Grade B (699)',
-      is_present: true,
-      attendance_datetime: '2025-11-28T08:00:00Z',
-      amount_earned: '699.00',
-      remarks: 'Present - Standard shift',
-      working_party_prisoner: 'wp-005',
-      earning_rate: 'er-002',
-    },
-  ];
-
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
-
-=======
   const [editData, setEditData] = useState<AttendanceRecord | null>(null);
   const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
     
   const recordsPerPage = 10;
-  // Mock data for attendance records
   const [mockAttendanceRecords,setMockAttendanceRecords]= useState<any[]>([
   ]);
     const [workingParties,setworkingParties]= useState([
     ]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
+
   useEffect(() => {
   loadData();
   }, []);
@@ -188,9 +98,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             alert(error);
           });
           }
-  //userEffect here
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
->>>>>>> ezama
   // Filter and search logic
   const filteredRecords = attendanceRecords.filter((record) => {
     const matchesSearch = 
@@ -220,16 +127,9 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   };
 
   const handleEdit = (record: AttendanceRecord) => {
-<<<<<<< HEAD
-    setSelectedRecord(record);
-    setIsFormOpen(true);
-=======
-    //alert(`Editing record for ${JSON.stringify(record)}`);
     setSelectedRecord(record);
     setIsFormOpen(true);
     setEditData(record);
-   //working_party_prisoner
->>>>>>> ezama
   };
 
   const handleView = (record: AttendanceRecord) => {
@@ -238,24 +138,12 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   };
 
   const handleDelete = (record: AttendanceRecord) => {
-<<<<<<< HEAD
-=======
-
->>>>>>> ezama
     setSelectedRecord(record);
     setIsDeleteOpen(true);
   };
 
   const confirmDelete = () => {
     if (selectedRecord) {
-<<<<<<< HEAD
-      setAttendanceRecords(attendanceRecords.filter(r => r.id !== selectedRecord.id));
-      toast.success('Attendance record deleted successfully');
-      setIsDeleteOpen(false);
-      setSelectedRecord(null);
-=======
-     // setAttendanceRecords(attendanceRecords.filter(r => r.id !== selectedRecord.id));
-      
         deleteEarningScheme(selectedRecord.id).then((data) => {
      toast.success('Attendance record deleted successfully');
       setIsDeleteOpen(false);
@@ -266,8 +154,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
           }).catch((error) => {
             alert(error);
           });
-
->>>>>>> ezama
     }
   };
 
@@ -281,21 +167,8 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
     } else {
       // Create new record
       const newRecord: AttendanceRecord = {
-<<<<<<< HEAD
-        id: `${attendanceRecords.length + 1}`,
         ...data,
       };
-      setAttendanceRecords([...attendanceRecords, newRecord]);
-      toast.success('Attendance record created successfully');
-    }
-    setIsFormOpen(false);
-    setSelectedRecord(null);
-=======
-      //  id: `${attendanceRecords.length + 1}`,
-        ...data,
-      };
-    //alert(JSON.stringify(newRecord));
-     // setAttendanceRecords([...attendanceRecords, newRecord]);    
     saveEarningSchemes(newRecord).then((data) => {
     toast.success('Attendance record created successfully');
     setIsFormOpen(false);
@@ -306,8 +179,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             alert(error);
           });
     }
-
->>>>>>> ezama
   };
 
   const handleResetFilters = () => {
@@ -369,19 +240,11 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Parties</SelectItem>
-<<<<<<< HEAD
-                  <SelectItem value="Workshop A">Workshop A</SelectItem>
-                  <SelectItem value="Workshop B">Workshop B</SelectItem>
-                  <SelectItem value="Kitchen">Kitchen</SelectItem>
-                  <SelectItem value="Cleaning Squad">Cleaning Squad</SelectItem>
-                  <SelectItem value="Shamba/Agriculture">Shamba/Agriculture</SelectItem>
-=======
                   {workingParties.map((party) => (
                     <SelectItem key={party.id} value={party.name}>
                       {party.name}
                     </SelectItem>
                   ))}
->>>>>>> ezama
                 </SelectContent>
               </Select>
             </div>
@@ -608,15 +471,11 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             onCancel={() => {
               setIsFormOpen(false);
               setSelectedRecord(null);
-<<<<<<< HEAD
-            }}
-=======
               setEditData(null);
             }}
             editData={editData}
             prisoners={prisoners}
             workingParties={workingParties}
->>>>>>> ezama
           />
         </DialogContent>
       </Dialog>
@@ -705,8 +564,4 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
       </Dialog>
     </div>
   );
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> ezama

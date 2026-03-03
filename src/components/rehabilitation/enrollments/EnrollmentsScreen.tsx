@@ -7,6 +7,7 @@ import { toast } from 'sonner@2.0.3';
 import { Plus, BookOpen, Users, Award, TrendingUp } from 'lucide-react';
 import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
 import RehabilitationEnrollmentList from './RehabilitationEnrollmentList';
+import EnrollmentDetailView from './EnrollmentDetailView';
 
 interface RehabilitationEnrollment {
   id?: string;
@@ -89,9 +90,9 @@ const EnrollmentsScreen: React.FC = () => {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="w-full h-full p-6 space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between w-full">
         <div>
           <h1 style={{ color: '#650000' }}>Enrollments</h1>
           <p className="text-gray-600">Manage prisoner enrollments in rehabilitation programmes</p>
@@ -114,27 +115,70 @@ const EnrollmentsScreen: React.FC = () => {
         refreshTrigger={refreshTrigger}
       />
 
-      {/* Form Dialog */}
+      {/* Form/View Dialog */}
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
-        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto" style={{ width: '1200px' }}>
-          <DialogHeader>
-            <DialogTitle>
-              {dialogMode === 'create' && 'Create New Enrollment'}
-              {dialogMode === 'edit' && 'Edit Enrollment'}
-              {dialogMode === 'view' && 'View Enrollment Details'}
-            </DialogTitle>
-            <DialogDescription>
-              {dialogMode === 'create' && 'Enroll a prisoner in a rehabilitation programme'}
-              {dialogMode === 'edit' && 'Update enrollment information'}
-              {dialogMode === 'view' && 'View enrollment details and progress'}
-            </DialogDescription>
-          </DialogHeader>
-          <RehabilitationEnrollmentForm
-            enrollment={selectedEnrollment}
-            mode={dialogMode}
-            onSubmit={handleSubmit}
-            onCancel={handleCancel}
-          />
+        <DialogContent
+          className={
+            dialogMode === 'view'
+              ? 'max-w-[95vw] w-[1400px] max-h-[95vh] overflow-y-auto'
+              : 'max-w-[1200px] max-h-[90vh] overflow-y-auto'
+          }
+          style={dialogMode === 'view' ? { width: '1400px' } : { width: '1200px' }}
+        >
+          {dialogMode !== 'view' && (
+            <DialogHeader>
+              <DialogTitle>
+                {dialogMode === 'create' && 'Create New Enrollment'}
+                {dialogMode === 'edit' && 'Edit Enrollment'}
+              </DialogTitle>
+              <DialogDescription>
+                {dialogMode === 'create' && 'Enroll a prisoner in a rehabilitation programme'}
+                {dialogMode === 'edit' && 'Update enrollment information'}
+              </DialogDescription>
+            </DialogHeader>
+          )}
+          {dialogMode === 'view' && selectedEnrollment ? (
+            <EnrollmentDetailView
+              enrollment={selectedEnrollment as any}
+              onViewAssessment={(assessment) => {
+                console.log('View assessment:', assessment);
+              }}
+              onEditAssessment={(assessment) => {
+                console.log('Edit assessment:', assessment);
+              }}
+              onDeleteAssessment={(id) => {
+                console.log('Delete assessment:', id);
+                toast.success('Assessment deleted successfully');
+              }}
+              onViewSession={(session) => {
+                console.log('View session:', session);
+              }}
+              onEditSession={(session) => {
+                console.log('Edit session:', session);
+              }}
+              onDeleteSession={(id) => {
+                console.log('Delete session:', id);
+                toast.success('Session deleted successfully');
+              }}
+              onViewAfterCare={(afterCare) => {
+                console.log('View after care:', afterCare);
+              }}
+              onEditAfterCare={(afterCare) => {
+                console.log('Edit after care:', afterCare);
+              }}
+              onDeleteAfterCare={(id) => {
+                console.log('Delete after care:', id);
+                toast.success('After care record deleted successfully');
+              }}
+            />
+          ) : (
+            <RehabilitationEnrollmentForm
+              enrollment={selectedEnrollment}
+              mode={dialogMode}
+              onSubmit={handleSubmit}
+              onCancel={handleCancel}
+            />
+          )}
         </DialogContent>
       </Dialog>
 

@@ -73,7 +73,19 @@ const PrisonerDetailScreen: React.FC = () => {
     fetchPrisonerData();
   }, [id]);
 
-  const handleEdit = () => {
+  const handleEdit = async () => {
+    // Refetch bioData to ensure we have the latest data
+    if (id) {
+      try {
+        const biodataResult = await getPrisonerBiodataByPrisonerId(id);
+        if (biodataResult) {
+          setBioData(biodataResult);
+        }
+      } catch (error) {
+        console.error("Error refetching biodata:", error);
+        toast.error("Failed to load latest biodata");
+      }
+    }
     setIsEditDialogOpen(true);
   };
 
