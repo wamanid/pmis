@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BookOpen, Calendar, ClipboardCheck, Award, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
@@ -8,6 +8,16 @@ import RehabilitationEnrollmentList from './enrollments/enrollment/Rehabilitatio
 import EnrollmentAssessmentList from './enrollments/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
+import { Enrollment, Programme, Sponsor, ProgrammeStage } from '../../services/rehabilitation';
+import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
+import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
+import { StaffItem } from '../../services/stationServices/staffDeploymentService';
+import {
+  getEnrollmentList,
+  getProgrammesList,
+  getCertificationList,
+  getProgressStatusList
+} from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
   DialogContent,
@@ -54,6 +64,34 @@ const RehabilitationDetailView: React.FC = () => {
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare'>('enrollments');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Backend data state
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const [certifications, setCertifications] = useState<Unit[]>([]);
+  const [statuses, setStatuses] = useState<Unit[]>([]);
+  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([]);
+  const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [programmeStages, setProgrammeStages] = useState<ProgrammeStage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loader, setLoader] = useState(false);
+  const [newDialogLoader, setNewDialogLoader] = useState(false);
+
+  // Load dropdown data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        getEnrollmentList(setEnrollments),
+        getProgrammesList(setProgrammes),
+        getCertificationList(setCertifications),
+        getProgressStatusList(setStatuses)
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [refreshTrigger]);
 
   // Dialog states
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
@@ -370,7 +408,10 @@ const RehabilitationDetailView: React.FC = () => {
                 onEdit={handleEditEnrollment}
                 onDelete={handleDeleteEnrollment}
                 refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
+                enrollments={enrollments}
+                programmes={programmes}
+                certifications={certifications}
+                statuses={statuses}
               />
             </div>
           )}
@@ -457,6 +498,19 @@ const RehabilitationDetailView: React.FC = () => {
                 setShowEnrollmentDialog(false);
                 setSelectedEnrollment(null);
               }}
+              prisoners={prisoners}
+              setPrisoners={setPrisoners}
+              staff={staff}
+              setStaff={setStaff}
+              sponsors={sponsors}
+              setSponsors={setSponsors}
+              programmeStages={programmeStages}
+              setProgrammeStages={setProgrammeStages}
+              programmes={programmes}
+              statuses={statuses}
+              loader={loader}
+              setLoader={setLoader}
+              setNewDialogLoader={setNewDialogLoader}
             />
           )}
         </DialogContent>
