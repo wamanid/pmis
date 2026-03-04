@@ -8,7 +8,7 @@ import { Plus, BookOpen, Users, Award, TrendingUp } from 'lucide-react';
 import RehabilitationEnrollmentForm from './enrollment/RehabilitationEnrollmentForm';
 import RehabilitationEnrollmentList from './enrollment/RehabilitationEnrollmentList';
 import {
-  addEnrollment,
+  addEnrollment, deleteEnrollment,
   Enrollment,
   Programme,
   ProgrammeStage,
@@ -24,7 +24,7 @@ import {
 import {handleCatchError, handleResponseError} from "../../../services/stationServices/utils";
 import {PrisonerItem} from "../../../services/stationServices/visitorsServices/VisitorsService";
 import {StaffItem} from "../../../services/stationServices/staffDeploymentService";
-import {addCaseBook, updateCaseBook} from "../../../services/medical/medicalInformation/medical";
+import {addCaseBook, deleteCaseBook, updateCaseBook} from "../../../services/medical/medicalInformation/medical";
 
 // interface RehabilitationEnrollment {
 //   id?: string;
@@ -123,16 +123,30 @@ const EnrollmentsScreen: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
+
+    if (!enrollmentToDelete) return
+
+    try {
+      await deleteEnrollment(enrollmentToDelete)
+      setEnrollments(prev => prev.filter(rec => rec.id !== enrollmentToDelete))
+      toast.success('Enrollment deleted successfully');
+      setShowDeleteDialog(false);
+      setEnrollmentToDelete(null);
+
+    }catch (error) {
+      handleCatchError(error)
+    }
+
     // Simulate API call
-    toast.success('Enrollment deleted successfully');
-    setShowDeleteDialog(false);
-    setEnrollmentToDelete(null);
-    setRefreshTrigger((prev) => prev + 1);
+    // toast.success('Enrollment deleted successfully');
+    // setShowDeleteDialog(false);
+    // setEnrollmentToDelete(null);
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleSubmit = async (data: RehabilitationEnrollment) => {
-    console.log(data)
+    // console.log(data)
     try {
       let response
       if (selectedEnrollment) {
@@ -143,19 +157,21 @@ const EnrollmentsScreen: React.FC = () => {
       }
       if (handleResponseError(response)) return;
 
-      if (!('id' in response)) {
-        toast.error("Failed to update the enrollments table");
-        return;
-      }
+      // console.log(response)
 
       if (selectedEnrollment) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the enrollments table");
+          return;
+        }
         setEnrollments(prev => (
             prev.map(item => item.id === response.id ? response : item)
         ));
         toast.success('Enrollment updated successfully');
       }
       else {
-        setEnrollments(prev => [response, ...prev]);
+        const enrollments = response.enrollments
+        setEnrollments(prev => [...enrollments, ...prev]);
         toast.success('Enrollment created successfully');
       }
 

@@ -137,10 +137,10 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     certificate_awarded: false,
     certification_document: '',
     comment: '',
-    prisoner: [],
+    prisoners: [],
     programme: '',
     programme_stage: '',
-    rehabilitation_sponsor: '',
+    rehabilitation_sponsor: null,
     responsible_officer: '',
     progress_status: ''
   });
@@ -225,9 +225,9 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
         prisonersOk = await getPrisonersList(setPrisoners)
       }
 
-      await getSponsorList(setSponsors)
+      if (!sponsors.length) await getSponsorList(setSponsors)
       // await getProgrammeStagesList("asas", setProgrammeStages)
-      await getStaffList(setStaff)
+      if(!staff.length) await getStaffList(setStaff)
 
       if (prisonersOk) {
         setDataLoaded(false)
@@ -244,15 +244,17 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
   useEffect(() => {
     if (enrollment) {
-      const prisonerIds = Array.isArray(enrollment.prisoner) 
-        ? enrollment.prisoner 
-        : enrollment.prisoner 
-        ? [enrollment.prisoner] 
-        : [];
+      console.log(enrollment)
+      const prisonerIds = [enrollment.prisoner]
+      // const prisonerIds = Array.isArray(enrollment.prisoners)
+      //   ? enrollment.prisoners
+      //   : enrollment.prisoners
+      //   ? [enrollment.prisoners]
+      //   : [];
       
       setFormData({
         ...enrollment,
-        prisoner: prisonerIds,
+        prisoners: prisonerIds,
         programme: enrollment.programme || '',
         programme_stage: enrollment.programme_stage || '',
         rehabilitation_sponsor: enrollment.rehabilitation_sponsor || '',
@@ -283,7 +285,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     e.preventDefault();
     
     // Validation
-    const prisonerArray = Array.isArray(formData.prisoner) ? formData.prisoner : [];
+    const prisonerArray = Array.isArray(formData.prisoners) ? formData.prisoners : [];
     if (prisonerArray.length === 0) {
       toast.error('Please select at least one prisoner');
       return;
@@ -325,7 +327,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     if (!selectedPrisonerIds.includes(prisonerId)) {
       const newSelectedIds = [...selectedPrisonerIds, prisonerId];
       setSelectedPrisonerIds(newSelectedIds);
-      handleInputChange('prisoner', newSelectedIds);
+      handleInputChange('prisoners', newSelectedIds);
     }
     setPrisonerSearch('');
   };
@@ -333,7 +335,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
   const handleRemovePrisoner = (prisonerId: string) => {
     const newSelectedIds = selectedPrisonerIds.filter(id => id !== prisonerId);
     setSelectedPrisonerIds(newSelectedIds);
-    handleInputChange('prisoner', newSelectedIds);
+    handleInputChange('prisoners', newSelectedIds);
   };
 
   const selectedPrisoners = prisoners.filter(p => selectedPrisonerIds.includes(p.id));
