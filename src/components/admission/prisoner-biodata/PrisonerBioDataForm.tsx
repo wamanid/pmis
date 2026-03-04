@@ -77,12 +77,14 @@ interface PrisonerBiodataFormProps {
   bioData: PrisonerBiodata | null;
   onSubmit: (data: PrisonerBiodata) => void;
   onCancel: () => void;
+  skipNavigation?: boolean; // If true, don't navigate after submission (for multi-step forms)
 }
 
 const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
   bioData,
   onSubmit,
   onCancel,
+  skipNavigation = false,
 }) => {
   const { station } = useFilters();
   const prisonerCategory = useMemo(() => {
@@ -155,57 +157,116 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
 
   useEffect(() => {
     if (bioData) {
-      reset(bioData);
+      console.log('🔍 BioData received:', bioData);
+      
+      // Reset the entire form with bioData - this will update all watch() values
+      reset(bioData, { 
+        keepErrors: false,
+        keepDirty: false,
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepIsValid: false,
+        keepSubmitCount: false,
+      });
 
-      if ((bioData as any).continent) {
-        setValue('continent' as keyof PrisonerBiodata, coerceIdToUuid((bioData as any).continent) as any);
-      }
-      
-      // Populate address fields explicitly for AddressSelect components
-      if (bioData.address_region) setValue("address_region", bioData.address_region);
-      if (bioData.address_district) setValue("address_district", bioData.address_district);
-      if (bioData.address_county) setValue("address_county", bioData.address_county);
-      if (bioData.address_sub_county) setValue("address_sub_county", bioData.address_sub_county);
-      if (bioData.address_parish) setValue("address_parish", bioData.address_parish);
-      if (bioData.address_village) setValue("address_village", bioData.address_village);
-      
-      if (bioData.permanent_region) setValue("permanent_region", bioData.permanent_region);
-      if (bioData.permanent_district) setValue("permanent_district", bioData.permanent_district);
-      if (bioData.permanent_county) setValue("permanent_county", bioData.permanent_county);
-      if (bioData.permanent_sub_county) setValue("permanent_sub_county", bioData.permanent_sub_county);
-      if (bioData.permanent_parish) setValue("permanent_parish", bioData.permanent_parish);
-      if (bioData.permanent_village) setValue("permanent_village", bioData.permanent_village);
-      
-      // Populate birth location fields
-      if (bioData.birth_region) setValue("birth_region", bioData.birth_region);
-      if (bioData.birth_district) setValue("birth_district", bioData.birth_district);
-      if (bioData.birth_county) setValue("birth_county", bioData.birth_county);
-      if (bioData.birth_sub_county) setValue("birth_sub_county", bioData.birth_sub_county);
-      if (bioData.birth_parish) setValue("birth_parish", bioData.birth_parish);
-      if (bioData.birth_village) setValue("birth_village", bioData.birth_village);
-      
-      // Populate physical characteristics fields
-      if (bioData.build) setValue("build", bioData.build);
-      if (bioData.face) setValue("face", bioData.face);
-      if (bioData.eyes) setValue("eyes", bioData.eyes);
-      if (bioData.mouth) setValue("mouth", bioData.mouth);
-      if (bioData.teeth) setValue("teeth", bioData.teeth);
-      if (bioData.lips) setValue("lips", bioData.lips);
-      if (bioData.ears) setValue("ears", bioData.ears);
-      if (bioData.hair) setValue("hair", bioData.hair);
-      if (bioData.speech) setValue("speech", bioData.speech);
-      
-      // Populate arrest location fields
-      if (bioData.arrest_region) setValue("arrest_region", bioData.arrest_region);
-      if (bioData.arrest_district) setValue("arrest_district", bioData.arrest_district);
-      if (bioData.arrest_county) setValue("arrest_county", bioData.arrest_county);
-      if (bioData.arrest_sub_county) setValue("arrest_sub_county", bioData.arrest_sub_county);
-      if (bioData.arrest_parish) setValue("arrest_parish", bioData.arrest_parish);
-      if (bioData.arrest_village) setValue("arrest_village", bioData.arrest_village);
-      
-      // Populate record fields
-      if (bioData.desired_district_of_release) setValue("desired_district_of_release", bioData.desired_district_of_release);
-      if (bioData.prisoner_class) setValue("prisoner_class", bioData.prisoner_class);
+      // Force update select dropdown fields to ensure they're populated
+      // Using setTimeout to ensure the reset has completed
+      // Extract IDs from nested objects since API returns {id, name} format
+      setTimeout(() => {
+        console.log('⏰ Setting values after reset...');
+        if (bioData.sex) setValue("sex", typeof bioData.sex === 'string' ? bioData.sex : (bioData.sex as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.marital_status) setValue("marital_status", typeof bioData.marital_status === 'string' ? bioData.marital_status : (bioData.marital_status as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.education_level) setValue("education_level", typeof bioData.education_level === 'string' ? bioData.education_level : (bioData.education_level as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.employment_status) setValue("employment_status", typeof bioData.employment_status === 'string' ? bioData.employment_status : (bioData.employment_status as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.nationality) setValue("nationality", typeof bioData.nationality === 'string' ? bioData.nationality : (bioData.nationality as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.tribe) setValue("tribe", typeof bioData.tribe === 'string' ? bioData.tribe : (bioData.tribe as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.religion) setValue("religion", typeof bioData.religion === 'string' ? bioData.religion : (bioData.religion as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.status_of_women) setValue("status_of_women", typeof bioData.status_of_women === 'string' ? bioData.status_of_women : (bioData.status_of_women as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.id_type) setValue("id_type", typeof bioData.id_type === 'string' ? bioData.id_type : (bioData.id_type as any)?.id, { shouldValidate: false, shouldDirty: false });
+        
+        // Populate physical characteristics
+        if (bioData.build) setValue("build", typeof bioData.build === 'string' ? bioData.build : (bioData.build as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.face) setValue("face", typeof bioData.face === 'string' ? bioData.face : (bioData.face as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.eyes) setValue("eyes", typeof bioData.eyes === 'string' ? bioData.eyes : (bioData.eyes as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.mouth) setValue("mouth", typeof bioData.mouth === 'string' ? bioData.mouth : (bioData.mouth as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.teeth) setValue("teeth", typeof bioData.teeth === 'string' ? bioData.teeth : (bioData.teeth as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.lips) setValue("lips", typeof bioData.lips === 'string' ? bioData.lips : (bioData.lips as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.ears) setValue("ears", typeof bioData.ears === 'string' ? bioData.ears : (bioData.ears as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.hair) setValue("hair", typeof bioData.hair === 'string' ? bioData.hair : (bioData.hair as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.speech) setValue("speech", typeof bioData.speech === 'string' ? bioData.speech : (bioData.speech as any)?.id, { shouldValidate: false, shouldDirty: false });
+        
+        // Populate address fields - extract IDs from nested objects
+        console.log('📍 Current Address Fields:', {
+          region: bioData.address_region,
+          district: bioData.address_district,
+          county: bioData.address_county,
+          sub_county: bioData.address_sub_county,
+          parish: bioData.address_parish,
+          village: bioData.address_village
+        });
+        
+        if (bioData.address_region) {
+          const regionId = typeof bioData.address_region === 'string' ? bioData.address_region : (bioData.address_region as any)?.id;
+          console.log('Setting address_region:', regionId);
+          setValue("address_region", regionId, { shouldValidate: false, shouldDirty: false });
+        }
+        if (bioData.address_district) {
+          const districtId = typeof bioData.address_district === 'string' ? bioData.address_district : (bioData.address_district as any)?.id;
+          console.log('Setting address_district:', districtId);
+          setValue("address_district", districtId, { shouldValidate: false, shouldDirty: false });
+        }
+        if (bioData.address_county) {
+          const countyId = typeof bioData.address_county === 'string' ? bioData.address_county : (bioData.address_county as any)?.id;
+          console.log('Setting address_county:', countyId);
+          setValue("address_county", countyId, { shouldValidate: false, shouldDirty: false });
+        }
+        if (bioData.address_sub_county) {
+          const subCountyId = typeof bioData.address_sub_county === 'string' ? bioData.address_sub_county : (bioData.address_sub_county as any)?.id;
+          console.log('Setting address_sub_county:', subCountyId);
+          setValue("address_sub_county", subCountyId, { shouldValidate: false, shouldDirty: false });
+        }
+        if (bioData.address_parish) {
+          const parishId = typeof bioData.address_parish === 'string' ? bioData.address_parish : (bioData.address_parish as any)?.id;
+          console.log('Setting address_parish:', parishId);
+          setValue("address_parish", parishId, { shouldValidate: false, shouldDirty: false });
+        }
+        if (bioData.address_village) {
+          const villageId = typeof bioData.address_village === 'string' ? bioData.address_village : (bioData.address_village as any)?.id;
+          console.log('Setting address_village:', villageId);
+          setValue("address_village", villageId, { shouldValidate: false, shouldDirty: false });
+        }
+        
+        if (bioData.permanent_region) setValue("permanent_region", typeof bioData.permanent_region === 'string' ? bioData.permanent_region : (bioData.permanent_region as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.permanent_district) setValue("permanent_district", typeof bioData.permanent_district === 'string' ? bioData.permanent_district : (bioData.permanent_district as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.permanent_county) setValue("permanent_county", typeof bioData.permanent_county === 'string' ? bioData.permanent_county : (bioData.permanent_county as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.permanent_sub_county) setValue("permanent_sub_county", typeof bioData.permanent_sub_county === 'string' ? bioData.permanent_sub_county : (bioData.permanent_sub_county as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.permanent_parish) setValue("permanent_parish", typeof bioData.permanent_parish === 'string' ? bioData.permanent_parish : (bioData.permanent_parish as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.permanent_village) setValue("permanent_village", typeof bioData.permanent_village === 'string' ? bioData.permanent_village : (bioData.permanent_village as any)?.id, { shouldValidate: false, shouldDirty: false });
+        
+        if (bioData.birth_region) setValue("birth_region", typeof bioData.birth_region === 'string' ? bioData.birth_region : (bioData.birth_region as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.birth_district) setValue("birth_district", typeof bioData.birth_district === 'string' ? bioData.birth_district : (bioData.birth_district as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.birth_county) setValue("birth_county", typeof bioData.birth_county === 'string' ? bioData.birth_county : (bioData.birth_county as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.birth_sub_county) setValue("birth_sub_county", typeof bioData.birth_sub_county === 'string' ? bioData.birth_sub_county : (bioData.birth_sub_county as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.birth_parish) setValue("birth_parish", typeof bioData.birth_parish === 'string' ? bioData.birth_parish : (bioData.birth_parish as any)?.id, { shouldValidate: false, shouldDirty: false });
+        if (bioData.birth_village) setValue("birth_village", typeof bioData.birth_village === 'string' ? bioData.birth_village : (bioData.birth_village as any)?.id, { shouldValidate: false, shouldDirty: false });
+        
+        // Note: Arrest location and prisoner_class fields are populated from prisoner records, not biodata
+        // However, if prisoner_class exists in bioData as an object, extract its ID to prevent format mismatch
+        if (bioData.prisoner_class) {
+          const prisonerClassId = typeof bioData.prisoner_class === 'string' ? bioData.prisoner_class : (bioData.prisoner_class as any)?.id;
+          if (prisonerClassId) {
+            console.log('Setting prisoner_class from bioData (will be overwritten by record):', prisonerClassId);
+            setValue("prisoner_class", prisonerClassId, { shouldValidate: false, shouldDirty: false });
+          }
+        }
+        
+        if (bioData.desired_district_of_release) setValue("desired_district_of_release", typeof bioData.desired_district_of_release === 'string' ? bioData.desired_district_of_release : (bioData.desired_district_of_release as any)?.id, { shouldValidate: false, shouldDirty: false });
+        
+        if ((bioData as any).continent) {
+          const continentId = typeof (bioData as any).continent === 'string' ? (bioData as any).continent : (bioData as any).continent?.id;
+          setValue('continent' as keyof PrisonerBiodata, coerceIdToUuid(continentId) as any, { shouldValidate: false, shouldDirty: false });
+        }
+      }, 0);
       
       // Fetch prisoner records if prisoner ID is available
       if (bioData.prisoner) {
@@ -213,6 +274,51 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       }
     }
   }, [bioData, reset, setValue]);
+
+  // Populate arrest location and prisoner_class fields from prisoner records
+  useEffect(() => {
+    if (prisonerRecords && prisonerRecords.length > 0) {
+      const record = prisonerRecords[0];
+      console.log('📍 Populating fields from prisoner record:', record);
+      
+      // Use setTimeout to ensure values are set after any form resets
+      setTimeout(() => {
+        if (record.arrest_region) {
+          console.log('Setting arrest_region:', record.arrest_region);
+          setValue("arrest_region", record.arrest_region, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.arrest_district) {
+          console.log('Setting arrest_district:', record.arrest_district);
+          setValue("arrest_district", record.arrest_district, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.arrest_county) {
+          console.log('Setting arrest_county:', record.arrest_county);
+          setValue("arrest_county", record.arrest_county, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.arrest_sub_county) {
+          console.log('Setting arrest_sub_county:', record.arrest_sub_county);
+          setValue("arrest_sub_county", record.arrest_sub_county, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.arrest_parish) {
+          console.log('Setting arrest_parish:', record.arrest_parish);
+          setValue("arrest_parish", record.arrest_parish, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.arrest_village) {
+          console.log('Setting arrest_village:', record.arrest_village);
+          setValue("arrest_village", record.arrest_village, { shouldValidate: false, shouldDirty: false });
+        }
+        if (record.prisoner_class) {
+          console.log('Setting prisoner_class:', record.prisoner_class);
+          console.log('Current watchPrisonerClass before setValue:', watch("prisoner_class"));
+          setValue("prisoner_class", record.prisoner_class, { shouldValidate: false, shouldDirty: false });
+          // Verify it was set
+          setTimeout(() => {
+            console.log('Current watchPrisonerClass after setValue:', watch("prisoner_class"));
+          }, 100);
+        }
+      }, 100);
+    }
+  }, [prisonerRecords, setValue, watch]);
 
   // Save form state to localStorage whenever form data changes
   useEffect(() => {
@@ -269,19 +375,39 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
     try {
       setIsSubmitting(true);
       
-      // Get prisoner IDs from localStorage
+      // Get prisoner IDs from localStorage or bioData (when editing)
       const storedReservation = localStorage.getItem("pmis_prisoner_number_reservation");
+      console.log("🔍 Checking for stored reservation:", storedReservation);
+      
       let prisonerId=null
       let prisonerNumberId = null;
       let prisonerPersonalNumberId = null;
       let reservationId = null;
       
-      if (storedReservation) {
+      // If editing existing bioData, use IDs from bioData (only if they exist)
+      if (bioData && bioData.prisoner && bioData.prisoner_number) {
+        prisonerId = bioData.prisoner;
+        prisonerNumberId = bioData.prisoner_number;
+        prisonerPersonalNumberId = bioData.prisoner_personal_number;
+        console.log("📝 Using IDs from bioData (editing mode):", { prisonerId, prisonerNumberId, prisonerPersonalNumberId });
+      } else if (storedReservation) {
+        // For new prisoner, get from localStorage
         const reservation = JSON.parse(storedReservation);
-        prisonerId=reservation.prisoner_id
-        prisonerNumberId = reservation.id;  // Send prisoner_id
-        prisonerPersonalNumberId = reservation.prisoner_personal_number_details?.id;  // Send prisoner_personal_number_details.id
-        reservationId = reservation.id;  // Send reservation id
+        console.log("📦 Parsed reservation from localStorage:", reservation);
+        
+        prisonerId = reservation.prisoner_id;
+        prisonerNumberId = reservation.id;  // This is the prisoner number reservation ID
+        prisonerPersonalNumberId = reservation.prisoner_personal_number_details?.id;
+        reservationId = reservation.id;
+        
+        console.log("✅ Extracted IDs from reservation:", {
+          prisonerId,
+          prisonerNumberId,
+          prisonerPersonalNumberId,
+          reservationId
+        });
+      } else {
+        console.log("❌ No reservation found in localStorage and no bioData provided");
       }
       
       if (!prisonerNumberId || !prisonerPersonalNumberId) {
@@ -339,7 +465,9 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       }
       
       // 1. Submit biodata to API
-      const biodataResponse = bioData?.id 
+      // Only update if we have an existing biodata record (with prisoner and prisoner_number)
+      // Otherwise create a new biodata record
+      const biodataResponse = (bioData?.id && bioData.prisoner && bioData.prisoner_number)
         ? await updatePrisonerBiodata(bioData.id, biodataSubmission)
         : await createPrisonerBiodata(biodataSubmission);
       
@@ -390,10 +518,15 @@ const PrisonerBiodataForm: React.FC<PrisonerBiodataFormProps> = ({
       // Call the parent onSubmit callback
       onSubmit(biodataResponse);
       
-      // Navigate to prisoner detail screen
-      navigate(`/admissions-management/prisoners/${prisonerId}`);
+      // Navigate to prisoner detail screen only if not in multi-step form
+      if (!skipNavigation) {
+        navigate(`/admissions-management/prisoners/${prisonerId}`);
+      }
     } catch (error: any) {
       console.error("Error submitting biodata:", error);
+      
+      // Re-enable submit button immediately on error
+      setIsSubmitting(false);
       
       // Check if it's a 400 validation error
       if (error?.response?.status === 400 && error?.response?.data) {

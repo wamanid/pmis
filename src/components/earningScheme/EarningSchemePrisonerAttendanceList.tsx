@@ -61,11 +61,12 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   const [prisoners, setPrisoners] = useState<PrisonerRecord[]>([]);
     
   const recordsPerPage = 10;
-  // Mock data for attendance records
   const [mockAttendanceRecords,setMockAttendanceRecords]= useState<any[]>([
   ]);
     const [workingParties,setworkingParties]= useState([
     ]);
+  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
+
   useEffect(() => {
   loadData();
   }, []);
@@ -97,8 +98,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             alert(error);
           });
           }
-  //userEffect here
-  const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>(mockAttendanceRecords);
   // Filter and search logic
   const filteredRecords = attendanceRecords.filter((record) => {
     const matchesSearch = 
@@ -128,11 +127,9 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
   };
 
   const handleEdit = (record: AttendanceRecord) => {
-    //alert(`Editing record for ${JSON.stringify(record)}`);
     setSelectedRecord(record);
     setIsFormOpen(true);
     setEditData(record);
-   //working_party_prisoner
   };
 
   const handleView = (record: AttendanceRecord) => {
@@ -147,8 +144,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
 
   const confirmDelete = () => {
     if (selectedRecord) {
-     // setAttendanceRecords(attendanceRecords.filter(r => r.id !== selectedRecord.id));
-      
         deleteEarningScheme(selectedRecord.id).then((data) => {
      toast.success('Attendance record deleted successfully');
       setIsDeleteOpen(false);
@@ -159,7 +154,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
           }).catch((error) => {
             alert(error);
           });
-
     }
   };
 
@@ -173,11 +167,8 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
     } else {
       // Create new record
       const newRecord: AttendanceRecord = {
-      //  id: `${attendanceRecords.length + 1}`,
         ...data,
       };
-    //alert(JSON.stringify(newRecord));
-     // setAttendanceRecords([...attendanceRecords, newRecord]);    
     saveEarningSchemes(newRecord).then((data) => {
     toast.success('Attendance record created successfully');
     setIsFormOpen(false);
@@ -188,7 +179,6 @@ export const EarningSchemePrisonerAttendanceList: React.FC = () => {
             alert(error);
           });
     }
-
   };
 
   const handleResetFilters = () => {

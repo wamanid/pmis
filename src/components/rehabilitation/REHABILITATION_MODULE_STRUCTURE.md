@@ -7,21 +7,39 @@ The Rehabilitation Management module has been reorganized into a modular, menu-a
 
 ```
 src/components/rehabilitation/
+├── RehabilitationDetailView.tsx                 # Main overview/dashboard
+│
 ├── enrollments/                                 # Menu: Rehabilitation Enrollments
-│   ├── EnrollmentsScreen.tsx                    # Tab container
-│   ├── enrollment/
+│   ├── EnrollmentsScreen.tsx                    # Tab container for enrollments
+│   ├── EnrollmentDetailView.tsx                 # Detail view component
+│   ├── EnrollmentAssessmentScreen.tsx           # Assessment container
+│   ├── EnrollmentAssessmentForm.tsx             # Assessment form
+│   ├── EnrollmentAssessmentList.tsx             # Assessment list
+│   ├── enrollment/                              # Enrollment management
 │   │   ├── RehabilitationEnrollmentScreen.tsx
 │   │   ├── RehabilitationEnrollmentForm.tsx
 │   │   └── RehabilitationEnrollmentList.tsx
-│   └── sessions/
+│   └── sessions/                                # Session tracking
 │       ├── RehabilitationEnrollmentSessionScreen.tsx
 │       ├── RehabilitationEnrollmentSessionForm.tsx
 │       └── RehabilitationEnrollmentSessionList.tsx
 │
-└── afterCare/                                   # Menu: After Care
-    ├── AfterCareScreen.tsx
-    ├── AfterCareForm.tsx
-    └── AfterCareList.tsx
+├── afterCare/                                   # Menu: After Care
+│   ├── AfterCareScreen.tsx
+│   ├── AfterCareForm.tsx
+│   └── AfterCareList.tsx
+│
+├── prisonerChildren/                            # Menu: Prisoner Children
+│   ├── PrisonerChildrenForm.tsx
+│   └── PrisonerChildrenList.tsx
+│
+├── prisonerDependents/                          # Menu: Prisoner Dependents
+│   ├── PrisonerDependentsForm.tsx
+│   └── PrisonerDependentsList.tsx
+│
+└── welfare/                                     # Menu: Welfare
+    ├── WelfareForm.tsx
+    └── WelfareList.tsx
 ```
 
 ## Services Structure
@@ -31,10 +49,19 @@ src/services/rehabilitation/
 ├── index.ts                                     # Main barrel exports
 │
 ├── enrollments/
-│   └── index.ts                                 # Ready for individual services
+│   └── index.ts                                 # Ready for enrollment services
 │
-└── afterCare/
-    └── index.ts                                 # Ready for individual services
+├── afterCare/
+│   └── index.ts                                 # Ready for after care services
+│
+├── prisonerChildren/
+│   └── index.ts                                 # Ready for prisoner children services
+│
+├── prisonerDependents/
+│   └── index.ts                                 # Ready for prisoner dependents services
+│
+└── welfare/
+    └── index.ts                                 # Ready for welfare services
 ```
 
 ## Import Examples
@@ -98,8 +125,16 @@ Routes updated in `src/routes/rehabilitation.routes.tsx`:
 
 ```typescript
 {
+  path: '/rehabilitation/overview',
+  element: <RehabilitationDetailView />,
+},
+{
   path: '/rehabilitation/enrollments',
   element: <EnrollmentsScreen />,
+},
+{
+  path: '/rehabilitation/assessments',
+  element: <EnrollmentAssessmentScreen />,
 },
 {
   path: '/rehabilitation/after-care',
@@ -109,10 +144,11 @@ Routes updated in `src/routes/rehabilitation.routes.tsx`:
 
 ## Migration Completed
 
-**Files Moved**: 10 component files  
-**Folders Created**: 4 component subfolders, 2 service subfolders  
-**Routes Created**: 1 new routes file with 2 routes  
-**Git History**: Preserved with `git mv`  
+**Files Organized**: 21 component files  
+**Folders Created**: 7 component subfolders, 5 service subfolders  
+**Routes Created**: 1 routes file with 4 routes  
+**Git History**: Preserved with `git mv` for original 10 files  
+**Additional Files**: 11 new component files added to existing structure  
 
 ## File Mapping
 
@@ -134,6 +170,15 @@ Routes updated in `src/routes/rehabilitation.routes.tsx`:
 | `AfterCareForm.tsx` | `afterCare/AfterCareForm.tsx` |
 | `AfterCareList.tsx` | `afterCare/AfterCareList.tsx` |
 
+### Additional Modules (New Files)
+| Module | Files | Location |
+|--------|-------|----------|
+| **Enrollment Assessments** | 3 files | `enrollments/EnrollmentAssessment*.tsx` |
+| **Prisoner Children** | 2 files | `prisonerChildren/PrisonerChildren*.tsx` |
+| **Prisoner Dependents** | 2 files | `prisonerDependents/PrisonerDependents*.tsx` |
+| **Welfare** | 2 files | `welfare/Welfare*.tsx` |
+| **Detail Views** | 2 files | Root and enrollments folders |
+
 ## Import Path Corrections
 
 All import paths have been systematically corrected based on file depth:
@@ -153,6 +198,26 @@ All import paths have been systematically corrected based on file depth:
 
 ### After Care Files (1 level deep)
 - **Location**: `afterCare/*.tsx`
+- **UI imports**: `../../../ui/component`
+
+### Enrollment Assessment Files (2 levels deep)
+- **Location**: `enrollments/EnrollmentAssessment*.tsx`
+- **UI imports**: `../../../ui/component`
+
+### Prisoner Children Files (1 level deep)
+- **Location**: `prisonerChildren/*.tsx`
+- **UI imports**: `../../../ui/component`
+
+### Prisoner Dependents Files (1 level deep)
+- **Location**: `prisonerDependents/*.tsx`
+- **UI imports**: `../../../ui/component`
+
+### Welfare Files (1 level deep)
+- **Location**: `welfare/*.tsx`
+- **UI imports**: `../../../ui/component`
+
+### Root Level Files
+- **Location**: `RehabilitationDetailView.tsx`
 - **UI imports**: `../../ui/component`
 
 ## Next Steps
@@ -169,16 +234,22 @@ All import paths have been systematically corrected based on file depth:
 The rehabilitation module follows a two-tier structure:
 
 **Tier 1: Main Menu Items**
+- Overview/Dashboard
 - Enrollments (with sub-features)
 - After Care
+- Prisoner Children
+- Prisoner Dependents
+- Welfare
 
-**Tier 2: Sub-Features**
+**Tier 2: Sub-Features (under Enrollments)**
 - Enrollment management
 - Session tracking
+- Enrollment assessments
 
 This structure allows for easy expansion as new rehabilitation features are added.
 
 ---
 
 *Generated: February 26, 2026*  
+*Updated: March 3, 2026 (Added new submodules)*  
 *Pattern: Based on Medical Module Refactoring (commit 9d6c64a)*

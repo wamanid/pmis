@@ -6,6 +6,8 @@
 export interface PrisonerBiodata {
   id?: string;
   prisoner?: string;
+  prisoner_number?: string;
+  prisoner_personal_number?: string;
   is_active?: boolean;
   first_name?: string;
   middle_name?: string;

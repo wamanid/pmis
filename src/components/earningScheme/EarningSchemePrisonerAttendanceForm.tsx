@@ -117,8 +117,6 @@ export const EarningSchemePrisonerAttendanceForm: React.FC<EarningSchemePrisoner
 
   }, [initialData]);
 
-
-
   // Calculate earnings based on attendance, hours worked, and grade
   const calculateEarnings = (isPresent: boolean, hours: string, grade: string) => {
     if (!isPresent) return '0.00';

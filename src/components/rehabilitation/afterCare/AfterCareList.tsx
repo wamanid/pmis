@@ -1,8 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Button } from '../../ui/button';
-import { Input } from '../../ui/input';
-import { Card, CardContent } from '../../ui/card';
-import { Badge } from '../../ui/badge';
+import { Button } from '../../../ui/button';
+import { Input } from '../../../ui/input';
+import { Card, CardContent } from '../../../ui/card';
+import { Badge } from '../../../ui/badge';
 import { 
   Table, 
   TableBody, 
@@ -10,7 +10,7 @@ import {
   TableHead, 
   TableHeader, 
   TableRow 
-} from '../../ui/table';
+} from '../../../ui/table';
 import { 
   Search, 
   Eye, 
@@ -31,7 +31,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../ui/alert-dialog';
+} from '../../../ui/alert-dialog';
 
 interface AfterCare {
   id: string;
@@ -47,22 +47,74 @@ interface AfterCare {
 }
 
 interface AfterCareListProps {
-  afterCares: AfterCare[];
+  afterCares?: AfterCare[];
   onView: (afterCare: AfterCare) => void;
   onEdit: (afterCare: AfterCare) => void;
   onDelete: (id: string) => void;
+  prisonerId?: string;
+  refreshTrigger?: number;
 }
 
+// Mock after care data
+const mockAfterCares: AfterCare[] = [
+  {
+    id: '1',
+    prisoner_name: 'John Doe',
+    prisoner_number: 'PN-2024-001',
+    activity_name: 'Job Placement Support',
+    officer_name: 'Officer Smith',
+    description: 'Follow-up on job placement assistance.',
+    prisoner: '1',
+    after_care_activity: '1',
+    officer: 101,
+  },
+  {
+    id: '2',
+    prisoner_name: 'Jane Smith',
+    prisoner_number: 'PN-2024-002',
+    activity_name: 'Counseling Session',
+    officer_name: 'Officer Johnson',
+    description: 'Regular counseling for reintegration.',
+    prisoner: '2',
+    after_care_activity: '2',
+    officer: 102,
+  },
+];
+
 const AfterCareList: React.FC<AfterCareListProps> = ({
-  afterCares,
+  afterCares: propAfterCares,
   onView,
   onEdit,
-  onDelete
+  onDelete,
+  prisonerId,
+  refreshTrigger,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [filteredAfterCares, setFilteredAfterCares] = useState<AfterCare[]>(afterCares);
+  const [afterCares, setAfterCares] = useState<AfterCare[]>([]);
+  const [filteredAfterCares, setFilteredAfterCares] = useState<AfterCare[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [afterCareToDelete, setAfterCareToDelete] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (propAfterCares) {
+      setAfterCares(propAfterCares);
+    } else {
+      loadAfterCares();
+    }
+  }, [propAfterCares, prisonerId, refreshTrigger]);
+
+  const loadAfterCares = () => {
+    setLoading(true);
+    setTimeout(() => {
+      let data = mockAfterCares;
+      if (prisonerId) {
+        data = data.filter((a) => a.prisoner === prisonerId);
+      }
+      setAfterCares(data);
+      setLoading(false);
+    }, 500);
+  };
 
   useEffect(() => {
     const filtered = afterCares.filter(afterCare => {
