@@ -108,7 +108,7 @@ const RehabilitationEnrollmentScreen: React.FC = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  const handleSubmit = (data: Enrollment) => {
+  const handleSubmit = (data: Enrollment, file?: File | null) => {
     // Simulate API call
     if (dialogMode === 'create') {
       toast.success('Enrollment created successfully');

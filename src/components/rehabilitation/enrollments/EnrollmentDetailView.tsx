@@ -5,7 +5,7 @@ import { Badge } from '../../ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../ui/tabs';
 import { Button } from '../../ui/button';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../../ui/collapsible';
-import EnrollmentAssessmentList from './EnrollmentAssessmentList';
+import EnrollmentAssessmentList from './assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from '../afterCare/AfterCareList';
 
@@ -262,7 +262,7 @@ const EnrollmentDetailView: React.FC<EnrollmentDetailViewProps> = ({
         </TabsList>
 
         {/* Enrollment Assessments Tab */}
-        <TabsContent value="assessments" className="mt-6">
+        <TabsContent value="assessments" className="mt-6 p-6">
           <EnrollmentAssessmentList
             onView={onViewAssessment}
             onEdit={onEditAssessment}
@@ -272,7 +272,7 @@ const EnrollmentDetailView: React.FC<EnrollmentDetailViewProps> = ({
         </TabsContent>
 
         {/* Enrollment Sessions Tab */}
-        <TabsContent value="sessions" className="mt-6">
+        <TabsContent value="sessions" className="mt-6 p-6">
           <RehabilitationEnrollmentSessionList
             onView={onViewSession}
             onEdit={onEditSession}
@@ -282,7 +282,7 @@ const EnrollmentDetailView: React.FC<EnrollmentDetailViewProps> = ({
         </TabsContent>
 
         {/* After Care Services Tab */}
-        <TabsContent value="aftercare" className="mt-6">
+        <TabsContent value="aftercare" className="mt-6 p-6">
           <AfterCareList
             onView={onViewAfterCare}
             onEdit={onEditAfterCare}

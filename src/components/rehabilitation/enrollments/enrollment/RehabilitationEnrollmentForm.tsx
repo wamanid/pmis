@@ -21,7 +21,9 @@ import {
   FileText,
   Award,
   User,
-  BookOpen, Save
+  BookOpen, Save,
+  Upload,
+  File
 } from 'lucide-react';
 import { cn } from '../../../ui/utils';
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
@@ -105,7 +107,7 @@ import {
 interface RehabilitationEnrollmentFormProps {
   enrollment?: Enrollment | null;
   mode: 'create' | 'edit' | 'view';
-  onSubmit: (data: RehabilitationEnrollment) => void;
+  onSubmit: (data: RehabilitationEnrollment, file?: File | null) => void;
   onCancel: () => void;
   prisoners: PrisonerItem[];
   setPrisoners: Dispatch<SetStateAction<PrisonerItem[]>>;
@@ -212,6 +214,8 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
   const [showStartDate, setShowStartDate] = useState(false);
   const [showEndDate, setShowEndDate] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
+  const [certificationFile, setCertificationFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string>('');
 
   useEffect(() => {
     loadDropdownData();
@@ -262,6 +266,11 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
         progress_status: enrollment.progress_status || ''
       });
       setSelectedPrisonerIds(prisonerIds);
+      
+      // Set file preview if certification document exists
+      if (enrollment.certification_document) {
+        setFilePreview(enrollment.certification_document);
+      }
     }
   }, [enrollment]);
 
@@ -279,6 +288,50 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
         setNewDialogLoader(false)
       }
     }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = [
+      'application/pdf',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'image/jpeg',
+      'image/jpg',
+      'image/png',
+      'image/gif'
+    ];
+
+    if (!validTypes.includes(file.type)) {
+      toast.error('Invalid file type. Please upload PDF, DOC, DOCX, or image files (JPEG, PNG, GIF)');
+      e.target.value = '';
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      toast.error('File size exceeds 10MB. Please upload a smaller file.');
+      e.target.value = '';
+      return;
+    }
+
+    setCertificationFile(file);
+    setFilePreview(file.name);
+    // Store file name in formData for reference
+    handleInputChange('certification_document', file.name);
+  };
+
+  const handleRemoveFile = () => {
+    setCertificationFile(null);
+    setFilePreview('');
+    handleInputChange('certification_document', '');
+    // Reset file input
+    const fileInput = document.getElementById('certification_document') as HTMLInputElement;
+    if (fileInput) fileInput.value = '';
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -320,7 +373,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     }
 
     // setLoader(true);
-    onSubmit(formData);
+    onSubmit(formData, certificationFile);
   };
 
   const handleAddPrisoner = (prisonerId: string) => {
@@ -863,13 +916,59 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
                 {formData.certificate_awarded && (
                   <div className="space-y-2">
                     <Label htmlFor="certification_document">Certification Document</Label>
-                    <Input
-                      id="certification_document"
-                      value={formData.certification_document}
-                      onChange={(e) => handleInputChange('certification_document', e.target.value)}
-                      placeholder="Enter document reference or URL"
-                      disabled={isDisabled}
-                    />
+                    {!isDisabled ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="w-full"
+                            onClick={() => document.getElementById('certification_document')?.click()}
+                          >
+                            <Upload className="mr-2 h-4 w-4" />
+                            {filePreview ? 'Change File' : 'Upload File'}
+                          </Button>
+                          <Input
+                            id="certification_document"
+                            type="file"
+                            onChange={handleFileChange}
+                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+                            className="hidden"
+                          />
+                        </div>
+                        {filePreview && (
+                          <div className="flex items-center justify-between p-2 border rounded-md bg-gray-50">
+                            <div className="flex items-center gap-2">
+                              <File className="h-4 w-4 text-blue-500" />
+                              <span className="text-sm truncate max-w-[200px]" title={filePreview}>
+                                {filePreview}
+                              </span>
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={handleRemoveFile}
+                              className="h-6 w-6 p-0"
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-500">
+                          Accepted formats: PDF, DOC, DOCX, JPEG, PNG, GIF (Max 10MB)
+                        </p>
+                      </div>
+                    ) : (
+                      filePreview && (
+                        <div className="flex items-center gap-2 p-2 border rounded-md bg-gray-50">
+                          <File className="h-4 w-4 text-blue-500" />
+                          <span className="text-sm truncate" title={filePreview}>
+                            {filePreview}
+                          </span>
+                        </div>
+                      )
+                    )}
                   </div>
                 )}
               </div>

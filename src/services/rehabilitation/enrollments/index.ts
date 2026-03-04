@@ -175,12 +175,64 @@ export const getSponsors = async (): Promise<SponsorResponse<Sponsor>> => {
   return response.data
 }
 
-export const addEnrollment = async (enrollment: RehabilitationEnrollment) : Promise<EnrollmentResponse1> => {
+export const addEnrollment = async (enrollment: RehabilitationEnrollment, file?: File | null) : Promise<EnrollmentResponse1> => {
+  if (file) {
+    const formData = new FormData();
+    
+    // Append all enrollment data to FormData
+    Object.keys(enrollment).forEach(key => {
+      const value = enrollment[key as keyof RehabilitationEnrollment];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          value.forEach((item) => formData.append(key, item));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+    
+    // Append the file
+    formData.append('certification_document', file);
+    
+    const response = await axiosInstance.post<EnrollmentResponse1>('/rehabilitation/enrollments/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+  
   const response = await axiosInstance.post<EnrollmentResponse1>('/rehabilitation/enrollments/', enrollment);
   return response.data;
 }
 
-export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id: string) : Promise<EnrollmentResponse2> => {
+export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id: string, file?: File | null) : Promise<EnrollmentResponse2> => {
+  if (file) {
+    const formData = new FormData();
+    
+    // Append all enrollment data to FormData
+    Object.keys(enrollment).forEach(key => {
+      const value = enrollment[key as keyof RehabilitationEnrollment];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          value.forEach((item) => formData.append(key, item));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+    
+    // Append the file
+    formData.append('certification_document', file);
+    
+    const response = await axiosInstance.put<EnrollmentResponse2>(`/rehabilitation/enrollments/${id}/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+  
   const response = await axiosInstance.put<EnrollmentResponse2>(`/rehabilitation/enrollments/${id}/`, enrollment);
   return response.data;
 }

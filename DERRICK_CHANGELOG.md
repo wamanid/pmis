@@ -2,10 +2,76 @@
 
 ---
 **Author**: Derrick Wamani (Demani) | **Email**: derrickwamani98@gmail.com | **Website**: demani.net  
-**Created**: February 6, 2026 | **Last Updated**: February 26, 2026
+**Created**: February 6, 2026 | **Last Updated**: March 4, 2026
 ---
 
 All notable changes to this project should be documented in this file.
+
+## [Released] - 2026-03-04
+
+### Added
+- **Rehabilitation Enrollment - File Upload for Certification Documents (March 4, 2026)**:
+  - Converted certification document field from text input to proper file upload with multipart/form-data support
+  - **File Upload Features**:
+    - Accepted formats: PDF, DOC, DOCX, JPEG, PNG, GIF
+    - Maximum file size: 10MB with validation
+    - Custom file input UI with upload button and file preview
+    - Remove file functionality with X button
+    - File type and size hints displayed below upload button
+    - Read-only mode shows existing file name when viewing records
+  - **Backend Integration**:
+    - Updated `addEnrollment` and `updateEnrollment` services to handle FormData
+    - Automatic conversion of enrollment data to FormData when file present
+    - Sets proper `Content-Type: multipart/form-data` headers
+    - Falls back to JSON request when no file attached
+  - **Form Component Updates**:
+    - Added `certificationFile` and `filePreview` state management
+    - Implemented `handleFileChange` with comprehensive validation
+    - File preview shows truncated name with full text on hover
+    - File persists during form edits until explicitly removed
+  - **Props Updated**: `onSubmit` now accepts optional `file?: File | null` parameter
+  - **Files Modified**: RehabilitationEnrollmentForm.tsx, EnrollmentsScreen.tsx, RehabilitationDetailView.tsx, RehabilitationEnrollmentScreen.tsx, services/rehabilitation/enrollments/index.ts
+  - **Icons Added**: Upload, File icons from lucide-react
+  - **Benefit**: Proper document management for rehabilitation certificates with secure file upload
+
+### Fixed
+- **Rehabilitation Module - Import Path Corrections After Assessment Subfolder Creation (March 4, 2026)** (CRITICAL):
+  - Fixed all broken import paths caused by moving assessment files into `assessment/` subfolder
+  - **Problem**: After organizing enrollment files into subfolders, assessment files moved one level deeper, breaking relative UI imports
+  - **Solution**: Updated all relative paths from `../../ui/` to `../../../ui/` in assessment files
+    - EnrollmentAssessmentForm.tsx: Fixed 8 UI component imports (Button, Input, Label, Textarea, Select, Calendar, Popover)
+    - EnrollmentAssessmentList.tsx: Fixed 7 UI component imports (Card, Button, Input, Select, Table, Badge, DropdownMenu)
+    - EnrollmentAssessmentScreen.tsx: Fixed 3 UI component imports (Button, Dialog, AlertDialog)
+  - **Parent Component Import Updates**:
+    - RehabilitationDetailView.tsx: `./enrollments/EnrollmentAssessmentList` → `./enrollments/assessment/EnrollmentAssessmentList`
+    - RehabilitationDetailView.tsx: `./enrollments/EnrollmentAssessmentForm` → `./enrollments/assessment/EnrollmentAssessmentForm`
+    - EnrollmentDetailView.tsx: `./EnrollmentAssessmentList` → `./assessment/EnrollmentAssessmentList`
+    - rehabilitation.routes.tsx: Updated EnrollmentAssessmentScreen import path
+  - **Root Cause**: Files moved from 2 levels deep to 3 levels deep required additional `../` in all relative imports
+  - **Impact**: Resolved CORS errors, module loading failures, and Vite build errors
+  - **Verification**: Session files already had correct paths (served as reference pattern)
+  - **Files Modified**: 6 files (3 assessment components + 3 parent components)
+  - **Result**: All import resolution errors resolved, dev server runs without errors
+
+### Changed
+- **Rehabilitation Module - UI Spacing Improvements (March 4, 2026)**:
+  - Added consistent padding to all tab content areas for better visual spacing
+  - **RehabilitationDetailView.tsx Updates**:
+    - Added `p-6` class (24px padding) to all four tab content wrappers:
+      - Enrollments tab content
+      - Assessments tab content
+      - Sessions tab content
+      - After Care tab content
+  - **EnrollmentDetailView.tsx Updates**:
+    - Added `p-6` class to all three TabsContent components (in addition to existing `mt-6`):
+      - Enrollment Assessments tab
+      - Enrollment Sessions tab
+      - After Care Services tab
+  - **Screen Component Updates**:
+    - RehabilitationEnrollmentSessionScreen.tsx: Changed wrapper from `container mx-auto py-6` to `p-6`
+    - AfterCareScreen.tsx: Changed wrapper from `container mx-auto py-6` to `p-6`
+  - **Benefit**: Content no longer starts at container edges, providing proper breathing room consistent with other modules
+  - **UX Impact**: Tables, filters, and forms now have 24px padding on all sides for improved readability
 
 ## [Released] - 2026-02-26
 

@@ -132,7 +132,7 @@ const RehabilitationEnrollmentSessionScreen: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <Card>
         <CardHeader>

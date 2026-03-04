@@ -5,7 +5,7 @@ import { Card, CardContent } from '../ui/card';
 import { toast } from 'sonner';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
 import RehabilitationEnrollmentList from './enrollments/enrollment/RehabilitationEnrollmentList';
-import EnrollmentAssessmentList from './enrollments/EnrollmentAssessmentList';
+import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
 import { Enrollment, Programme, Sponsor, ProgrammeStage } from '../../services/rehabilitation';
@@ -36,7 +36,7 @@ import {
   AlertDialogTitle,
 } from '../ui/alert-dialog';
 import RehabilitationEnrollmentForm from './enrollments/enrollment/RehabilitationEnrollmentForm';
-import EnrollmentAssessmentForm from './enrollments/EnrollmentAssessmentForm';
+import EnrollmentAssessmentForm from './enrollments/assessment/EnrollmentAssessmentForm';
 import RehabilitationEnrollmentSessionForm from './enrollments/sessions/RehabilitationEnrollmentSessionForm';
 import AfterCareForm from './afterCare/AfterCareForm';
 import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
@@ -179,7 +179,7 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleEnrollmentSubmit = (data: any) => {
+  const handleEnrollmentSubmit = (data: any, file?: File | null) => {
     toast.success(
       enrollmentDialogMode === 'create'
         ? 'Enrollment created successfully'
@@ -402,7 +402,7 @@ const RehabilitationDetailView: React.FC = () => {
 
           {/* Tab Content */}
           {activeTab === 'enrollments' && (
-            <div>
+            <div className="p-6">
               <RehabilitationEnrollmentList
                 onView={handleViewEnrollment}
                 onEdit={handleEditEnrollment}
@@ -417,7 +417,7 @@ const RehabilitationDetailView: React.FC = () => {
           )}
 
           {activeTab === 'assessments' && (
-            <div>
+            <div className="p-6">
               <EnrollmentAssessmentList
                 onView={handleViewAssessment}
                 onEdit={handleEditAssessment}
@@ -429,7 +429,7 @@ const RehabilitationDetailView: React.FC = () => {
           )}
 
           {activeTab === 'sessions' && (
-            <div>
+            <div className="p-6">
               <RehabilitationEnrollmentSessionList
                 onView={handleViewSession}
                 onEdit={handleEditSession}
@@ -441,7 +441,7 @@ const RehabilitationDetailView: React.FC = () => {
           )}
 
           {activeTab === 'aftercare' && (
-            <div>
+            <div className="p-6">
               <AfterCareList
                 onView={handleViewAfterCare}
                 onEdit={handleEditAfterCare}

@@ -145,15 +145,15 @@ const EnrollmentsScreen: React.FC = () => {
     // setRefreshTrigger((prev) => prev + 1);
   };
 
-  const handleSubmit = async (data: RehabilitationEnrollment) => {
+  const handleSubmit = async (data: RehabilitationEnrollment, file?: File | null) => {
     // console.log(data)
     try {
       let response
       if (selectedEnrollment) {
-        response = await updateEnrollment(data, selectedEnrollment.id)
+        response = await updateEnrollment(data, selectedEnrollment.id, file)
       }
       else {
-        response = await addEnrollment(data)
+        response = await addEnrollment(data, file)
       }
       if (handleResponseError(response)) return;
 
