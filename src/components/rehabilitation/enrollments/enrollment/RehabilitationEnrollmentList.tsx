@@ -5,12 +5,6 @@ import { Input } from '../../../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../../../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../ui/table';
 import { Badge } from '../../../ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '../../../ui/dropdown-menu';
 import { 
   Search, 
   Eye, 
@@ -20,9 +14,10 @@ import {
   ChevronRight,
   Award,
   BookOpen,
-  User,
-  MoreVertical
+  User
 } from 'lucide-react';
+import {Enrollment, Programme} from "../../../../services/rehabilitation";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
 
 interface RehabilitationEnrollment {
   id: string;
@@ -53,18 +48,21 @@ interface RehabilitationEnrollmentListProps {
   onEdit: (enrollment: RehabilitationEnrollment) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
-  prisonerId?: string;
+  enrollments: Enrollment[];
+  programmes: Programme[];
+  certifications: Unit[];
+  statuses: Unit[];
 }
 
 const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> = ({
+  enrollments, statuses, certifications, programmes,
   onView,
   onEdit,
   onDelete,
-  refreshTrigger,
-  prisonerId,
+  refreshTrigger
 }) => {
-  const [enrollments, setEnrollments] = useState<RehabilitationEnrollment[]>([]);
-  const [filteredEnrollments, setFilteredEnrollments] = useState<RehabilitationEnrollment[]>([]);
+  // const [enrollments, setEnrollments] = useState<RehabilitationEnrollment[]>([]);
+  const [filteredEnrollments, setFilteredEnrollments] = useState<Enrollment[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [programmeFilter, setProgrammeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -74,145 +72,140 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
   const [loading, setLoading] = useState(false);
 
   // Mock data
-  const mockEnrollments: RehabilitationEnrollment[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'PR-2024-001',
-      programme_name: 'Vocational Training',
-      programme_stage_name: 'Basic Level',
-      sponsor_name: 'NGO Hope Foundation',
-      responsible_officer_name: 'David Wilson',
-      progress_status_name: 'In Progress',
-      prisoner_opinion: 'Very helpful programme',
-      date_of_enrollment: '2024-01-15',
-      start_date: '2024-01-20',
-      end_date: '2024-06-20',
-      certificate_awarded: false,
-      certification_document: '',
-      comment: 'Showing good progress',
-      prisoner: '1',
-      programme: '1',
-      programme_stage: '2',
-      rehabilitation_sponsor: '1',
-      responsible_officer: 1,
-      progress_status: '2'
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'PR-2024-002',
-      programme_name: 'Education Programme',
-      programme_stage_name: 'Advanced Level',
-      sponsor_name: 'Community Outreach',
-      responsible_officer_name: 'Sarah Brown',
-      progress_status_name: 'Completed',
-      prisoner_opinion: 'Excellent learning experience',
-      date_of_enrollment: '2023-09-10',
-      start_date: '2023-09-15',
-      end_date: '2024-03-15',
-      certificate_awarded: true,
-      certification_document: 'CERT-2024-001',
-      comment: 'Successfully completed all modules',
-      prisoner: '2',
-      programme: '2',
-      programme_stage: '4',
-      rehabilitation_sponsor: '2',
-      responsible_officer: 2,
-      progress_status: '3'
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      prisoner_number: 'PR-2024-003',
-      programme_name: 'Counseling Services',
-      programme_stage_name: 'Initial Assessment',
-      sponsor_name: 'Faith-Based Organization',
-      responsible_officer_name: 'James Taylor',
-      progress_status_name: 'Enrolled',
-      prisoner_opinion: 'Looking forward to the sessions',
-      date_of_enrollment: '2024-10-01',
-      start_date: '2024-10-05',
-      end_date: '2024-12-05',
-      certificate_awarded: false,
-      certification_document: '',
-      comment: 'Just started',
-      prisoner: '3',
-      programme: '3',
-      programme_stage: '5',
-      rehabilitation_sponsor: '3',
-      responsible_officer: 3,
-      progress_status: '1'
-    },
-    {
-      id: '4',
-      prisoner_name: 'Robert Lee',
-      prisoner_number: 'PR-2024-004',
-      programme_name: 'Substance Abuse Recovery',
-      programme_stage_name: 'Intermediate Level',
-      sponsor_name: 'Government Programme',
-      responsible_officer_name: 'David Wilson',
-      progress_status_name: 'Suspended',
-      prisoner_opinion: 'Need more support',
-      date_of_enrollment: '2024-03-20',
-      start_date: '2024-03-25',
-      end_date: '2024-09-25',
-      certificate_awarded: false,
-      certification_document: '',
-      comment: 'Temporarily suspended due to health issues',
-      prisoner: '4',
-      programme: '4',
-      programme_stage: '3',
-      rehabilitation_sponsor: '4',
-      responsible_officer: 1,
-      progress_status: '4'
-    },
-    {
-      id: '5',
-      prisoner_name: 'Emily Davis',
-      prisoner_number: 'PR-2024-005',
-      programme_name: 'Vocational Training',
-      programme_stage_name: 'Intermediate Level',
-      sponsor_name: 'NGO Hope Foundation',
-      responsible_officer_name: 'Sarah Brown',
-      progress_status_name: 'In Progress',
-      prisoner_opinion: 'Skills are very practical',
-      date_of_enrollment: '2024-02-10',
-      start_date: '2024-02-15',
-      end_date: '2024-08-15',
-      certificate_awarded: false,
-      certification_document: '',
-      comment: 'Excellent hands-on skills',
-      prisoner: '5',
-      programme: '1',
-      programme_stage: '2',
-      rehabilitation_sponsor: '1',
-      responsible_officer: 2,
-      progress_status: '2'
-    }
-  ];
-
-  useEffect(() => {
-    loadEnrollments();
-  }, [refreshTrigger, prisonerId]);
+  // const mockEnrollments: RehabilitationEnrollment[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     prisoner_number: 'PR-2024-001',
+  //     programme_name: 'Vocational Training',
+  //     programme_stage_name: 'Basic Level',
+  //     sponsor_name: 'NGO Hope Foundation',
+  //     responsible_officer_name: 'David Wilson',
+  //     progress_status_name: 'In Progress',
+  //     prisoner_opinion: 'Very helpful programme',
+  //     date_of_enrollment: '2024-01-15',
+  //     start_date: '2024-01-20',
+  //     end_date: '2024-06-20',
+  //     certificate_awarded: false,
+  //     certification_document: '',
+  //     comment: 'Showing good progress',
+  //     prisoner: '1',
+  //     programme: '1',
+  //     programme_stage: '2',
+  //     rehabilitation_sponsor: '1',
+  //     responsible_officer: 1,
+  //     progress_status: '2'
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     prisoner_number: 'PR-2024-002',
+  //     programme_name: 'Education Programme',
+  //     programme_stage_name: 'Advanced Level',
+  //     sponsor_name: 'Community Outreach',
+  //     responsible_officer_name: 'Sarah Brown',
+  //     progress_status_name: 'Completed',
+  //     prisoner_opinion: 'Excellent learning experience',
+  //     date_of_enrollment: '2023-09-10',
+  //     start_date: '2023-09-15',
+  //     end_date: '2024-03-15',
+  //     certificate_awarded: true,
+  //     certification_document: 'CERT-2024-001',
+  //     comment: 'Successfully completed all modules',
+  //     prisoner: '2',
+  //     programme: '2',
+  //     programme_stage: '4',
+  //     rehabilitation_sponsor: '2',
+  //     responsible_officer: 2,
+  //     progress_status: '3'
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     prisoner_number: 'PR-2024-003',
+  //     programme_name: 'Counseling Services',
+  //     programme_stage_name: 'Initial Assessment',
+  //     sponsor_name: 'Faith-Based Organization',
+  //     responsible_officer_name: 'James Taylor',
+  //     progress_status_name: 'Enrolled',
+  //     prisoner_opinion: 'Looking forward to the sessions',
+  //     date_of_enrollment: '2024-10-01',
+  //     start_date: '2024-10-05',
+  //     end_date: '2024-12-05',
+  //     certificate_awarded: false,
+  //     certification_document: '',
+  //     comment: 'Just started',
+  //     prisoner: '3',
+  //     programme: '3',
+  //     programme_stage: '5',
+  //     rehabilitation_sponsor: '3',
+  //     responsible_officer: 3,
+  //     progress_status: '1'
+  //   },
+  //   {
+  //     id: '4',
+  //     prisoner_name: 'Robert Lee',
+  //     prisoner_number: 'PR-2024-004',
+  //     programme_name: 'Substance Abuse Recovery',
+  //     programme_stage_name: 'Intermediate Level',
+  //     sponsor_name: 'Government Programme',
+  //     responsible_officer_name: 'David Wilson',
+  //     progress_status_name: 'Suspended',
+  //     prisoner_opinion: 'Need more support',
+  //     date_of_enrollment: '2024-03-20',
+  //     start_date: '2024-03-25',
+  //     end_date: '2024-09-25',
+  //     certificate_awarded: false,
+  //     certification_document: '',
+  //     comment: 'Temporarily suspended due to health issues',
+  //     prisoner: '4',
+  //     programme: '4',
+  //     programme_stage: '3',
+  //     rehabilitation_sponsor: '4',
+  //     responsible_officer: 1,
+  //     progress_status: '4'
+  //   },
+  //   {
+  //     id: '5',
+  //     prisoner_name: 'Emily Davis',
+  //     prisoner_number: 'PR-2024-005',
+  //     programme_name: 'Vocational Training',
+  //     programme_stage_name: 'Intermediate Level',
+  //     sponsor_name: 'NGO Hope Foundation',
+  //     responsible_officer_name: 'Sarah Brown',
+  //     progress_status_name: 'In Progress',
+  //     prisoner_opinion: 'Skills are very practical',
+  //     date_of_enrollment: '2024-02-10',
+  //     start_date: '2024-02-15',
+  //     end_date: '2024-08-15',
+  //     certificate_awarded: false,
+  //     certification_document: '',
+  //     comment: 'Excellent hands-on skills',
+  //     prisoner: '5',
+  //     programme: '1',
+  //     programme_stage: '2',
+  //     rehabilitation_sponsor: '1',
+  //     responsible_officer: 2,
+  //     progress_status: '2'
+  //   }
+  // ];
+  //
+  // useEffect(() => {
+  //   loadEnrollments();
+  // }, [refreshTrigger]);
 
   useEffect(() => {
     filterEnrollments();
   }, [enrollments, searchTerm, programmeFilter, statusFilter, certificateFilter]);
 
-  const loadEnrollments = () => {
-    setLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      let data = mockEnrollments;
-      // Filter by prisonerId if provided
-      if (prisonerId) {
-        data = data.filter((e) => e.prisoner === prisonerId);
-      }
-      setEnrollments(data);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadEnrollments = () => {
+  //   setLoading(true);
+  //   // Simulate API call
+  //   setTimeout(() => {
+  //     setEnrollments(mockEnrollments);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterEnrollments = () => {
     let filtered = [...enrollments];
@@ -277,13 +270,13 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
   const currentItems = filteredEnrollments.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredEnrollments.length / itemsPerPage);
 
-  const uniqueProgrammes = Array.from(new Set(enrollments.map(e => e.programme_name)));
-  const uniqueStatuses = Array.from(new Set(enrollments.map(e => e.progress_status_name)));
+  // const uniqueProgrammes = Array.from(new Set(enrollments.map(e => e.programme_name)));
+  // const uniqueStatuses = Array.from(new Set(enrollments.map(e => e.progress_status_name)));
 
   return (
-    <div className="w-full space-y-4">
+    <div className="space-y-4">
       {/* Filters */}
-      <Card className="w-full">
+      <Card>
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
@@ -304,9 +297,9 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Programmes</SelectItem>
-                {uniqueProgrammes.map((programme) => (
-                  <SelectItem key={programme} value={programme}>
-                    {programme}
+                {programmes.map((programme) => (
+                  <SelectItem key={programme.id} value={programme.programme_name}>
+                    {programme.programme_name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -319,9 +312,9 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                {uniqueStatuses.map((status) => (
-                  <SelectItem key={status} value={status}>
-                    {status}
+                {statuses.map((status) => (
+                  <SelectItem key={status.id} value={status.name}>
+                    {status.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -333,9 +326,12 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
                 <SelectValue placeholder="All Certificates" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Certificates</SelectItem>
-                <SelectItem value="awarded">Certificate Awarded</SelectItem>
-                <SelectItem value="not-awarded">No Certificate</SelectItem>
+                 <SelectItem value="all">All Certificates</SelectItem>
+                {
+                  certifications.map(item => (
+                      <SelectItem key={item.id} value={item.name}>{item.name}</SelectItem>
+                  ))
+                }
               </SelectContent>
             </Select>
           </div>
@@ -351,10 +347,10 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
       </div>
 
       {/* Table */}
-      <Card className="w-full">
+      <Card>
         <CardContent className="p-0">
-          <div className="overflow-x-auto w-full">
-            <Table className="w-full">
+          <div className="overflow-x-auto">
+            <Table>
               <TableHeader>
                 <TableRow style={{ backgroundColor: '#650000' }}>
                   <TableHead className="text-white">Prisoner</TableHead>
@@ -411,30 +407,33 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreVertical className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => onView(enrollment)}>
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Details
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => onEdit(enrollment)}>
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Edit
-                            </DropdownMenuItem>
-                            <DropdownMenuItem 
-                              onClick={() => onDelete(enrollment.id)}
-                              className="text-red-600 focus:text-red-600"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onView(enrollment)}
+                            title="View"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onEdit(enrollment)}
+                            title="Edit"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => onDelete(enrollment.id)}
+                            title="Delete"
+                            className="text-red-600 hover:text-red-700"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))
