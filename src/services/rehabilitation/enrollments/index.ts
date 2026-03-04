@@ -106,7 +106,7 @@ export interface RehabilitationEnrollment {
   end_date: string;
   certificate_awarded: boolean;
   certification_document: string;
-  prisoner: string;
+  prisoner: string[];
   programme: string;
   programme_stage: string;
   rehabilitation_sponsor: string;

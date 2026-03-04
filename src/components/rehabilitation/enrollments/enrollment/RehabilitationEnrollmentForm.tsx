@@ -137,7 +137,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     certificate_awarded: false,
     certification_document: '',
     comment: '',
-    prisoner: '',
+    prisoner: [],
     programme: '',
     programme_stage: '',
     rehabilitation_sponsor: '',
@@ -292,8 +292,28 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
       toast.error('Please select a programme');
       return;
     }
+     if (!formData.programme_stage) {
+      toast.error('Please select a programme stage');
+      return;
+    }
     if (!formData.date_of_enrollment) {
       toast.error('Please select date of enrollment');
+      return;
+    }
+    if (!formData.start_date) {
+      toast.error('Please select the start date');
+      return;
+    }
+    if (!formData.end_date) {
+      toast.error('Please select the end date');
+      return;
+    }
+    if (!formData.responsible_officer) {
+      toast.error('Please select the responsible officer');
+      return;
+    }
+    if (!formData.progress_status) {
+      toast.error('Please select the progress status');
       return;
     }
 
@@ -521,7 +541,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
                 {/* Programme Stage Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="programme_stage">Programme Stage</Label>
+                  <Label htmlFor="programme_stage">Programme Stage <span className="text-red-600">*</span></Label>
                   <Popover open={openStage} onOpenChange={setOpenStage}>
                     <PopoverTrigger asChild>
                       <Button
@@ -615,7 +635,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
                 {/* Responsible Officer Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="responsible_officer">Responsible Officer</Label>
+                  <Label htmlFor="responsible_officer">Responsible Officer <span className="text-red-600">*</span></Label>
                   <Popover open={openOfficer} onOpenChange={setOpenOfficer}>
                     <PopoverTrigger asChild>
                       <Button
@@ -666,7 +686,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
                 {/* Progress Status Selection */}
                 <div className="space-y-2">
-                  <Label htmlFor="progress_status">Progress Status</Label>
+                  <Label htmlFor="progress_status">Progress Status <span className="text-red-600">*</span></Label>
                   <Popover open={openStatus} onOpenChange={setOpenStatus}>
                     <PopoverTrigger asChild>
                       <Button
@@ -750,7 +770,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
                 {/* Start Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="start_date">Start Date</Label>
+                  <Label htmlFor="start_date">Start Date <span className="text-red-600">*</span></Label>
                   <Popover open={showStartDate} onOpenChange={setShowStartDate}>
                     <PopoverTrigger asChild>
                       <Button
@@ -785,7 +805,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
 
                 {/* End Date */}
                 <div className="space-y-2">
-                  <Label htmlFor="end_date">End Date</Label>
+                  <Label htmlFor="end_date">End Date <span className="text-red-600">*</span></Label>
                   <Popover open={showEndDate} onOpenChange={setShowEndDate}>
                     <PopoverTrigger asChild>
                       <Button
