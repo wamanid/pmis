@@ -17,6 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { deleteCourtProceedings, getCourtattendance, postgetCourtProceedings, updateCourtProceedings } from '../../services/courtService';
+import { CourtAttendanceRecord, CourtProceedingPost, CourtProceedingRecord } from '../../models/court';
 
 interface CourtProceedingFormProps {
   open: boolean;
@@ -25,21 +27,7 @@ interface CourtProceedingFormProps {
   editData?: CourtProceedingRecord | null;
 }
 
-interface CourtProceedingRecord {
-  id?: string;
-  court_attendance_details?: string;
-  prisoner_name?: string;
-  transcript?: string;
-  court_attendance?: string;
-}
 
-interface CourtAttendanceRecord {
-  id: string;
-  prisoner_name: string;
-  court_name: string;
-  attendance_datetime: string;
-  criminal_case_number: string;
-}
 
 // Mock data for court attendance dropdown
 const mockCourtAttendanceRecords: CourtAttendanceRecord[] = [
@@ -85,7 +73,14 @@ const CourtProceedingForm: React.FC<CourtProceedingFormProps> = ({
 
   useEffect(() => {
     // Load court attendance records
-    setCourtAttendanceRecords(mockCourtAttendanceRecords);
+     getCourtattendance().then((data) => {
+            setCourtAttendanceRecords(data.results);
+            //alert(JSON.stringify(data.results));
+              }).catch((error) => {
+                alert(error);
+              });
+
+   // setCourtAttendanceRecords(mockCourtAttendanceRecords);
   }, []);
 
   useEffect(() => {
@@ -138,18 +133,49 @@ const CourtProceedingForm: React.FC<CourtProceedingFormProps> = ({
     setLoading(true);
 
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+     
+
+
       if (editData?.id) {
+let dataTopost: CourtProceedingPost = {
+  id: editData.id,
+        court_attendance: formData.court_attendance,
+        transcript: formData.transcript
+
+      };
+
+     // alert(JSON.stringify(dataTopost));
+
+       updateCourtProceedings(dataTopost).then((response) => {
+      }).catch((error) => {
+
+        alert(error);
+      });
         toast.success('Court proceeding updated successfully');
-      } else {
-        toast.success('Court proceeding created successfully');
-      }
-      
+             
       resetForm();
       onSuccess();
       onClose();
+      } else {
+
+      let dataTopost: CourtProceedingPost = {
+        court_attendance: formData.court_attendance,
+        transcript: formData.transcript
+      }
+
+      postgetCourtProceedings(dataTopost).then((response) => {
+      }).catch((error) => {
+
+        alert(error);
+      });
+
+           
+      resetForm();
+      onSuccess();
+      onClose();
+        toast.success('Court proceeding created successfully');
+      }
+ 
     } catch (error) {
       toast.error('An error occurred. Please try again.');
     } finally {
@@ -162,13 +188,15 @@ const CourtProceedingForm: React.FC<CourtProceedingFormProps> = ({
     
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      toast.success('Court proceeding deleted successfully');
+     deleteCourtProceedings(editData.id).then((response) => {
+     toast.success('Court proceeding deleted successfully');
       setShowDeleteDialog(false);
       onSuccess();
       onClose();
+      }).catch((error) => {
+     });
+      
+     
     } catch (error) {
       toast.error('Failed to delete court proceeding');
     } finally {

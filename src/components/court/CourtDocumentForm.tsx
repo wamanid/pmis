@@ -17,6 +17,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
+import { deleteCourtDocument, getCourtattendance } from '../../services/courtService';
+import axiosInstance from '../../services/axiosInstance';
 
 interface CourtDocumentFormProps {
   open: boolean;
@@ -34,14 +36,7 @@ interface CourtDocumentRecord {
 }
 
 // Mock data for court attendance records
-const mockCourtAttendanceRecords = [
-  { id: '1', details: 'Court Appearance - High Court Kampala - 2024-01-15' },
-  { id: '2', details: 'Bail Hearing - Chief Magistrates Court - 2024-01-20' },
-  { id: '3', details: 'Sentencing - Magistrates Court Nakawa - 2024-01-25' },
-  { id: '4', details: 'Appeal Hearing - High Court Kampala - 2024-02-01' },
-  { id: '5', details: 'Case Mention - Family Court Mengo - 2024-02-05' },
-];
-
+let mockCourtAttendanceRecords:any = [];
 const CourtDocumentForm: React.FC<CourtDocumentFormProps> = ({
   open,
   onClose,
@@ -70,6 +65,16 @@ const CourtDocumentForm: React.FC<CourtDocumentFormProps> = ({
         setSelectedFileName(editData.document);
       }
     } else {
+
+       //load attendance records
+            getCourtattendance().then((data) => {
+             // alert(JSON.stringify(data));
+                mockCourtAttendanceRecords = data.results;
+              }).catch((error) => {
+                alert(error);
+              });
+
+
       resetForm();
     }
   }, [editData, open]);
@@ -120,19 +125,72 @@ const CourtDocumentForm: React.FC<CourtDocumentFormProps> = ({
 
     setLoading(true);
 
-    try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
+       try {
+      // TODO: Replace with actual API call
+       const formDataToSend = new FormData();
+       //multipart form data
+
       
-      if (editData?.id) {
-        toast.success('Court document updated successfully');
-      } else {
-        toast.success('Court document created successfully');
-      }
-      
-      resetForm();
+       //use editData if editData exist
+
+        formDataToSend.append('document', selectedFile ? selectedFile : '');
+        formDataToSend.append('court_attendance', formData.court_attendance);
+        formDataToSend.append('description', formData.description);
+    
+
+     const token =
+        localStorage.getItem("access_token") ??
+        localStorage.getItem("token") ??
+        localStorage.getItem("auth_token") ??
+        localStorage.getItem("authToken") ??
+        null;
+      const configuredBase =
+      (axiosInstance && (axiosInstance.defaults as any)?.baseURL) ??
+      ((import.meta as any).env?.VITE_API_BASE_URL ?? "")
+
+       try {   
+        
+        let response:any=null;
+            //if edit data
+            if(editData){
+        formDataToSend.append('document', selectedFile ? selectedFile : '');
+        formDataToSend.append('court_attendance', editData.court_attendance);
+        formDataToSend.append('description', editData.description);
+               response = await fetch(configuredBase+"/court-attendance/documents/"+editData.id+"/", {
+                method: 'PUT',
+                headers: {
+                  "Authorization": "Bearer "+token, // ✅ Optional auth
+                },
+                body: formDataToSend,
+              });
+            }
+            else{
+ response = await fetch(configuredBase+"/court-attendance/documents/", {
+              method: 'POST',
+              headers: {
+                "Authorization": "Bearer "+token, // ✅ Optional auth
+              },
+              body: formDataToSend,
+            });
+            }
+             const result = await response.json();
+           // alert(JSON.stringify(result));
+            if (!response.ok) {
+                  toast.error(response.status); 
+             // throw new Error(`Upload failed: ${response.status}`);
+            }
+            else{
+      toast.success(editData ? 'Court documents record updated successfully' : 'Court documents record created successfully');
+     resetForm();
       onSuccess();
       onClose();
+            }
+          } catch (error) {
+            console.error('Upload error:', error);
+            alert(error);
+          
+          }
+
     } catch (error) {
       toast.error('An error occurred. Please try again.');
     } finally {
@@ -145,13 +203,15 @@ const CourtDocumentForm: React.FC<CourtDocumentFormProps> = ({
     
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
+        deleteCourtDocument(editData.id).then((data) => {
       toast.success('Court document deleted successfully');
       setShowDeleteDialog(false);
       onSuccess();
       onClose();
+             }).catch((error) => {
+               alert(error);
+             });
+     
     } catch (error) {
       toast.error('Failed to delete court document');
     } finally {
@@ -207,7 +267,7 @@ const CourtDocumentForm: React.FC<CourtDocumentFormProps> = ({
                 <SelectContent>
                   {mockCourtAttendanceRecords.map((record) => (
                     <SelectItem key={record.id} value={record.id}>
-                      {record.details}
+                      {record.court_name}-{record.criminal_case_number}-{record.prisoner_name}
                     </SelectItem>
                   ))}
                 </SelectContent>

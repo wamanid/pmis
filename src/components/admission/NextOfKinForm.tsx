@@ -7,6 +7,9 @@ import { Checkbox } from "../ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
 import { Separator } from "../ui/separator";
 import { SexSelect } from "../common/SexSelect";
+import { RelationshipSelect } from "../common/RelationshipSelect";
+import { IdTypeSelect } from "../common/IdTypeSelect";
+import { AddressSelect } from "../common/AddressSelect";
 import { NextOfKin } from "../../models/admission/";
 
 interface NextOfKinFormProps {
@@ -97,10 +100,16 @@ const NextOfKinForm: React.FC<NextOfKinFormProps> = ({
             {/* Relationship */}
             <div>
               <Label htmlFor="nok_relationship">Relationship</Label>
-              <Input
-                id="nok_relationship"
-                {...register("relationship")}
-                placeholder="e.g., Father, Mother, Spouse"
+              <Controller
+                name="relationship"
+                control={control}
+                render={({ field }) => (
+                  <RelationshipSelect
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                    placeholder="Select relationship"
+                  />
+                )}
               />
             </div>
 
@@ -137,10 +146,16 @@ const NextOfKinForm: React.FC<NextOfKinFormProps> = ({
             {/* ID Type */}
             <div>
               <Label htmlFor="nok_id_type">ID Type</Label>
-              <Input
-                id="nok_id_type"
-                {...register("id_type")}
-                placeholder="e.g., National ID, Passport"
+              <Controller
+                name="id_type"
+                control={control}
+                render={({ field }) => (
+                  <IdTypeSelect
+                    value={field.value}
+                    onValueChange={(value) => field.onChange(value)}
+                    placeholder="Select ID type"
+                  />
+                )}
               />
             </div>
 
@@ -189,67 +204,21 @@ const NextOfKinForm: React.FC<NextOfKinFormProps> = ({
           {/* Address Information */}
           <div>
             <h4 className="mb-4 font-semibold">Next of Kin Address</h4>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Region */}
-              <div>
-                <Label htmlFor="nok_address_region">Region</Label>
-                <Input
-                  id="nok_address_region"
-                  {...register("address_region")}
-                  placeholder="Enter region"
-                />
-              </div>
-
-              {/* District */}
-              <div>
-                <Label htmlFor="nok_address_district">District</Label>
-                <Input
-                  id="nok_address_district"
-                  {...register("address_district")}
-                  placeholder="Enter district"
-                />
-              </div>
-
-              {/* County */}
-              <div>
-                <Label htmlFor="nok_address_county">County</Label>
-                <Input
-                  id="nok_address_county"
-                  {...register("address_county")}
-                  placeholder="Enter county"
-                />
-              </div>
-
-              {/* Sub County */}
-              <div>
-                <Label htmlFor="nok_address_sub_county">Sub County</Label>
-                <Input
-                  id="nok_address_sub_county"
-                  {...register("address_sub_county")}
-                  placeholder="Enter sub county"
-                />
-              </div>
-
-              {/* Parish */}
-              <div>
-                <Label htmlFor="nok_address_parish">Parish</Label>
-                <Input
-                  id="nok_address_parish"
-                  {...register("address_parish")}
-                  placeholder="Enter parish"
-                />
-              </div>
-
-              {/* Village */}
-              <div>
-                <Label htmlFor="nok_address_village">Village</Label>
-                <Input
-                  id="nok_address_village"
-                  {...register("address_village")}
-                  placeholder="Enter village"
-                />
-              </div>
-            </div>
+            <AddressSelect
+              region={watch("address_region")}
+              district={watch("address_district")}
+              county={watch("address_county")}
+              subCounty={watch("address_sub_county")}
+              parish={watch("address_parish")}
+              village={watch("address_village")}
+              onRegionChange={(value) => setValue("address_region", value)}
+              onDistrictChange={(value) => setValue("address_district", value)}
+              onCountyChange={(value) => setValue("address_county", value)}
+              onSubCountyChange={(value) => setValue("address_sub_county", value)}
+              onParishChange={(value) => setValue("address_parish", value)}
+              onVillageChange={(value) => setValue("address_village", value)}
+              gridCols={2}
+            />
           </div>
 
           {/* Form Actions */}

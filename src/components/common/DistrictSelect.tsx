@@ -25,6 +25,7 @@ export interface DistrictSelectProps {
   placeholder?: string;
   disabled?: boolean;
   className?: string;
+  ignoreRegion?: boolean;
 }
 
 export function DistrictSelect({
@@ -34,6 +35,7 @@ export function DistrictSelect({
   placeholder = 'Select district...',
   disabled = false,
   className,
+  ignoreRegion = false,
 }: DistrictSelectProps) {
   const [open, setOpen] = useState(false);
   const [districts, setDistricts] = useState<District[]>([]);
@@ -49,7 +51,7 @@ export function DistrictSelect({
         setError(null);
         const response = await fetchDistricts({
           search: searchQuery || undefined,
-          region: regionId || undefined,
+          region: ignoreRegion ? undefined : (regionId || undefined),
           is_active: true,
           ordering: 'name',
         });
@@ -63,7 +65,7 @@ export function DistrictSelect({
     };
 
     loadDistricts();
-  }, [searchQuery, regionId]);
+  }, [searchQuery, regionId, ignoreRegion]);
 
   // Find selected district
   const selectedDistrict = districts.find((district) => district.id === value);

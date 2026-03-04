@@ -316,6 +316,7 @@ export default function PrisonerSearchScreen({
                 <p className="font-medium text-sm">{selectedPrisoner.last_name}</p>
               </div>
 
+            
               {/* Current Station */}
               {selectedPrisoner.current_station_name && (
                 <div className="space-y-1">

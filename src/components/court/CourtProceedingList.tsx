@@ -30,99 +30,14 @@ import { toast } from 'sonner@2.0.3';
 import CourtProceedingForm from './CourtProceedingForm';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { Textarea } from '../ui/textarea';
+import { CourtAttendanceRecord, CourtAttendanceRecordMini, CourtProceedingRecord } from '../../models/court';
+import { getCourtattendance, getCourtProceedings } from '../../services/courtService';
+import { getprisoners } from '../../services/gateService';
 
-interface CourtProceedingRecord {
-  id: string;
-  court_attendance_details: string;
-  prisoner_name: string;
-  transcript: string;
-  court_attendance: string;
-  created_datetime?: string;
-  updated_datetime?: string;
-}
 
-interface CourtAttendanceRecord {
-  id: string;
-  prisoner_name: string;
-  court_name: string;
-  attendance_datetime: string;
-  criminal_case_number: string;
-}
-
-// Mock data
-const mockCourtAttendanceRecords: CourtAttendanceRecord[] = [
-  {
-    id: '1',
-    prisoner_name: 'John Doe',
-    court_name: 'High Court - Kampala',
-    attendance_datetime: '2025-10-15T09:00:00',
-    criminal_case_number: 'HCT-00-CR-0123-2025'
-  },
-  {
-    id: '2',
-    prisoner_name: 'Jane Smith',
-    court_name: 'Chief Magistrates Court - Kampala',
-    attendance_datetime: '2025-10-16T10:30:00',
-    criminal_case_number: 'CMC-00-CR-0456-2025'
-  },
-  {
-    id: '3',
-    prisoner_name: 'Michael Johnson',
-    court_name: 'Magistrates Court - Nakawa',
-    attendance_datetime: '2025-10-17T14:00:00',
-    criminal_case_number: 'MC-NAK-CR-0789-2025'
-  },
-];
-
-const mockCourtProceedingRecords: CourtProceedingRecord[] = [
-  {
-    id: '1',
-    court_attendance: '1',
-    court_attendance_details: 'High Court - Kampala - HCT-00-CR-0123-2025 - 10/15/2025, 9:00:00 AM',
-    prisoner_name: 'John Doe',
-    transcript: 'The court convened at 9:00 AM. The accused was present with legal representation. The prosecution presented evidence including witness testimonies and forensic reports. The defense argued for bail citing lack of prior criminal record. The magistrate reserved ruling for next week.',
-    created_datetime: '2025-10-15T09:30:00',
-    updated_datetime: '2025-10-15T09:30:00'
-  },
-  {
-    id: '2',
-    court_attendance: '2',
-    court_attendance_details: 'Chief Magistrates Court - Kampala - CMC-00-CR-0456-2025 - 10/16/2025, 10:30:00 AM',
-    prisoner_name: 'Jane Smith',
-    transcript: 'Case mention. The defense requested for adjournment to allow time to prepare witnesses. The prosecution had no objection. The case was adjourned to November 5, 2025. The accused was remanded until the next court date.',
-    created_datetime: '2025-10-16T11:00:00',
-    updated_datetime: '2025-10-16T11:00:00'
-  },
-  {
-    id: '3',
-    court_attendance: '3',
-    court_attendance_details: 'Magistrates Court - Nakawa - MC-NAK-CR-0789-2025 - 10/17/2025, 2:00:00 PM',
-    prisoner_name: 'Michael Johnson',
-    transcript: 'Sentencing hearing. The accused pleaded guilty to the charges. Character witnesses testified on behalf of the accused. The magistrate considered the guilty plea and mitigating circumstances. Sentenced to 2 years imprisonment with possibility of parole after 12 months.',
-    created_datetime: '2025-10-17T14:45:00',
-    updated_datetime: '2025-10-17T14:45:00'
-  },
-  {
-    id: '4',
-    court_attendance: '1',
-    court_attendance_details: 'High Court - Kampala - HCT-00-CR-0123-2025 - 10/15/2025, 9:00:00 AM',
-    prisoner_name: 'John Doe',
-    transcript: 'Follow-up hearing. The court delivered its ruling on the bail application. Bail was denied due to the severity of the charges and flight risk. The accused was remanded to custody. Next hearing scheduled for trial commencement on November 20, 2025.',
-    created_datetime: '2025-10-22T10:00:00',
-    updated_datetime: '2025-10-22T10:00:00'
-  },
-  {
-    id: '5',
-    court_attendance: '2',
-    court_attendance_details: 'Chief Magistrates Court - Kampala - CMC-00-CR-0456-2025 - 10/16/2025, 10:30:00 AM',
-    prisoner_name: 'Jane Smith',
-    transcript: 'Pre-trial conference. Both parties agreed on the list of witnesses. Documentary evidence was submitted and verified. The court set a trial date for December 1, 2025. Directions were given regarding the filing of additional affidavits.',
-    created_datetime: '2025-10-23T09:30:00',
-    updated_datetime: '2025-10-23T09:30:00'
-  },
-];
 
 const CourtProceedingList: React.FC = () => {
+  const [mockCourtProceedingRecords, setMockCourtProceedingRecords] = useState<CourtProceedingRecord[]>([]);
   const [proceedings, setProceedings] = useState<CourtProceedingRecord[]>([]);
   const [filteredProceedings, setFilteredProceedings] = useState<CourtProceedingRecord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -130,7 +45,8 @@ const CourtProceedingList: React.FC = () => {
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [selectedProceeding, setSelectedProceeding] = useState<CourtProceedingRecord | null>(null);
   const [editData, setEditData] = useState<CourtProceedingRecord | null>(null);
-
+ const [mockCourtAttendanceRecords, setMockCourtAttendanceRecords] = useState<CourtAttendanceRecord[]>([]);
+ 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [filterPrisoner, setFilterPrisoner] = useState('');
@@ -152,9 +68,21 @@ const CourtProceedingList: React.FC = () => {
   const loadProceedings = async () => {
     setLoading(true);
     try {
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      setProceedings(mockCourtProceedingRecords);
+            
+       getCourtattendance().then((data) => {
+        setMockCourtAttendanceRecords(data.results);
+          }).catch((error) => {
+            alert(error);
+          });
+
+      //get proceeedings here
+       getCourtProceedings().then((data) => {
+        setMockCourtProceedingRecords(data.results);
+        setProceedings(data.results); 
+      //  alert(JSON.stringify(data.results));
+          }).catch((error) => {
+            alert(error);
+          });
       setTotalCount(mockCourtProceedingRecords.length);
     } catch (error) {
       toast.error('Failed to load court proceedings');

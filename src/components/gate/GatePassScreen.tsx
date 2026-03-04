@@ -293,10 +293,11 @@ getworkingparty().then((data) => {
       gatePass.destination.toLowerCase().includes(searchTerm.toLowerCase()) ||
       gatePass.prisoners.some(p => p.prisoner_name.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    //const matchesStatus = statusFilter === 'all' || gatePass.status === statusFilter;
-    //const matchesType = typeFilter === 'all' || gatePass.gate_pass_type === typeFilter;
+     // alert(gatePass.gate_pass_type_name+"==="+typeFilter);
+    const matchesStatus = statusFilter === 'all' || gatePass.status_name === statusFilter;
+    const matchesType = typeFilter === 'all' || gatePass.gate_pass_type_name === typeFilter;
 
-    return matchesSearch /*&& matchesStatus && matchesType*/;
+    return matchesSearch && matchesStatus && matchesType;
   });
 
 
@@ -815,9 +816,9 @@ editgatePass(newGatePass2).then((data) => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                <SelectItem value="active">Active</SelectItem>
-                <SelectItem value="completed">Completed</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Completed">Completed</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
               </SelectContent>
             </Select>
 
@@ -828,7 +829,7 @@ editgatePass(newGatePass2).then((data) => {
               <SelectContent>
                 <SelectItem value="all">All Types</SelectItem>
                 {mockGatePassTypes.map(type => (
-                  <SelectItem key={type.id} value={type.id}>{type.name}</SelectItem>
+                  <SelectItem key={type.name} value={type.name}>{type.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -868,7 +869,7 @@ editgatePass(newGatePass2).then((data) => {
                   paginatedGatePasses.map((gatePass) => (
                     <TableRow key={gatePass.id}>
                       <TableCell>{gatePass.gate_pass_type_name}</TableCell>
-                      <TableCell>{gatePass.gate_keeper_username}</TableCell>
+                      <TableCell>{gatePass.gate_keeper_name}</TableCell>
                       <TableCell>{gatePass.destination}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{gatePass.prisoners.length}</Badge>
@@ -886,7 +887,7 @@ editgatePass(newGatePass2).then((data) => {
                       </TableCell>
                       <TableCell>{getStatusBadge(gatePass.status_name)}</TableCell>
                       <TableCell className="text-sm text-gray-600">
-                        {gatePass.created_at ? formatDateTime(gatePass.created_at) : '-'}
+                        {gatePass.created_datetime ? formatDateTime(gatePass.created_datetime) : '-'}
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-2">
@@ -1446,11 +1447,11 @@ editgatePass(newGatePass2).then((data) => {
                       </div>
                       <div>
                         <Label className="text-gray-600">Gatekeeper</Label>
-                        <p>{selectedGatePass.gate_keeper_username}</p>
+                        <p>{selectedGatePass.gate_keeper_name}</p>
                       </div>
                       <div>
                         <Label className="text-gray-600">Created</Label>
-                        <p>{selectedGatePass.created_at ? formatDateTime(selectedGatePass.created_at) : '-'}</p>
+                        <p>{selectedGatePass.created_datetime ? formatDateTime(selectedGatePass.created_datetime) : '-'}</p>
                       </div>
                       <div className="col-span-2">
                         <Label className="text-gray-600">Destination</Label>

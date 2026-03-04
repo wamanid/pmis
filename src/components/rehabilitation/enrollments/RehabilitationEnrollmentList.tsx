@@ -5,6 +5,12 @@ import { Input } from '../ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { Badge } from '../ui/badge';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '../ui/dropdown-menu';
 import { 
   Search, 
   Eye, 
@@ -14,7 +20,8 @@ import {
   ChevronRight,
   Award,
   BookOpen,
-  User
+  User,
+  MoreVertical
 } from 'lucide-react';
 
 interface RehabilitationEnrollment {
@@ -46,13 +53,15 @@ interface RehabilitationEnrollmentListProps {
   onEdit: (enrollment: RehabilitationEnrollment) => void;
   onDelete: (id: string) => void;
   refreshTrigger?: number;
+  prisonerId?: string;
 }
 
 const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> = ({
   onView,
   onEdit,
   onDelete,
-  refreshTrigger
+  refreshTrigger,
+  prisonerId,
 }) => {
   const [enrollments, setEnrollments] = useState<RehabilitationEnrollment[]>([]);
   const [filteredEnrollments, setFilteredEnrollments] = useState<RehabilitationEnrollment[]>([]);
@@ -185,7 +194,7 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
 
   useEffect(() => {
     loadEnrollments();
-  }, [refreshTrigger]);
+  }, [refreshTrigger, prisonerId]);
 
   useEffect(() => {
     filterEnrollments();
@@ -195,7 +204,12 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
     setLoading(true);
     // Simulate API call
     setTimeout(() => {
-      setEnrollments(mockEnrollments);
+      let data = mockEnrollments;
+      // Filter by prisonerId if provided
+      if (prisonerId) {
+        data = data.filter((e) => e.prisoner === prisonerId);
+      }
+      setEnrollments(data);
       setLoading(false);
     }, 500);
   };
@@ -267,9 +281,9 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
   const uniqueStatuses = Array.from(new Set(enrollments.map(e => e.progress_status_name)));
 
   return (
-    <div className="space-y-4">
+    <div className="w-full space-y-4">
       {/* Filters */}
-      <Card>
+      <Card className="w-full">
         <CardContent className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             {/* Search */}
@@ -337,10 +351,10 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="w-full">
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
+          <div className="overflow-x-auto w-full">
+            <Table className="w-full">
               <TableHeader>
                 <TableRow style={{ backgroundColor: '#650000' }}>
                   <TableHead className="text-white">Prisoner</TableHead>
@@ -397,33 +411,30 @@ const RehabilitationEnrollmentList: React.FC<RehabilitationEnrollmentListProps> 
                         )}
                       </TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onView(enrollment)}
-                            title="View"
-                          >
-                            <Eye className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onEdit(enrollment)}
-                            title="Edit"
-                          >
-                            <Pencil className="h-4 w-4" />
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onDelete(enrollment.id)}
-                            title="Delete"
-                            className="text-red-600 hover:text-red-700"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon">
+                              <MoreVertical className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => onView(enrollment)}>
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => onEdit(enrollment)}>
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Edit
+                            </DropdownMenuItem>
+                            <DropdownMenuItem 
+                              onClick={() => onDelete(enrollment.id)}
+                              className="text-red-600 focus:text-red-600"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </TableCell>
                     </TableRow>
                   ))

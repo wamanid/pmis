@@ -69,3 +69,16 @@ export const generatePrisonerNumber = async (
     throw error;
   }
 };
+
+/**
+ * Delete a prisoner by ID
+ * @param id - Prisoner ID
+ */
+export const deletePrisoner = async (id: string): Promise<void> => {
+  try {
+    await axiosInstance.delete(`admission/prisoners/${id}/`);
+  } catch (error) {
+    console.error(`Error deleting prisoner ${id}:`, error);
+    throw error;
+  }
+};
