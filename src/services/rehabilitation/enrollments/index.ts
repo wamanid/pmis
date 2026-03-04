@@ -106,12 +106,18 @@ export interface RehabilitationEnrollment {
   end_date: string;
   certificate_awarded: boolean;
   certification_document: string;
-  prisoner: string[];
+  prisoners: string[];
   programme: string;
   programme_stage: string;
-  rehabilitation_sponsor: string;
+  rehabilitation_sponsor: string | null;
   responsible_officer: string;
   progress_status: string;
+}
+
+export interface EnrollmentResp {
+  message: string;
+  count: number;
+  enrollments: Enrollment[];
 }
 
 export type ProgrammesResponse<T> = Paginated<T> | ErrorResponse
@@ -120,7 +126,8 @@ export type CertificationsResponse<T> = Paginated<T> | ErrorResponse
 export type EnrollmentsResponse<T> = Paginated<T> | ErrorResponse
 export type ProgrammeStageResponse<T> = Paginated<T> | ErrorResponse
 export type SponsorResponse<T> = Paginated<T> | ErrorResponse
-export type EnrollmentResponse = RehabilitationEnrollment | ErrorResponse
+export type EnrollmentResponse1 = EnrollmentResp | ErrorResponse
+export type EnrollmentResponse2 = Enrollment | ErrorResponse
 
 export const getProgrammes = async (): Promise<ProgrammesResponse<Programme>> => {
   const response = await axiosInstance.get<Paginated<Programme>>(
@@ -168,13 +175,13 @@ export const getSponsors = async (): Promise<SponsorResponse<Sponsor>> => {
   return response.data
 }
 
-export const addEnrollment = async (enrollment: RehabilitationEnrollment) : Promise<EnrollmentResponse> => {
-  const response = await axiosInstance.post<EnrollmentResponse>('/rehabilitation/enrollments/', enrollment);
+export const addEnrollment = async (enrollment: RehabilitationEnrollment) : Promise<EnrollmentResponse1> => {
+  const response = await axiosInstance.post<EnrollmentResponse1>('/rehabilitation/enrollments/', enrollment);
   return response.data;
 }
 
-export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id: string) : Promise<EnrollmentResponse> => {
-  const response = await axiosInstance.post<EnrollmentResponse>(`/rehabilitation/enrollments/${id}/`, enrollment);
+export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id: string) : Promise<EnrollmentResponse2> => {
+  const response = await axiosInstance.put<EnrollmentResponse2>(`/rehabilitation/enrollments/${id}/`, enrollment);
   return response.data;
 }
 
