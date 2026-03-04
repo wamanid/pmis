@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
-import { Button } from '../../../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../ui/dialog';
+import { Button } from '../../ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -10,7 +10,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../ui/alert-dialog';
+} from '../../ui/alert-dialog';
 import { toast } from 'sonner@2.0.3';
 import { Plus } from 'lucide-react';
 import EnrollmentAssessmentForm from './EnrollmentAssessmentForm';

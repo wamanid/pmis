@@ -1,10 +1,10 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Button } from '../../../ui/button';
-import { Input } from '../../../ui/input';
-import { Label } from '../../../ui/label';
-import { Textarea } from '../../../ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '../../../ui/popover';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../../ui/command';
+import { Button } from '../../ui/button';
+import { Input } from '../../ui/input';
+import { Label } from '../../ui/label';
+import { Textarea } from '../../ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '../../ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../../ui/command';
 import { toast } from 'sonner';
 import { 
   Check, 
@@ -17,7 +17,7 @@ import {
   FileText,
   Image as ImageIcon
 } from 'lucide-react';
-import { cn } from '../../../ui/utils';
+import { cn } from '../../ui/utils';
 
 interface AfterCare {
   id?: string;

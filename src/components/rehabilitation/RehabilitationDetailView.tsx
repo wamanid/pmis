@@ -1,20 +1,20 @@
 ﻿import React, { useState } from 'react';
 import { BookOpen, Calendar, ClipboardCheck, Award, Plus } from 'lucide-react';
-import { Button } from '../../../ui/button';
-import { Card, CardContent } from '../../../ui/card';
+import { Button } from '../ui/button';
+import { Card, CardContent } from '../ui/card';
 import { toast } from 'sonner';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import RehabilitationEnrollmentList from './RehabilitationEnrollmentList';
-import EnrollmentAssessmentList from './EnrollmentAssessmentList';
-import RehabilitationEnrollmentSessionList from './RehabilitationEnrollmentSessionList';
-import AfterCareList from './AfterCareList';
+import RehabilitationEnrollmentList from './enrollments/enrollment/RehabilitationEnrollmentList';
+import EnrollmentAssessmentList from './enrollments/EnrollmentAssessmentList';
+import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
+import AfterCareList from './afterCare/AfterCareList';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '../../../ui/dialog';
+} from '../ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,12 +24,12 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from '../../../ui/alert-dialog';
-import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
-import EnrollmentAssessmentForm from './EnrollmentAssessmentForm';
-import RehabilitationEnrollmentSessionForm from './RehabilitationEnrollmentSessionForm';
-import AfterCareForm from './AfterCareForm';
-import EnrollmentDetailView from './EnrollmentDetailView';
+} from '../ui/alert-dialog';
+import RehabilitationEnrollmentForm from './enrollments/enrollment/RehabilitationEnrollmentForm';
+import EnrollmentAssessmentForm from './enrollments/EnrollmentAssessmentForm';
+import RehabilitationEnrollmentSessionForm from './enrollments/sessions/RehabilitationEnrollmentSessionForm';
+import AfterCareForm from './afterCare/AfterCareForm';
+import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
 
 interface Prisoner {
   id: string;
