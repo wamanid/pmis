@@ -240,3 +240,121 @@ export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id:
 export const deleteEnrollment = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/rehabilitation/enrollments/${id}/`);
 };
+
+
+// Assessment
+export interface Assessment {
+  id: string;
+  prisoner_name: string;
+  programme_name: string;
+  status_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  start_date: string;
+  end_date: string;
+  board_members: string;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  enrollment: string;
+  status: string;
+}
+
+export interface AssessmentForm {
+  is_active: boolean;
+  deleted_datetime: string;
+  start_date: string;
+  end_date: string;
+  board_members: string;
+  remarks: string;
+  deleted_by: number;
+  enrollment: string;
+  status: string;
+}
+
+export type AssessmentResponse<T> = Paginated<T> | ErrorResponse
+export type AssessmentFormResponse = Assessment | ErrorResponse
+
+export const getAssessments = async (): Promise<AssessmentResponse<Assessment>> => {
+  const response = await axiosInstance.get<Paginated<Assessment>>(
+    '/rehabilitation/assessments/'
+  )
+  return response.data
+}
+
+export const addAssessment = async (assessment: AssessmentForm): Promise<AssessmentFormResponse> => {
+  const response = await axiosInstance.post<AssessmentFormResponse>(
+    '/rehabilitation/assessments/'
+  )
+  return response.data
+}
+
+export const updateAssessment = async (assessment: AssessmentForm, id: string): Promise<AssessmentFormResponse> => {
+  const response = await axiosInstance.put<AssessmentFormResponse>(
+    `/rehabilitation/assessments/${id}/`
+  )
+  return response.data
+}
+
+export const deleteAssessment = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/assessments/${id}/`);
+};
+
+// Session
+export interface Session {
+  id: string;
+  prisoner_name: string;
+  programme_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  session_date: string;
+  session_duration: number;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  enrollment: string;
+}
+
+export interface SessionForm {
+  is_active: boolean;
+  deleted_datetime: string;
+  session_date: string;
+  session_duration: number;
+  remarks: string;
+  deleted_by: number;
+  enrollment: string;
+}
+
+export type SessionResponse<T> = Paginated<T> | ErrorResponse
+export type SessionFormResponse = Session | ErrorResponse
+
+export const getSessions = async (): Promise<SessionResponse<Session>> => {
+  const response = await axiosInstance.get<Paginated<Session>>(
+    '/rehabilitation/enrollment-sessions/'
+  )
+  return response.data
+}
+
+export const addSession = async (session: SessionForm): Promise<SessionFormResponse> => {
+  const response = await axiosInstance.post<SessionFormResponse>(
+    '/rehabilitation/enrollment-sessions/'
+  )
+  return response.data
+}
+
+export const updateSession = async (session: SessionForm, id: string): Promise<SessionFormResponse> => {
+  const response = await axiosInstance.put<SessionFormResponse>(
+    `/rehabilitation/enrollment-sessions/${id}/`
+  )
+  return response.data
+}
+
+export const deleteSession = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/enrollment-sessions/${id}/`);
+};

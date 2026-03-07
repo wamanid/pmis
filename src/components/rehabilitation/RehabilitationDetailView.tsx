@@ -8,7 +8,7 @@ import RehabilitationEnrollmentList from './enrollments/enrollment/Rehabilitatio
 import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
-import { Enrollment, Programme, Sponsor, ProgrammeStage } from '../../services/rehabilitation';
+import {Enrollment, Programme, Sponsor, ProgrammeStage, Assessment} from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
 import { StaffItem } from '../../services/stationServices/staffDeploymentService';
@@ -16,7 +16,7 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList
+  getProgressStatusList, getAssessmentList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -40,6 +40,8 @@ import EnrollmentAssessmentForm from './enrollments/assessment/EnrollmentAssessm
 import RehabilitationEnrollmentSessionForm from './enrollments/sessions/RehabilitationEnrollmentSessionForm';
 import AfterCareForm from './afterCare/AfterCareForm';
 import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
+import {preinit} from "react-dom";
+import {handleCatchError} from "../../services/stationServices/utils";
 
 interface Prisoner {
   id: string;
@@ -60,6 +62,13 @@ interface Prisoner {
   status?: string;
 }
 
+export interface Loader {
+  enrollment: boolean,
+  assessment: boolean,
+  session: boolean,
+  afterCare: boolean,
+}
+
 const RehabilitationDetailView: React.FC = () => {
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare'>('enrollments');
@@ -74,21 +83,20 @@ const RehabilitationDetailView: React.FC = () => {
   const [staff, setStaff] = useState<StaffItem[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [programmeStages, setProgrammeStages] = useState<ProgrammeStage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<Loader>({ enrollment: true, assessment: true, session: true, afterCare: true });
   const [loader, setLoader] = useState(false);
   const [newDialogLoader, setNewDialogLoader] = useState(false);
 
   // Load dropdown data on mount
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
       await Promise.all([
         getEnrollmentList(setEnrollments),
         getProgrammesList(setProgrammes),
         getCertificationList(setCertifications),
         getProgressStatusList(setStatuses)
       ]);
-      setLoading(false);
+      setLoading(prev => ({...prev, enrollment: false}));
     };
     loadData();
   }, [refreshTrigger]);
@@ -118,6 +126,36 @@ const RehabilitationDetailView: React.FC = () => {
     setSelectedPrisoner(prisoner);
     setRefreshTrigger((prev) => prev + 1);
   };
+
+  const [assessments, setAssessments] = useState<Assessment[]>([])
+
+  useEffect(() => {
+    if (activeTab === "assessments" && loading.assessment){
+      fetchAssessments()
+    }
+  }, [activeTab]);
+
+  async function fetchAssessments(){
+    try {
+      await getAssessmentList(setAssessments)
+      const promises = []
+      if (!programmes?.length) {
+        promises.push(getProgrammesList(setProgrammes))
+      }
+      if (!statuses?.length) {
+        promises.push(getProgressStatusList(setStatuses))
+      }
+      await Promise.all(promises)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        assessment: false
+      }))
+    }
+  }
 
   // Create button handlers
   const handleCreateClick = () => {
@@ -403,52 +441,111 @@ const RehabilitationDetailView: React.FC = () => {
           {/* Tab Content */}
           {activeTab === 'enrollments' && (
             <div className="p-6">
-              <RehabilitationEnrollmentList
-                onView={handleViewEnrollment}
-                onEdit={handleEditEnrollment}
-                onDelete={handleDeleteEnrollment}
-                refreshTrigger={refreshTrigger}
-                enrollments={enrollments}
-                programmes={programmes}
-                certifications={certifications}
-                statuses={statuses}
-              />
+              {
+                loading.enrollment ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Enrollment records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                   <RehabilitationEnrollmentList
+                    onView={handleViewEnrollment}
+                    onEdit={handleEditEnrollment}
+                    onDelete={handleDeleteEnrollment}
+                    refreshTrigger={refreshTrigger}
+                    enrollments={enrollments}
+                    programmes={programmes}
+                    certifications={certifications}
+                    statuses={statuses}
+                  />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'assessments' && (
             <div className="p-6">
-              <EnrollmentAssessmentList
-                onView={handleViewAssessment}
-                onEdit={handleEditAssessment}
-                onDelete={handleDeleteAssessment}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+              {
+                loading.assessment ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Assessment records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <EnrollmentAssessmentList
+                      onView={handleViewAssessment}
+                      onEdit={handleEditAssessment}
+                      onDelete={handleDeleteAssessment}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                      programmes={programmes}
+                      statuses={statuses}
+                      assessments={assessments}
+                    />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'sessions' && (
             <div className="p-6">
-              <RehabilitationEnrollmentSessionList
-                onView={handleViewSession}
-                onEdit={handleEditSession}
-                onDelete={handleDeleteSession}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+              {
+                loading.session ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Sessions records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <RehabilitationEnrollmentSessionList
+                      onView={handleViewSession}
+                      onEdit={handleEditSession}
+                      onDelete={handleDeleteSession}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                    />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'aftercare' && (
             <div className="p-6">
-              <AfterCareList
-                onView={handleViewAfterCare}
-                onEdit={handleEditAfterCare}
-                onDelete={handleDeleteAfterCare}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+               {
+                loading.afterCare ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching After care records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <AfterCareList
+                      onView={handleViewAfterCare}
+                      onEdit={handleEditAfterCare}
+                      onDelete={handleDeleteAfterCare}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                    />
+                )
+              }
+
             </div>
           )}
         </CardContent>
