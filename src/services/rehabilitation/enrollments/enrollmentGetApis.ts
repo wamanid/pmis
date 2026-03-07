@@ -45,9 +45,9 @@ export async function getCertificationList(setData: React.Dispatch<React.SetStat
     populateList(response, "There are no certifications", setData)
 }
 
-export async function getEnrollmentList(setData: React.Dispatch<React.SetStateAction<Enrollment[]>>) {
+export async function getEnrollmentList(setData: React.Dispatch<React.SetStateAction<Enrollment[]>>): Promise<boolean> {
     const response = await getEnrollments()
-    populateList(response, "There are no enrollments", setData)
+    return populateList(response, "There are no enrollments", setData)
 }
 
 export async function getSponsorList(setData: React.Dispatch<React.SetStateAction<Sponsor[]>>): Promise<boolean> {

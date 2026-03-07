@@ -8,7 +8,14 @@ import RehabilitationEnrollmentList from './enrollments/enrollment/Rehabilitatio
 import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
-import {Enrollment, Programme, Sponsor, ProgrammeStage, Assessment} from '../../services/rehabilitation';
+import {
+  Enrollment,
+  Programme,
+  Sponsor,
+  ProgrammeStage,
+  Assessment,
+  AssessmentForm, updateEnrollment, addEnrollment, updateAssessment, addAssessment
+} from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
 import { StaffItem } from '../../services/stationServices/staffDeploymentService';
@@ -41,7 +48,7 @@ import RehabilitationEnrollmentSessionForm from './enrollments/sessions/Rehabili
 import AfterCareForm from './afterCare/AfterCareForm';
 import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
 import {preinit} from "react-dom";
-import {handleCatchError} from "../../services/stationServices/utils";
+import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
 
 interface Prisoner {
   id: string;
@@ -246,15 +253,57 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleAssessmentSubmit = (data: any) => {
-    toast.success(
+  const handleAssessmentSubmit = async (data: AssessmentForm) => {
+    console.log(data)
+    try {
+      let response
+      if (selectedEnrollment) {
+        response = await updateAssessment(data, selectedAssessment.id)
+      }
+      else {
+        response = await addAssessment(data)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedAssessment) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the assessment table");
+          return;
+        }
+        setAssessments(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        const enrollments = response.enrollments
+        setEnrollments(prev => [...enrollments, ...prev]);
+      }
+
+      toast.success(
       assessmentDialogMode === 'create'
         ? 'Assessment created successfully'
         : 'Assessment updated successfully'
     );
-    setShowAssessmentDialog(false);
-    setSelectedAssessment(null);
-    setRefreshTrigger((prev) => prev + 1);
+
+      setShowAssessmentDialog(false);
+      setSelectedAssessment(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    // finally {
+    //   setLoader(false)
+    // }
+    // toast.success(
+    //   assessmentDialogMode === 'create'
+    //     ? 'Assessment created successfully'
+    //     : 'Assessment updated successfully'
+    // );
+    // setShowAssessmentDialog(false);
+    // setSelectedAssessment(null);
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   // Session handlers
@@ -631,6 +680,9 @@ const RehabilitationDetailView: React.FC = () => {
               setShowAssessmentDialog(false);
               setSelectedAssessment(null);
             }}
+            enrollments={enrollments}
+            setEnrollments={setEnrollments}
+            statuses={statuses}
           />
         </DialogContent>
       </Dialog>

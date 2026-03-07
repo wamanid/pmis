@@ -285,16 +285,16 @@ export const getAssessments = async (): Promise<AssessmentResponse<Assessment>> 
   return response.data
 }
 
-export const addAssessment = async (assessment: AssessmentForm): Promise<AssessmentFormResponse> => {
+export const addAssessment = async (assessmentForm: AssessmentForm): Promise<AssessmentFormResponse> => {
   const response = await axiosInstance.post<AssessmentFormResponse>(
-    '/rehabilitation/assessments/'
+    '/rehabilitation/assessments/', assessmentForm
   )
   return response.data
 }
 
 export const updateAssessment = async (assessment: AssessmentForm, id: string): Promise<AssessmentFormResponse> => {
   const response = await axiosInstance.put<AssessmentFormResponse>(
-    `/rehabilitation/assessments/${id}/`
+    `/rehabilitation/assessments/${id}/`, assessment
   )
   return response.data
 }
