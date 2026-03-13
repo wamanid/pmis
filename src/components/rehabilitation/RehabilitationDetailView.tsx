@@ -20,7 +20,7 @@ import {
   updateAssessment,
   addAssessment,
   getAssessmentStatuses,
-  deleteAssessment
+  deleteAssessment, Session, deleteSession, SessionForm, updateSession, addSession
 } from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
@@ -29,7 +29,7 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList, getAssessmentList, getAssessmentStatusList
+  getProgressStatusList, getAssessmentList, getAssessmentStatusList, getSessionList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -143,10 +143,17 @@ const RehabilitationDetailView: React.FC = () => {
 
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [assessmentStatuses, setAssessmentStatuses] = useState<Unit[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
 
   useEffect(() => {
     if (activeTab === "assessments" && loading.assessment){
       fetchAssessments()
+    }
+  }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === "sessions" && loading.session){
+      fetchSessions()
     }
   }, [activeTab]);
 
@@ -168,6 +175,20 @@ const RehabilitationDetailView: React.FC = () => {
       setLoading(prev => ({
         ...prev,
         assessment: false
+      }))
+    }
+  }
+
+  async function fetchSessions(){
+    try {
+      await getSessionList(setSessions)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        session: false
       }))
     }
   }
@@ -262,7 +283,7 @@ const RehabilitationDetailView: React.FC = () => {
   };
 
   const handleAssessmentSubmit = async (data: AssessmentForm) => {
-    console.log(data)
+    // console.log(data)
     try {
       let response
       if (selectedAssessment) {
@@ -332,15 +353,47 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleSessionSubmit = (data: any) => {
-    toast.success(
+  const handleSessionSubmit = async (data: SessionForm) => {
+    console.log(data)
+    try {
+      let response
+      if (selectedSession) {
+        response = await updateSession(data, selectedSession.id)
+      }
+      else {
+        response = await addSession(data)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedSession) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the sessions' table");
+          return;
+        }
+        setSessions(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setSessions(prev => [response, ...prev]);
+      }
+
+       toast.success(
       sessionDialogMode === 'create'
         ? 'Session created successfully'
         : 'Session updated successfully'
-    );
-    setShowSessionDialog(false);
-    setSelectedSession(null);
-    setRefreshTrigger((prev) => prev + 1);
+      );
+
+      setShowSessionDialog(false);
+      setSelectedSession(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+
   };
 
   // After Care handlers
@@ -390,6 +443,18 @@ const RehabilitationDetailView: React.FC = () => {
       try {
         await deleteAssessment(id)
         setAssessments(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+    else if (deleteTarget.type === "session" && id) {
+      try {
+        await deleteSession(id)
+        setSessions(prev => prev.filter(rec => rec.id !== id))
         toast.success(messages[deleteTarget.type as keyof typeof messages]);
         setShowDeleteDialog(false);
         setDeleteTarget(null);
@@ -587,6 +652,7 @@ const RehabilitationDetailView: React.FC = () => {
                       onDelete={handleDeleteSession}
                       refreshTrigger={refreshTrigger}
                       prisonerId={selectedPrisoner?.id}
+                      sessions={sessions}
                     />
                 )
               }
@@ -727,6 +793,8 @@ const RehabilitationDetailView: React.FC = () => {
               setShowSessionDialog(false);
               setSelectedSession(null);
             }}
+            enrollments={enrollments}
+            setEnrollments={setEnrollments}
           />
         </DialogContent>
       </Dialog>

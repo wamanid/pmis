@@ -31,6 +31,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../../ui/alert-dialog';
+import {Session} from "../../../../services/rehabilitation";
 
 interface EnrollmentSession {
   id: string;
@@ -43,48 +44,18 @@ interface EnrollmentSession {
 }
 
 interface RehabilitationEnrollmentSessionListProps {
-  sessions?: EnrollmentSession[];
-  onView: (session: EnrollmentSession) => void;
-  onEdit: (session: EnrollmentSession) => void;
+  // sessions?: EnrollmentSession[];
+  onView: (session: Session) => void;
+  onEdit: (session: Session) => void;
   onDelete: (id: string) => void;
   enrollmentId?: string;
   refreshTrigger?: number;
   prisonerId?: string;
+  sessions: Session[]
 }
 
-// Mock sessions data
-const mockSessions: EnrollmentSession[] = [
-  {
-    id: '1',
-    prisoner_name: 'John Doe',
-    programme_name: 'Carpentry Skills',
-    session_date: '2025-11-01',
-    session_duration: 120,
-    remarks: 'Excellent progress in skills development.',
-    enrollment: '1',
-  },
-  {
-    id: '2',
-    prisoner_name: 'Jane Smith',
-    programme_name: 'Computer Literacy',
-    session_date: '2025-11-03',
-    session_duration: 90,
-    remarks: 'Good understanding of basic concepts.',
-    enrollment: '2',
-  },
-  {
-    id: '3',
-    prisoner_name: 'Michael Johnson',
-    programme_name: 'Agriculture Training',
-    session_date: '2025-11-05',
-    session_duration: 150,
-    remarks: 'Practical workshop session completed.',
-    enrollment: '3',
-  },
-];
-
 const RehabilitationEnrollmentSessionList: React.FC<RehabilitationEnrollmentSessionListProps> = ({
-  sessions: propSessions,
+  sessions,
   onView,
   onEdit,
   onDelete,
@@ -93,33 +64,33 @@ const RehabilitationEnrollmentSessionList: React.FC<RehabilitationEnrollmentSess
   prisonerId,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [sessions, setSessions] = useState<EnrollmentSession[]>([]);
-  const [filteredSessions, setFilteredSessions] = useState<EnrollmentSession[]>([]);
+  // const [sessions, setSessions] = useState<EnrollmentSession[]>([]);
+  const [filteredSessions, setFilteredSessions] = useState<Session[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (propSessions) {
-      setSessions(propSessions);
-    } else {
-      loadSessions();
-    }
-  }, [propSessions, enrollmentId, refreshTrigger, prisonerId]);
+  // useEffect(() => {
+  //   if (propSessions) {
+  //     setSessions(propSessions);
+  //   } else {
+  //     loadSessions();
+  //   }
+  // }, [propSessions, enrollmentId, refreshTrigger, prisonerId]);
 
-  const loadSessions = () => {
-    setLoading(true);
-    setTimeout(() => {
-      let data = mockSessions;
-      if (enrollmentId) {
-        data = data.filter((s) => s.enrollment === enrollmentId);
-      }
-      // Filter by prisonerId if provided (mock - in real API would filter by prisoner)
-      // For now just showing all sessions when no enrollmentId
-      setSessions(data);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadSessions = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     let data = mockSessions;
+  //     if (enrollmentId) {
+  //       data = data.filter((s) => s.enrollment === enrollmentId);
+  //     }
+  //     // Filter by prisonerId if provided (mock - in real API would filter by prisoner)
+  //     // For now just showing all sessions when no enrollmentId
+  //     setSessions(data);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   useEffect(() => {
     const filtered = sessions.filter(session => {

@@ -351,14 +351,14 @@ export const getSessions = async (): Promise<SessionResponse<Session>> => {
 
 export const addSession = async (session: SessionForm): Promise<SessionFormResponse> => {
   const response = await axiosInstance.post<SessionFormResponse>(
-    '/rehabilitation/enrollment-sessions/'
+    '/rehabilitation/enrollment-sessions/', session
   )
   return response.data
 }
 
 export const updateSession = async (session: SessionForm, id: string): Promise<SessionFormResponse> => {
   const response = await axiosInstance.put<SessionFormResponse>(
-    `/rehabilitation/enrollment-sessions/${id}/`
+    `/rehabilitation/enrollment-sessions/${id}/`, session
   )
   return response.data
 }
