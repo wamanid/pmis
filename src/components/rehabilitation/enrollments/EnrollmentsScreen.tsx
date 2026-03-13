@@ -138,11 +138,6 @@ const EnrollmentsScreen: React.FC = () => {
       handleCatchError(error)
     }
 
-    // Simulate API call
-    // toast.success('Enrollment deleted successfully');
-    // setShowDeleteDialog(false);
-    // setEnrollmentToDelete(null);
-    // setRefreshTrigger((prev) => prev + 1);
   };
 
   const handleSubmit = async (data: RehabilitationEnrollment, file?: File | null) => {
