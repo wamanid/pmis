@@ -43,7 +43,7 @@ interface EnrollmentAssessmentFormProps {
   onSubmit: (data: EnrollmentAssessment) => void;
   onCancel: () => void;
   enrollments: Enrollment[]
-  statuses: Unit[]
+  assessmentStatuses: Unit[]
   setEnrollments: Dispatch<SetStateAction<Enrollment[]>>;
 }
 
@@ -65,7 +65,7 @@ interface EnrollmentAssessmentFormProps {
 // ];
 
 const EnrollmentAssessmentForm: React.FC<EnrollmentAssessmentFormProps> = ({
-  enrollments, statuses, setEnrollments,
+  enrollments, assessmentStatuses, setEnrollments,
   assessment,
   mode,
   onSubmit,
@@ -94,7 +94,7 @@ const EnrollmentAssessmentForm: React.FC<EnrollmentAssessmentFormProps> = ({
 
   async function loadDropdownData () {
     try {
-      console.log(statuses)
+      // console.log(statuses)
       let enrollmentsOk = true
 
       if (!enrollments.length) {
@@ -247,7 +247,7 @@ const EnrollmentAssessmentForm: React.FC<EnrollmentAssessmentFormProps> = ({
                         <SelectValue placeholder="Select status" />
                       </SelectTrigger>
                       <SelectContent>
-                        {statuses.map((status) => (
+                        {assessmentStatuses.map((status) => (
                           <SelectItem key={status.id} value={status.id}>
                             {status.name}
                           </SelectItem>

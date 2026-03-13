@@ -36,7 +36,7 @@ interface EnrollmentAssessmentListProps {
   enrollmentId?: string;
   prisonerId?: string;
   assessments: Assessment[]
-  statuses: Unit[]
+  assessmentStatuses: Unit[]
   programmes: Programme[]
 }
 
@@ -141,7 +141,7 @@ interface EnrollmentAssessmentListProps {
 // ];
 
 const EnrollmentAssessmentList: React.FC<EnrollmentAssessmentListProps> = ({
-  assessments, statuses, programmes,
+  assessments, assessmentStatuses, programmes,
   onView,
   onEdit,
   onDelete,
@@ -268,7 +268,7 @@ const EnrollmentAssessmentList: React.FC<EnrollmentAssessmentListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Statuses</SelectItem>
-                {statuses.map((status) => (
+                {assessmentStatuses.map((status) => (
                   <SelectItem key={status.id} value={status.name}>
                     {status.name}
                   </SelectItem>

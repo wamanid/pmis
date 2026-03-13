@@ -8,7 +8,14 @@ import {
     getEnrollments,
     getCertifications,
     Sponsor,
-    getSponsors, ProgrammeStage, getProgrammeStages, Assessment, getAssessments, Session, getSessions
+    getSponsors,
+    ProgrammeStage,
+    getProgrammeStages,
+    Assessment,
+    getAssessments,
+    Session,
+    getSessions,
+    getAssessmentStatuses
 } from "./index";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -70,6 +77,11 @@ export async function getStaffList(setData: React.Dispatch<React.SetStateAction<
 export async function getAssessmentList(setData: React.Dispatch<React.SetStateAction<Assessment[]>>) {
     const response = await getAssessments()
     populateList(response, "There are no assessments", setData)
+}
+
+export async function getAssessmentStatusList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getAssessmentStatuses()
+    populateList(response, "There are no assessments statuses", setData)
 }
 
 // Sessions

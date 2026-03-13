@@ -276,11 +276,19 @@ export interface AssessmentForm {
 }
 
 export type AssessmentResponse<T> = Paginated<T> | ErrorResponse
+export type AssessmentStatusResponse<T> = Paginated<T> | ErrorResponse
 export type AssessmentFormResponse = Assessment | ErrorResponse
 
 export const getAssessments = async (): Promise<AssessmentResponse<Assessment>> => {
   const response = await axiosInstance.get<Paginated<Assessment>>(
     '/rehabilitation/assessments/'
+  )
+  return response.data
+}
+
+export const getAssessmentStatuses = async (): Promise<AssessmentStatusResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/assessment-statuses/'
   )
   return response.data
 }

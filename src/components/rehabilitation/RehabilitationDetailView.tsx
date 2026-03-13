@@ -14,7 +14,13 @@ import {
   Sponsor,
   ProgrammeStage,
   Assessment,
-  AssessmentForm, updateEnrollment, addEnrollment, updateAssessment, addAssessment
+  AssessmentForm,
+  updateEnrollment,
+  addEnrollment,
+  updateAssessment,
+  addAssessment,
+  getAssessmentStatuses,
+  deleteAssessment
 } from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
@@ -23,7 +29,7 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList, getAssessmentList
+  getProgressStatusList, getAssessmentList, getAssessmentStatusList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -49,6 +55,7 @@ import AfterCareForm from './afterCare/AfterCareForm';
 import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
 import {preinit} from "react-dom";
 import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
+import {deleteMedicalRecord} from "../../services/medical/medicalInformation/medical";
 
 interface Prisoner {
   id: string;
@@ -135,6 +142,7 @@ const RehabilitationDetailView: React.FC = () => {
   };
 
   const [assessments, setAssessments] = useState<Assessment[]>([])
+  const [assessmentStatuses, setAssessmentStatuses] = useState<Unit[]>([])
 
   useEffect(() => {
     if (activeTab === "assessments" && loading.assessment){
@@ -149,8 +157,8 @@ const RehabilitationDetailView: React.FC = () => {
       if (!programmes?.length) {
         promises.push(getProgrammesList(setProgrammes))
       }
-      if (!statuses?.length) {
-        promises.push(getProgressStatusList(setStatuses))
+      if (!assessmentStatuses?.length) {
+        promises.push(getAssessmentStatusList(setAssessmentStatuses))
       }
       await Promise.all(promises)
     }
@@ -257,7 +265,7 @@ const RehabilitationDetailView: React.FC = () => {
     console.log(data)
     try {
       let response
-      if (selectedEnrollment) {
+      if (selectedAssessment) {
         response = await updateAssessment(data, selectedAssessment.id)
       }
       else {
@@ -277,8 +285,8 @@ const RehabilitationDetailView: React.FC = () => {
         ));
       }
       else {
-        const enrollments = response.enrollments
-        setEnrollments(prev => [...enrollments, ...prev]);
+        // console.log(response)
+        setAssessments(prev => [response, ...prev]);
       }
 
       toast.success(
@@ -365,8 +373,10 @@ const RehabilitationDetailView: React.FC = () => {
   };
 
   // Delete confirmation
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+
+    // console.log(deleteTarget)
 
     const messages = {
       enrollment: 'Enrollment deleted successfully',
@@ -375,10 +385,22 @@ const RehabilitationDetailView: React.FC = () => {
       aftercare: 'After care record deleted successfully',
     };
 
-    toast.success(messages[deleteTarget.type as keyof typeof messages]);
-    setShowDeleteDialog(false);
-    setDeleteTarget(null);
-    setRefreshTrigger((prev) => prev + 1);
+    const id = deleteTarget.id
+    if (deleteTarget.type === "assessment" && id) {
+      try {
+        await deleteAssessment(id)
+        setAssessments(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+
+
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   return (
@@ -537,7 +559,7 @@ const RehabilitationDetailView: React.FC = () => {
                       refreshTrigger={refreshTrigger}
                       prisonerId={selectedPrisoner?.id}
                       programmes={programmes}
-                      statuses={statuses}
+                      assessmentStatuses={assessmentStatuses}
                       assessments={assessments}
                     />
                 )
@@ -682,7 +704,7 @@ const RehabilitationDetailView: React.FC = () => {
             }}
             enrollments={enrollments}
             setEnrollments={setEnrollments}
-            statuses={statuses}
+            assessmentStatuses={assessmentStatuses}
           />
         </DialogContent>
       </Dialog>
