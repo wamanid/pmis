@@ -15,7 +15,7 @@ import {
     getAssessments,
     Session,
     getSessions,
-    getAssessmentStatuses
+    getAssessmentStatuses, AfterCare, getAfterCare, getAfterCareActivities
 } from "./index";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -89,4 +89,16 @@ export async function getAssessmentStatusList(setData: React.Dispatch<React.SetS
 export async function getSessionList(setData: React.Dispatch<React.SetStateAction<Session[]>>) {
     const response = await getSessions()
     populateList(response, "There are no enrollment sessions", setData)
+}
+
+// After care
+
+export async function getAfterCareList(setData: React.Dispatch<React.SetStateAction<AfterCare[]>>) {
+    const response = await getAfterCare()
+    populateList(response, "There are no after care records", setData)
+}
+
+export async function getAfterCareActivitiesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getAfterCareActivities()
+    return populateList(response, "There are no after care activities", setData)
 }

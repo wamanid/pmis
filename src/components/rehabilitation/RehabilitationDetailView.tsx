@@ -20,7 +20,15 @@ import {
   updateAssessment,
   addAssessment,
   getAssessmentStatuses,
-  deleteAssessment, Session, deleteSession, SessionForm, updateSession, addSession
+  deleteAssessment,
+  Session,
+  deleteSession,
+  SessionForm,
+  updateSession,
+  addSession,
+  AfterCare,
+  deleteAfterCare,
+  updateAfterCare, addAfterCare
 } from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
@@ -29,7 +37,7 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList, getAssessmentList, getAssessmentStatusList, getSessionList
+  getProgressStatusList, getAssessmentList, getAssessmentStatusList, getSessionList, getAfterCareList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -144,16 +152,21 @@ const RehabilitationDetailView: React.FC = () => {
   const [assessments, setAssessments] = useState<Assessment[]>([])
   const [assessmentStatuses, setAssessmentStatuses] = useState<Unit[]>([])
   const [sessions, setSessions] = useState<Session[]>([])
+  const [afterCare, setAfterCare] = useState<AfterCare[]>([])
+  const [afterCareActivities, setAfterCareActivities] = useState<Unit[]>([])
 
   useEffect(() => {
     if (activeTab === "assessments" && loading.assessment){
       fetchAssessments()
     }
-  }, [activeTab]);
-
-  useEffect(() => {
-    if (activeTab === "sessions" && loading.session){
+    else if (activeTab === "sessions" && loading.session){
       fetchSessions()
+    }
+    else if (activeTab === "aftercare" && loading.afterCare){
+      fetchAfterCare()
+    }
+    else {
+      return
     }
   }, [activeTab]);
 
@@ -189,6 +202,20 @@ const RehabilitationDetailView: React.FC = () => {
       setLoading(prev => ({
         ...prev,
         session: false
+      }))
+    }
+  }
+
+  async function fetchAfterCare(){
+    try {
+      await getAfterCareList(setAfterCare)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        afterCare: false
       }))
     }
   }
@@ -354,7 +381,7 @@ const RehabilitationDetailView: React.FC = () => {
   };
 
   const handleSessionSubmit = async (data: SessionForm) => {
-    console.log(data)
+    // console.log(data)
     try {
       let response
       if (selectedSession) {
@@ -414,15 +441,45 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleAfterCareSubmit = (data: any) => {
-    toast.success(
+  const handleAfterCareSubmit = async (data: AfterCareForm, file?: File | null) => {
+    // console.log(data)
+    try {
+      let response
+      if (selectedAfterCare) {
+        response = await updateAfterCare(data, selectedAfterCare.id, file)
+      }
+      else {
+        response = await addAfterCare(data, file)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedAfterCare) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the after care records' table");
+          return;
+        }
+        setAfterCare(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setAfterCare(prev => [response, ...prev]);
+      }
+
+      toast.success(
       afterCareDialogMode === 'create'
-        ? 'After care record created successfully'
-        : 'After care record updated successfully'
-    );
-    setShowAfterCareDialog(false);
-    setSelectedAfterCare(null);
-    setRefreshTrigger((prev) => prev + 1);
+          ? 'After care record created successfully'
+          : 'After care record updated successfully'
+      );
+      setShowAfterCareDialog(false);
+      setSelectedAfterCare(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
   };
 
   // Delete confirmation
@@ -464,6 +521,22 @@ const RehabilitationDetailView: React.FC = () => {
       }
     }
 
+    else if (deleteTarget.type === "aftercare" && id) {
+      try {
+        await deleteAfterCare(id)
+        setAfterCare(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+
+    else {
+      return
+    }
 
     // setRefreshTrigger((prev) => prev + 1);
   };
@@ -679,6 +752,7 @@ const RehabilitationDetailView: React.FC = () => {
                       onDelete={handleDeleteAfterCare}
                       refreshTrigger={refreshTrigger}
                       prisonerId={selectedPrisoner?.id}
+                      afterCare={afterCare}
                     />
                 )
               }
@@ -817,6 +891,12 @@ const RehabilitationDetailView: React.FC = () => {
               setShowAfterCareDialog(false);
               setSelectedAfterCare(null);
             }}
+            prisoners={prisoners}
+            setPrisoners={setPrisoners}
+            staff={staff}
+            setStaff={setStaff}
+            afterCareActivities={afterCareActivities}
+            setAfterCareActivities={setAfterCareActivities}
           />
         </DialogContent>
       </Dialog>

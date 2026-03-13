@@ -32,22 +32,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../../ui/alert-dialog';
+import {AfterCare} from "../../../services/rehabilitation";
 
-interface AfterCare {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  activity_name: string;
-  officer_name: string;
-  description: string;
-  photo?: string;
-  prisoner: string;
-  after_care_activity: string;
-  officer: number;
-}
+// interface AfterCare {
+//   id: string;
+//   prisoner_name: string;
+//   prisoner_number: string;
+//   activity_name: string;
+//   officer_name: string;
+//   description: string;
+//   photo?: string;
+//   prisoner: string;
+//   after_care_activity: string;
+//   officer: number;
+// }
 
 interface AfterCareListProps {
-  afterCares?: AfterCare[];
+  afterCare: AfterCare[];
   onView: (afterCare: AfterCare) => void;
   onEdit: (afterCare: AfterCare) => void;
   onDelete: (id: string) => void;
@@ -55,34 +56,8 @@ interface AfterCareListProps {
   refreshTrigger?: number;
 }
 
-// Mock after care data
-const mockAfterCares: AfterCare[] = [
-  {
-    id: '1',
-    prisoner_name: 'John Doe',
-    prisoner_number: 'PN-2024-001',
-    activity_name: 'Job Placement Support',
-    officer_name: 'Officer Smith',
-    description: 'Follow-up on job placement assistance.',
-    prisoner: '1',
-    after_care_activity: '1',
-    officer: 101,
-  },
-  {
-    id: '2',
-    prisoner_name: 'Jane Smith',
-    prisoner_number: 'PN-2024-002',
-    activity_name: 'Counseling Session',
-    officer_name: 'Officer Johnson',
-    description: 'Regular counseling for reintegration.',
-    prisoner: '2',
-    after_care_activity: '2',
-    officer: 102,
-  },
-];
-
 const AfterCareList: React.FC<AfterCareListProps> = ({
-  afterCares: propAfterCares,
+  afterCare,
   onView,
   onEdit,
   onDelete,
@@ -90,34 +65,34 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
   refreshTrigger,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [afterCares, setAfterCares] = useState<AfterCare[]>([]);
+  // const [afterCares, setAfterCares] = useState<AfterCare[]>([]);
   const [filteredAfterCares, setFilteredAfterCares] = useState<AfterCare[]>([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [afterCareToDelete, setAfterCareToDelete] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (propAfterCares) {
-      setAfterCares(propAfterCares);
-    } else {
-      loadAfterCares();
-    }
-  }, [propAfterCares, prisonerId, refreshTrigger]);
+  // useEffect(() => {
+  //   if (propAfterCares) {
+  //     setAfterCares(propAfterCares);
+  //   } else {
+  //     loadAfterCares();
+  //   }
+  // }, [propAfterCares, prisonerId, refreshTrigger]);
+  //
+  // const loadAfterCares = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     let data = mockAfterCares;
+  //     if (prisonerId) {
+  //       data = data.filter((a) => a.prisoner === prisonerId);
+  //     }
+  //     setAfterCares(data);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
-  const loadAfterCares = () => {
-    setLoading(true);
-    setTimeout(() => {
-      let data = mockAfterCares;
-      if (prisonerId) {
-        data = data.filter((a) => a.prisoner === prisonerId);
-      }
-      setAfterCares(data);
-      setLoading(false);
-    }, 500);
-  };
-
   useEffect(() => {
-    const filtered = afterCares.filter(afterCare => {
+    const filtered = afterCare.filter(afterCare => {
       const searchLower = searchTerm.toLowerCase();
       return (
         afterCare.prisoner_name.toLowerCase().includes(searchLower) ||
@@ -128,7 +103,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
       );
     });
     setFilteredAfterCares(filtered);
-  }, [searchTerm, afterCares]);
+  }, [searchTerm, afterCare]);
 
   const handleDeleteClick = (id: string) => {
     setAfterCareToDelete(id);
@@ -286,7 +261,7 @@ const AfterCareList: React.FC<AfterCareListProps> = ({
           {filteredAfterCares.length > 0 && (
             <div className="flex items-center justify-between mt-4 text-sm text-gray-600">
               <div>
-                Showing {filteredAfterCares.length} of {afterCares.length} record(s)
+                Showing {filteredAfterCares.length} of {afterCare.length} record(s)
               </div>
             </div>
           )}
