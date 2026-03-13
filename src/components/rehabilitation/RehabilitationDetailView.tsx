@@ -8,7 +8,28 @@ import RehabilitationEnrollmentList from './enrollments/enrollment/Rehabilitatio
 import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
-import { Enrollment, Programme, Sponsor, ProgrammeStage } from '../../services/rehabilitation';
+import {
+  Enrollment,
+  Programme,
+  Sponsor,
+  ProgrammeStage,
+  Assessment,
+  AssessmentForm,
+  updateEnrollment,
+  addEnrollment,
+  updateAssessment,
+  addAssessment,
+  getAssessmentStatuses,
+  deleteAssessment,
+  Session,
+  deleteSession,
+  SessionForm,
+  updateSession,
+  addSession,
+  AfterCare,
+  deleteAfterCare,
+  updateAfterCare, addAfterCare
+} from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
 import { StaffItem } from '../../services/stationServices/staffDeploymentService';
@@ -16,7 +37,7 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList
+  getProgressStatusList, getAssessmentList, getAssessmentStatusList, getSessionList, getAfterCareList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -40,6 +61,9 @@ import EnrollmentAssessmentForm from './enrollments/assessment/EnrollmentAssessm
 import RehabilitationEnrollmentSessionForm from './enrollments/sessions/RehabilitationEnrollmentSessionForm';
 import AfterCareForm from './afterCare/AfterCareForm';
 import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
+import {preinit} from "react-dom";
+import {handleCatchError, handleResponseError} from "../../services/stationServices/utils";
+import {deleteMedicalRecord} from "../../services/medical/medicalInformation/medical";
 
 interface Prisoner {
   id: string;
@@ -60,6 +84,13 @@ interface Prisoner {
   status?: string;
 }
 
+export interface Loader {
+  enrollment: boolean,
+  assessment: boolean,
+  session: boolean,
+  afterCare: boolean,
+}
+
 const RehabilitationDetailView: React.FC = () => {
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare'>('enrollments');
@@ -74,21 +105,20 @@ const RehabilitationDetailView: React.FC = () => {
   const [staff, setStaff] = useState<StaffItem[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [programmeStages, setProgrammeStages] = useState<ProgrammeStage[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState<Loader>({ enrollment: true, assessment: true, session: true, afterCare: true });
   const [loader, setLoader] = useState(false);
   const [newDialogLoader, setNewDialogLoader] = useState(false);
 
   // Load dropdown data on mount
   useEffect(() => {
     const loadData = async () => {
-      setLoading(true);
       await Promise.all([
         getEnrollmentList(setEnrollments),
         getProgrammesList(setProgrammes),
         getCertificationList(setCertifications),
         getProgressStatusList(setStatuses)
       ]);
-      setLoading(false);
+      setLoading(prev => ({...prev, enrollment: false}));
     };
     loadData();
   }, [refreshTrigger]);
@@ -118,6 +148,77 @@ const RehabilitationDetailView: React.FC = () => {
     setSelectedPrisoner(prisoner);
     setRefreshTrigger((prev) => prev + 1);
   };
+
+  const [assessments, setAssessments] = useState<Assessment[]>([])
+  const [assessmentStatuses, setAssessmentStatuses] = useState<Unit[]>([])
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [afterCare, setAfterCare] = useState<AfterCare[]>([])
+  const [afterCareActivities, setAfterCareActivities] = useState<Unit[]>([])
+
+  useEffect(() => {
+    if (activeTab === "assessments" && loading.assessment){
+      fetchAssessments()
+    }
+    else if (activeTab === "sessions" && loading.session){
+      fetchSessions()
+    }
+    else if (activeTab === "aftercare" && loading.afterCare){
+      fetchAfterCare()
+    }
+    else {
+      return
+    }
+  }, [activeTab]);
+
+  async function fetchAssessments(){
+    try {
+      await getAssessmentList(setAssessments)
+      const promises = []
+      if (!programmes?.length) {
+        promises.push(getProgrammesList(setProgrammes))
+      }
+      if (!assessmentStatuses?.length) {
+        promises.push(getAssessmentStatusList(setAssessmentStatuses))
+      }
+      await Promise.all(promises)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        assessment: false
+      }))
+    }
+  }
+
+  async function fetchSessions(){
+    try {
+      await getSessionList(setSessions)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        session: false
+      }))
+    }
+  }
+
+  async function fetchAfterCare(){
+    try {
+      await getAfterCareList(setAfterCare)
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        afterCare: false
+      }))
+    }
+  }
 
   // Create button handlers
   const handleCreateClick = () => {
@@ -208,15 +309,57 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleAssessmentSubmit = (data: any) => {
-    toast.success(
+  const handleAssessmentSubmit = async (data: AssessmentForm) => {
+    // console.log(data)
+    try {
+      let response
+      if (selectedAssessment) {
+        response = await updateAssessment(data, selectedAssessment.id)
+      }
+      else {
+        response = await addAssessment(data)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedAssessment) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the assessment table");
+          return;
+        }
+        setAssessments(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setAssessments(prev => [response, ...prev]);
+      }
+
+      toast.success(
       assessmentDialogMode === 'create'
         ? 'Assessment created successfully'
         : 'Assessment updated successfully'
     );
-    setShowAssessmentDialog(false);
-    setSelectedAssessment(null);
-    setRefreshTrigger((prev) => prev + 1);
+
+      setShowAssessmentDialog(false);
+      setSelectedAssessment(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+    // finally {
+    //   setLoader(false)
+    // }
+    // toast.success(
+    //   assessmentDialogMode === 'create'
+    //     ? 'Assessment created successfully'
+    //     : 'Assessment updated successfully'
+    // );
+    // setShowAssessmentDialog(false);
+    // setSelectedAssessment(null);
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   // Session handlers
@@ -237,15 +380,47 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleSessionSubmit = (data: any) => {
-    toast.success(
+  const handleSessionSubmit = async (data: SessionForm) => {
+    // console.log(data)
+    try {
+      let response
+      if (selectedSession) {
+        response = await updateSession(data, selectedSession.id)
+      }
+      else {
+        response = await addSession(data)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedSession) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the sessions' table");
+          return;
+        }
+        setSessions(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setSessions(prev => [response, ...prev]);
+      }
+
+       toast.success(
       sessionDialogMode === 'create'
         ? 'Session created successfully'
         : 'Session updated successfully'
-    );
-    setShowSessionDialog(false);
-    setSelectedSession(null);
-    setRefreshTrigger((prev) => prev + 1);
+      );
+
+      setShowSessionDialog(false);
+      setSelectedSession(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
+
   };
 
   // After Care handlers
@@ -266,20 +441,52 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleAfterCareSubmit = (data: any) => {
-    toast.success(
+  const handleAfterCareSubmit = async (data: AfterCareForm, file?: File | null) => {
+    // console.log(data)
+    try {
+      let response
+      if (selectedAfterCare) {
+        response = await updateAfterCare(data, selectedAfterCare.id, file)
+      }
+      else {
+        response = await addAfterCare(data, file)
+      }
+      if (handleResponseError(response)) return;
+
+      // console.log(response)
+
+      if (selectedAfterCare) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the after care records' table");
+          return;
+        }
+        setAfterCare(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setAfterCare(prev => [response, ...prev]);
+      }
+
+      toast.success(
       afterCareDialogMode === 'create'
-        ? 'After care record created successfully'
-        : 'After care record updated successfully'
-    );
-    setShowAfterCareDialog(false);
-    setSelectedAfterCare(null);
-    setRefreshTrigger((prev) => prev + 1);
+          ? 'After care record created successfully'
+          : 'After care record updated successfully'
+      );
+      setShowAfterCareDialog(false);
+      setSelectedAfterCare(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
   };
 
   // Delete confirmation
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
+
+    // console.log(deleteTarget)
 
     const messages = {
       enrollment: 'Enrollment deleted successfully',
@@ -288,10 +495,50 @@ const RehabilitationDetailView: React.FC = () => {
       aftercare: 'After care record deleted successfully',
     };
 
-    toast.success(messages[deleteTarget.type as keyof typeof messages]);
-    setShowDeleteDialog(false);
-    setDeleteTarget(null);
-    setRefreshTrigger((prev) => prev + 1);
+    const id = deleteTarget.id
+    if (deleteTarget.type === "assessment" && id) {
+      try {
+        await deleteAssessment(id)
+        setAssessments(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+    else if (deleteTarget.type === "session" && id) {
+      try {
+        await deleteSession(id)
+        setSessions(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+
+    else if (deleteTarget.type === "aftercare" && id) {
+      try {
+        await deleteAfterCare(id)
+        setAfterCare(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
+    }
+
+    else {
+      return
+    }
+
+    // setRefreshTrigger((prev) => prev + 1);
   };
 
   return (
@@ -403,52 +650,113 @@ const RehabilitationDetailView: React.FC = () => {
           {/* Tab Content */}
           {activeTab === 'enrollments' && (
             <div className="p-6">
-              <RehabilitationEnrollmentList
-                onView={handleViewEnrollment}
-                onEdit={handleEditEnrollment}
-                onDelete={handleDeleteEnrollment}
-                refreshTrigger={refreshTrigger}
-                enrollments={enrollments}
-                programmes={programmes}
-                certifications={certifications}
-                statuses={statuses}
-              />
+              {
+                loading.enrollment ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Enrollment records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                   <RehabilitationEnrollmentList
+                    onView={handleViewEnrollment}
+                    onEdit={handleEditEnrollment}
+                    onDelete={handleDeleteEnrollment}
+                    refreshTrigger={refreshTrigger}
+                    enrollments={enrollments}
+                    programmes={programmes}
+                    certifications={certifications}
+                    statuses={statuses}
+                  />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'assessments' && (
             <div className="p-6">
-              <EnrollmentAssessmentList
-                onView={handleViewAssessment}
-                onEdit={handleEditAssessment}
-                onDelete={handleDeleteAssessment}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+              {
+                loading.assessment ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Assessment records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <EnrollmentAssessmentList
+                      onView={handleViewAssessment}
+                      onEdit={handleEditAssessment}
+                      onDelete={handleDeleteAssessment}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                      programmes={programmes}
+                      assessmentStatuses={assessmentStatuses}
+                      assessments={assessments}
+                    />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'sessions' && (
             <div className="p-6">
-              <RehabilitationEnrollmentSessionList
-                onView={handleViewSession}
-                onEdit={handleEditSession}
-                onDelete={handleDeleteSession}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+              {
+                loading.session ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching Sessions records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <RehabilitationEnrollmentSessionList
+                      onView={handleViewSession}
+                      onEdit={handleEditSession}
+                      onDelete={handleDeleteSession}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                      sessions={sessions}
+                    />
+                )
+              }
+
             </div>
           )}
 
           {activeTab === 'aftercare' && (
             <div className="p-6">
-              <AfterCareList
-                onView={handleViewAfterCare}
-                onEdit={handleEditAfterCare}
-                onDelete={handleDeleteAfterCare}
-                refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
-              />
+               {
+                loading.afterCare ? (
+                    <div className="size-full flex items-center justify-center">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                            <p className="text-muted-foreground text-sm">
+                              Fetching After care records, Please wait...
+                            </p>
+                      </div>
+                    </div>
+                ) : (
+                    <AfterCareList
+                      onView={handleViewAfterCare}
+                      onEdit={handleEditAfterCare}
+                      onDelete={handleDeleteAfterCare}
+                      refreshTrigger={refreshTrigger}
+                      prisonerId={selectedPrisoner?.id}
+                      afterCare={afterCare}
+                    />
+                )
+              }
+
             </div>
           )}
         </CardContent>
@@ -534,6 +842,9 @@ const RehabilitationDetailView: React.FC = () => {
               setShowAssessmentDialog(false);
               setSelectedAssessment(null);
             }}
+            enrollments={enrollments}
+            setEnrollments={setEnrollments}
+            assessmentStatuses={assessmentStatuses}
           />
         </DialogContent>
       </Dialog>
@@ -556,6 +867,8 @@ const RehabilitationDetailView: React.FC = () => {
               setShowSessionDialog(false);
               setSelectedSession(null);
             }}
+            enrollments={enrollments}
+            setEnrollments={setEnrollments}
           />
         </DialogContent>
       </Dialog>
@@ -578,6 +891,12 @@ const RehabilitationDetailView: React.FC = () => {
               setShowAfterCareDialog(false);
               setSelectedAfterCare(null);
             }}
+            prisoners={prisoners}
+            setPrisoners={setPrisoners}
+            staff={staff}
+            setStaff={setStaff}
+            afterCareActivities={afterCareActivities}
+            setAfterCareActivities={setAfterCareActivities}
           />
         </DialogContent>
       </Dialog>

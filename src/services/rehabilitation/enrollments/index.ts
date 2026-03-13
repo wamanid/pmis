@@ -1,12 +1,6 @@
 import {Paginated} from "../../stationServices/utils";
 import {ErrorResponse} from "../../stationServices/visitorsServices/VisitorsService";
 import axiosInstance from "../../axiosInstance";
-import {
-  BloodGroupResponse,
-  MedicalRecord,
-  MedicalRecordResponse,
-  Record, RecordResponse
-} from "../../medical/medicalInformation/medical";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
 
 export interface Programme {
@@ -239,4 +233,249 @@ export const updateEnrollment = async (enrollment: RehabilitationEnrollment, id:
 
 export const deleteEnrollment = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/rehabilitation/enrollments/${id}/`);
+};
+
+
+// Assessment
+export interface Assessment {
+  id: string;
+  prisoner_name: string;
+  programme_name: string;
+  status_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  start_date: string;
+  end_date: string;
+  board_members: string;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  enrollment: string;
+  status: string;
+}
+
+export interface AssessmentForm {
+  is_active: boolean;
+  deleted_datetime: string;
+  start_date: string;
+  end_date: string;
+  board_members: string;
+  remarks: string;
+  deleted_by: number;
+  enrollment: string;
+  status: string;
+}
+
+export type AssessmentResponse<T> = Paginated<T> | ErrorResponse
+export type AssessmentStatusResponse<T> = Paginated<T> | ErrorResponse
+export type AssessmentFormResponse = Assessment | ErrorResponse
+
+export const getAssessments = async (): Promise<AssessmentResponse<Assessment>> => {
+  const response = await axiosInstance.get<Paginated<Assessment>>(
+    '/rehabilitation/assessments/'
+  )
+  return response.data
+}
+
+export const getAssessmentStatuses = async (): Promise<AssessmentStatusResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/assessment-statuses/'
+  )
+  return response.data
+}
+
+export const addAssessment = async (assessmentForm: AssessmentForm): Promise<AssessmentFormResponse> => {
+  const response = await axiosInstance.post<AssessmentFormResponse>(
+    '/rehabilitation/assessments/', assessmentForm
+  )
+  return response.data
+}
+
+export const updateAssessment = async (assessment: AssessmentForm, id: string): Promise<AssessmentFormResponse> => {
+  const response = await axiosInstance.put<AssessmentFormResponse>(
+    `/rehabilitation/assessments/${id}/`, assessment
+  )
+  return response.data
+}
+
+export const deleteAssessment = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/assessments/${id}/`);
+};
+
+// Session
+export interface Session {
+  id: string;
+  prisoner_name: string;
+  programme_name: string;
+  created_datetime: string;
+  is_active: boolean;
+  updated_datetime: string;
+  deleted_datetime: string;
+  session_date: string;
+  session_duration: number;
+  remarks: string;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  enrollment: string;
+}
+
+export interface SessionForm {
+  is_active: boolean;
+  deleted_datetime: string;
+  session_date: string;
+  session_duration: number;
+  remarks: string;
+  deleted_by: number;
+  enrollment: string;
+}
+
+export type SessionResponse<T> = Paginated<T> | ErrorResponse
+export type SessionFormResponse = Session | ErrorResponse
+
+export const getSessions = async (): Promise<SessionResponse<Session>> => {
+  const response = await axiosInstance.get<Paginated<Session>>(
+    '/rehabilitation/enrollment-sessions/'
+  )
+  return response.data
+}
+
+export const addSession = async (session: SessionForm): Promise<SessionFormResponse> => {
+  const response = await axiosInstance.post<SessionFormResponse>(
+    '/rehabilitation/enrollment-sessions/', session
+  )
+  return response.data
+}
+
+export const updateSession = async (session: SessionForm, id: string): Promise<SessionFormResponse> => {
+  const response = await axiosInstance.put<SessionFormResponse>(
+    `/rehabilitation/enrollment-sessions/${id}/`, session
+  )
+  return response.data
+}
+
+export const deleteSession = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/enrollment-sessions/${id}/`);
+};
+
+// After care
+export interface AfterCare {
+  id: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  activity_name: string;
+  officer_name: string;
+  created_datetime: string;
+  updated_datetime?: string | null;
+  deleted_datetime?: string | null;
+  description: string;
+  photo: string;
+  is_active: boolean;
+  created_by: number;
+  updated_by?: number | null;
+  deleted_by?: number | null;
+  prisoner: string;
+  after_care_activity: string;
+  officer: string;
+}
+
+export interface AfterCareForm {
+  is_active: boolean;
+  deleted_datetime?: string | null;
+  description: string;
+  photo: string;
+  deleted_by?: number | null;
+  prisoner: string;
+  after_care_activity: string;
+  officer: string;
+}
+
+export type AfterCareResponse<T> = Paginated<T> | ErrorResponse
+export type AfterCareActivitiesResponse<T> = Paginated<T> | ErrorResponse
+export type AfterCareFormResponse = AfterCare | ErrorResponse
+
+export const getAfterCare = async (): Promise<AfterCareResponse<AfterCare>> => {
+  const response = await axiosInstance.get<Paginated<AfterCare>>(
+    '/rehabilitation/prisoner-aftercare/'
+  )
+  return response.data
+}
+
+export const getAfterCareActivities = async (): Promise<AfterCareActivitiesResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/rehabilitation/aftercare-activities/'
+  )
+  return response.data
+}
+
+export const addAfterCare = async (afterCare: AfterCareForm, file?: File | null): Promise<AfterCareFormResponse> => {
+  if (file) {
+    const formData = new FormData();
+
+    // Append all enrollment data to FormData
+    Object.keys(afterCare).forEach(key => {
+      const value = afterCare[key as keyof AfterCareForm];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          value.forEach((item) => formData.append(key, item));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+
+    // Append the file
+    formData.append('photo', file);
+
+    const response = await axiosInstance.post<AfterCareFormResponse>('/rehabilitation/prisoner-aftercare/', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+
+  const response = await axiosInstance.post<AfterCareFormResponse>(
+    '/rehabilitation/prisoner-aftercare/', afterCare
+  )
+  return response.data
+}
+
+export const updateAfterCare = async (afterCare: AfterCareForm, id: string, file?: File | null): Promise<AfterCareFormResponse> => {
+  if (file) {
+    const formData = new FormData();
+
+    // Append all enrollment data to FormData
+    Object.keys(afterCare).forEach(key => {
+      const value = afterCare[key as keyof AfterCareForm];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          value.forEach((item) => formData.append(key, item));
+        } else {
+          formData.append(key, String(value));
+        }
+      }
+    });
+
+    // Append the file
+    formData.append('photo', file);
+
+    const response = await axiosInstance.put<AfterCareFormResponse>(`/rehabilitation/prisoner-aftercare/${id}/`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  }
+  const response = await axiosInstance.put<AfterCareFormResponse>(
+    `/rehabilitation/prisoner-aftercare/${id}/`, afterCare
+  )
+  return response.data
+}
+
+export const deleteAfterCare = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/prisoner-aftercare/${id}/`);
 };

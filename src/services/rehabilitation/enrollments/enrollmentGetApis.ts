@@ -8,7 +8,14 @@ import {
     getEnrollments,
     getCertifications,
     Sponsor,
-    getSponsors, ProgrammeStage, getProgrammeStages
+    getSponsors,
+    ProgrammeStage,
+    getProgrammeStages,
+    Assessment,
+    getAssessments,
+    Session,
+    getSessions,
+    getAssessmentStatuses, AfterCare, getAfterCare, getAfterCareActivities
 } from "./index";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -45,9 +52,9 @@ export async function getCertificationList(setData: React.Dispatch<React.SetStat
     populateList(response, "There are no certifications", setData)
 }
 
-export async function getEnrollmentList(setData: React.Dispatch<React.SetStateAction<Enrollment[]>>) {
+export async function getEnrollmentList(setData: React.Dispatch<React.SetStateAction<Enrollment[]>>): Promise<boolean> {
     const response = await getEnrollments()
-    populateList(response, "There are no enrollments", setData)
+    return populateList(response, "There are no enrollments", setData)
 }
 
 export async function getSponsorList(setData: React.Dispatch<React.SetStateAction<Sponsor[]>>): Promise<boolean> {
@@ -63,4 +70,35 @@ export async function getProgrammeStagesList(programme: string, setData: React.D
 export async function getStaffList(setData: React.Dispatch<React.SetStateAction<StaffItem[]>>): Promise<boolean> {
     const response = await getStaffProfile()
     return populateList(response, "There are no staff members", setData)
+}
+
+// Assessments
+
+export async function getAssessmentList(setData: React.Dispatch<React.SetStateAction<Assessment[]>>) {
+    const response = await getAssessments()
+    populateList(response, "There are no assessments", setData)
+}
+
+export async function getAssessmentStatusList(setData: React.Dispatch<React.SetStateAction<Unit[]>>) {
+    const response = await getAssessmentStatuses()
+    populateList(response, "There are no assessments statuses", setData)
+}
+
+// Sessions
+
+export async function getSessionList(setData: React.Dispatch<React.SetStateAction<Session[]>>) {
+    const response = await getSessions()
+    populateList(response, "There are no enrollment sessions", setData)
+}
+
+// After care
+
+export async function getAfterCareList(setData: React.Dispatch<React.SetStateAction<AfterCare[]>>) {
+    const response = await getAfterCare()
+    populateList(response, "There are no after care records", setData)
+}
+
+export async function getAfterCareActivitiesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getAfterCareActivities()
+    return populateList(response, "There are no after care activities", setData)
 }
