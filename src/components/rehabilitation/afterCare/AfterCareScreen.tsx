@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
-import { Button } from '../ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
-import { toast } from 'sonner@2.0.3';
+﻿import React, { useState } from 'react';
+import { Button } from '../../ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '../../ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../../ui/dialog';
+import { toast } from 'sonner';
 import { Plus, HeartHandshake } from 'lucide-react';
 import AfterCareForm from './AfterCareForm';
 import AfterCareList from './AfterCareList';
@@ -152,7 +152,7 @@ const AfterCareScreen: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto py-6 space-y-6">
+    <div className="p-6 space-y-6">
       {/* Header */}
       <Card>
         <CardHeader>

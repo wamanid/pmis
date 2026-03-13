@@ -1,41 +1,46 @@
-import React, { useState } from 'react';
-import { Card, CardContent } from '../ui/card';
-import { Button } from '../ui/button';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../ui/dialog';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../ui/alert-dialog';
-import { toast } from 'sonner@2.0.3';
+﻿import React, {useEffect, useState} from 'react';
+import { Card, CardContent } from '../../../ui/card';
+import { Button } from '../../../ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../ui/alert-dialog';
+import { toast } from 'sonner';
 import { Plus, BookOpen, Users, Award, TrendingUp } from 'lucide-react';
-import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
-import RehabilitationEnrollmentList from './RehabilitationEnrollmentList';
+import EnrollmentForm from './RehabilitationEnrollmentForm';
+import EnrollmentList from './RehabilitationEnrollmentList';
+import {Enrollment, getEnrollments, getProgrammes, Programme} from "../../../../services/rehabilitation";
+import {Unit} from "../../../../services/stationServices/visitorsServices/visitorItem";
+import {handleCatchError} from "../../../../services/stationServices/utils";
+import RehabilitationEnrollmentList from "./RehabilitationEnrollmentList";
+import RehabilitationEnrollmentForm from "./RehabilitationEnrollmentForm";
 
-interface RehabilitationEnrollment {
-  id?: string;
-  prisoner_name?: string;
-  prisoner_number?: string;
-  programme_name?: string;
-  programme_stage_name?: string;
-  sponsor_name?: string;
-  responsible_officer_name?: string;
-  progress_status_name?: string;
-  prisoner_opinion: string;
-  date_of_enrollment: string;
-  start_date: string;
-  end_date: string;
-  certificate_awarded: boolean;
-  certification_document: string;
-  comment: string;
-  prisoner: string;
-  programme: string;
-  programme_stage: string;
-  rehabilitation_sponsor: string;
-  responsible_officer: number;
-  progress_status: string;
-}
+// interface Enrollment {
+//   id?: string;
+//   prisoner_name?: string;
+//   prisoner_number?: string;
+//   programme_name?: string;
+//   programme_stage_name?: string;
+//   sponsor_name?: string;
+//   responsible_officer_name?: string;
+//   progress_status_name?: string;
+//   prisoner_opinion: string;
+//   date_of_enrollment: string;
+//   start_date: string;
+//   end_date: string;
+//   certificate_awarded: boolean;
+//   certification_document: string;
+//   comment: string;
+//   prisoner: string;
+//   programme: string;
+//   programme_stage: string;
+//   rehabilitation_sponsor: string;
+//   responsible_officer: number;
+//   progress_status: string;
+// }
 
 const RehabilitationEnrollmentScreen: React.FC = () => {
   const [showDialog, setShowDialog] = useState(false);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit' | 'view'>('create');
-  const [selectedEnrollment, setSelectedEnrollment] = useState<RehabilitationEnrollment | null>(null);
+  const [selectedEnrollment, setSelectedEnrollment] = useState<Enrollment | null>(null);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [enrollmentToDelete, setEnrollmentToDelete] = useState<string | null>(null);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -78,13 +83,13 @@ const RehabilitationEnrollmentScreen: React.FC = () => {
     setShowDialog(true);
   };
 
-  const handleView = (enrollment: RehabilitationEnrollment) => {
+  const handleView = (enrollment: Enrollment) => {
     setDialogMode('view');
     setSelectedEnrollment(enrollment);
     setShowDialog(true);
   };
 
-  const handleEdit = (enrollment: RehabilitationEnrollment) => {
+  const handleEdit = (enrollment: Enrollment) => {
     setDialogMode('edit');
     setSelectedEnrollment(enrollment);
     setShowDialog(true);
@@ -103,7 +108,7 @@ const RehabilitationEnrollmentScreen: React.FC = () => {
     setRefreshTrigger((prev) => prev + 1);
   };
 
-  const handleSubmit = (data: RehabilitationEnrollment) => {
+  const handleSubmit = (data: Enrollment, file?: File | null) => {
     // Simulate API call
     if (dialogMode === 'create') {
       toast.success('Enrollment created successfully');
@@ -122,7 +127,7 @@ const RehabilitationEnrollmentScreen: React.FC = () => {
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 style={{ color: '#650000' }}>Rehabilitation Enrollment Sessions</h1>

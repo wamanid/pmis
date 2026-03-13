@@ -13,6 +13,7 @@ import { reportsRoutes } from './reports.routes';
 import { medicalRoutes } from './medical.routes';
 import { courtRoutes } from './court.routes';
 import { gratuityRoutes } from './gratuity.routes';
+import { rehabilitationRoutes } from './rehabilitation.routes';
 
 /**
  * Application Routes Configuration
@@ -63,6 +64,9 @@ export const routes: RouteObject[] = [
 
   // Gratuity Management Routes
   ...gratuityRoutes,
+
+  // Rehabilitation Management Routes
+  ...rehabilitationRoutes,
 
   // Default/Fallback Route
   {

@@ -1,13 +1,23 @@
-import React, { useState } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { BookOpen, Calendar, ClipboardCheck, Award, Plus } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import PrisonerSearchScreenWider from '../common/PrisonerSearchScreen-wider';
-import RehabilitationEnrollmentList from './RehabilitationEnrollmentList';
-import EnrollmentAssessmentList from './EnrollmentAssessmentList';
-import RehabilitationEnrollmentSessionList from './RehabilitationEnrollmentSessionList';
-import AfterCareList from './AfterCareList';
+import RehabilitationEnrollmentList from './enrollments/enrollment/RehabilitationEnrollmentList';
+import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
+import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
+import AfterCareList from './afterCare/AfterCareList';
+import { Enrollment, Programme, Sponsor, ProgrammeStage } from '../../services/rehabilitation';
+import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
+import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
+import { StaffItem } from '../../services/stationServices/staffDeploymentService';
+import {
+  getEnrollmentList,
+  getProgrammesList,
+  getCertificationList,
+  getProgressStatusList
+} from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
   DialogContent,
@@ -25,11 +35,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '../ui/alert-dialog';
-import RehabilitationEnrollmentForm from './RehabilitationEnrollmentForm';
-import EnrollmentAssessmentForm from './EnrollmentAssessmentForm';
-import RehabilitationEnrollmentSessionForm from './RehabilitationEnrollmentSessionForm';
-import AfterCareForm from './AfterCareForm';
-import EnrollmentDetailView from './EnrollmentDetailView';
+import RehabilitationEnrollmentForm from './enrollments/enrollment/RehabilitationEnrollmentForm';
+import EnrollmentAssessmentForm from './enrollments/assessment/EnrollmentAssessmentForm';
+import RehabilitationEnrollmentSessionForm from './enrollments/sessions/RehabilitationEnrollmentSessionForm';
+import AfterCareForm from './afterCare/AfterCareForm';
+import EnrollmentDetailView from './enrollments/EnrollmentDetailView';
 
 interface Prisoner {
   id: string;
@@ -54,6 +64,34 @@ const RehabilitationDetailView: React.FC = () => {
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
   const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare'>('enrollments');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  // Backend data state
+  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
+  const [programmes, setProgrammes] = useState<Programme[]>([]);
+  const [certifications, setCertifications] = useState<Unit[]>([]);
+  const [statuses, setStatuses] = useState<Unit[]>([]);
+  const [prisoners, setPrisoners] = useState<PrisonerItem[]>([]);
+  const [staff, setStaff] = useState<StaffItem[]>([]);
+  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
+  const [programmeStages, setProgrammeStages] = useState<ProgrammeStage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loader, setLoader] = useState(false);
+  const [newDialogLoader, setNewDialogLoader] = useState(false);
+
+  // Load dropdown data on mount
+  useEffect(() => {
+    const loadData = async () => {
+      setLoading(true);
+      await Promise.all([
+        getEnrollmentList(setEnrollments),
+        getProgrammesList(setProgrammes),
+        getCertificationList(setCertifications),
+        getProgressStatusList(setStatuses)
+      ]);
+      setLoading(false);
+    };
+    loadData();
+  }, [refreshTrigger]);
 
   // Dialog states
   const [showEnrollmentDialog, setShowEnrollmentDialog] = useState(false);
@@ -141,7 +179,7 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleEnrollmentSubmit = (data: any) => {
+  const handleEnrollmentSubmit = (data: any, file?: File | null) => {
     toast.success(
       enrollmentDialogMode === 'create'
         ? 'Enrollment created successfully'
@@ -364,19 +402,22 @@ const RehabilitationDetailView: React.FC = () => {
 
           {/* Tab Content */}
           {activeTab === 'enrollments' && (
-            <div>
+            <div className="p-6">
               <RehabilitationEnrollmentList
                 onView={handleViewEnrollment}
                 onEdit={handleEditEnrollment}
                 onDelete={handleDeleteEnrollment}
                 refreshTrigger={refreshTrigger}
-                prisonerId={selectedPrisoner?.id}
+                enrollments={enrollments}
+                programmes={programmes}
+                certifications={certifications}
+                statuses={statuses}
               />
             </div>
           )}
 
           {activeTab === 'assessments' && (
-            <div>
+            <div className="p-6">
               <EnrollmentAssessmentList
                 onView={handleViewAssessment}
                 onEdit={handleEditAssessment}
@@ -388,7 +429,7 @@ const RehabilitationDetailView: React.FC = () => {
           )}
 
           {activeTab === 'sessions' && (
-            <div>
+            <div className="p-6">
               <RehabilitationEnrollmentSessionList
                 onView={handleViewSession}
                 onEdit={handleEditSession}
@@ -400,7 +441,7 @@ const RehabilitationDetailView: React.FC = () => {
           )}
 
           {activeTab === 'aftercare' && (
-            <div>
+            <div className="p-6">
               <AfterCareList
                 onView={handleViewAfterCare}
                 onEdit={handleEditAfterCare}
@@ -457,6 +498,19 @@ const RehabilitationDetailView: React.FC = () => {
                 setShowEnrollmentDialog(false);
                 setSelectedEnrollment(null);
               }}
+              prisoners={prisoners}
+              setPrisoners={setPrisoners}
+              staff={staff}
+              setStaff={setStaff}
+              sponsors={sponsors}
+              setSponsors={setSponsors}
+              programmeStages={programmeStages}
+              setProgrammeStages={setProgrammeStages}
+              programmes={programmes}
+              statuses={statuses}
+              loader={loader}
+              setLoader={setLoader}
+              setNewDialogLoader={setNewDialogLoader}
             />
           )}
         </DialogContent>
