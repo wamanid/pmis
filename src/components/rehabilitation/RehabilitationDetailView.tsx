@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { BookOpen, Calendar, ClipboardCheck, Award, Plus } from 'lucide-react';
+import { BookOpen, Calendar, ClipboardCheck, Award, Plus, Heart } from 'lucide-react';
 import { Button } from '../ui/button';
 import { Card, CardContent } from '../ui/card';
 import { toast } from 'sonner';
@@ -8,6 +8,8 @@ import RehabilitationEnrollmentList from './enrollments/enrollment/Rehabilitatio
 import EnrollmentAssessmentList from './enrollments/assessment/EnrollmentAssessmentList';
 import RehabilitationEnrollmentSessionList from './enrollments/sessions/RehabilitationEnrollmentSessionList';
 import AfterCareList from './afterCare/AfterCareList';
+import WelfareList from './welfare/WelfareList';
+import WelfareForm from './welfare/WelfareForm';
 import {
   Enrollment,
   Programme,
@@ -89,11 +91,12 @@ export interface Loader {
   assessment: boolean,
   session: boolean,
   afterCare: boolean,
+  welfare: boolean,
 }
 
 const RehabilitationDetailView: React.FC = () => {
   const [selectedPrisoner, setSelectedPrisoner] = useState<Prisoner | null>(null);
-  const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare'>('enrollments');
+  const [activeTab, setActiveTab] = useState<'enrollments' | 'assessments' | 'sessions' | 'aftercare' | 'welfare'>('enrollments');
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   // Backend data state
@@ -105,7 +108,7 @@ const RehabilitationDetailView: React.FC = () => {
   const [staff, setStaff] = useState<StaffItem[]>([]);
   const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [programmeStages, setProgrammeStages] = useState<ProgrammeStage[]>([]);
-  const [loading, setLoading] = useState<Loader>({ enrollment: true, assessment: true, session: true, afterCare: true });
+  const [loading, setLoading] = useState<Loader>({ enrollment: true, assessment: true, session: true, afterCare: true, welfare: true });
   const [loader, setLoader] = useState(false);
   const [newDialogLoader, setNewDialogLoader] = useState(false);
 
@@ -140,6 +143,10 @@ const RehabilitationDetailView: React.FC = () => {
   const [afterCareDialogMode, setAfterCareDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [selectedAfterCare, setSelectedAfterCare] = useState<any>(null);
 
+  const [showWelfareDialog, setShowWelfareDialog] = useState(false);
+  const [welfareDialogMode, setWelfareDialogMode] = useState<'create' | 'edit' | 'view'>('create');
+  const [selectedWelfare, setSelectedWelfare] = useState<any>(null);
+
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<{ type: string; id: string } | null>(null);
 
@@ -154,6 +161,7 @@ const RehabilitationDetailView: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([])
   const [afterCare, setAfterCare] = useState<AfterCare[]>([])
   const [afterCareActivities, setAfterCareActivities] = useState<Unit[]>([])
+  const [welfareRecords, setWelfareRecords] = useState<any[]>([])
 
   useEffect(() => {
     if (activeTab === "assessments" && loading.assessment){
@@ -164,6 +172,9 @@ const RehabilitationDetailView: React.FC = () => {
     }
     else if (activeTab === "aftercare" && loading.afterCare){
       fetchAfterCare()
+    }
+    else if (activeTab === "welfare" && loading.welfare){
+      setLoading(prev => ({ ...prev, welfare: false }))
     }
     else {
       return
@@ -243,6 +254,11 @@ const RehabilitationDetailView: React.FC = () => {
         setSelectedAfterCare(null);
         setShowAfterCareDialog(true);
         break;
+      case 'welfare':
+        setWelfareDialogMode('create');
+        setSelectedWelfare(null);
+        setShowWelfareDialog(true);
+        break;
     }
   };
 
@@ -257,6 +273,8 @@ const RehabilitationDetailView: React.FC = () => {
         return 'Create Session';
       case 'aftercare':
         return 'Create After Care';
+      case 'welfare':
+        return 'Create Welfare Record';
       default:
         return 'Create';
     }
@@ -482,6 +500,39 @@ const RehabilitationDetailView: React.FC = () => {
     }
   };
 
+  // Welfare handlers
+  const handleViewWelfare = (welfare: any) => {
+    setWelfareDialogMode('view');
+    setSelectedWelfare(welfare);
+    setShowWelfareDialog(true);
+  };
+
+  const handleEditWelfare = (welfare: any) => {
+    setWelfareDialogMode('edit');
+    setSelectedWelfare(welfare);
+    setShowWelfareDialog(true);
+  };
+
+  const handleDeleteWelfare = (id: string) => {
+    setDeleteTarget({ type: 'welfare', id });
+    setShowDeleteDialog(true);
+  };
+
+  const handleWelfareSubmit = (data: any) => {
+    if (selectedWelfare) {
+      setWelfareRecords(prev => prev.map(item => item.id === selectedWelfare.id ? { ...data, id: selectedWelfare.id } : item));
+    } else {
+      setWelfareRecords(prev => [{ ...data, id: Date.now().toString() }, ...prev]);
+    }
+    toast.success(
+      welfareDialogMode === 'create'
+        ? 'Welfare record created successfully'
+        : 'Welfare record updated successfully'
+    );
+    setShowWelfareDialog(false);
+    setSelectedWelfare(null);
+  };
+
   // Delete confirmation
   const handleConfirmDelete = async () => {
     if (!deleteTarget) return;
@@ -493,6 +544,7 @@ const RehabilitationDetailView: React.FC = () => {
       assessment: 'Assessment deleted successfully',
       session: 'Session deleted successfully',
       aftercare: 'After care record deleted successfully',
+      welfare: 'Welfare record deleted successfully',
     };
 
     const id = deleteTarget.id
@@ -532,6 +584,13 @@ const RehabilitationDetailView: React.FC = () => {
       }catch (error) {
         handleCatchError(error)
       }
+    }
+
+    else if (deleteTarget.type === "welfare" && id) {
+      setWelfareRecords(prev => prev.filter(rec => rec.id !== id));
+      toast.success(messages['welfare']);
+      setShowDeleteDialog(false);
+      setDeleteTarget(null);
     }
 
     else {
@@ -632,6 +691,22 @@ const RehabilitationDetailView: React.FC = () => {
                 <div className="flex items-center gap-2 justify-center">
                   <Award className="h-4 w-4" />
                   <span>After Care</span>
+                </div>
+              </button>
+              <button
+                onClick={() => setActiveTab('welfare')}
+                className={`flex-1 px-6 py-3 rounded-lg transition-all shadow-sm ${
+                  activeTab === 'welfare'
+                    ? 'text-white'
+                    : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-200'
+                }`}
+                style={{
+                  backgroundColor: activeTab === 'welfare' ? '#650000' : undefined,
+                }}
+              >
+                <div className="flex items-center gap-2 justify-center">
+                  <Heart className="h-4 w-4" />
+                  <span>Welfare</span>
                 </div>
               </button>
             </div>
@@ -759,8 +834,52 @@ const RehabilitationDetailView: React.FC = () => {
 
             </div>
           )}
+          {activeTab === 'welfare' && (
+            <div className="p-6">
+              {loading.welfare ? (
+                <div className="size-full flex items-center justify-center">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                    <p className="text-muted-foreground text-sm">
+                      Fetching Welfare records, Please wait...
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <WelfareList
+                  onView={handleViewWelfare}
+                  onEdit={handleEditWelfare}
+                  onDelete={handleDeleteWelfare}
+                  refreshTrigger={refreshTrigger}
+                  prisonerId={selectedPrisoner?.id}
+                />
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Welfare Dialog */}
+      <Dialog open={showWelfareDialog} onOpenChange={setShowWelfareDialog}>
+        <DialogContent className="max-w-[1200px] max-h-[90vh] overflow-y-auto" style={{ width: '1200px' }}>
+          <DialogHeader>
+            <DialogTitle>
+              {welfareDialogMode === 'create' && 'Create New Welfare Record'}
+              {welfareDialogMode === 'edit' && 'Edit Welfare Record'}
+              {welfareDialogMode === 'view' && 'View Welfare Details'}
+            </DialogTitle>
+          </DialogHeader>
+          <WelfareForm
+            welfare={selectedWelfare}
+            mode={welfareDialogMode}
+            onSubmit={handleWelfareSubmit}
+            onCancel={() => {
+              setShowWelfareDialog(false);
+              setSelectedWelfare(null);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Enrollment Dialog */}
       <Dialog open={showEnrollmentDialog} onOpenChange={setShowEnrollmentDialog}>
