@@ -243,6 +243,7 @@ const RehabilitationEnrollmentForm: React.FC<RehabilitationEnrollmentFormProps> 
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   }
 

@@ -98,6 +98,7 @@ const RehabilitationEnrollmentSessionForm: React.FC<RehabilitationEnrollmentSess
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   }
 

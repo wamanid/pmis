@@ -101,6 +101,7 @@ const AfterCareForm: React.FC<AfterCareFormProps> = ({
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   }
 

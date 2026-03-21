@@ -15,7 +15,15 @@ import {
     getAssessments,
     Session,
     getSessions,
-    getAssessmentStatuses, AfterCare, getAfterCare, getAfterCareActivities
+    getAssessmentStatuses,
+    AfterCare,
+    getAfterCare,
+    getAfterCareActivities,
+    Welfare,
+    getWelfare,
+    getClasses,
+    getTreads,
+    getEducationalLevels, getLiteracyLevels, getReligions
 } from "./index";
 import React from "react";
 import {Unit} from "../../stationServices/visitorsServices/visitorItem";
@@ -101,4 +109,35 @@ export async function getAfterCareList(setData: React.Dispatch<React.SetStateAct
 export async function getAfterCareActivitiesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
     const response = await getAfterCareActivities()
     return populateList(response, "There are no after care activities", setData)
+}
+
+// Welfare
+export async function getWelfareList(setData: React.Dispatch<React.SetStateAction<Welfare[]>>) {
+    const response = await getWelfare()
+    populateList(response, "There are no welfare records", setData)
+}
+
+export async function getClassesList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getClasses()
+    return populateList(response, "There are no prisoner classes", setData)
+}
+
+export async function getTreadsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getTreads()
+    return populateList(response, "There are no tread qualifications", setData)
+}
+
+export async function getEducationLevelsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getEducationalLevels()
+    return populateList(response, "There are no educational levels", setData)
+}
+
+export async function getLiteracyLevelsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getLiteracyLevels()
+    return populateList(response, "There are no literacy levels", setData)
+}
+
+export async function getReligionsList(setData: React.Dispatch<React.SetStateAction<Unit[]>>): Promise<boolean> {
+    const response = await getReligions()
+    return populateList(response, "There are no religions", setData)
 }

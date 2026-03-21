@@ -111,6 +111,7 @@ const EnrollmentAssessmentForm: React.FC<EnrollmentAssessmentFormProps> = ({
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   }
 

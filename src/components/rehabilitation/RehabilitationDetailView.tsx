@@ -30,7 +30,7 @@ import {
   addSession,
   AfterCare,
   deleteAfterCare,
-  updateAfterCare, addAfterCare
+  updateAfterCare, addAfterCare, Welfare, updateWelfare, addWelfare, deleteWelfare
 } from '../../services/rehabilitation';
 import { Unit } from '../../services/stationServices/visitorsServices/visitorItem';
 import { PrisonerItem } from '../../services/stationServices/visitorsServices/VisitorsService';
@@ -39,7 +39,13 @@ import {
   getEnrollmentList,
   getProgrammesList,
   getCertificationList,
-  getProgressStatusList, getAssessmentList, getAssessmentStatusList, getSessionList, getAfterCareList
+  getProgressStatusList,
+  getAssessmentList,
+  getAssessmentStatusList,
+  getSessionList,
+  getAfterCareList,
+  getWelfareList,
+  getClassesList
 } from '../../services/rehabilitation/enrollments/enrollmentGetApis';
 import {
   Dialog,
@@ -161,7 +167,12 @@ const RehabilitationDetailView: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([])
   const [afterCare, setAfterCare] = useState<AfterCare[]>([])
   const [afterCareActivities, setAfterCareActivities] = useState<Unit[]>([])
-  const [welfareRecords, setWelfareRecords] = useState<any[]>([])
+  const [welfare, setWelfare] = useState<Welfare[]>([])
+  const [classes, setClasses] = useState<Unit[]>([])
+  const [treads, setTreads] = useState<Unit[]>([])
+  const [educationLevels, setEducationLevels] = useState<Unit[]>([])
+  const [literacyLevels, setLiteracyLevels] = useState<Unit[]>([])
+  const [religions, setReligions] = useState<Unit[]>([])
 
   useEffect(() => {
     if (activeTab === "assessments" && loading.assessment){
@@ -174,7 +185,7 @@ const RehabilitationDetailView: React.FC = () => {
       fetchAfterCare()
     }
     else if (activeTab === "welfare" && loading.welfare){
-      setLoading(prev => ({ ...prev, welfare: false }))
+      fetchWelfare()
     }
     else {
       return
@@ -227,6 +238,23 @@ const RehabilitationDetailView: React.FC = () => {
       setLoading(prev => ({
         ...prev,
         afterCare: false
+      }))
+    }
+  }
+
+  async function fetchWelfare(){
+    try {
+      await Promise.all([
+          getWelfareList(setWelfare),
+          getClassesList(setClasses)
+      ])
+    }
+    catch (error) {
+      handleCatchError(error)
+    } finally {
+      setLoading(prev => ({
+        ...prev,
+        welfare: false
       }))
     }
   }
@@ -518,19 +546,42 @@ const RehabilitationDetailView: React.FC = () => {
     setShowDeleteDialog(true);
   };
 
-  const handleWelfareSubmit = (data: any) => {
-    if (selectedWelfare) {
-      setWelfareRecords(prev => prev.map(item => item.id === selectedWelfare.id ? { ...data, id: selectedWelfare.id } : item));
-    } else {
-      setWelfareRecords(prev => [{ ...data, id: Date.now().toString() }, ...prev]);
-    }
-    toast.success(
-      welfareDialogMode === 'create'
-        ? 'Welfare record created successfully'
-        : 'Welfare record updated successfully'
-    );
-    setShowWelfareDialog(false);
+  const handleWelfareSubmit = async (data: WelfareForm) => {
+     try {
+      let response
+      if (selectedWelfare) {
+        response = await updateWelfare(data, selectedWelfare.id)
+      }
+      else {
+        response = await addWelfare(data)
+      }
+      if (handleResponseError(response)) return;
+
+      if (selectedWelfare) {
+        if (!('id' in response)) {
+          toast.error("Failed to update the welfare records' table");
+          return;
+        }
+        setWelfare(prev => (
+            prev.map(item => item.id === response.id ? response : item)
+        ));
+      }
+      else {
+        // console.log(response)
+        setWelfare(prev => [response, ...prev]);
+      }
+
+      toast.success(
+        welfareDialogMode === 'create'
+          ? 'Welfare record created successfully'
+          : 'Welfare record updated successfully'
+      );
+      setShowWelfareDialog(false);
     setSelectedWelfare(null);
+    }
+    catch (error) {
+      handleCatchError(error)
+    }
   };
 
   // Delete confirmation
@@ -587,10 +638,16 @@ const RehabilitationDetailView: React.FC = () => {
     }
 
     else if (deleteTarget.type === "welfare" && id) {
-      setWelfareRecords(prev => prev.filter(rec => rec.id !== id));
-      toast.success(messages['welfare']);
-      setShowDeleteDialog(false);
-      setDeleteTarget(null);
+      try {
+        await deleteWelfare(id)
+        setWelfare(prev => prev.filter(rec => rec.id !== id))
+        toast.success(messages[deleteTarget.type as keyof typeof messages]);
+        setShowDeleteDialog(false);
+        setDeleteTarget(null);
+
+      }catch (error) {
+        handleCatchError(error)
+      }
     }
 
     else {
@@ -852,6 +909,8 @@ const RehabilitationDetailView: React.FC = () => {
                   onDelete={handleDeleteWelfare}
                   refreshTrigger={refreshTrigger}
                   prisonerId={selectedPrisoner?.id}
+                  welfare={welfare}
+                  classes={classes}
                 />
               )}
             </div>
@@ -877,6 +936,19 @@ const RehabilitationDetailView: React.FC = () => {
               setShowWelfareDialog(false);
               setSelectedWelfare(null);
             }}
+            classes={classes}
+            treads={treads}
+            educationLevels={educationLevels}
+            literacyLevels={literacyLevels}
+            setTreads={setTreads}
+            setEducationLevels={setEducationLevels}
+            setLiteracyLevels={setLiteracyLevels}
+            prisoners={prisoners}
+            setPrisoners={setPrisoners}
+            staff={staff}
+            setStaff={setStaff}
+            religions={religions}
+            setReligions={setReligions}
           />
         </DialogContent>
       </Dialog>

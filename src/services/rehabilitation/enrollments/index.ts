@@ -479,3 +479,134 @@ export const updateAfterCare = async (afterCare: AfterCareForm, id: string, file
 export const deleteAfterCare = async (id: string): Promise<void> => {
   await axiosInstance.delete(`/rehabilitation/prisoner-aftercare/${id}/`);
 };
+
+// Welfare
+export interface Welfare {
+  id: string;
+  prisoner_name: string;
+  prisoner_number: string;
+  literacy_level_name: string;
+  education_level_name: string;
+  religion_name: string;
+  tread_qualification_name: string;
+  classification_name: string;
+  officer_name: string;
+  created_datetime: string;
+  updated_datetime: string;
+  deleted_datetime: string | null;
+  reception_date: string;
+  reception_place: string;
+  physical_mental_state: string;
+  prisoner_history: string;
+  note_from_previous_record: string;
+  board_recommendation: string;
+  income_details: string;
+  own_land_property: boolean;
+  consider_investigation: boolean;
+  has_salary_debt: boolean;
+  has_property_debt: boolean;
+  has_loan: boolean;
+  further_details: string;
+  date_captured: string;
+  is_active: boolean;
+  created_by: number;
+  updated_by: number;
+  deleted_by: number;
+  prisoner: string;
+  literacy_level: string;
+  education_level: string;
+  religion: string;
+  tread_qualification: string;
+  recommended_classification: string;
+  officer_in_charge: string;
+}
+
+export interface WelfareForm {
+  is_active: boolean;
+  deleted_datetime: string | null;
+  reception_date: string;
+  reception_place: string;
+  physical_mental_state: string;
+  prisoner_history: string;
+  note_from_previous_record: string;
+  board_recommendation: string;
+  income_details: string;
+  own_land_property: boolean;
+  consider_investigation: boolean;
+  has_salary_debt: boolean;
+  has_property_debt: boolean;
+  has_loan: boolean;
+  further_details: string;
+  deleted_by: number;
+  prisoner: string;
+  literacy_level: string;
+  education_level: string;
+  religion: string;
+  tread_qualification: string;
+  recommended_classification: string;
+  officer_in_charge: string;
+}
+
+export type WelfareResponse<T> = Paginated<T> | ErrorResponse
+export type UnitResponse<T> = Paginated<T> | ErrorResponse
+export type WelfareFormResponse = Welfare | ErrorResponse
+
+export const getClasses = async (): Promise<UnitResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/prisoner-classes/'
+  )
+  return response.data
+}
+
+export const getTreads = async (): Promise<UnitResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/tread-qualifications/'
+  )
+  return response.data
+}
+
+export const getEducationalLevels = async (): Promise<UnitResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/education-levels/'
+  )
+  return response.data
+}
+
+export const getLiteracyLevels = async (): Promise<UnitResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/literacy-levels/'
+  )
+  return response.data
+}
+
+export const getReligions = async (): Promise<UnitResponse<Unit>> => {
+  const response = await axiosInstance.get<Paginated<Unit>>(
+    '/system-administration/religions/'
+  )
+  return response.data
+}
+
+export const getWelfare = async (): Promise<WelfareResponse<Welfare>> => {
+  const response = await axiosInstance.get<Paginated<Welfare>>(
+    '/rehabilitation/prisoner-welfare/'
+  )
+  return response.data
+}
+
+export const addWelfare = async (welfare: WelfareForm): Promise<WelfareFormResponse> => {
+  const response = await axiosInstance.post<WelfareFormResponse>(
+    '/rehabilitation/prisoner-welfare/', welfare
+  )
+  return response.data
+}
+
+export const updateWelfare = async (welfare: WelfareForm, id: string): Promise<WelfareFormResponse> => {
+  const response = await axiosInstance.put<WelfareFormResponse>(
+    `/rehabilitation/prisoner-welfare/${id}/`, welfare
+  )
+  return response.data
+}
+
+export const deleteWelfare = async (id: string): Promise<void> => {
+  await axiosInstance.delete(`/rehabilitation/prisoner-welfare/${id}/`);
+};

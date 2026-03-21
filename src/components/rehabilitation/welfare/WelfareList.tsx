@@ -33,39 +33,41 @@ import {
   XCircle,
 } from 'lucide-react';
 import { toast } from 'sonner@2.0.3';
+import {AfterCare, Welfare} from "../../../services/rehabilitation";
+import {Unit} from "../../../services/stationServices/visitorsServices/visitorItem";
 
-interface Welfare {
-  id: string;
-  prisoner_name: string;
-  prisoner_number: string;
-  literacy_level_name: string;
-  education_level_name: string;
-  religion_name: string;
-  tread_qualification_name: string;
-  classification_name: string;
-  officer_name: string;
-  reception_date: string;
-  reception_place: string;
-  physical_mental_state: string;
-  prisoner_history: string;
-  note_from_previous_record: string;
-  board_recommendation: string;
-  income_details: string;
-  own_land_property: boolean;
-  consider_investigation: boolean;
-  has_salary_debt: boolean;
-  has_property_debt: boolean;
-  has_loan: boolean;
-  further_details: string;
-  date_captured: string;
-  prisoner: string;
-  literacy_level: string;
-  education_level: string;
-  religion: string;
-  tread_qualification: string;
-  recommended_classification: string;
-  officer_in_charge: number;
-}
+// interface Welfare {
+//   id: string;
+//   prisoner_name: string;
+//   prisoner_number: string;
+//   literacy_level_name: string;
+//   education_level_name: string;
+//   religion_name: string;
+//   tread_qualification_name: string;
+//   classification_name: string;
+//   officer_name: string;
+//   reception_date: string;
+//   reception_place: string;
+//   physical_mental_state: string;
+//   prisoner_history: string;
+//   note_from_previous_record: string;
+//   board_recommendation: string;
+//   income_details: string;
+//   own_land_property: boolean;
+//   consider_investigation: boolean;
+//   has_salary_debt: boolean;
+//   has_property_debt: boolean;
+//   has_loan: boolean;
+//   further_details: string;
+//   date_captured: string;
+//   prisoner: string;
+//   literacy_level: string;
+//   education_level: string;
+//   religion: string;
+//   tread_qualification: string;
+//   recommended_classification: string;
+//   officer_in_charge: number;
+// }
 
 interface WelfareListProps {
   onView: (welfare: Welfare) => void;
@@ -73,16 +75,19 @@ interface WelfareListProps {
   onDelete: (id: string) => void;
   refreshTrigger?: number;
   prisonerId?: string;
+  welfare: Welfare[];
+  classes: Unit[];
 }
 
 const WelfareList: React.FC<WelfareListProps> = ({
+  welfare, classes,
   onView,
   onEdit,
   onDelete,
   refreshTrigger,
   prisonerId,
 }) => {
-  const [welfareRecords, setWelfareRecords] = useState<Welfare[]>([]);
+  // const [welfareRecords, setWelfareRecords] = useState<Welfare[]>([]);
   const [filteredRecords, setFilteredRecords] = useState<Welfare[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [classificationFilter, setClassificationFilter] = useState('all');
@@ -95,127 +100,127 @@ const WelfareList: React.FC<WelfareListProps> = ({
   const [recordToDelete, setRecordToDelete] = useState<string | null>(null);
 
   // Mock data
-  const mockWelfareRecords: Welfare[] = [
-    {
-      id: '1',
-      prisoner_name: 'John Doe',
-      prisoner_number: 'PR-2024-001',
-      literacy_level_name: 'Fully Literate',
-      education_level_name: 'Secondary Education',
-      religion_name: 'Christianity',
-      tread_qualification_name: 'Carpentry',
-      classification_name: 'Class A - Low Risk',
-      officer_name: 'Officer David Wilson',
-      reception_date: '2024-01-15',
-      reception_place: 'Kampala Central Prison',
-      physical_mental_state: 'Good physical health, stable mental state',
-      prisoner_history: 'First-time offender, cooperative behavior',
-      note_from_previous_record: 'No previous records',
-      board_recommendation: 'Suitable for vocational training programs',
-      income_details: 'Monthly income from family business: UGX 500,000',
-      own_land_property: true,
-      consider_investigation: false,
-      has_salary_debt: false,
-      has_property_debt: false,
-      has_loan: true,
-      further_details: 'Has family support and stable background',
-      date_captured: '2024-01-15T10:00:00Z',
-      prisoner: '1',
-      literacy_level: '4',
-      education_level: '3',
-      religion: '1',
-      tread_qualification: '1',
-      recommended_classification: '1',
-      officer_in_charge: 1,
-    },
-    {
-      id: '2',
-      prisoner_name: 'Jane Smith',
-      prisoner_number: 'PR-2024-002',
-      literacy_level_name: 'Basic Literacy',
-      education_level_name: 'Primary Education',
-      religion_name: 'Islam',
-      tread_qualification_name: 'Tailoring',
-      classification_name: 'Class B - Medium Risk',
-      officer_name: 'Officer Sarah Brown',
-      reception_date: '2024-02-20',
-      reception_place: 'Jinja Prison',
-      physical_mental_state: 'Minor health issues, requires monitoring',
-      prisoner_history: 'Previous conviction, needs rehabilitation support',
-      note_from_previous_record: 'Previously served 2 years',
-      board_recommendation: 'Recommend psychological counseling and skills training',
-      income_details: 'No stable income source',
-      own_land_property: false,
-      consider_investigation: true,
-      has_salary_debt: true,
-      has_property_debt: false,
-      has_loan: false,
-      further_details: 'Limited family support, needs welfare assistance',
-      date_captured: '2024-02-20T11:30:00Z',
-      prisoner: '2',
-      literacy_level: '2',
-      education_level: '2',
-      religion: '2',
-      tread_qualification: '3',
-      recommended_classification: '2',
-      officer_in_charge: 2,
-    },
-    {
-      id: '3',
-      prisoner_name: 'Michael Johnson',
-      prisoner_number: 'PR-2024-003',
-      literacy_level_name: 'Cannot Read or Write',
-      education_level_name: 'No Formal Education',
-      religion_name: 'Christianity',
-      tread_qualification_name: 'Agriculture',
-      classification_name: 'Class C - High Risk',
-      officer_name: 'Officer James Taylor',
-      reception_date: '2024-03-10',
-      reception_place: 'Mbarara Prison',
-      physical_mental_state: 'Aggressive behavior, requires close supervision',
-      prisoner_history: 'Multiple convictions, violent offenses',
-      note_from_previous_record: 'History of disciplinary issues',
-      board_recommendation: 'High security classification, intensive rehabilitation needed',
-      income_details: 'No documented income',
-      own_land_property: false,
-      consider_investigation: true,
-      has_salary_debt: false,
-      has_property_debt: true,
-      has_loan: false,
-      further_details: 'High risk prisoner, needs constant monitoring',
-      date_captured: '2024-03-10T09:15:00Z',
-      prisoner: '3',
-      literacy_level: '1',
-      education_level: '1',
-      religion: '1',
-      tread_qualification: '5',
-      recommended_classification: '3',
-      officer_in_charge: 3,
-    },
-  ];
+  // const mockWelfareRecords: Welfare[] = [
+  //   {
+  //     id: '1',
+  //     prisoner_name: 'John Doe',
+  //     prisoner_number: 'PR-2024-001',
+  //     literacy_level_name: 'Fully Literate',
+  //     education_level_name: 'Secondary Education',
+  //     religion_name: 'Christianity',
+  //     tread_qualification_name: 'Carpentry',
+  //     classification_name: 'Class A - Low Risk',
+  //     officer_name: 'Officer David Wilson',
+  //     reception_date: '2024-01-15',
+  //     reception_place: 'Kampala Central Prison',
+  //     physical_mental_state: 'Good physical health, stable mental state',
+  //     prisoner_history: 'First-time offender, cooperative behavior',
+  //     note_from_previous_record: 'No previous records',
+  //     board_recommendation: 'Suitable for vocational training programs',
+  //     income_details: 'Monthly income from family business: UGX 500,000',
+  //     own_land_property: true,
+  //     consider_investigation: false,
+  //     has_salary_debt: false,
+  //     has_property_debt: false,
+  //     has_loan: true,
+  //     further_details: 'Has family support and stable background',
+  //     date_captured: '2024-01-15T10:00:00Z',
+  //     prisoner: '1',
+  //     literacy_level: '4',
+  //     education_level: '3',
+  //     religion: '1',
+  //     tread_qualification: '1',
+  //     recommended_classification: '1',
+  //     officer_in_charge: 1,
+  //   },
+  //   {
+  //     id: '2',
+  //     prisoner_name: 'Jane Smith',
+  //     prisoner_number: 'PR-2024-002',
+  //     literacy_level_name: 'Basic Literacy',
+  //     education_level_name: 'Primary Education',
+  //     religion_name: 'Islam',
+  //     tread_qualification_name: 'Tailoring',
+  //     classification_name: 'Class B - Medium Risk',
+  //     officer_name: 'Officer Sarah Brown',
+  //     reception_date: '2024-02-20',
+  //     reception_place: 'Jinja Prison',
+  //     physical_mental_state: 'Minor health issues, requires monitoring',
+  //     prisoner_history: 'Previous conviction, needs rehabilitation support',
+  //     note_from_previous_record: 'Previously served 2 years',
+  //     board_recommendation: 'Recommend psychological counseling and skills training',
+  //     income_details: 'No stable income source',
+  //     own_land_property: false,
+  //     consider_investigation: true,
+  //     has_salary_debt: true,
+  //     has_property_debt: false,
+  //     has_loan: false,
+  //     further_details: 'Limited family support, needs welfare assistance',
+  //     date_captured: '2024-02-20T11:30:00Z',
+  //     prisoner: '2',
+  //     literacy_level: '2',
+  //     education_level: '2',
+  //     religion: '2',
+  //     tread_qualification: '3',
+  //     recommended_classification: '2',
+  //     officer_in_charge: 2,
+  //   },
+  //   {
+  //     id: '3',
+  //     prisoner_name: 'Michael Johnson',
+  //     prisoner_number: 'PR-2024-003',
+  //     literacy_level_name: 'Cannot Read or Write',
+  //     education_level_name: 'No Formal Education',
+  //     religion_name: 'Christianity',
+  //     tread_qualification_name: 'Agriculture',
+  //     classification_name: 'Class C - High Risk',
+  //     officer_name: 'Officer James Taylor',
+  //     reception_date: '2024-03-10',
+  //     reception_place: 'Mbarara Prison',
+  //     physical_mental_state: 'Aggressive behavior, requires close supervision',
+  //     prisoner_history: 'Multiple convictions, violent offenses',
+  //     note_from_previous_record: 'History of disciplinary issues',
+  //     board_recommendation: 'High security classification, intensive rehabilitation needed',
+  //     income_details: 'No documented income',
+  //     own_land_property: false,
+  //     consider_investigation: true,
+  //     has_salary_debt: false,
+  //     has_property_debt: true,
+  //     has_loan: false,
+  //     further_details: 'High risk prisoner, needs constant monitoring',
+  //     date_captured: '2024-03-10T09:15:00Z',
+  //     prisoner: '3',
+  //     literacy_level: '1',
+  //     education_level: '1',
+  //     religion: '1',
+  //     tread_qualification: '5',
+  //     recommended_classification: '3',
+  //     officer_in_charge: 3,
+  //   },
+  // ];
 
-  useEffect(() => {
-    loadWelfareRecords();
-  }, [refreshTrigger, prisonerId]);
+  // useEffect(() => {
+  //   loadWelfareRecords();
+  // }, [refreshTrigger, prisonerId]);
 
   useEffect(() => {
     filterRecords();
-  }, [welfareRecords, searchTerm, classificationFilter, dateFromFilter, dateToFilter]);
+  }, [welfare, searchTerm, classificationFilter, dateFromFilter, dateToFilter]);
 
-  const loadWelfareRecords = () => {
-    setLoading(true);
-    setTimeout(() => {
-      let data = mockWelfareRecords;
-      if (prisonerId) {
-        data = data.filter((record) => record.prisoner === prisonerId);
-      }
-      setWelfareRecords(data);
-      setLoading(false);
-    }, 500);
-  };
+  // const loadWelfareRecords = () => {
+  //   setLoading(true);
+  //   setTimeout(() => {
+  //     let data = mockWelfareRecords;
+  //     if (prisonerId) {
+  //       data = data.filter((record) => record.prisoner === prisonerId);
+  //     }
+  //     setWelfareRecords(data);
+  //     setLoading(false);
+  //   }, 500);
+  // };
 
   const filterRecords = () => {
-    let filtered = [...welfareRecords];
+    let filtered = [...welfare];
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -268,15 +273,15 @@ const WelfareList: React.FC<WelfareListProps> = ({
     setDeleteDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    if (recordToDelete) {
-      onDelete(recordToDelete);
-      setWelfareRecords((prev) => prev.filter((record) => record.id !== recordToDelete));
-      toast.success('Welfare record deleted successfully');
-      setDeleteDialogOpen(false);
-      setRecordToDelete(null);
-    }
-  };
+  // const handleConfirmDelete = () => {
+  //   if (recordToDelete) {
+  //     // onDelete(recordToDelete);
+  //     // setWelfare((prev) => prev.filter((record) => record.id !== recordToDelete));
+  //     // toast.success('Welfare record deleted successfully');
+  //     // setDeleteDialogOpen(false);
+  //     // setRecordToDelete(null);
+  //   }
+  // };
 
   // Pagination
   const indexOfLastItem = currentPage * itemsPerPage;
@@ -284,7 +289,7 @@ const WelfareList: React.FC<WelfareListProps> = ({
   const currentItems = filteredRecords.slice(indexOfFirstItem, indexOfLastItem);
   const totalPages = Math.ceil(filteredRecords.length / itemsPerPage);
 
-  const uniqueClassifications = Array.from(new Set(welfareRecords.map((r) => r.classification_name)));
+  // const uniqueClassifications = Array.from(new Set(welfare.map((r) => r.classification_name)));
 
   return (
     <div className="w-full space-y-4">
@@ -308,9 +313,9 @@ const WelfareList: React.FC<WelfareListProps> = ({
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Classifications</SelectItem>
-                {uniqueClassifications.map((classification) => (
-                  <SelectItem key={classification} value={classification}>
-                    {classification}
+                {classes.map((classification) => (
+                  <SelectItem key={classification.id} value={classification.name}>
+                    {classification.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -428,8 +433,8 @@ const WelfareList: React.FC<WelfareListProps> = ({
                               Edit
                             </DropdownMenuItem>
                             <DropdownMenuItem
-                              onClick={() => handleDeleteClick(record.id)}
-                              className="text-red-600 focus:text-red-600"
+                              onClick={() => onDelete(record.id)}
+                              className="text-red-600"
                             >
                               <Trash2 className="h-4 w-4 mr-2" />
                               Delete
@@ -477,27 +482,6 @@ const WelfareList: React.FC<WelfareListProps> = ({
         </div>
       )}
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This action cannot be undone. This will permanently delete the welfare record from the system.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmDelete}
-              style={{ backgroundColor: '#650000' }}
-              className="text-white hover:opacity-90"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 };
