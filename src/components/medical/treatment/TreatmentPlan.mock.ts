@@ -330,21 +330,21 @@ export const mockCaseBooks = [
     reference: 'CB-2026-001',
     prisoner_number: 'ARPC000000001/26',
     prisoner_name: 'John Doe',
-    diagnosis: 'Malaria with complications',
+    diagnoses: ['Malaria with complications', 'Influenza (Flu)', 'Upper Respiratory Tract Infection', 'Anaemia'],
   },
   {
     id: 'cb-002',
     reference: 'CB-2026-002',
     prisoner_number: 'JMPR000000002/26',
     prisoner_name: 'Jane Smith',
-    diagnosis: 'Hypertension',
+    diagnoses: ['Hypertension'],
   },
   {
     id: 'cb-003',
     reference: 'CB-2026-003',
     prisoner_number: 'MKPR000000003/26',
     prisoner_name: 'Michael Johnson',
-    diagnosis: 'Respiratory Tract Infection',
+    diagnoses: ['Respiratory Tract Infection', 'Cough'],
   },
 ];
 

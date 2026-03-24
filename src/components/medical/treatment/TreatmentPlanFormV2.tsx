@@ -80,6 +80,7 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
 
   const [editingMedId, setEditingMedId] = useState<string | null>(null);
   const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const [isCustomFrequency, setIsCustomFrequency] = useState(false);
 
   // Reset medication form
   const resetMedicationForm = () => {
@@ -98,6 +99,7 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
       additional_instructions: '',
     });
     setEditingMedId(null);
+    setIsCustomFrequency(false);
   };
 
   // Add or update medication
@@ -140,6 +142,8 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
   const handleEditFromTable = (med: TreatmentMedication) => {
     setCurrentMed(med);
     setEditingMedId(med.id);
+    const isCustom = !DOSAGE_FREQUENCIES.includes(med.dosage_frequency as any);
+    setIsCustomFrequency(isCustom);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -180,7 +184,7 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
         case_book_reference: selectedCase.reference,
         prisoner_number: selectedCase.prisoner_number,
         prisoner_name: selectedCase.prisoner_name,
-        diagnosis_name: selectedCase.diagnosis,
+        diagnosis_name: selectedCase.diagnoses.join('\n'),
       });
     }
   };
@@ -219,8 +223,8 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Case Information
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 md:col-span-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2 md:col-span-3">
                 <Label>
                   Medical Case Book <span className="text-red-500">*</span>
                 </Label>
@@ -244,11 +248,23 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                 )}
               </div>
 
-              <div className="space-y-2">
-                <Label>Diagnosis</Label>
-                <div className="p-2 bg-gray-50 rounded border">
-                  {formData.diagnosis_name || 'Auto-filled from case'}
-                </div>
+              <div className="space-y-2 md:col-span-3">
+                {formData.diagnosis_name ? (
+                  <div className="p-3 bg-gray-50 rounded border min-h-[80px]">
+                    <ul className="space-y-1">
+                      {formData.diagnosis_name.split('\n').map((diag, i) => (
+                        <li key={i} className="flex items-start gap-2 text-sm">
+                          <span className="mt-1 h-2 w-2 rounded-full bg-red-800 shrink-0" style={{ backgroundColor: '#650000' }} />
+                          <span>{diag}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="p-3 bg-gray-50 rounded border min-h-[80px] text-muted-foreground text-sm">
+                    Auto-filled from case
+                  </div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -484,10 +500,16 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                         <div className="space-y-2">
                           <Label>Frequency</Label>
                           <Select
-                            value={currentMed.dosage_frequency}
-                            onValueChange={(value: string) =>
-                              setCurrentMed({ ...currentMed, dosage_frequency: value })
-                            }
+                            value={isCustomFrequency ? 'Custom' : currentMed.dosage_frequency}
+                            onValueChange={(value: string) => {
+                              if (value === 'Custom') {
+                                setIsCustomFrequency(true);
+                                setCurrentMed({ ...currentMed, dosage_frequency: '' });
+                              } else {
+                                setIsCustomFrequency(false);
+                                setCurrentMed({ ...currentMed, dosage_frequency: value });
+                              }
+                            }}
                           >
                             <SelectTrigger>
                               <SelectValue />
@@ -500,6 +522,16 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                               ))}
                             </SelectContent>
                           </Select>
+                          {isCustomFrequency && (
+                            <Input
+                              value={currentMed.dosage_frequency}
+                              onChange={(e) =>
+                                setCurrentMed({ ...currentMed, dosage_frequency: e.target.value })
+                              }
+                              placeholder="Enter custom frequency..."
+                              autoFocus
+                            />
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -687,25 +719,6 @@ const TreatmentPlanFormV2: React.FC<TreatmentPlanFormV2Props> = ({
                   {!isReadOnly && 'Fill the form above and click "Add to List".'}
                 </p>
               </div>
-            )}
-          </div>
-
-          {/* General Treatment Notes */}
-          <div className="space-y-2">
-            <Label>General Treatment Notes</Label>
-            {isReadOnly ? (
-              <div className="p-2 bg-gray-50 rounded border min-h-[80px]">
-                {formData.general_notes || 'None'}
-              </div>
-            ) : (
-              <Textarea
-                value={formData.general_notes}
-                onChange={(e) =>
-                  setFormData({ ...formData, general_notes: e.target.value })
-                }
-                placeholder="Enter general notes about the treatment plan..."
-                rows={3}
-              />
             )}
           </div>
 
