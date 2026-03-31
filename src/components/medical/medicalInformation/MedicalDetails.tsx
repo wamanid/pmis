@@ -7,7 +7,7 @@ import BMIScreen from './bmi/BMIScreen';
 import CaseBookScreen from './caseBook/CaseBookScreen';
 import ScheduleScreen from './schedules/ScheduleScreen';
 import LabTestScreen from './labTests/LabTestScreen';
-import TreatmentScreen from './treatments/TreatmentScreen';
+import TreatmentPlanDemo from '../treatment/TreatmentPlanDemo';
 import ExamResultScreen from './examinationResults/ExamResultScreen';
 import AilmentScreen from './ailments/AilmentScreen';
 import DiagnosisScreen from './diagnosis/DiagnosisScreen';
@@ -296,7 +296,7 @@ export default function MedicalDetails() {
 
           {activeTab === 'treatment' && (
             <div>
-              <TreatmentScreen />
+              <TreatmentPlanDemo />
             </div>
           )}
 
