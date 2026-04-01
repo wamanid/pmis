@@ -21,7 +21,7 @@ axiosInstance.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    console.log("token"+token);
+    // console.log("token"+token);
     
     // Add location filters to query parameters
     const filterStorage = localStorage.getItem('pmis_user_filters');

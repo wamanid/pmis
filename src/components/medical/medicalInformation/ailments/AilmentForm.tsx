@@ -89,6 +89,7 @@ const AilmentForm: React.FC<AilmentFormProps> = ({ ailment, onSubmit, onCancel, 
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   };
 

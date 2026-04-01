@@ -89,6 +89,7 @@ const DiagnosisForm: React.FC<DiagnosisFormProps> = ({ diagnosis, onSubmit, onCa
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   };
 

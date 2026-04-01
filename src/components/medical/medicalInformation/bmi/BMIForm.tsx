@@ -9,6 +9,8 @@ import { toast } from 'sonner@2.0.3';
 import { Badge } from '../../../ui/badge';
 import {Bmi, BmiClassification, Record} from "../../../../services/medical/medicalInformation/medical";
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
+import {getPrisonersList} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {handleCatchError} from "../../../../services/stationServices/utils";
 
 interface BMIRecord {
   id?: string;
@@ -29,12 +31,13 @@ interface BMIFormProps {
   mode: 'create' | 'edit' | 'view';
   classifications: BmiClassification[]
   prisoners: PrisonerItem[]
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem>>
   loader: boolean
   setLoader:  React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const BMIForm: React.FC<BMIFormProps> = ({
-  prisoners, classifications, loader, setLoader,
+  prisoners, classifications, loader, setLoader, setPrisoners,
   bmiRecord,
   onSubmit,
   onCancel,
@@ -52,10 +55,11 @@ const BMIForm: React.FC<BMIFormProps> = ({
   // const [bmiClassifications, setBmiClassifications] = useState<any[]>([]);
   // const [loader, setLoader] = useState(false);
   const [calculatedBMI, setCalculatedBMI] = useState<number | null>(null);
+  const [dataLoaded, setDataLoaded] = useState(true);
 
-  // useEffect(() => {
-  //   loadDropdownData();
-  // }, []);
+  useEffect(() => {
+    loadDropdownData();
+  }, []);
 
   useEffect(() => {
     if (bmiRecord) {
@@ -70,25 +74,28 @@ const BMIForm: React.FC<BMIFormProps> = ({
     calculateBMI();
   }, [formData.weight, formData.height]);
 
-  // const loadDropdownData = () => {
-  //   // Mock data - replace with actual API calls
-  //   setPrisoners([
-  //     { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-  //     { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-  //     { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-  //     { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-  //     { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-  //   ]);
-  //
-  //   setBmiClassifications([
-  //     { id: '1', name: 'Underweight', min_bmi: 0, max_bmi: 18.5, description: 'BMI less than 18.5' },
-  //     { id: '2', name: 'Normal Weight', min_bmi: 18.5, max_bmi: 24.9, description: 'BMI 18.5 - 24.9' },
-  //     { id: '3', name: 'Overweight', min_bmi: 25, max_bmi: 29.9, description: 'BMI 25 - 29.9' },
-  //     { id: '4', name: 'Obese Class I', min_bmi: 30, max_bmi: 34.9, description: 'BMI 30 - 34.9' },
-  //     { id: '5', name: 'Obese Class II', min_bmi: 35, max_bmi: 39.9, description: 'BMI 35 - 39.9' },
-  //     { id: '6', name: 'Obese Class III', min_bmi: 40, max_bmi: 100, description: 'BMI 40 and above' },
-  //   ]);
-  // };
+  const loadDropdownData = async () => {
+      try {
+        let prisonersOk = true
+
+        if (!prisoners.length) {
+          prisonersOk = await getPrisonersList(setPrisoners)
+        }
+
+        if (prisonersOk) {
+          setDataLoaded(false)
+        }
+        else {
+          toast.error("Please make sure you have prisoners")
+          onCancel()
+        }
+
+      }
+      catch (error) {
+        handleCatchError(error)
+        onCancel()
+      }
+  };
 
   const calculateBMI = () => {
     const weight = parseFloat(formData.weight);
@@ -210,7 +217,18 @@ const BMIForm: React.FC<BMIFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {
+          dataLoaded ? (
+              <div className="size-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground text-sm">
+                        Fetching additional information, Please wait...
+                      </p>
+                </div>
+              </div>
+          ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
           {/* Prisoner Information */}
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
@@ -412,6 +430,9 @@ const BMIForm: React.FC<BMIFormProps> = ({
             </div>
           )}
         </form>
+          )
+        }
+
       </CardContent>
     </Card>
   );

@@ -80,6 +80,7 @@ const ExamResultForm: React.FC<ExamResultFormProps> = ({ examResult, onSubmit, o
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
     // setCaseBooks([
     //   { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },

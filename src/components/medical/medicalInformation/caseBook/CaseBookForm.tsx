@@ -148,6 +148,7 @@ const CaseBookForm: React.FC<CaseBookFormProps> = ({
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
     // Mock data - replace with actual API calls
     // setPrisoners([

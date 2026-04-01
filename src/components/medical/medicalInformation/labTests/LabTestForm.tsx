@@ -87,6 +87,7 @@ const LabTestForm: React.FC<LabTestFormProps> = ({ labTest, onSubmit, onCancel, 
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
   };
 

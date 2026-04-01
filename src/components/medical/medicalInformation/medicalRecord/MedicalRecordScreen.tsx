@@ -58,9 +58,13 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
 
   async function fetchData() {
     try {
-      await getPrisonersList(setPrisoners)
-      await getMedicalRecordsList(setMedicalRecords)
-      await getBloodGroupList(setBloodGroups)
+      // await getPrisonersList(setPrisoners)
+      await Promise.all([
+          getMedicalRecordsList(setMedicalRecords),
+          getBloodGroupList(setBloodGroups),
+          // getPrisonersList(setPrisoners)
+      ])
+
     } catch (error) {
       handleCatchError(error)
     } finally {
@@ -72,10 +76,10 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
   }
 
   const handleCreateClick = () => {
-    if (!prisoners.length){
-      toast.error("You can't create a medical record without prisoners")
-      return
-    }
+    // if (!prisoners.length){
+    //   toast.error("You can't create a medical record without prisoners")
+    //   return
+    // }
     if (!bloodGroups.length){
       toast.error("You can create a medical record without blood groups")
       return;
@@ -224,6 +228,7 @@ const MedicalRecordScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, lo
             loader={loader}
             setLoader={setLoader}
             prisoners={prisoners}
+            setPrisoners={setPrisoners}
             medicalRecord={selectedRecord}
             onSubmit={handleSubmit}
             onCancel={handleCancel}

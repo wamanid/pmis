@@ -9,6 +9,8 @@ import {Unit} from "../../../../services/stationServices/visitorsServices/visito
 import {PrisonerItem} from "../../../../services/stationServices/visitorsServices/VisitorsService";
 import {Loading} from "../MedicalDetails";
 import {Record} from "../../../../services/medical/medicalInformation/medical";
+import {getBloodGroupList, getPrisonersList} from "../../../../services/medical/medicalInformation/medicalGetApis";
+import {handleCatchError} from "../../../../services/stationServices/utils";
 
 interface MedicalRecord {
   id?: string;
@@ -25,13 +27,14 @@ interface MedicalRecordFormProps {
   onCancel: () => void;
   mode: 'create' | 'edit' | 'view';
   prisoners: PrisonerItem[]
+  setPrisoners: React.Dispatch<React.SetStateAction<PrisonerItem>>
   bloodGroups: Unit[]
   loader: Boolean,
   setLoader: React.Dispatch<React.SetStateAction<Boolean>>
 }
 
 const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
-  prisoners, bloodGroups, loader, setLoader,
+  prisoners, bloodGroups, loader, setLoader, setPrisoners,
   medicalRecord,
   onSubmit,
   onCancel,
@@ -47,9 +50,9 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
   // const [loader, setLoader] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(true);
 
-  // useEffect(() => {
-  //   loadDropdownData();
-  // }, []);
+  useEffect(() => {
+    loadDropdownData();
+  }, []);
 
   useEffect(() => {
     if (medicalRecord && dataLoaded) {
@@ -58,29 +61,28 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
     }
   }, [medicalRecord, dataLoaded]);
 
-  // const loadDropdownData = () => {
-  //   // Mock data - replace with actual API calls
-  //   setPrisoners([
-  //     { id: '1', prisoner_number: 'PR-2024-001', full_name: 'John Doe' },
-  //     { id: '2', prisoner_number: 'PR-2024-002', full_name: 'Jane Smith' },
-  //     { id: '3', prisoner_number: 'PR-2024-003', full_name: 'Michael Johnson' },
-  //     { id: '4', prisoner_number: 'PR-2024-004', full_name: 'Emily Davis' },
-  //     { id: '5', prisoner_number: 'PR-2024-005', full_name: 'Robert Lee' },
-  //   ]);
-  //
-  //   setBloodGroups([
-  //     { id: '1', name: 'A+', description: 'Blood Group A Positive' },
-  //     { id: '2', name: 'A-', description: 'Blood Group A Negative' },
-  //     { id: '3', name: 'B+', description: 'Blood Group B Positive' },
-  //     { id: '4', name: 'B-', description: 'Blood Group B Negative' },
-  //     { id: '5', name: 'AB+', description: 'Blood Group AB Positive' },
-  //     { id: '6', name: 'AB-', description: 'Blood Group AB Negative' },
-  //     { id: '7', name: 'O+', description: 'Blood Group O Positive' },
-  //     { id: '8', name: 'O-', description: 'Blood Group O Negative' },
-  //   ]);
-  //
-  //   setDataLoaded(true);
-  // };
+  const loadDropdownData = async () => {
+      try {
+        let prisonersOk = true
+
+        if (!prisoners.length) {
+          prisonersOk = await getPrisonersList(setPrisoners)
+        }
+
+        if (prisonersOk) {
+          setDataLoaded(false)
+        }
+        else {
+          toast.error("Please make sure you have prisoners")
+          onCancel()
+        }
+
+      }
+      catch (error) {
+        handleCatchError(error)
+        onCancel()
+      }
+  };
 
   const handleInputChange = (field: keyof MedicalRecord, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -149,7 +151,18 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="p-6">
-        <form onSubmit={handleSubmit} className="space-y-6">
+        {
+          dataLoaded ? (
+              <div className="size-full flex items-center justify-center">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+                      <p className="text-muted-foreground text-sm">
+                        Fetching additional information, Please wait...
+                      </p>
+                </div>
+              </div>
+          ) : (
+              <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
             <h3 className="text-lg font-semibold" style={{ color: '#650000' }}>
               Medical Information
@@ -237,6 +250,9 @@ const MedicalRecordForm: React.FC<MedicalRecordFormProps> = ({
             </div>
           )}
         </form>
+          )
+        }
+
       </CardContent>
     </Card>
   );

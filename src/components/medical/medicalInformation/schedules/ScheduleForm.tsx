@@ -87,6 +87,7 @@ const ScheduleForm: React.FC<ScheduleFormProps> = ({ schedule, onSubmit, onCance
     }
     catch (error) {
       handleCatchError(error)
+      onCancel()
     }
     // setCaseBooks([
     //   { id: '1', prisoner_name: 'John Doe', case_number: 'CB-2024-001' },

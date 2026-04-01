@@ -57,9 +57,6 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
 
   async function fetchData() {
     try {
-      if (!prisoners.length) {
-        await getPrisonersList(setPrisoners)
-      }
       await getBmiList(setBmiRecords)
       await getClassifications(setClassifications)
     } catch (error) {
@@ -223,6 +220,7 @@ const BMIScreen: React.FC<ChildProps> = ({ prisoners, setPrisoners, loading, set
           <BMIForm
             classifications={classifications}
             prisoners={prisoners}
+            setPrisoners={setPrisoners}
             loader={loader}
             setLoader={setLoader}
             bmiRecord={selectedRecord}
